@@ -1,8 +1,8 @@
-from itertools import combinations
+from itertools import permutations
 from typing import List, Tuple
 
 
-def create_signature_combinations(call_parameters: List[str], lifted_signature: List[str],
+def create_signature_permutations(call_parameters: List[str], lifted_signature: List[str],
                                   subset_size: int) -> List[Tuple[Tuple[str]]]:
     """Choose r items our of a list size n.
 
@@ -12,8 +12,8 @@ def create_signature_combinations(call_parameters: List[str], lifted_signature: 
     :return: a list containing matches of grounded objects and their lifted action parameter name counterparts.
     """
     matching_signatures = zip(call_parameters, list(lifted_signature))
-    matching_combinations = list(combinations(matching_signatures, subset_size))
-    return matching_combinations
+    matching_permutations = list(permutations(matching_signatures, subset_size))
+    return matching_permutations
 
 
 def contains_duplicates(parameter_objects: List[str]) -> bool:

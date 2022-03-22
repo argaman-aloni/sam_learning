@@ -1,22 +1,23 @@
 """Test the extended functionality of the predicate matcher."""
 
-from pddl_plus_parser.lisp_parsers import DomainParser
-from pddl_plus_parser.models import GroundedPredicate, Domain, ActionCall, Predicate
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
+from pddl_plus_parser.models import GroundedPredicate, Domain, ActionCall, Predicate, Problem, Observation
 from pytest import fixture
 
 from sam_learning.core import PredicatesMatcher
 from tests.consts import LOCATION_TYPE, AGENT_TYPE, DOMAIN_WITH_CONSTS_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
-    TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE
+    TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, ELEVATORS_DOMAIN_PATH, \
+    ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH
 
 TRUCK_AT_LOCATION_GROUNDED_PREDICATE = GroundedPredicate(
     name="at",
-    signature={"?a": AGENT_TYPE,
+    signature={"?obj": OBJECT_TYPE,
                "?loc": LOCATION_TYPE},
-    object_mapping={"?a": "tru1", "?loc": "pos1"})
+    object_mapping={"?obj": "tru1", "?loc": "pos1"})
 
 IN_CITY_GROUNDED_PREDICATE = GroundedPredicate(
     name="in-city",
-    signature={"?agent": AGENT_TYPE,
+    signature={"?agent": TRUCK_TYPE,
                "?loc": LOCATION_TYPE,
                "?city": CITY_TYPE},
     object_mapping={"?agent": "tru1", "?loc": "pos1", "?city": "city1"})
@@ -46,6 +47,22 @@ def discrete_domain() -> Domain:
 
 
 @fixture()
+def elevators_domain() -> Domain:
+    domain_parser = DomainParser(ELEVATORS_DOMAIN_PATH, partial_parsing=True)
+    return domain_parser.parse_domain()
+
+
+@fixture()
+def elevators_problem(elevators_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=ELEVATORS_PROBLEM_PATH, domain=elevators_domain).parse_problem()
+
+
+@fixture()
+def elevators_observation(elevators_domain: Domain, elevators_problem: Problem) -> Observation:
+    return TrajectoryParser(elevators_domain, elevators_problem).parse_trajectory(ELEVATORS_TRAJECTORY_PATH)
+
+
+@fixture()
 def discrete_domain_with_consts() -> Domain:
     parser = DomainParser(DOMAIN_WITH_CONSTS_PATH, partial_parsing=True)
     return parser.parse_domain()
@@ -59,6 +76,11 @@ def predicate_matcher_no_consts(discrete_domain: Domain) -> PredicatesMatcher:
 @fixture()
 def predicate_matcher_with_consts(discrete_domain_with_consts: Domain) -> PredicatesMatcher:
     return PredicatesMatcher(domain=discrete_domain_with_consts)
+
+
+@fixture()
+def elevators_predicate_matcher(elevators_domain: Domain) -> PredicatesMatcher:
+    return PredicatesMatcher(domain=elevators_domain)
 
 
 def test_match_predicate_to_action_with_no_match_returns_empty_list(
@@ -76,7 +98,7 @@ def test_match_predicate_to_action_with_no_duplicated_parameters_returns_correct
     actual_predicates = predicate_matcher_no_consts.match_predicate_to_action_literals(
         grounded_predicate=TRUCK_AT_LOCATION_GROUNDED_PREDICATE, action_call=test_action_call)
 
-    expected_predicate = Predicate(name="at", signature={"?truck": AGENT_TYPE, "?loc-from": LOCATION_TYPE})
+    expected_predicate = Predicate(name="at", signature={"?truck": TRUCK_TYPE, "?loc-from": LOCATION_TYPE})
 
     assert len(actual_predicates) == 1
     assert expected_predicate.untyped_representation == actual_predicates[0].untyped_representation
@@ -177,3 +199,20 @@ def test_get_possible_literal_matches_with_two_predicate_returns_correct_matches
     assert len(possible_matches) == 2
     assert [p.untyped_representation for p in expected_predicates] == [p.untyped_representation for p in
                                                                        possible_matches]
+
+
+def test_get_possible_literal_matches_from_actual_trajectory_state(
+        elevators_predicate_matcher: PredicatesMatcher, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    test_action_call = observation_component.grounded_action_call
+
+
+    previous_state_predicates = []
+    for predicate_set in observation_component.previous_state.state_predicates.values():
+        previous_state_predicates.extend(predicate_set)
+
+    possible_matches = elevators_predicate_matcher.get_possible_literal_matches(test_action_call,
+                                                                                previous_state_predicates)
+    for matched_lifted_predicate in possible_matches:
+        for parameter in matched_lifted_predicate.signature:
+            assert parameter in ["?lift", "?f1", "?f2"]

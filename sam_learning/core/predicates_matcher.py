@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 
 from pddl_plus_parser.models import Domain, Predicate, GroundedPredicate, ActionCall
 
-from sam_learning.core.matching_utils import contains_duplicates, create_signature_combinations
+from sam_learning.core.matching_utils import contains_duplicates, create_signature_permutations
 
 
 class PredicatesMatcher:
@@ -31,6 +31,29 @@ class PredicatesMatcher:
 
         return call_objects, lifted_params
 
+    def _filter_out_impossible_combinations(self, grounded_predicate: GroundedPredicate,
+                                            possible_matches: List[Predicate]) -> List[Predicate]:
+        """Filters out signature permutations that don't match the original predicate's order.
+
+        :param grounded_predicate: the grounded predicate that is being matches.
+        :param possible_matches: the possible matching permutations generated.
+        :return: the correct possible matches that fit the original parameters order.
+        """
+        self.logger.debug("Filtering out impossible matches from the matches list.")
+        filtered_matches = []
+        for match in possible_matches:
+            is_possible_match = True
+            for signature_item_type, grounded_predicate_signature_item_type in \
+                    zip(match.signature.values(), grounded_predicate.signature.values()):
+                if not signature_item_type.is_sub_type(grounded_predicate_signature_item_type):
+                    is_possible_match = False
+                    break
+
+            if is_possible_match:
+                filtered_matches.append(match)
+
+        return filtered_matches
+
     def match_predicate_to_action_literals(
             self, grounded_predicate: GroundedPredicate, action_call: ActionCall) -> Optional[List[Predicate]]:
         """Matches the action objects to the predicate objects.
@@ -49,7 +72,7 @@ class PredicatesMatcher:
         if contains_duplicates(action_call.parameters):
             self.logger.debug(f"Action {str(action_call)} was executed with duplicated objects!")
 
-        possible_parameter_permutations = create_signature_combinations(
+        possible_parameter_permutations = create_signature_permutations(
             action_grounded_objects, lifted_action_params, len(grounded_predicate_call))
         possible_matches = []
         for possible_permutation in possible_parameter_permutations:
@@ -63,6 +86,7 @@ class PredicatesMatcher:
                         lifted_parameters
                     }))
 
+        possible_matches = self._filter_out_impossible_combinations(grounded_predicate, possible_matches)
         return possible_matches
 
     def get_possible_literal_matches(
@@ -83,3 +107,4 @@ class PredicatesMatcher:
             possible_matches.extend(matches)
 
         return possible_matches
+

@@ -8,7 +8,12 @@ CWD = os.getcwd()
 EXAMPLES_DIR_PATH = Path(CWD, "examples")
 DOMAIN_NO_CONSTS_PATH = EXAMPLES_DIR_PATH / "domain-logistics.pddl"
 DOMAIN_WITH_CONSTS_PATH = EXAMPLES_DIR_PATH / "woodworking-domain.pddl"
-NUMERIC_DOMAIN_WITH_PATH = EXAMPLES_DIR_PATH / "depot_numeric.pddl"
+NUMERIC_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_numeric.pddl"
+NUMERIC_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile2.pddl"
+ELEVATORS_DOMAIN_PATH = EXAMPLES_DIR_PATH / "elevators_domain.pddl"
+ELEVATORS_PROBLEM_PATH = EXAMPLES_DIR_PATH / "elevators_p03.pddl"
+ELEVATORS_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "test_trajectory"
+DEPOT_NUMERIC_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "test_numeric_trajectory"
 
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
