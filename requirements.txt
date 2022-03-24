@@ -4,3 +4,5 @@ pytest==6.2.4
 pathlib~=1.0.1
 requests==2.26.0
 anytree~=2.8.0
+numpy~=1.22.3
+scipy~=1.8.0
