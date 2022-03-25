@@ -152,7 +152,7 @@ def test_construct_pddl_inequality_scheme_with_simple_2d_four_equations_returns_
             fail()
 
 
-def test_construct_pddl_inequality_scheme_with_simple_23_four_equations_returns_correct_representation(
+def test_construct_pddl_inequality_scheme_with_simple_3d_four_equations_returns_correct_representation(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
     CURRENT_LIMIT_TRAJECTORY_FUNCTION.set_value(121.0)
@@ -169,7 +169,7 @@ def test_construct_pddl_inequality_scheme_with_simple_23_four_equations_returns_
     right_side_points = np.random.randint(10, size=4)
 
     inequalities = load_action_state_fluent_storage.construct_pddl_inequality_scheme(left_side_coefficients,
-                                                                                    right_side_points)
+                                                                                     right_side_points)
 
     joint_inequalities = "\n".join(inequalities)
     joint_inequalities = f"({joint_inequalities})"
@@ -185,3 +185,52 @@ def test_construct_pddl_inequality_scheme_with_simple_23_four_equations_returns_
 
         except Exception:
             fail()
+
+
+def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_in_variables_returns_empty_list(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    for i in range(3):
+        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(i + 1)
+        CURRENT_LIMIT_TRAJECTORY_FUNCTION.set_value(i)
+        simple_prev_state_fluents = {
+            "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+            "(current_load ?z)": CURRENT_LIMIT_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_prev_state_fluents)
+        load_action_state_fluent_storage.add_to_next_state_storage(simple_prev_state_fluents)
+
+    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
+    assert len(assignment_equations) == 0
+
+
+def test_construct_assignment_equations_with_simple_2d_equations_returns_correct_string_representation(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    for i in range(3):
+        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(i + 1)
+        CURRENT_LIMIT_TRAJECTORY_FUNCTION.set_value(i)
+        simple_prev_state_fluents = {
+            "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+            "(current_load ?z)": CURRENT_LIMIT_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_prev_state_fluents)
+        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(i + 1)
+        CURRENT_LIMIT_TRAJECTORY_FUNCTION.set_value(10 - (i + 1))
+        simple_next_state_fluents = {
+            "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+            "(current_load ?z)": CURRENT_LIMIT_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
+
+    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
+    assert len(assignment_equations) == 1
+    print(assignment_equations)
+    pddl_tokenizer = PDDLTokenizer(pddl_str=assignment_equations[0])
+
+    parsed_expressions = pddl_tokenizer.parse()
+    try:
+        expression_node = construct_expression_tree(parsed_expressions, TEST_DOMAIN_FUNCTIONS)
+        expression_tree = NumericalExpressionTree(expression_node)
+        print(str(expression_tree))
+
+    except Exception:
+        fail()

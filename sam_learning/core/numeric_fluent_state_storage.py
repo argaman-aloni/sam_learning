@@ -23,25 +23,37 @@ class NumericFluentStateStorage:
 
     def _construct_multipliction_strings(self, coefficients_vector: np.ndarray,
                                          function_variables: List[str]) -> List[str]:
-        """
+        """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
-        :param coefficients_vector:
-        :param function_variables:
-        :return:
+        :param coefficients_vector: the coefficient that multiplies the function vector.
+        :param function_variables: the name of the numeric fluents that are being used.
+        :return: the representation of the fluents multiplied by the coefficients.
         """
         return [f"(* {func} {coefficient})" for func, coefficient in zip(function_variables, coefficients_vector)]
 
     def _construct_linear_equation_string(self, multiplication_parts: List[str]) -> str:
-        """
+        """Construct the addition parts of the linear equation string.
 
-        :param multiplication_parts:
-        :return:
+        :param multiplication_parts: the multiplication function strings that are multiplied by the coefficient.
+        :return: the string representing the sum of the linear variables.
         """
         if len(multiplication_parts) == 1:
             return multiplication_parts[0]
 
         inner_layer = self._construct_linear_equation_string(multiplication_parts[1:])
         return f"(+ {multiplication_parts[0]} {inner_layer})"
+
+    def _solve_function_linear_equations(self, values_matrix: np.ndarray,
+                                         function_post_values: np.ndarray) -> np.ndarray:
+        """Solves the linear equations using a matrix form.
+
+        Note: the equation Ax=b is solved as: x = inverse(A)*b.
+
+        :param values_matrix: the A matrix that contains the previous values of the function variables.
+        :param function_post_values: the resulting values after the linear change.
+        :return: the vector representing the coefficients for the function variables.
+        """
+        return np.linalg.pinv(values_matrix).dot(function_post_values)
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
@@ -119,24 +131,12 @@ class NumericFluentStateStorage:
                                                       next_state_values)]):
                 continue
 
-            function_post_values = np.ndarray(next_state_values)
+            function_post_values = np.array(next_state_values)
             values_matrix = self.convert_to_array_format("previous_state")
-            coefficient_vector = self.solve_function_linear_equations(values_matrix, function_post_values)
+            coefficient_vector = self._solve_function_linear_equations(values_matrix, function_post_values)
             multiplication_functions = self._construct_multipliction_strings(
                 coefficient_vector, list(self.previous_state_storage.keys()))
             constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 
         return assignment_statements
-
-    def solve_function_linear_equations(self, values_matrix: np.ndarray,
-                                        function_post_values: np.ndarray) -> np.ndarray:
-        """Solves the linear equations using a matrix form.
-
-        Note: the equation Ax=b is solved as: x = inverse(A)*b.
-
-        :param values_matrix: the A matrix that contains the previous values of the function variables.
-        :param function_post_values: the resulting values after the linear change.
-        :return: the vector representing the coefficients for the function variables.
-        """
-        return np.linalg.inv(values_matrix).dot(function_post_values)
