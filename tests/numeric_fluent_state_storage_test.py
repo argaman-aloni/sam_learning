@@ -227,8 +227,8 @@ def test_construct_assignment_equations_when_change_is_caused_by_constant_return
 
 def test_construct_assignment_equations_with_simple_2d_equations_returns_correct_string_representation(
         load_action_state_fluent_storage: NumericFluentStateStorage):
-    previous_state_values = [(1, 7), (2, -1), (2, 14)]
-    next_state_values = [9, 18, 18]
+    previous_state_values = [(1, 7), (2, -1), (2, 14), (1, 0)]
+    next_state_values = [9, 18, 18, 9]
     for prev_values, next_state_value in zip(previous_state_values, next_state_values):
         LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(prev_values[0])
         CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(prev_values[1])
@@ -246,13 +246,14 @@ def test_construct_assignment_equations_with_simple_2d_equations_returns_correct
 
     assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
     assert len(assignment_equations) == 1
-    assert assignment_equations == ["(assign (current_load ?z) (+ (* (load_limit ?z) 9.0) (* (current_load ?z) 0.0)))"]
+    assert assignment_equations == [
+        "(assign (current_load ?z) (+ (* (load_limit ?z) 9.0) (+ (* (current_load ?z) 0.0) (* (dummy) 0.0))))"]
 
 
 def test_construct_assignment_equations_with_two_equations_result_in_multiple_changes(
         load_action_state_fluent_storage: NumericFluentStateStorage):
-    previous_state_values = [(1, 7), (2, -1), (2, 14)]
-    next_state_values = [(7, 9), (-16, 18), (14, 18)]
+    previous_state_values = [(1, 7), (2, -1), (2, 14), (1, 0)]
+    next_state_values = [(7, 9), (-16, 18), (14, 18), (-7, 9)]
     for prev_values, next_state_values in zip(previous_state_values, next_state_values):
         LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(prev_values[0])
         CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(prev_values[1])
@@ -271,9 +272,9 @@ def test_construct_assignment_equations_with_two_equations_result_in_multiple_ch
 
     assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
     assert len(assignment_equations) == 2
-    assert assignment_equations == ["(assign (load_limit ?z) (+ (* (load_limit ?z) -7.0) (* (current_load ?z) 2.0)))",
-                                    "(assign (current_load ?z) (+ (* (load_limit ?z) 9.0) (* (current_load ?z) 0.0)))"]
-
+    assert assignment_equations == [
+        "(assign (load_limit ?z) (+ (* (load_limit ?z) -7.0) (+ (* (current_load ?z) 2.0) (* (dummy) 0.0))))",
+        "(assign (current_load ?z) (+ (* (load_limit ?z) 9.0) (+ (* (current_load ?z) 0.0) (* (dummy) 0.0))))"]
 
 def test_construct_assignment_equations_with_an_increase_change_results_in_correct_values(
         load_action_state_fluent_storage: NumericFluentStateStorage):

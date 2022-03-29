@@ -66,9 +66,10 @@ class NumericFluentStateStorage:
         :return: the vector representing the coefficients for the function variables.
         """
         try:
-            num_dimensions = values_matrix.shape[1]
-            _, indices = sympy.Matrix(values_matrix).T.rref()
-            independent_matrix_rows = np.array([values_matrix[index] for index in indices])
+            padded_matrix = np.pad(values_matrix, [(0, 0), (0, 1)], constant_values=1)
+            num_dimensions = padded_matrix.shape[1]
+            _, indices = sympy.Matrix(padded_matrix).T.rref()
+            independent_matrix_rows = np.array([padded_matrix[index] for index in indices])
             independent_next_values = np.array([function_post_values[index] for index in indices])
 
             A = independent_matrix_rows[:num_dimensions]
@@ -112,10 +113,10 @@ class NumericFluentStateStorage:
         return inequalities
 
     def _create_disjunctive_preconditions(self, previous_state_matrix: np.ndarray) -> Tuple[List[str], ConditionType]:
-        """
+        """Create the disjunctive representation of the preconditions.
 
-        :param previous_state_matrix:
-        :return:
+        :param previous_state_matrix: the matrix containing the previous state values.
+        :return: a disjunctive representation for the precondition in case a convex hull cannot be created.
         """
         functions_equality_strings = []
         if previous_state_matrix.shape[0] == 1:
@@ -212,7 +213,7 @@ class NumericFluentStateStorage:
             num_variables = len(self.next_state_storage)
             num_equations = len(self.previous_state_storage[lifted_function])
             # validate that it is possible to solve linear equations at all.
-            if num_equations < num_variables:
+            if num_equations < num_variables + 1:
                 failure_reason = "Cannot solve linear equations when too little input equations given."
                 self.logger.warning(failure_reason)
                 raise NotSafeActionError(self.action_name, failure_reason)
@@ -221,8 +222,9 @@ class NumericFluentStateStorage:
             values_matrix = self._convert_to_array_format("previous_state")
             coefficient_vector = self._solve_function_linear_equations(values_matrix, function_post_values)
 
+            functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
             multiplication_functions = self._construct_multipliction_strings(
-                coefficient_vector, list(self.previous_state_storage.keys()))
+                coefficient_vector, functions_including_dummy)
             constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 
