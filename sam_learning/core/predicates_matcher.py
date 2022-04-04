@@ -32,17 +32,23 @@ class PredicatesMatcher:
         return call_objects, lifted_params
 
     def _filter_out_impossible_combinations(self, grounded_predicate: GroundedPredicate,
-                                            possible_matches: List[Predicate]) -> List[Predicate]:
+                                            possible_matches: List[Predicate],
+                                            possible_grounded_params: List[List[str]]) -> List[Predicate]:
         """Filters out signature permutations that don't match the original predicate's order.
 
         :param grounded_predicate: the grounded predicate that is being matches.
         :param possible_matches: the possible matching permutations generated.
+        :param possible_grounded_params: the list of objects that represent the lifted parameters.
+            used to filter out wrong permutations.
         :return: the correct possible matches that fit the original parameters order.
         """
         self.logger.debug("Filtering out impossible matches from the matches list.")
         filtered_matches = []
-        for match in possible_matches:
+        for match, grounded_matching_objects in zip(possible_matches, possible_grounded_params):
             is_possible_match = True
+            if grounded_predicate.grounded_objects != grounded_matching_objects:
+                continue
+
             for signature_item_type, grounded_predicate_signature_item_type in \
                     zip(match.signature.values(), grounded_predicate.signature.values()):
                 if not signature_item_type.is_sub_type(grounded_predicate_signature_item_type):
@@ -75,6 +81,7 @@ class PredicatesMatcher:
         possible_parameter_permutations = create_signature_permutations(
             action_grounded_objects, lifted_action_params, len(grounded_predicate_call))
         possible_matches = []
+        grounded_base_params = []
         for possible_permutation in possible_parameter_permutations:
             possible_match_action_objects, lifted_parameters = self._extract_combinations_data(possible_permutation)
             if set(possible_match_action_objects) == set(grounded_predicate_call):
@@ -85,8 +92,9 @@ class PredicatesMatcher:
                         lifted_parameter_name: combined_types[lifted_parameter_name] for lifted_parameter_name in
                         lifted_parameters
                     }))
+                grounded_base_params.append(possible_match_action_objects)
 
-        possible_matches = self._filter_out_impossible_combinations(grounded_predicate, possible_matches)
+        possible_matches = self._filter_out_impossible_combinations(grounded_predicate, possible_matches, grounded_base_params)
         return possible_matches
 
     def get_possible_literal_matches(

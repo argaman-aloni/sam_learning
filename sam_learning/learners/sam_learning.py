@@ -34,9 +34,10 @@ class SAMLearner:
             state.
         :return: the effect containing the add and del list of predicates.
         """
+        self.logger.debug(f"Starting to learn the effects of {str(grounded_action)}.")
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         lifted_add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
-        lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
+        lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_del_effects))
 
         return lifted_add_effects, lifted_delete_effects
 
@@ -112,7 +113,7 @@ class SAMLearner:
         """Verifies if the action was called with duplicated objects in a trajectory component.
 
         :param grounded_action: the grounded action observed in the trajectory triplet.
-        :return: whther or not the action contains duplicated parameters.
+        :return: whether the action contains duplicated parameters.
         """
         return contains_duplicates(grounded_action.parameters)
 

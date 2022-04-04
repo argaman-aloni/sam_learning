@@ -38,6 +38,13 @@ class LearnerAction:
     def parameter_names(self) -> List[str]:
         return list(self.signature.keys())
 
+    def to_pddl(self) -> str:
+        """Returns the PDDL string representation of the action.
+
+        :return: the PDDL string representing the action.
+        """
+        pass
+
 
 class LearnerDomain:
     """Class representing the domain that is to be learned by the action model learning algorithm."""
@@ -60,6 +67,7 @@ class LearnerDomain:
         self.constants = domain.constants
         self.predicates = domain.predicates
         self.functions = domain.functions
+        self.actions = {}
         for action_name, action_object in domain.actions.items():
             self.actions[action_name] = LearnerAction(name=action_name, signature=action_object.signature)
 

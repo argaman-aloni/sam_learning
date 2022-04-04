@@ -144,6 +144,42 @@ def test_match_predicate_to_action_with_no_duplicated_parameters_where_predicate
                                                                        actual_predicates]
 
 
+def test_match_predicate_to_action_literals_with_complex_action_returns_only_correct_matches(
+        elevators_predicate_matcher: PredicatesMatcher, elevators_domain: Domain):
+    test_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow2-0", "n17", "n16"])
+    next_predicate = elevators_domain.predicates["next"]
+    test_grounded_predicate = GroundedPredicate(
+        name=next_predicate.name,
+        signature=next_predicate.signature,
+        object_mapping={
+            "?n1": "n16",
+            "?n2": "n17",
+        })
+
+    actual_predicates = elevators_predicate_matcher.match_predicate_to_action_literals(
+        grounded_predicate=test_grounded_predicate, action_call=test_action_call)
+    assert len(actual_predicates) == 1
+    assert actual_predicates[0].untyped_representation == "(next ?f2 ?f1)"
+
+
+def test_match_predicate_to_action_literals_with_complex_action_with_duplicates_returns_only_correct_matches(
+        elevators_predicate_matcher: PredicatesMatcher, elevators_domain: Domain):
+    test_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow2-0", "n17", "n17"])
+    next_predicate = elevators_domain.predicates["next"]
+    test_grounded_predicate = GroundedPredicate(
+        name=next_predicate.name,
+        signature=next_predicate.signature,
+        object_mapping={
+            "?n1": "n17",
+            "?n2": "n17",
+        })
+
+    actual_predicates = elevators_predicate_matcher.match_predicate_to_action_literals(
+        grounded_predicate=test_grounded_predicate, action_call=test_action_call)
+    assert len(actual_predicates) == 2
+    assert [p.untyped_representation for p in actual_predicates] == ["(next ?f1 ?f2)", "(next ?f2 ?f1)"]
+
+
 def test_match_predicate_to_action_with_duplicated_objects_finds_all_possible_matches(
         predicate_matcher_no_consts: PredicatesMatcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru1", "pos1", "pos1", "city1"])
@@ -205,7 +241,6 @@ def test_get_possible_literal_matches_from_actual_trajectory_state(
         elevators_predicate_matcher: PredicatesMatcher, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]
     test_action_call = observation_component.grounded_action_call
-
 
     previous_state_predicates = []
     for predicate_set in observation_component.previous_state.state_predicates.values():
