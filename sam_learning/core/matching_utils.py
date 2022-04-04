@@ -1,5 +1,5 @@
 from itertools import permutations
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Set
 
 from pddl_plus_parser.models import State, GroundedPredicate
 
@@ -32,7 +32,7 @@ def extract_effects(previous_state: State,
 
     :param previous_state: the previous state object containing the grounded literals.
     :param next_state: the next state object containing its grounded literals.
-    :return: dictionary describing the add and delete effects of the action.
+    :return: tuple containing the add and delete effects of the action.
     """
     prev_state_predicate = previous_state.state_predicates
     next_state_predicate = next_state.state_predicates
@@ -43,7 +43,7 @@ def extract_effects(previous_state: State,
     # Checking all the add effects
     for lifted_predicate, grounded_predicates in next_state_predicate.items():
         if lifted_predicate not in prev_state_predicate:
-            add_effects[lifted_predicate] = grounded_predicates
+            add_effects.update(grounded_predicates)
             continue
 
         add_effects.update(grounded_predicates.difference(prev_state_predicate[lifted_predicate]))
