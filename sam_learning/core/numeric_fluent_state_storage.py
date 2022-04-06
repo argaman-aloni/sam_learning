@@ -178,6 +178,17 @@ class NumericFluentStateStorage:
         for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
             self.next_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
 
+    def filter_out_inconsistent_state_variables(self) -> NoReturn:
+        """
+
+        :return:
+        """
+        max_function_len = max([len(values) for values in self.previous_state_storage.values()])
+        self.previous_state_storage = {lifted_function: state_values for lifted_function, state_values in
+                                       self.previous_state_storage.items() if len(state_values) == max_function_len}
+        self.next_state_storage = {lifted_function: state_values for lifted_function, state_values in
+                                   self.next_state_storage.items() if len(state_values) == max_function_len}
+
     def construct_safe_linear_inequalities(self) -> Tuple[List[str], ConditionType]:
         """
 
@@ -210,13 +221,7 @@ class NumericFluentStateStorage:
                 const_assigned_value = self.next_state_storage[lifted_function][0]
                 return [f"(assign {lifted_function} {const_assigned_value})"]
 
-            num_variables = len(self.next_state_storage)
-            num_equations = len(self.previous_state_storage[lifted_function])
-            # validate that it is possible to solve linear equations at all.
-            if num_equations < num_variables + 1:
-                failure_reason = "Cannot solve linear equations when too little input equations given."
-                self.logger.warning(failure_reason)
-                raise NotSafeActionError(self.action_name, failure_reason)
+            self._validate_safe_equation_solving(lifted_function)
 
             function_post_values = np.array(next_state_values)
             values_matrix = self._convert_to_array_format("previous_state")
@@ -229,3 +234,12 @@ class NumericFluentStateStorage:
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 
         return assignment_statements
+
+    def _validate_safe_equation_solving(self, lifted_function):
+        num_variables = len(self.next_state_storage)
+        num_equations = len(self.previous_state_storage[lifted_function])
+        # validate that it is possible to solve linear equations at all.
+        if num_equations < num_variables + 1:
+            failure_reason = "Cannot solve linear equations when too little input equations given."
+            self.logger.warning(failure_reason)
+            raise NotSafeActionError(self.action_name, failure_reason)

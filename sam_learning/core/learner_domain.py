@@ -1,9 +1,10 @@
 """class representing the datatype of the learner domain since it differs from the original domain in terms of the actions."""
+from collections import defaultdict
 from typing import Set, List, Dict, Tuple
 
 from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain
 
-from sam_learning.core import ConditionType
+from .numeric_fluent_state_storage import ConditionType
 
 
 class LearnerAction:
@@ -57,7 +58,19 @@ class LearnerAction:
         :return:
         """
         positive_preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
-        # TODO: Handle numeric preconditions.
+        if len(self.numeric_preconditions) > 0:
+            numeric_preconditions = self.numeric_preconditions[0]
+            conditions_type = self.numeric_preconditions[1]
+            if conditions_type == ConditionType.disjunctive:
+                preconds_str = "\t\t\n".join(numeric_preconditions)
+                preconditions_str = f"(or {preconds_str})"
+
+            else:
+                preconditions_str = "\t\t\n".join(numeric_preconditions)
+
+            return f"(and {' '.join(positive_preconditions)}\n" \
+                   f"\t\t{preconditions_str})"
+
         return f"(and {' '.join(positive_preconditions)})"
 
     def _effects_to_pddl(self) -> str:
@@ -67,7 +80,11 @@ class LearnerAction:
         if len(delete_effects) > 0:
             delete_effects_str = f"(not {' '.join(delete_effects)})"
 
-        # TODO: Handle numeric effects.
+        if len(self.numeric_effects) > 0:
+            numeric_effects = "\t\t\n".join([effect for effect in self.numeric_effects])
+            return f"(and {' '.join(add_effects)} {delete_effects_str}\n" \
+                   f"\t\t{numeric_effects}\n)"
+
         return f"(and {' '.join(add_effects)} {delete_effects_str})"
 
     def to_pddl(self) -> str:
@@ -120,10 +137,30 @@ class LearnerDomain:
                 )
         )
 
+    def _types_to_pddl(self) -> str:
+        """
+
+        :return:
+        """
+        parent_child_map = defaultdict(list)
+        for type_name, type_obj in self.types.items():
+            if type_name == "object":
+                continue
+
+            parent_child_map[type_obj.parent.name].append(type_name)
+
+        types_strs = []
+        for parent_type, children_types in parent_child_map.items():
+            types_strs.append(f"\t{' '.join(children_types)} - {parent_type}")
+
+        return "\n".join(types_strs)
+
+
     def to_pddl(self) -> str:
         predicates = "\n\t".join([p.untyped_representation for p in self.predicates.values()])
         actions = "\n".join(action.to_pddl() for action in self.actions.values())
         return f"(define (domain: {self.name})\n" \
                f"(:requirements {' '.join(self.requirements)})\n" \
+               f"(:types {self._types_to_pddl()}\n)\n\n" \
                f"(:predicates {predicates}\n)\n\n" \
                f"{actions}\n)"
