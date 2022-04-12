@@ -24,6 +24,7 @@ class LearnerAction:
         self.signature = signature
         self.positive_preconditions = set()
         self.negative_preconditions = set()
+        self.numeric_preconditions = tuple()
         self.add_effects = set()
         self.delete_effects = set()
         self.numeric_effects = []
