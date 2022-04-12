@@ -138,9 +138,9 @@ class LearnerDomain:
         )
 
     def _types_to_pddl(self) -> str:
-        """
+        """Converts the types to a PDDL string.
 
-        :return:
+        :return: the PDDL string representing the types.
         """
         parent_child_map = defaultdict(list)
         for type_name, type_obj in self.types.items():
@@ -156,11 +156,32 @@ class LearnerDomain:
         return "\n".join(types_strs)
 
 
+    def _constants_to_pddl(self) -> str:
+        """Converts the constants to a PDDL string.
+
+        :return: the PDDL string representing the constants.
+        """
+        same_type_constant = defaultdict(list)
+        for const_name, constant in self.constants.items():
+            if const_name == "object":
+                continue
+
+            same_type_constant[constant.type.name].append(const_name)
+
+        types_strs = []
+        for constant_type_name, constant_objects in same_type_constant.items():
+            types_strs.append(f"\t{' '.join(constant_objects)} - {constant_type_name}")
+
+        return "\n".join(types_strs)
+
+
     def to_pddl(self) -> str:
         predicates = "\n\t".join([p.untyped_representation for p in self.predicates.values()])
         actions = "\n".join(action.to_pddl() for action in self.actions.values())
+        constants = f"(:constants {self._constants_to_pddl()}\n)\n\n" if len(self.constants) > 0 else ""
         return f"(define (domain: {self.name})\n" \
                f"(:requirements {' '.join(self.requirements)})\n" \
                f"(:types {self._types_to_pddl()}\n)\n\n" \
+               f"{constants}" \
                f"(:predicates {predicates}\n)\n\n" \
                f"{actions}\n)"

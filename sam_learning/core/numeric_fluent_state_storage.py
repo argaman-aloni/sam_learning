@@ -3,16 +3,19 @@ import itertools
 import logging
 from collections import defaultdict
 from enum import Enum
-from typing import Dict, List, NoReturn, Tuple
+from typing import Dict, List, NoReturn, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import sympy
 from pddl_plus_parser.models import PDDLFunction
-from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
+from scipy.spatial import ConvexHull, convex_hull_plot_2d
+from scipy.spatial.qhull import QhullError
+from sklearn.linear_model import LinearRegression
 
-from sam_learning.core.exceptions import NotSafeActionError
+from sam_learning.core.exceptions import NotSafeActionError, EquationSolutionType
 
+EPSILON = 1e-10
 
 class ConditionType(Enum):
     injunctive = 1
@@ -33,7 +36,7 @@ class NumericFluentStateStorage:
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
 
-    def _construct_multipliction_strings(self, coefficients_vector: np.ndarray,
+    def _construct_multipliction_strings(self, coefficients_vector: Union[np.ndarray, List[float]],
                                          function_variables: List[str]) -> List[str]:
         """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
@@ -41,7 +44,18 @@ class NumericFluentStateStorage:
         :param function_variables: the name of the numeric fluents that are being used.
         :return: the representation of the fluents multiplied by the coefficients.
         """
-        return [f"(* {func} {coefficient})" for func, coefficient in zip(function_variables, coefficients_vector)]
+        multiplicators = []
+        for func, coefficient in zip(function_variables, coefficients_vector):
+            if coefficient == 0.0:
+                continue
+
+            if func == "(dummy)":
+                multiplicators.append(f"{coefficient}")
+
+            else:
+                multiplicators.append(f"(* {func} {coefficient})")
+
+        return multiplicators
 
     def _construct_linear_equation_string(self, multiplication_parts: List[str]) -> str:
         """Construct the addition parts of the linear equation string.
@@ -56,26 +70,31 @@ class NumericFluentStateStorage:
         return f"(+ {multiplication_parts[0]} {inner_layer})"
 
     def _solve_function_linear_equations(self, values_matrix: np.ndarray,
-                                         function_post_values: np.ndarray) -> np.ndarray:
+                                         function_post_values: np.ndarray) -> Tuple[List[float], float]:
         """Solves the linear equations using a matrix form.
 
         Note: the equation Ax=b is solved as: x = inverse(A)*b.
 
         :param values_matrix: the A matrix that contains the previous values of the function variables.
         :param function_post_values: the resulting values after the linear change.
-        :return: the vector representing the coefficients for the function variables.
+        :return: the vector representing the coefficients for the function variables and the learning score (R^2).
         """
         try:
-            padded_matrix = np.pad(values_matrix, [(0, 0), (0, 1)], constant_values=1)
-            num_dimensions = padded_matrix.shape[1]
-            _, indices = sympy.Matrix(padded_matrix).T.rref()
-            independent_matrix_rows = np.array([padded_matrix[index] for index in indices])
-            independent_next_values = np.array([function_post_values[index] for index in indices])
+            num_dimensions = values_matrix.shape[1]
+            _, indices = sympy.Matrix(values_matrix).T.rref()
+            X = np.array([values_matrix[index] for index in indices])
+            y = np.array([function_post_values[index] for index in indices])
 
-            A = independent_matrix_rows[:num_dimensions]
-            b = independent_next_values[:num_dimensions]
+            if X.shape[0] < num_dimensions:
+                failure_reason = "There are too few independent rows of data! cannot solve linear equations!"
+                self.logger.warning(failure_reason)
+                raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 
-            return np.linalg.solve(A, b)
+            reg = LinearRegression().fit(X, y)
+            learning_score = reg.score(X, y)
+            coefficients = list(reg.coef_) + [reg.intercept_]
+            coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
+            return coefficients, learning_score
 
         except np.LinAlgError:
             failure_reason = "Could not solve input equations, thus making the action unsafe to use."
@@ -103,14 +122,14 @@ class NumericFluentStateStorage:
         :param border_points: the convex hull point which ensures that Ax <= b.
         :return: the inequalities PDDL formatted strings.
         """
-        inequalities = []
+        inequalities = set()
         for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
             multiplication_functions = self._construct_multipliction_strings(inequality_coefficients,
                                                                              list(self.previous_state_storage.keys()))
             constructed_left_side = self._construct_linear_equation_string(multiplication_functions)
-            inequalities.append(f"(<= {constructed_left_side} {border_point})")
+            inequalities.add(f"(<= {constructed_left_side} {border_point})")
 
-        return inequalities
+        return list(inequalities)
 
     def _create_disjunctive_preconditions(self, previous_state_matrix: np.ndarray) -> Tuple[List[str], ConditionType]:
         """Create the disjunctive representation of the preconditions.
@@ -160,7 +179,7 @@ class NumericFluentStateStorage:
         except QhullError:
             failure_reason = "Convex hull encountered an error condition and no solution was found"
             self.logger.warning(failure_reason)
-            raise NotSafeActionError(self.action_name, failure_reason)
+            raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.no_solution_found)
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
@@ -203,9 +222,10 @@ class NumericFluentStateStorage:
         inequalities_strs = self._construct_pddl_inequality_scheme(A, b)
         return inequalities_strs, ConditionType.injunctive
 
-    def construct_assignment_equations(self) -> List[str]:
+    def construct_assignment_equations(self, should_optimize: bool = True) -> List[str]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
+        :param should_optimize: whether to optimize the search and claim that there is no numeric effect.
         :return: the constructed assignment statements.
         """
         assignment_statements = []
@@ -213,7 +233,7 @@ class NumericFluentStateStorage:
             # check if the action changed the value from the previous state at all.
             if not any([(next_value - prev_value) != 0 for
                         prev_value, next_value in zip(self.previous_state_storage[lifted_function],
-                                                      next_state_values)]):
+                                                      next_state_values)]) and should_optimize:
                 continue
 
             # check if all of the values consist of a change to a constant value C.
@@ -225,7 +245,8 @@ class NumericFluentStateStorage:
 
             function_post_values = np.array(next_state_values)
             values_matrix = self._convert_to_array_format("previous_state")
-            coefficient_vector = self._solve_function_linear_equations(values_matrix, function_post_values)
+            coefficient_vector, learning_score = self._solve_function_linear_equations(values_matrix, function_post_values)
+            self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
 
             functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
             multiplication_functions = self._construct_multipliction_strings(
@@ -239,7 +260,8 @@ class NumericFluentStateStorage:
         num_variables = len(self.next_state_storage)
         num_equations = len(self.previous_state_storage[lifted_function])
         # validate that it is possible to solve linear equations at all.
-        if num_equations < num_variables + 1:
+        if num_equations < num_variables:
             failure_reason = "Cannot solve linear equations when too little input equations given."
             self.logger.warning(failure_reason)
-            raise NotSafeActionError(self.action_name, failure_reason)
+            raise NotSafeActionError(
+                self.action_name, failure_reason, EquationSolutionType.not_enough_data)

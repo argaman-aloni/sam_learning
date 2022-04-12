@@ -66,6 +66,7 @@ class NumericSAMLearner(SAMLearner):
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
+        allowed_actions = {}
         for observation in observations:
             for component in observation.components:
                 self.handle_single_trajectory_component(component)
@@ -75,10 +76,12 @@ class NumericSAMLearner(SAMLearner):
             action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
             try:
                 action.numeric_effects = self.storage[action_name].construct_assignment_equations()
+                allowed_actions[action_name] = action
 
             except NotSafeActionError as e:
                 self.logger.debug(f"The action -{e.action_name} is not safe for execution, reason - {e.reason}")
                 # TODO: Add the regression learning of the effects.
                 # TODO: Handle the dummy variable in the effects.
 
+        self.partial_domain.actions = allowed_actions
         return self.partial_domain
