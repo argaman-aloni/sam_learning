@@ -32,6 +32,7 @@ def numeric_sam_learning(depot_domain: Domain) -> NumericSAMLearner:
 
 def test_learn_action_model_returns_learned_model(numeric_sam_learning: NumericSAMLearner,
                                                   numeric_observation: Observation):
-    learned_model = numeric_sam_learning.learn_action_model([numeric_observation])
+    learned_model, learning_metadata = numeric_sam_learning.learn_action_model([numeric_observation])
     print()
+    print(learning_metadata)
     print(learned_model.to_pddl())

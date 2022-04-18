@@ -103,5 +103,6 @@ def test_handle_single_trajectory_component_learns_preconditions_and_effects_whe
     assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(lift-at ?lift ?f1)"]
 
 def test_learn_action_model_returns_learned_model(sam_learning: SAMLearner, elevators_observation: Observation):
-    learned_model = sam_learning.learn_action_model([elevators_observation])
+    learned_model, learning_report = sam_learning.learn_action_model([elevators_observation])
+    print(learning_report)
     print(learned_model.to_pddl())

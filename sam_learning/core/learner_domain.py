@@ -7,6 +7,9 @@ from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLCons
 from .numeric_fluent_state_storage import ConditionType
 
 
+DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
+
+
 class LearnerAction:
     """Class representing an instantaneous action in a PDDL+ problems."""
 
@@ -116,6 +119,9 @@ class LearnerDomain:
     def __init__(self, domain: Domain):
         self.name = domain.name
         self.requirements = domain.requirements
+        if not DISJUNCTIVE_PRECONDITIONS_REQ in self.requirements:
+            self.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
+
         self.types = domain.types
         self.constants = domain.constants
         self.predicates = domain.predicates
@@ -156,7 +162,6 @@ class LearnerDomain:
 
         return "\n".join(types_strs)
 
-
     def _constants_to_pddl(self) -> str:
         """Converts the constants to a PDDL string.
 
@@ -174,7 +179,6 @@ class LearnerDomain:
             types_strs.append(f"\t{' '.join(constant_objects)} - {constant_type_name}")
 
         return "\n".join(types_strs)
-
 
     def to_pddl(self) -> str:
         predicates = "\n\t".join([p.untyped_representation for p in self.predicates.values()])

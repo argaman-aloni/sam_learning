@@ -1,6 +1,6 @@
 """The Safe Action Model Learning algorithm module."""
 import logging
-from typing import List, Tuple, NoReturn
+from typing import List, Tuple, NoReturn, Dict
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent
 
@@ -137,7 +137,7 @@ class SAMLearner:
         else:
             self.update_action(grounded_action, previous_state, next_state)
 
-    def learn_action_model(self, observations: List[Observation]) -> LearnerDomain:
+    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
         :param observations: the list of trajectories that are used to learn the safe action model.
@@ -148,4 +148,5 @@ class SAMLearner:
             for component in observation.components:
                 self.handle_single_trajectory_component(component)
 
-        return self.partial_domain
+        learning_report = {action_name: "OK" for action_name in self.partial_domain.actions}
+        return self.partial_domain, learning_report

@@ -30,13 +30,13 @@ class KFoldSplit:
     test_set_dir_path: Path
     domain_file_path: Path
 
-    def __init__(self, working_directory_path: Path, n_split: int, domain_name: str):
+    def __init__(self, working_directory_path: Path, n_split: int, domain_file_name: str):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.n_split = n_split
         self.train_set_dir_path = working_directory_path / "train"
         self.test_set_dir_path = working_directory_path / "test"
-        self.domain_file_path = working_directory_path / domain_name
+        self.domain_file_path = working_directory_path / domain_file_name
 
     def _copy_domain(self) -> NoReturn:
         """Copies the domain to the train set directory so that it'd be used in the learning process."""
@@ -76,8 +76,9 @@ class KFoldSplit:
             for problem in test_set_problems:
                 shutil.copy(problem, self.test_set_dir_path / problem.name)
 
-            for trajectory in train_set_trajectories:
+            for trajectory, problem in zip(train_set_trajectories, train_set_problems):
                 shutil.copy(trajectory, self.train_set_dir_path / trajectory.name)
+                shutil.copy(problem, self.train_set_dir_path / problem.name)
 
             self.logger.debug("Finished creating fold!")
             yield self.train_set_dir_path, self.test_set_dir_path

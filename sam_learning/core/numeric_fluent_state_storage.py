@@ -1,6 +1,7 @@
 """Module that stores an action's numeric state fluents and handles its access."""
 import itertools
 import logging
+import math
 from collections import defaultdict
 from enum import Enum
 from typing import Dict, List, NoReturn, Tuple, Union
@@ -16,6 +17,8 @@ from sklearn.linear_model import LinearRegression
 from sam_learning.core.exceptions import NotSafeActionError, EquationSolutionType
 
 EPSILON = 1e-10
+LEGAL_LEARNING_SCORE = 0.98
+
 
 class ConditionType(Enum):
     injunctive = 1
@@ -69,6 +72,19 @@ class NumericFluentStateStorage:
         inner_layer = self._construct_linear_equation_string(multiplication_parts[1:])
         return f"(+ {multiplication_parts[0]} {inner_layer})"
 
+    def _validate_legal_equations(self, values_matrix: np.ndarray) -> NoReturn:
+        """Validates that there are enough independent equations which enable for a single solution for the equation.
+
+        :param values_matrix: the matrix constructed based on the observations.
+        """
+        num_dimensions = values_matrix.shape[1]
+        _, indices = sympy.Matrix(values_matrix).T.rref()
+        X = np.array([values_matrix[index] for index in indices])
+        if X.shape[0] < num_dimensions:
+            failure_reason = "There are too few independent rows of data! cannot solve linear equations!"
+            self.logger.warning(failure_reason)
+            raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
+
     def _solve_function_linear_equations(self, values_matrix: np.ndarray,
                                          function_post_values: np.ndarray) -> Tuple[List[float], float]:
         """Solves the linear equations using a matrix form.
@@ -79,27 +95,39 @@ class NumericFluentStateStorage:
         :param function_post_values: the resulting values after the linear change.
         :return: the vector representing the coefficients for the function variables and the learning score (R^2).
         """
-        try:
-            num_dimensions = values_matrix.shape[1]
-            _, indices = sympy.Matrix(values_matrix).T.rref()
-            X = np.array([values_matrix[index] for index in indices])
-            y = np.array([function_post_values[index] for index in indices])
+        self._validate_legal_equations(values_matrix)
+        reg = LinearRegression().fit(values_matrix, function_post_values)
+        learning_score = reg.score(values_matrix, function_post_values)
+        if learning_score < LEGAL_LEARNING_SCORE:
+            reason = "The learned effects are not safe since the R^2 is not high enough."
+            self.logger.warning(reason)
+            raise NotSafeActionError(self.action_name, reason, EquationSolutionType.no_solution_found)
 
-            if X.shape[0] < num_dimensions:
-                failure_reason = "There are too few independent rows of data! cannot solve linear equations!"
-                self.logger.warning(failure_reason)
-                raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
+        coefficients = list(reg.coef_) + [reg.intercept_]
+        coefficients = self._prettify_coefficients(coefficients)
+        return coefficients, learning_score
 
-            reg = LinearRegression().fit(X, y)
-            learning_score = reg.score(X, y)
-            coefficients = list(reg.coef_) + [reg.intercept_]
-            coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-            return coefficients, learning_score
+    def _prettify_coefficients(self, coefficients: List[float]) -> List[float]:
+        """Converts the coefficients into a prettier form so that the created equations would be more presentable.
 
-        except np.LinAlgError:
-            failure_reason = "Could not solve input equations, thus making the action unsafe to use."
-            self.logger.warning(failure_reason)
-            raise NotSafeActionError(self.action_name, failure_reason)
+        :param coefficients: the RAW coefficients received from the linear regression.
+        :return: the prettified version of the coefficients.
+        """
+        coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
+        prettified_coefficients = []
+        for coef in coefficients:
+            upper_delta = math.ceil(coef) - coef
+            lower_delta = coef - math.floor(coef)
+            if upper_delta < EPSILON:
+                prettified_coefficients.append(float(math.ceil(coef)))
+
+            elif lower_delta < EPSILON:
+                prettified_coefficients.append(float(math.floor(coef)))
+
+            else:
+                prettified_coefficients.append(coef)
+
+        return prettified_coefficients
 
     def _convert_to_array_format(self, storage_name: str) -> np.ndarray:
         """Converts the storage to a numpy array format so that scipy functions would be able to use it.
@@ -170,6 +198,7 @@ class NumericFluentStateStorage:
             num_dimensions = points.shape[1]
             if num_dimensions == 2:
                 _ = convex_hull_plot_2d(hull)
+                plt.title(f"{self.action_name} - convex hull")
                 plt.show()
 
             A = hull.equations[:, :num_dimensions]
@@ -179,7 +208,17 @@ class NumericFluentStateStorage:
         except QhullError:
             failure_reason = "Convex hull encountered an error condition and no solution was found"
             self.logger.warning(failure_reason)
-            raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.no_solution_found)
+            raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.convex_hull_not_found)
+
+    def _validate_safe_equation_solving(self, lifted_function):
+        num_variables = len(self.next_state_storage)
+        num_equations = len(self.previous_state_storage[lifted_function])
+        # validate that it is possible to solve linear equations at all.
+        if num_equations < num_variables:
+            failure_reason = "Cannot solve linear equations when too little input equations given."
+            self.logger.warning(failure_reason)
+            raise NotSafeActionError(
+                self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
@@ -245,7 +284,8 @@ class NumericFluentStateStorage:
 
             function_post_values = np.array(next_state_values)
             values_matrix = self._convert_to_array_format("previous_state")
-            coefficient_vector, learning_score = self._solve_function_linear_equations(values_matrix, function_post_values)
+            coefficient_vector, learning_score = self._solve_function_linear_equations(values_matrix,
+                                                                                       function_post_values)
             self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
 
             functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
@@ -255,13 +295,3 @@ class NumericFluentStateStorage:
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 
         return assignment_statements
-
-    def _validate_safe_equation_solving(self, lifted_function):
-        num_variables = len(self.next_state_storage)
-        num_equations = len(self.previous_state_storage[lifted_function])
-        # validate that it is possible to solve linear equations at all.
-        if num_equations < num_variables:
-            failure_reason = "Cannot solve linear equations when too little input equations given."
-            self.logger.warning(failure_reason)
-            raise NotSafeActionError(
-                self.action_name, failure_reason, EquationSolutionType.not_enough_data)
