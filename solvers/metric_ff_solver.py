@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import NoReturn
 
-script_headers = """#!/bin/bash
+execution_script = """#!/bin/bash
 
 ################################################################################################
 ### sbatch configuration parameters must start with #SBATCH and must precede any other commands.
@@ -25,86 +25,66 @@ script_headers = """#!/bin/bash
 
 module load anaconda
 conda info --envs
-source activate safe_action_learner
-"""
+source activate pol_framework
 
-script_execution_headers = """
-
-directory_path={test_set_directory_path}
-files_regex_path="$directory_path/{problems_regex}"
-fast_downward_dir_path="/home/mordocha/downward"
-fast_downward_file_path="$fast_downward_dir_path/fast-downward.py"
-domain_path={domain_file_path}
-
+./sise/home/mordocha/numeric_planning/Metric-FF-v2.1/ff -o {domain_file_path} -f {problem_file_path} > {solution_file_path}
 """
 
 script_execution_lines = """
 
-for FILE in $files_regex_path; do
-  filename=$(basename -- "$FILE")
-  name="${filename%.*}"
-  echo "Processing the file - ${filename}:"
-  if [[ $name == combined_domain ]]; then
-    continue
-  fi
-  if test -f "${directory_path}/${name}_plan.solution"; then
-    continue
-  else
-    python "$fast_downward_file_path" --overall-time-limit "1m" --sas-file "${directory_path}/${name}-output.sas" --plan-file "${directory_path}/${name}_plan.solution" "$domain_path" "$FILE" --evaluator "hff=ff()" --evaluator "hcea=cea()" --search "lazy_greedy([hff, hcea], preferred=[hff, hcea])"
-    sleep 1
-    rm "${directory_path}/${name}-output.sas"
-  fi
-done
-
 """
 
 BATCH_JOB_SUBMISSION_REGEX = re.compile(b"Submitted batch job (?P<batch_id>\d+)")
+MAX_RUNNING_TIME = 60  # seconds
 
 
 class MetricFFSolver:
-	logger: logging.Logger
+    logger: logging.Logger
 
-	def __init__(self):
-		self.logger = logging.getLogger(__name__)
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
 
-	def write_batch_and_execute_solver(
-			self, output_file_path: Path, test_set_directory_path: Path, problems_regex: str,
-			domain_file_path: str) -> NoReturn:
-		"""
+    def write_batch_and_execute_solver(self, script_file_path: Path, problems_directory_path: Path,
+                                       domain_file_path: Path) -> NoReturn:
+        """
 
-		:param output_file_path:
-		:param test_set_directory_path:
-		:param problems_regex:
-		:param domain_file_path:
-		:return:
-		"""
-		os.chdir(output_file_path.parent)
-		self.logger.info("Starting to solve the input problems using fast downward solver.")
-		completed_file_str = script_headers
-		completed_file_str += script_execution_headers.format(
-			test_set_directory_path=str(test_set_directory_path),
-			problems_regex=problems_regex,
-			domain_file_path=domain_file_path
-		)
-		completed_file_str += script_execution_lines
+        :param script_file_path:
+        :param problems_directory_path:
+        :param domain_file_path:
+        :return:
+        """
+        self.logger.info("Changing the current working directory to the MetricFF directory.")
+        os.chdir(script_file_path.parent)
+        self.logger.info("Starting to solve the input problems using fast downward solver.")
+        for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
+            solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
+            completed_file_str = execution_script.format(
+                domain_file_path=str(domain_file_path.absolute()),
+                problem_file_path=str(problem_file_path.absolute()),
+                solution_file_path=str(solution_path.absolute())
+            )
 
-		with open(output_file_path, "wt") as run_script_file:
-			run_script_file.write(completed_file_str)
+            with open(script_file_path, "wt") as run_script_file:
+                run_script_file.write(completed_file_str)
 
-		submission_str = subprocess.check_output(["sbatch", str(output_file_path)])
-		match = BATCH_JOB_SUBMISSION_REGEX.match(submission_str)
-		batch_id = match.group("batch_id")
-		# waiting for fast downward process to start
-		time.sleep(1)
-		execution_state = subprocess.check_output(["squeue", "--me"])
-		while batch_id in execution_state:
-			self.logger.debug(f"Solver with the id - {batch_id} is still running...")
-			execution_state = subprocess.check_output(["squeue", "--me"])
-			time.sleep(1)
-			continue
+            submission_str = subprocess.check_output(["sbatch", str(script_file_path)])
+            match = BATCH_JOB_SUBMISSION_REGEX.match(submission_str)
+            batch_id = match.group("batch_id")
+            # waiting for fast downward process to start
+            time.sleep(1)
+            start_time = time.time()
+            execution_state = subprocess.check_output(["squeue", "--me"])
+            while batch_id in execution_state:
+                self.logger.debug(f"Solver with the id - {batch_id} is still running...")
+                if (time.time() - start_time) > MAX_RUNNING_TIME:
+                    subprocess.check_output(["scancel", batch_id])
 
-		self.logger.info("Solver finished its execution!")
+                execution_state = subprocess.check_output(["squeue", "--me"])
+                time.sleep(1)
+                continue
 
-		self.logger.debug("Cleaning the sbatch file from the problems directory.")
-		os.remove(output_file_path)
-		return
+            self.logger.info("Solver finished its execution!")
+            self.logger.debug("Cleaning the sbatch file from the problems directory.")
+            os.remove(script_file_path)
+
+        return

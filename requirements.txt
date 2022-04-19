@@ -1,10 +1,8 @@
 typing~=3.7.4.1
-ply==3.11
 pytest==6.2.4
 pathlib~=1.0.1
-requests==2.26.0
-anytree~=2.8.0
 numpy~=1.22.3
 scipy~=1.8.0
 matplotlib~=3.5.1
 sympy~=1.10
+scikit-learn~=1.0.2

@@ -7,7 +7,8 @@ from pytest import fixture
 from sam_learning.core import PredicatesMatcher
 from tests.consts import LOCATION_TYPE, AGENT_TYPE, DOMAIN_WITH_CONSTS_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
     TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, ELEVATORS_DOMAIN_PATH, \
-    ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH
+    ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH, NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, \
+    DEPOT_NUMERIC_TRAJECTORY_PATH
 
 TRUCK_AT_LOCATION_GROUNDED_PREDICATE = GroundedPredicate(
     name="at",
@@ -81,6 +82,27 @@ def predicate_matcher_with_consts(discrete_domain_with_consts: Domain) -> Predic
 @fixture()
 def elevators_predicate_matcher(elevators_domain: Domain) -> PredicatesMatcher:
     return PredicatesMatcher(domain=elevators_domain)
+
+
+@fixture()
+def depot_domain() -> Domain:
+    domain_parser = DomainParser(NUMERIC_DOMAIN_PATH, partial_parsing=True)
+    return domain_parser.parse_domain()
+
+
+@fixture()
+def depot_problem(depot_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=NUMERIC_PROBLEM_PATH, domain=depot_domain).parse_problem()
+
+
+@fixture()
+def depot_observation(depot_domain: Domain, depot_problem: Problem) -> Observation:
+    return TrajectoryParser(depot_domain, depot_problem).parse_trajectory(DEPOT_NUMERIC_TRAJECTORY_PATH)
+
+
+@fixture()
+def depot_predicate_matcher(depot_domain: Domain) -> PredicatesMatcher:
+    return PredicatesMatcher(domain=depot_domain)
 
 
 def test_match_predicate_to_action_with_no_match_returns_empty_list(
@@ -251,3 +273,20 @@ def test_get_possible_literal_matches_from_actual_trajectory_state(
     for matched_lifted_predicate in possible_matches:
         for parameter in matched_lifted_predicate.signature:
             assert parameter in ["?lift", "?f1", "?f2"]
+
+
+def test_get_possible_literal_from_actual_state_captures_all_needed_predicates_in_a_numeric_domain(
+        depot_predicate_matcher: PredicatesMatcher, depot_observation: Observation):
+    observation_component = depot_observation.components[1]
+    test_action_call = observation_component.grounded_action_call
+    previous_state_predicates = []
+    for predicate_set in observation_component.previous_state.state_predicates.values():
+        previous_state_predicates.extend(predicate_set)
+
+    possible_matches = depot_predicate_matcher.get_possible_literal_matches(test_action_call,
+                                                                            previous_state_predicates)
+
+    actual_preconditions = {"(at ?x ?p)", "(available ?x)", "(at ?y ?p)", "(on ?y ?z)", "(clear ?y)"}
+    possible_lifted_matches = [matched_lifted_predicate.untyped_representation for matched_lifted_predicate in
+                               possible_matches]
+    assert actual_preconditions.issubset(possible_lifted_matches)

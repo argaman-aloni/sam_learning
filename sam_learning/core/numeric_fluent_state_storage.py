@@ -248,9 +248,9 @@ class NumericFluentStateStorage:
                                    self.next_state_storage.items() if len(state_values) == max_function_len}
 
     def construct_safe_linear_inequalities(self) -> Tuple[List[str], ConditionType]:
-        """
+        """Constructs the linear inequalities strings that will be used in the learned model later.
 
-        :return:
+        :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
         num_required_dimensions = len(self.previous_state_storage) + 1
         previous_state_matrix = self._convert_to_array_format("previous_state")

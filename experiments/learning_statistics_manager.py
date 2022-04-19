@@ -1,4 +1,5 @@
 """Module to manage the action model learning statistics."""
+import csv
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, NoReturn, List
@@ -117,3 +118,16 @@ class LearningStatisticsManager:
                 **precision_recall_calculator.export_action_statistics(action_name)
             }
             self.action_learning_stats.append(action_stats)
+
+    def export_action_learning_statistics(self, fold_number: int) -> NoReturn:
+        """Export the statistics collected about the actions.
+
+        :param fold_number: the number of the currently running fold.
+        """
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm}_{self.model_domain.name}" \
+                                                  f"_action_stats_fold_{fold_number}.csv"
+        with open(statistics_path, "wt", newline='') as statistics_file:
+            stats_writer = csv.DictWriter(statistics_file, fieldnames=LEARNED_ACTIONS_STATS_COLUMNS)
+            stats_writer.writeheader()
+            for data_line in self.action_learning_stats:
+                stats_writer.writerow(data_line)

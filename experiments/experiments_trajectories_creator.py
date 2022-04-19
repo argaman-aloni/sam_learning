@@ -38,4 +38,6 @@ class ExperimentTrajectoriesCreator:
 
 
 if __name__ == '__main__':
-    ExperimentTrajectoriesCreator(sys.argv[1], Path(sys.argv[2])).create_domain_trajectories()
+    trajectory_creator = ExperimentTrajectoriesCreator(sys.argv[1], Path(sys.argv[2]))
+    trajectory_creator.fix_solution_files()
+    trajectory_creator.create_domain_trajectories()
