@@ -2,12 +2,13 @@
 import csv
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, NoReturn, List
+from typing import Any, Dict, NoReturn, List, Optional
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation
 
 from experiments.action_precision_recall_calculator import PrecisionRecallCalculator
+from experiments.util_types import LearningAlgorithmType
 from sam_learning.core import LearnerDomain
 
 LEARNED_ACTIONS_STATS_COLUMNS = [
@@ -44,7 +45,10 @@ NUMERIC_LEARNING_STAT_COLUMNS = [
     "#numeric_actions_learned_ok",
     "#numeric_actions_no_solution",
     "#numeric_actions_no_convex_hull",
-    "#numeric_actions_infinite_number_solutions"
+    "#numeric_actions_infinite_number_solutions",
+    "model_precision",
+    "model_recall",
+    "model_f1_score"
 ]
 
 SOLVING_STATISTICS = [
@@ -60,32 +64,31 @@ SOLVING_STATISTICS = [
 
 
 class LearningStatisticsManager:
+    """Class that manages the statistics gathered from the learning process."""
     model_domain: Domain
-    learning_algorithm: str
+    learning_algorithm: LearningAlgorithmType
     working_directory_path: Path
     results_dir_path: Path
     action_learning_stats: List[Dict[str, Any]]
-    solving_stats: List[Dict[str, Any]]
     numeric_learning_stats: List[Dict[str, Any]]
 
-    def __init__(self, working_directory_path: Path, domain_path: Path, learning_algorithm: str):
+    def __init__(self, working_directory_path: Path, domain_path: Path, learning_algorithm: LearningAlgorithmType):
         self.working_directory_path = working_directory_path
         self.model_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
         self.learning_algorithm = learning_algorithm
         self.action_learning_stats = []
-        self.solving_stats = {}
-        self.numeric_learning_stats = {}
+        self.numeric_learning_stats = []
         self.results_dir_path = self.working_directory_path / "results_directory"
 
     def create_results_directory(self) -> NoReturn:
         """Creates the results directory that contains the learning results."""
         self.results_dir_path.mkdir(exist_ok=True)
 
-    def add_to_action_stats(self, used_observations: List[Observation], learned_domain: LearnerDomain) -> NoReturn:
-        """
+    def add_to_action_stats(self, used_observations: List[Observation], learned_domain: LearnerDomain,
+                            learning_report: Optional[Dict[str, str]] = None) -> NoReturn:
+        """Add the action data to the statistics.
 
-        :param used_observations:
-        :return:
+        :param used_observations: the observations that were used to learn the action.
         """
         num_triplets = sum([len(observation.components) for observation in used_observations])
         action_appearance_counter = Counter()
@@ -96,7 +99,7 @@ class LearningStatisticsManager:
         for action_name, action_data in learned_domain.actions.items():
             precision_recall_calculator.add_action_data(action_data, self.model_domain.actions[action_name])
             action_stats = {
-                "learning_algorithm": self.learning_algorithm,
+                "learning_algorithm": self.learning_algorithm.name,
                 "domain_name": self.model_domain.name,
                 "num_trajectories": len(used_observations),
                 "num_trajectory_triplets": num_triplets,
@@ -119,15 +122,63 @@ class LearningStatisticsManager:
             }
             self.action_learning_stats.append(action_stats)
 
+        if self.learning_algorithm == LearningAlgorithmType.numeric_sam:
+            self._collect_numeric_learning_statistics(
+                used_observations, learning_report, precision_recall_calculator)
+
     def export_action_learning_statistics(self, fold_number: int) -> NoReturn:
         """Export the statistics collected about the actions.
 
         :param fold_number: the number of the currently running fold.
         """
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm}_{self.model_domain.name}" \
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" \
                                                   f"_action_stats_fold_{fold_number}.csv"
         with open(statistics_path, "wt", newline='') as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=LEARNED_ACTIONS_STATS_COLUMNS)
             stats_writer.writeheader()
             for data_line in self.action_learning_stats:
                 stats_writer.writerow(data_line)
+
+    def export_numeric_learning_statistics(self, fold_number: int) -> NoReturn:
+        """Export the statistics collected about the actions.
+
+        :param fold_number: the number of the currently running fold.
+        """
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" \
+                                                  f"_numeric_learning_fold_{fold_number}.csv"
+        with open(statistics_path, "wt", newline='') as statistics_file:
+            stats_writer = csv.DictWriter(statistics_file, fieldnames=NUMERIC_LEARNING_STAT_COLUMNS)
+            stats_writer.writeheader()
+            for data_line in self.numeric_learning_stats:
+                stats_writer.writerow(data_line)
+
+    def _collect_numeric_learning_statistics(
+            self, used_observations: List[Observation], learning_report: Dict[str, str],
+            precision_recall_calc: PrecisionRecallCalculator) -> NoReturn:
+        """
+
+        :param used_observations:
+        :param learning_report:
+        :param precision_recall_calc:
+        :return:
+        """
+        num_triplets = sum([len(observation.components) for observation in used_observations])
+        actions_stats_counter = Counter(learning_report.values())
+        model_precision = precision_recall_calc.calculate_model_precision()
+        model_recall = precision_recall_calc.calculate_model_recall()
+        model_f1_score = 2 * (model_precision * model_recall) / (model_precision + model_recall)
+        model_stats = {
+            "learning_algorithm": self.learning_algorithm.name,
+            "domain_name": self.model_domain.name,
+            "num_trajectories": len(used_observations),
+            "num_trajectory_triplets": num_triplets,
+            "total_number_of_actions": len(self.model_domain.actions),
+            "#numeric_actions_learned_ok": actions_stats_counter["OK"],
+            "#numeric_actions_no_solution": actions_stats_counter["no_solution_found"],
+            "#numeric_actions_no_convex_hull": actions_stats_counter["convex_hull_not_found"],
+            "#numeric_actions_infinite_number_solutions": actions_stats_counter["not_enough_data"],
+            "model_precision": model_precision,
+            "model_recall": model_recall,
+            "model_f1_score": model_f1_score
+        }
+        self.numeric_learning_stats.append(model_stats)

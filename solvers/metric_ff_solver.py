@@ -15,7 +15,7 @@ execution_script = """#!/bin/bash
 
 #SBATCH --partition main			### specify partition name where to run a job. short: 7 days limit; gtx1080: 7 days; debug: 2 hours limit and 1 job at a time
 #SBATCH --time 0-03:30:00			### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
-#SBATCH --job-name downward_planner_job			### name of the job
+#SBATCH --job-name metric_planner_job			### name of the job
 #SBATCH --output job-%J.out			### output log for running job - %J for job number
 ##SBATCH --mail-user=aaa.bbb@ccc	### user's email for sending job status messages
 ##SBATCH --mail-type=END			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
@@ -27,15 +27,12 @@ module load anaconda
 conda info --envs
 source activate pol_framework
 
-./sise/home/mordocha/numeric_planning/Metric-FF-v2.1/ff -o {domain_file_path} -f {problem_file_path} > {solution_file_path}
+./ff -o {domain_file_path} -f {problem_file_path} > {solution_file_path}
 """
 
-script_execution_lines = """
-
-"""
-
+METRIC_FF_DIRECTORY = "/sise/home/mordocha/numeric_planning/Metric-FF-v2.1/"
 BATCH_JOB_SUBMISSION_REGEX = re.compile(b"Submitted batch job (?P<batch_id>\d+)")
-MAX_RUNNING_TIME = 60  # seconds
+MAX_RUNNING_TIME = 100  # seconds
 
 
 class MetricFFSolver:
@@ -46,15 +43,14 @@ class MetricFFSolver:
 
     def write_batch_and_execute_solver(self, script_file_path: Path, problems_directory_path: Path,
                                        domain_file_path: Path) -> NoReturn:
-        """
+        """Writes the batch file script to run on the cluster and then executes the solver algorithm.
 
-        :param script_file_path:
-        :param problems_directory_path:
-        :param domain_file_path:
-        :return:
+        :param script_file_path: the path to output the learning script.
+        :param problems_directory_path: the directory containing the problems that are needed to be solved.
+        :param domain_file_path: the path to the domain file that will be used as an input to the planner.
         """
         self.logger.info("Changing the current working directory to the MetricFF directory.")
-        os.chdir(script_file_path.parent)
+        os.chdir(METRIC_FF_DIRECTORY)
         self.logger.info("Starting to solve the input problems using fast downward solver.")
         for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
@@ -88,3 +84,11 @@ class MetricFFSolver:
             os.remove(script_file_path)
 
         return
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    solver = MetricFFSolver()
+    solver.write_batch_and_execute_solver(
+        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests1/Depots/test/execution_script.sh"),
+        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests1/Depots/test/"),
+        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests1/Depots/test/depot_numeric.pddl"))
