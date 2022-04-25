@@ -276,6 +276,7 @@ def test_construct_assignment_equations_with_two_equations_result_in_multiple_ch
         "(assign (load_limit ?z) (+ (* (load_limit ?z) -7.0) (* (current_load ?z) 2.0)))",
         "(assign (current_load ?z) (* (load_limit ?z) 9.0))"]
 
+
 def test_construct_assignment_equations_with_an_increase_change_results_in_correct_values(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     previous_state_values = [(0, 7), (2, -1), (12, 32)]
@@ -341,3 +342,42 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_t
     assert condition_type == ConditionType.disjunctive
     assert output_conditions == ["(and (= (fuel-cost ) 34.0) (= (load_limit ?z) 411.0) (= (current_load ?z) 121.0))",
                                  "(and (= (fuel-cost ) 35.0) (= (load_limit ?z) 413.0) (= (current_load ?z) 121.0))"]
+
+
+def test_construct_safe_linear_inequalities_will_create_correct_inequalities_when_given_three_points_for_two_variables(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    pre_state_input_values = [(0.0, 0.0), (0.0, 1.0), (1.0, 0.0)]
+    for fuel_cost_val, current_limit_val in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_limit_val)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
+    expected_conditions = ["(<= (* (fuel-cost ) -1.0) 0.0)",
+                           "(<= (* (current_load ?z) -1.0) -0.0)",
+                           "(<= (+ (* (fuel-cost ) 1.0) (* (current_load ?z) 1.0)) 1.0)"]
+    assert output_conditions == expected_conditions
+
+
+def test_construct_safe_linear_inequalities_will_create_correct_inequalities_when_given_four_points_for_two_variables(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    pre_state_input_values = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    for fuel_cost_val, current_limit_val in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_limit_val)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
+    expected_conditions = ["(<= (* (current_load ?z) 1.0) 1.0)",
+                           "(<= (* (fuel-cost ) -1.0) 0.0)",
+                           "(<= (* (fuel-cost ) 1.0) 1.0)",
+                           "(<= (* (current_load ?z) -1.0) -0.0)"]
+    assert set(output_conditions) == set(expected_conditions)

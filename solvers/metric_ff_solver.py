@@ -27,7 +27,7 @@ module load anaconda
 conda info --envs
 source activate pol_framework
 
-./ff -o {domain_file_path} -f {problem_file_path} > {solution_file_path}
+./ff -o {domain_file_path} -f {problem_file_path} -s 0 > {solution_file_path}
 """
 
 METRIC_FF_DIRECTORY = "/sise/home/mordocha/numeric_planning/Metric-FF-v2.1/"
@@ -51,7 +51,7 @@ class MetricFFSolver:
         """
         self.logger.info("Changing the current working directory to the MetricFF directory.")
         os.chdir(METRIC_FF_DIRECTORY)
-        self.logger.info("Starting to solve the input problems using fast downward solver.")
+        self.logger.info("Starting to solve the input problems using MetricFF solver.")
         for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
             completed_file_str = execution_script.format(
@@ -89,6 +89,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     solver = MetricFFSolver()
     solver.write_batch_and_execute_solver(
-        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests1/Depots/test/execution_script.sh"),
-        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests1/Depots/test/"),
-        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests1/Depots/test/depot_numeric.pddl"))
+        Path("/sise/home/mordocha/numeric_planning/domains/farmland/execution_script.sh"),
+        Path("/sise/home/mordocha/numeric_planning/domains/farmland/"),
+        Path("/sise/home/mordocha/numeric_planning/domains/farmland/farmland.pddl"))

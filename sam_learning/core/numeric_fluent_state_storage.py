@@ -17,12 +17,57 @@ from sklearn.linear_model import LinearRegression
 from sam_learning.core.exceptions import NotSafeActionError, EquationSolutionType
 
 EPSILON = 1e-10
-LEGAL_LEARNING_SCORE = 0.98
+LEGAL_LEARNING_SCORE = 1.00
 
 
 class ConditionType(Enum):
     injunctive = 1
     disjunctive = 2
+
+
+def _construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List[float]],
+                                      function_variables: List[str]) -> List[str]:
+    """Constructs the strings representing the multiplications of the function variables with the coefficient.
+
+    :param coefficients_vector: the coefficient that multiplies the function vector.
+    :param function_variables: the name of the numeric fluents that are being used.
+    :return: the representation of the fluents multiplied by the coefficients.
+    """
+    product_components = []
+    for func, coefficient in zip(function_variables, coefficients_vector):
+        if coefficient == 0.0:
+            continue
+
+        if func == "(dummy)":
+            product_components.append(f"{coefficient}")
+
+        else:
+            product_components.append(f"(* {func} {coefficient})")
+
+    return product_components
+
+
+def _prettify_coefficients(coefficients: List[float]) -> List[float]:
+    """Converts the coefficients into a prettier form so that the created equations would be more presentable.
+
+    :param coefficients: the RAW coefficients received from the linear regression.
+    :return: the prettified version of the coefficients.
+    """
+    coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
+    prettified_coefficients = []
+    for coef in coefficients:
+        upper_delta = math.ceil(coef) - coef
+        lower_delta = coef - math.floor(coef)
+        if upper_delta < EPSILON:
+            prettified_coefficients.append(float(math.ceil(coef)))
+
+        elif lower_delta < EPSILON:
+            prettified_coefficients.append(float(math.floor(coef)))
+
+        else:
+            prettified_coefficients.append(coef)
+
+    return prettified_coefficients
 
 
 class NumericFluentStateStorage:
@@ -38,27 +83,6 @@ class NumericFluentStateStorage:
         self.action_name = action_name
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
-
-    def _construct_multipliction_strings(self, coefficients_vector: Union[np.ndarray, List[float]],
-                                         function_variables: List[str]) -> List[str]:
-        """Constructs the strings representing the multiplications of the function variables with the coefficient.
-
-        :param coefficients_vector: the coefficient that multiplies the function vector.
-        :param function_variables: the name of the numeric fluents that are being used.
-        :return: the representation of the fluents multiplied by the coefficients.
-        """
-        multiplicators = []
-        for func, coefficient in zip(function_variables, coefficients_vector):
-            if coefficient == 0.0:
-                continue
-
-            if func == "(dummy)":
-                multiplicators.append(f"{coefficient}")
-
-            else:
-                multiplicators.append(f"(* {func} {coefficient})")
-
-        return multiplicators
 
     def _construct_linear_equation_string(self, multiplication_parts: List[str]) -> str:
         """Construct the addition parts of the linear equation string.
@@ -104,30 +128,8 @@ class NumericFluentStateStorage:
             raise NotSafeActionError(self.action_name, reason, EquationSolutionType.no_solution_found)
 
         coefficients = list(reg.coef_) + [reg.intercept_]
-        coefficients = self._prettify_coefficients(coefficients)
+        coefficients = _prettify_coefficients(coefficients)
         return coefficients, learning_score
-
-    def _prettify_coefficients(self, coefficients: List[float]) -> List[float]:
-        """Converts the coefficients into a prettier form so that the created equations would be more presentable.
-
-        :param coefficients: the RAW coefficients received from the linear regression.
-        :return: the prettified version of the coefficients.
-        """
-        coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-        prettified_coefficients = []
-        for coef in coefficients:
-            upper_delta = math.ceil(coef) - coef
-            lower_delta = coef - math.floor(coef)
-            if upper_delta < EPSILON:
-                prettified_coefficients.append(float(math.ceil(coef)))
-
-            elif lower_delta < EPSILON:
-                prettified_coefficients.append(float(math.floor(coef)))
-
-            else:
-                prettified_coefficients.append(coef)
-
-        return prettified_coefficients
 
     def _convert_to_array_format(self, storage_name: str) -> np.ndarray:
         """Converts the storage to a numpy array format so that scipy functions would be able to use it.
@@ -152,8 +154,8 @@ class NumericFluentStateStorage:
         """
         inequalities = set()
         for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
-            multiplication_functions = self._construct_multipliction_strings(inequality_coefficients,
-                                                                             list(self.previous_state_storage.keys()))
+            multiplication_functions = _construct_multiplication_strings(inequality_coefficients,
+                                                                         list(self.previous_state_storage.keys()))
             constructed_left_side = self._construct_linear_equation_string(multiplication_functions)
             inequalities.add(f"(<= {constructed_left_side} {border_point})")
 
@@ -185,7 +187,7 @@ class NumericFluentStateStorage:
 
         return injunctive_conditions, ConditionType.disjunctive
 
-    def _create_convex_hull_linear_inequalities(self, points: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_convex_hull_linear_inequalities(self, points: np.ndarray, display_mode: bool = True) -> Tuple[np.ndarray, np.ndarray]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :param points: the points that represent the values of the function in the states of the observations.
@@ -196,19 +198,33 @@ class NumericFluentStateStorage:
         try:
             hull = ConvexHull(points)
             num_dimensions = points.shape[1]
-            if num_dimensions == 2:
-                _ = convex_hull_plot_2d(hull)
-                plt.title(f"{self.action_name} - convex hull")
-                plt.show()
+            self._display_convex_hull(display_mode, hull, num_dimensions)
 
-            A = hull.equations[:, :num_dimensions]
-            b = -hull.equations[:, num_dimensions]
+            equations = hull.equations
+            for index, row in enumerate(equations):
+                max_value = abs(max(row)) if max(row) != 0 else 1.0
+                equations[index] = np.array([num / max_value for num in row])
+
+            A = equations[:, :num_dimensions]
+            b = -equations[:, num_dimensions]
             return A, b
 
         except QhullError:
             failure_reason = "Convex hull encountered an error condition and no solution was found"
             self.logger.warning(failure_reason)
             raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.convex_hull_not_found)
+
+    def _display_convex_hull(self, display_mode: bool, hull: ConvexHull, num_dimensions: int) -> NoReturn:
+        """Displays the convex hull in as a plot.
+
+        :param display_mode: whether to display the plot.
+        :param hull: the convex hull to display.
+        :param num_dimensions: the number of dimensions of the original data.
+        """
+        if num_dimensions == 2 and display_mode:
+            _ = convex_hull_plot_2d(hull)
+            plt.title(f"{self.action_name} - convex hull")
+            plt.show()
 
     def _validate_safe_equation_solving(self, lifted_function):
         num_variables = len(self.next_state_storage)
@@ -289,7 +305,7 @@ class NumericFluentStateStorage:
             self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
 
             functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
-            multiplication_functions = self._construct_multipliction_strings(
+            multiplication_functions = _construct_multiplication_strings(
                 coefficient_vector, functions_including_dummy)
             constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")

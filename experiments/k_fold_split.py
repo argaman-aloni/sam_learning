@@ -29,6 +29,7 @@ class KFoldSplit:
     train_set_dir_path: Path
     test_set_dir_path: Path
     domain_file_path: Path
+    validation_directory_path: Path
 
     def __init__(self, working_directory_path: Path, n_split: int, domain_file_name: str):
         self.logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class KFoldSplit:
         self.n_split = n_split
         self.train_set_dir_path = working_directory_path / "train"
         self.test_set_dir_path = working_directory_path / "test"
+        self.validation_directory_path = working_directory_path / "validation_set"
         self.domain_file_path = working_directory_path / domain_file_name
 
     def _copy_domain(self) -> NoReturn:
@@ -66,6 +68,8 @@ class KFoldSplit:
         for test_set_indices in create_test_set_indices(len(problem_paths), self.n_split):
             self.train_set_dir_path.mkdir(exist_ok=True)
             self.test_set_dir_path.mkdir(exist_ok=True)
+            self.validation_directory_path.mkdir(exist_ok=True)
+
             self._copy_domain()
             test_set_problems = [problem_paths[i] for i in test_set_indices]
             train_set_problems = list(filter(lambda x: x not in test_set_problems, problem_paths))
