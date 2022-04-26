@@ -133,8 +133,8 @@ def test_construct_pddl_inequality_scheme_with_simple_2d_four_equations_returns_
     left_side_coefficients = np.random.randint(10, size=(4, 2))
     right_side_points = np.random.randint(10, size=4)
 
-    inequalities = load_action_state_fluent_storage._construct_pddl_inequality_scheme(left_side_coefficients,
-                                                                                      right_side_points)
+    inequalities = load_action_state_fluent_storage._construct_pddl_inequality_scheme(
+        left_side_coefficients, right_side_points, ["(load_limit ?z)", "(current_load ?z)"])
 
     joint_inequalities = "\n".join(inequalities)
     joint_inequalities = f"({joint_inequalities})"
@@ -168,8 +168,8 @@ def test_construct_pddl_inequality_scheme_with_simple_3d_four_equations_returns_
     left_side_coefficients = np.random.randint(10, size=(4, 3))
     right_side_points = np.random.randint(10, size=4)
 
-    inequalities = load_action_state_fluent_storage._construct_pddl_inequality_scheme(left_side_coefficients,
-                                                                                      right_side_points)
+    inequalities = load_action_state_fluent_storage._construct_pddl_inequality_scheme(
+        left_side_coefficients, right_side_points, ["(load_limit ?z)", "(current_load ?z)", "(fuel-cost )"])
 
     joint_inequalities = "\n".join(inequalities)
     joint_inequalities = f"({joint_inequalities})"
@@ -313,7 +313,8 @@ def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_de
         "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
     }
     load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
-    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities(
+        ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"])
     assert condition_type == ConditionType.injunctive
     assert output_conditions == ["(= (fuel-cost ) 34.0) (= (load_limit ?z) 411.0) (= (current_load ?z) 121.0)"]
 
@@ -338,7 +339,8 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_t
         "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
     }
     load_action_state_fluent_storage.add_to_previous_state_storage(another_simple_state_fluents)
-    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities(
+        ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"])
     assert condition_type == ConditionType.disjunctive
     assert output_conditions == ["(and (= (fuel-cost ) 34.0) (= (load_limit ?z) 411.0) (= (current_load ?z) 121.0))",
                                  "(and (= (fuel-cost ) 35.0) (= (load_limit ?z) 413.0) (= (current_load ?z) 121.0))"]
@@ -356,11 +358,13 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
         }
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
 
-    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities(
+        ["(fuel-cost )", "(current_load ?z)"])
+
     expected_conditions = ["(<= (* (fuel-cost ) -1.0) 0.0)",
-                           "(<= (* (current_load ?z) -1.0) -0.0)",
-                           "(<= (+ (* (fuel-cost ) 1.0) (* (current_load ?z) 1.0)) 1.0)"]
-    assert output_conditions == expected_conditions
+                           "(<= (* (current_load ?z) -1.0) 0.0)",
+                           "(<= (+ (* (fuel-cost ) 0.71) (* (current_load ?z) 0.71)) 0.71)"]
+    assert set(output_conditions) == set(expected_conditions)
 
 
 def test_construct_safe_linear_inequalities_will_create_correct_inequalities_when_given_four_points_for_two_variables(
@@ -375,9 +379,10 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
         }
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
 
-    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities(
+        ["(fuel-cost )", "(current_load ?z)"])
     expected_conditions = ["(<= (* (current_load ?z) 1.0) 1.0)",
                            "(<= (* (fuel-cost ) -1.0) 0.0)",
                            "(<= (* (fuel-cost ) 1.0) 1.0)",
-                           "(<= (* (current_load ?z) -1.0) -0.0)"]
+                           "(<= (* (current_load ?z) -1.0) 0.0)"]
     assert set(output_conditions) == set(expected_conditions)

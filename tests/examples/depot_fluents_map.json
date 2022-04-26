@@ -1,0 +1,7 @@
+{
+  "drive": [],
+  "lift": [],
+  "drop": [],
+  "load": ["(current_load ?z)", "(weight ?y)", "(load_limit ?z)"],
+  "unload": []
+}

@@ -4,7 +4,7 @@ import logging
 import math
 from collections import defaultdict
 from enum import Enum
-from typing import Dict, List, NoReturn, Tuple, Union
+from typing import Dict, List, NoReturn, Tuple, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -54,18 +54,18 @@ def _prettify_coefficients(coefficients: List[float]) -> List[float]:
     :return: the prettified version of the coefficients.
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = []
-    for coef in coefficients:
-        upper_delta = math.ceil(coef) - coef
-        lower_delta = coef - math.floor(coef)
-        if upper_delta < EPSILON:
-            prettified_coefficients.append(float(math.ceil(coef)))
-
-        elif lower_delta < EPSILON:
-            prettified_coefficients.append(float(math.floor(coef)))
-
-        else:
-            prettified_coefficients.append(coef)
+    prettified_coefficients = [round(value, 2) for value in coefficients]
+    # for coef in coefficients:
+    #     upper_delta = math.ceil(coef) - coef
+    #     lower_delta = coef - math.floor(coef)
+    #     if upper_delta < EPSILON:
+    #         prettified_coefficients.append(float(math.ceil(coef)))
+    #
+    #     elif lower_delta < EPSILON:
+    #         prettified_coefficients.append(float(math.floor(coef)))
+    #
+    #     else:
+    #         prettified_coefficients.append(coef)
 
     return prettified_coefficients
 
@@ -131,21 +131,23 @@ class NumericFluentStateStorage:
         coefficients = _prettify_coefficients(coefficients)
         return coefficients, learning_score
 
-    def _convert_to_array_format(self, storage_name: str) -> np.ndarray:
+    def _convert_to_array_format(self, storage_name: str, relevant_fluents: Optional[List[str]] = None) -> np.ndarray:
         """Converts the storage to a numpy array format so that scipy functions would be able to use it.
 
         :param storage_name: the name of the storage to take the values from.
         :return: the array containing the functions' values.
         """
         if storage_name == "previous_state":
-            storage = self.previous_state_storage
+            storage = {fluent: self.previous_state_storage[fluent] for fluent in relevant_fluents} \
+                if relevant_fluents is not None else self.previous_state_storage
         else:
             storage = self.next_state_storage
 
         array = list(map(list, itertools.zip_longest(*storage.values(), fillvalue=None)))
         return np.array(array)
 
-    def _construct_pddl_inequality_scheme(self, coefficient_matrix: np.ndarray, border_points: np.ndarray) -> List[str]:
+    def _construct_pddl_inequality_scheme(self, coefficient_matrix: np.ndarray, border_points: np.ndarray,
+                                          relevant_fluents: List[str]) -> List[str]:
         """Construct the inequality strings in the appropriate PDDL format.
 
         :param coefficient_matrix: the matrix containing the coefficient vectors for each inequality.
@@ -154,8 +156,7 @@ class NumericFluentStateStorage:
         """
         inequalities = set()
         for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
-            multiplication_functions = _construct_multiplication_strings(inequality_coefficients,
-                                                                         list(self.previous_state_storage.keys()))
+            multiplication_functions = _construct_multiplication_strings(inequality_coefficients, relevant_fluents)
             constructed_left_side = self._construct_linear_equation_string(multiplication_functions)
             inequalities.add(f"(<= {constructed_left_side} {border_point})")
 
@@ -187,7 +188,8 @@ class NumericFluentStateStorage:
 
         return injunctive_conditions, ConditionType.disjunctive
 
-    def _create_convex_hull_linear_inequalities(self, points: np.ndarray, display_mode: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_convex_hull_linear_inequalities(self, points: np.ndarray,
+                                                display_mode: bool = True) -> tuple[List[List[float]], List[float]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :param points: the points that represent the values of the function in the states of the observations.
@@ -199,15 +201,9 @@ class NumericFluentStateStorage:
             hull = ConvexHull(points)
             num_dimensions = points.shape[1]
             self._display_convex_hull(display_mode, hull, num_dimensions)
-
-            equations = hull.equations
-            for index, row in enumerate(equations):
-                max_value = abs(max(row)) if max(row) != 0 else 1.0
-                equations[index] = np.array([num / max_value for num in row])
-
-            A = equations[:, :num_dimensions]
-            b = -equations[:, num_dimensions]
-            return A, b
+            A = hull.equations[:, :num_dimensions]
+            b = -hull.equations[:, num_dimensions]
+            return [_prettify_coefficients(row) for row in A], _prettify_coefficients(b)
 
         except QhullError:
             failure_reason = "Convex hull encountered an error condition and no solution was found"
@@ -263,18 +259,18 @@ class NumericFluentStateStorage:
         self.next_state_storage = {lifted_function: state_values for lifted_function, state_values in
                                    self.next_state_storage.items() if len(state_values) == max_function_len}
 
-    def construct_safe_linear_inequalities(self) -> Tuple[List[str], ConditionType]:
+    def construct_safe_linear_inequalities(self, relevant_fluents: List[str]) -> Tuple[List[str], ConditionType]:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
-        num_required_dimensions = len(self.previous_state_storage) + 1
-        previous_state_matrix = self._convert_to_array_format("previous_state")
+        num_required_dimensions = len(relevant_fluents) + 1
+        previous_state_matrix = self._convert_to_array_format("previous_state", relevant_fluents)
         if previous_state_matrix.shape[0] < num_required_dimensions:
             return self._create_disjunctive_preconditions(previous_state_matrix)
 
         A, b = self._create_convex_hull_linear_inequalities(previous_state_matrix)
-        inequalities_strs = self._construct_pddl_inequality_scheme(A, b)
+        inequalities_strs = self._construct_pddl_inequality_scheme(A, b, relevant_fluents)
         return inequalities_strs, ConditionType.injunctive
 
     def construct_assignment_equations(self, should_optimize: bool = True) -> List[str]:

@@ -13,11 +13,13 @@ class NumericSAMLearner(SAMLearner):
 
     storage: Dict[str, NumericFluentStateStorage]
     function_matcher: NumericFunctionMatcher
+    preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain):
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Dict[str, List[str]]):
         super().__init__(partial_domain)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)
+        self.preconditions_fluent_map = preconditions_fluent_map
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
         """Adds a new action to the learned domain.
@@ -74,7 +76,9 @@ class NumericSAMLearner(SAMLearner):
 
         for action_name, action in self.partial_domain.actions.items():
             self.storage[action_name].filter_out_inconsistent_state_variables()
-            action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
+            if len(self.preconditions_fluent_map[action_name]) > 0:
+                action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
+                    self.preconditions_fluent_map[action_name])
             try:
                 action.numeric_effects = self.storage[action_name].construct_assignment_equations()
                 allowed_actions[action_name] = action

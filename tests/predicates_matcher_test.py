@@ -289,4 +289,5 @@ def test_get_possible_literal_from_actual_state_captures_all_needed_predicates_i
     actual_preconditions = {"(at ?x ?p)", "(available ?x)", "(at ?y ?p)", "(on ?y ?z)", "(clear ?y)"}
     possible_lifted_matches = [matched_lifted_predicate.untyped_representation for matched_lifted_predicate in
                                possible_matches]
+    print(possible_lifted_matches)
     assert actual_preconditions.issubset(possible_lifted_matches)

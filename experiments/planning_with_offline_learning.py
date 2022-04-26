@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import NoReturn, List
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
+from pddl_plus_parser.models import Observation
 
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
@@ -95,8 +96,8 @@ class POL:
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
-    def validate_learned_domain(self, allowed_observations: List[Observation], learned_model,
-                                test_set_dir_path, validation_problems) -> NoReturn:
+    def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
+                                test_set_dir_path: Path, validation_problems: List[Path]) -> NoReturn:
         """
 
         :param allowed_observations:
