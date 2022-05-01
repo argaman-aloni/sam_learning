@@ -5,6 +5,7 @@
 		${farm_name_list} - farm
 	)
   (:init
+        (= (cost) 0)
 		${farm_init_allocation}
 		${farm_connections}
 	)

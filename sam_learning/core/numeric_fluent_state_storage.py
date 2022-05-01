@@ -55,18 +55,6 @@ def _prettify_coefficients(coefficients: List[float]) -> List[float]:
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
     prettified_coefficients = [round(value, 2) for value in coefficients]
-    # for coef in coefficients:
-    #     upper_delta = math.ceil(coef) - coef
-    #     lower_delta = coef - math.floor(coef)
-    #     if upper_delta < EPSILON:
-    #         prettified_coefficients.append(float(math.ceil(coef)))
-    #
-    #     elif lower_delta < EPSILON:
-    #         prettified_coefficients.append(float(math.floor(coef)))
-    #
-    #     else:
-    #         prettified_coefficients.append(coef)
-
     return prettified_coefficients
 
 
@@ -264,6 +252,10 @@ class NumericFluentStateStorage:
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
+        if len(relevant_fluents) == 1:
+            self.logger.debug("Only one dimension is needed in the preconditions!")
+            return self._construct_single_dimension_inequalities(relevant_fluents[0])
+
         num_required_dimensions = len(relevant_fluents) + 1
         previous_state_matrix = self._convert_to_array_format("previous_state", relevant_fluents)
         if previous_state_matrix.shape[0] < num_required_dimensions:
@@ -280,14 +272,14 @@ class NumericFluentStateStorage:
         :return: the constructed assignment statements.
         """
         assignment_statements = []
-        for lifted_function, next_state_values in self.next_state_storage.items():
+        for index, (lifted_function, next_state_values) in enumerate(self.next_state_storage.items()):
             # check if the action changed the value from the previous state at all.
             if not any([(next_value - prev_value) != 0 for
                         prev_value, next_value in zip(self.previous_state_storage[lifted_function],
                                                       next_state_values)]) and should_optimize:
                 continue
 
-            # check if all of the values consist of a change to a constant value C.
+            # check if all the values consist of a change to a constant value C.
             if len(set(self.next_state_storage[lifted_function])) <= 1:
                 const_assigned_value = self.next_state_storage[lifted_function][0]
                 return [f"(assign {lifted_function} {const_assigned_value})"]
@@ -301,9 +293,59 @@ class NumericFluentStateStorage:
             self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
 
             functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
+            if coefficient_vector[index] != 0:
+                self.logger.debug("the assigned party is a part of the equation, "
+                                  "cannot use circular dependency so changing the format!")
+                coefficients_map = {lifted_func: coef for lifted_func, coef in
+                                    zip(functions_including_dummy, coefficient_vector)}
+                assignment_statements.append(
+                    self._construct_non_circular_assignment(lifted_function, coefficients_map,
+                        self.previous_state_storage[lifted_function][0], self.next_state_storage[lifted_function][0]))
+                continue
+
             multiplication_functions = _construct_multiplication_strings(
                 coefficient_vector, functions_including_dummy)
             constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 
         return assignment_statements
+
+    def _construct_single_dimension_inequalities(self, relevant_fluent: str) -> Tuple[List[str], ConditionType]:
+        """Construct a single dimension precondition representation.
+
+        :param relevant_fluent: the fluent only fluent that is relevant to the preconditions' creation.
+        :return: the preconditions string and the condition type.
+        """
+        min_value = min(self.previous_state_storage[relevant_fluent])
+        max_value = max(self.previous_state_storage[relevant_fluent])
+        return [f"(>= {relevant_fluent} {min_value})", f"(<= {relevant_fluent} {max_value})"], ConditionType.injunctive
+
+    def _construct_non_circular_assignment(self, lifted_function: str, coefficients_map: Dict[str, float],
+                                           previous_value: float, next_value: float) -> str:
+        """Changes circular assignment statements to be non-circular.
+
+        Note:
+            Since numeric solvers don't approve circular dependencies we need format the assignment operations to be
+            in the form of increase / decrease.
+
+        :param lifted_function: the assigned variable.
+        :param coefficients_map: the calculated coefficient map.
+        :param previous_value: the numeric value of the function prior to the action's execution.
+        :param next_value: the numeric value of the function after the action's execution.
+        :return: the formatted string without circular dependencies.
+        """
+        normalized_coefficients = {k: v / coefficients_map[lifted_function] for k, v in
+                                   coefficients_map.items() if k != lifted_function and v != 0}
+        if len(normalized_coefficients) == 1:
+            normalized_coefficients = {k: abs(v) for k, v in normalized_coefficients.items()}
+
+        multiplication_functions = _construct_multiplication_strings(
+            list(normalized_coefficients.values()), list(normalized_coefficients.keys()))
+        constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
+
+        if previous_value < next_value:
+            self.logger.debug("The action caused the value of the function to increase!")
+            return f"(increase {lifted_function} {constructed_right_side})"
+
+        self.logger.debug("The action caused the value of the function to decrease!")
+        return f"(decrease {lifted_function} {constructed_right_side})"

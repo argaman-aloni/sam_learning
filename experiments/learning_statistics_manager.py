@@ -88,6 +88,8 @@ class LearningStatisticsManager:
                             learning_report: Optional[Dict[str, str]] = None) -> NoReturn:
         """Add the action data to the statistics.
 
+        :param learning_report:
+        :param learned_domain:
         :param used_observations: the observations that were used to learn the action.
         """
         num_triplets = sum([len(observation.components) for observation in used_observations])
@@ -166,7 +168,8 @@ class LearningStatisticsManager:
         actions_stats_counter = Counter(learning_report.values())
         model_precision = precision_recall_calc.calculate_model_precision()
         model_recall = precision_recall_calc.calculate_model_recall()
-        model_f1_score = 2 * (model_precision * model_recall) / (model_precision + model_recall)
+        model_f1_score = 0 if model_precision + model_recall == 0 else \
+            2 * (model_precision * model_recall) / (model_precision + model_recall)
         model_stats = {
             "learning_algorithm": self.learning_algorithm.name,
             "domain_name": self.model_domain.name,

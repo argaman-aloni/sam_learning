@@ -1,8 +1,9 @@
 """The POL main framework - Compile, Learn and Plan."""
+import json
 import logging
 import sys
 from pathlib import Path
-from typing import NoReturn, List
+from typing import NoReturn, List, Optional, Dict
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import Observation
@@ -34,9 +35,10 @@ class POL:
     _learning_algorithm: LearningAlgorithmType
     _solver: SolverType
     domain_validator: SafeDomainValidator  # TODO: add unsafe domain validators.
+    fluents_map: Dict[str, List[str]]
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 learning_algorithm: LearningAlgorithmType, solver: SolverType):
+                 learning_algorithm: LearningAlgorithmType, solver: SolverType, fluents_map_path: Optional[Path]):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path, n_split=DEFAULT_SPLIT,
@@ -48,6 +50,10 @@ class POL:
             learning_algorithm=learning_algorithm)
         self._learning_algorithm = learning_algorithm
         self._solver = solver
+        if fluents_map_path is not None:
+            with open(fluents_map_path, "rt") as json_file:
+                self.fluents_map = json.load(json_file)
+
         if learning_algorithm in SAFE_LEARNER_TYPES:
             self.domain_validator = SafeDomainValidator(self.working_directory_path, solver, learning_algorithm)
         else:
@@ -85,7 +91,8 @@ class POL:
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain)
+            learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
+                                                                    preconditions_fluent_map=self.fluents_map)
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, validation_problems)
@@ -98,12 +105,12 @@ class POL:
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
                                 test_set_dir_path: Path, validation_problems: List[Path]) -> NoReturn:
-        """
+        """Validates that using the learned domain both the used and the test set problems can be solved.
 
-        :param allowed_observations:
-        :param learned_model:
-        :param test_set_dir_path:
-        :param validation_problems:
+        :param allowed_observations: the observations that were used in the learning process.
+        :param learned_model: the domain that was learned using POL.
+        :param test_set_dir_path: the path to the directory containing the test set problems.
+        :param validation_problems: the problems to use as validation set.
         :return:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
@@ -112,9 +119,12 @@ class POL:
                                               used_observations=allowed_observations,
                                               test_set_directory_path=self.working_directory_path / "validation_set",
                                               is_validation=True)
+        self.domain_validator.clear_validation_problems()
+        self.logger.debug("Checking that the test set problems can solved using the learned domain.")
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
-                                              used_observations=allowed_observations)
+                                              used_observations=allowed_observations,
+                                              is_validation=False)
 
     def run_cross_validation(self) -> NoReturn:
         """Runs that cross validation process on the domain's working directory and validates the results."""
@@ -129,8 +139,9 @@ if __name__ == '__main__':
     args = sys.argv
     logging.basicConfig(level=logging.INFO)
     offline_learner = POL(
-        working_directory_path=Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests1/Depots"),
-        domain_file_name="depot_numeric.pddl",
+        working_directory_path=Path("/sise/home/mordocha/numeric_planning/domains/farmland"),
+        domain_file_name="farmland.pddl",
         learning_algorithm=LearningAlgorithmType.numeric_sam,
-        solver=SolverType.metric_ff)
+        solver=SolverType.metric_ff,
+        fluents_map_path=Path("/sise/home/mordocha/numeric_planning/domains/farmland/farmland_fluents_map.json"))
     offline_learner.run_cross_validation()

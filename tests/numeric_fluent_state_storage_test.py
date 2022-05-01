@@ -152,6 +152,35 @@ def test_construct_pddl_inequality_scheme_with_simple_2d_four_equations_returns_
             fail()
 
 
+def test_construct_non_circular_assignment_constructs_correct_equation_with_correct_coefficient_sign_on_increase(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    lifted_function = "(current_load ?z)"
+    coefficient_map = {
+        "(current_load ?z)": 1.0,
+        "(weight ?y)": 1.0
+    }
+    previous_value = 0.0
+    next_value = 1.0
+    increase_statement = load_action_state_fluent_storage._construct_non_circular_assignment(
+        lifted_function, coefficient_map, previous_value, next_value)
+    assert increase_statement == "(increase (current_load ?z) (* (weight ?y) 1.0))"
+
+
+def test_construct_non_circular_assignment_constructs_correct_equation_with_correct_coefficient_sign_on_decrease(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    lifted_function = "(current_load ?z)"
+    coefficient_map = {
+        "(current_load ?z)": 1.0,
+        "(weight ?y)": -1.0,
+        "(dummy)": 0.0
+    }
+    previous_value = 1.0
+    next_value = 0.0
+    increase_statement = load_action_state_fluent_storage._construct_non_circular_assignment(
+        lifted_function, coefficient_map, previous_value, next_value)
+    assert increase_statement == "(decrease (current_load ?z) (* (weight ?y) 1.0))"
+
+
 def test_construct_pddl_inequality_scheme_with_simple_3d_four_equations_returns_correct_representation(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
@@ -272,9 +301,9 @@ def test_construct_assignment_equations_with_two_equations_result_in_multiple_ch
 
     assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
     assert len(assignment_equations) == 2
-    assert assignment_equations == [
-        "(assign (load_limit ?z) (+ (* (load_limit ?z) -7.0) (* (current_load ?z) 2.0)))",
-        "(assign (current_load ?z) (* (load_limit ?z) 9.0))"]
+    assert set(assignment_equations) == {
+        "(increase (load_limit ?z) (* (current_load ?z) 0.2857142857142857))",
+        "(assign (current_load ?z) (* (load_limit ?z) 9.0))"}
 
 
 def test_construct_assignment_equations_with_an_increase_change_results_in_correct_values(
@@ -385,4 +414,23 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
                            "(<= (* (fuel-cost ) -1.0) 0.0)",
                            "(<= (* (fuel-cost ) 1.0) 1.0)",
                            "(<= (* (current_load ?z) -1.0) 0.0)"]
+    assert set(output_conditions) == set(expected_conditions)
+
+
+def test_construct_safe_linear_inequalities_with_one_dimension_variable_select_min_and_max_values(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    pre_state_input_values = [(-19.0, 32.0), (14.0, 52.0), (28.0, 12.0), (-7.0, 13.0)]
+    for fuel_cost_val, current_limit_val in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_limit_val)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities(
+        ["(fuel-cost )"])
+    expected_conditions = ["(<= (fuel-cost ) 28.0)",
+                           "(>= (fuel-cost ) -19.0)"]
     assert set(output_conditions) == set(expected_conditions)

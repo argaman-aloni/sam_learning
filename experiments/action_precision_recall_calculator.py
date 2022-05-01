@@ -170,6 +170,9 @@ class PrecisionRecallCalculator:
                                   self._compared_tuples) for action_name in self._action_names])
         false_positives = sum([sum(calculate_false_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
                                    self._compared_tuples) for action_name in self._action_names])
+        if true_positives + false_positives == 0:
+            return 0
+
         return true_positives / (true_positives + false_positives)
 
     def calculate_model_recall(self) -> float:
@@ -181,4 +184,7 @@ class PrecisionRecallCalculator:
                                   self._compared_tuples) for action_name in self._action_names])
         false_negatives = sum([sum(calculate_false_negative_rate(tup[0][action_name], tup[1][action_name]) for tup in
                                    self._compared_tuples) for action_name in self._action_names])
+        if true_positives + false_negatives == 0:
+            return 0
+        
         return true_positives / (true_positives + false_negatives)

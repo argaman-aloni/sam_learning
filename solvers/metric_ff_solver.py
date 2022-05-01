@@ -32,7 +32,7 @@ source activate pol_framework
 
 METRIC_FF_DIRECTORY = "/sise/home/mordocha/numeric_planning/Metric-FF-v2.1/"
 BATCH_JOB_SUBMISSION_REGEX = re.compile(b"Submitted batch job (?P<batch_id>\d+)")
-MAX_RUNNING_TIME = 100  # seconds
+MAX_RUNNING_TIME = 300  # seconds
 
 
 class MetricFFSolver:
@@ -71,7 +71,7 @@ class MetricFFSolver:
             start_time = time.time()
             execution_state = subprocess.check_output(["squeue", "--me"])
             while batch_id in execution_state:
-                self.logger.debug(f"Solver with the id - {batch_id} is still running...")
+                self.logger.debug(f"Solver with the id - {batch_id} is still solving {problem_file_path.stem}...")
                 if (time.time() - start_time) > MAX_RUNNING_TIME:
                     subprocess.check_output(["scancel", batch_id])
 
@@ -84,6 +84,7 @@ class MetricFFSolver:
             os.remove(script_file_path)
 
         return
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

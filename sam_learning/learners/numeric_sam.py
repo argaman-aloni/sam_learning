@@ -75,6 +75,10 @@ class NumericSAMLearner(SAMLearner):
                 self.handle_single_trajectory_component(component)
 
         for action_name, action in self.partial_domain.actions.items():
+            if action_name not in self.storage:
+                self.logger.debug(f"The action - {action_name} has not been observed in the trajectories!")
+                continue
+
             self.storage[action_name].filter_out_inconsistent_state_variables()
             if len(self.preconditions_fluent_map[action_name]) > 0:
                 action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(

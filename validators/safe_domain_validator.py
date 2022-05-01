@@ -26,7 +26,11 @@ SOLVING_STATISTICS = [
 
 
 class SafeDomainValidator:
-    """"""
+    """Validates that the learned domain can create plans.
+
+    Note:
+        There is no validation on the plan content since the learning process is safe.
+    """
 
     logger: logging.Logger
     expected_domain_path: str
@@ -48,11 +52,10 @@ class SafeDomainValidator:
         self.results_dir_path = working_directory_path / "results_directory"
 
     def copy_validation_problems(self, tested_domain_file_path: Path, validation_set_problems: List[Path]) -> NoReturn:
-        """
+        """Copies the problems that were used in the learning process to the validation set directory.
 
-        :param tested_domain_file_path:
-        :param validation_set_problems:
-        :return:
+        :param tested_domain_file_path: the domain that was learned in the current iteration.
+        :param validation_set_problems: the problems to copy.
         """
         self.logger.info("Copying the tested domain and the validation set problems.")
         shutil.copy(tested_domain_file_path, self.validation_directory_path / tested_domain_file_path.name)
@@ -61,20 +64,19 @@ class SafeDomainValidator:
 
     def validate_domain(self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
                         used_observations: List[Observation] = None, is_validation: bool = False) -> NoReturn:
-        """
+        """Validates that using the input domain problems can be solved.
 
-        :param tested_domain_file_path:
-        :param test_set_directory_path:
-        :param used_observations:
-        :param is_validation:
-        :return:
+        :param tested_domain_file_path: the path of the domain that was learned using POL.
+        :param test_set_directory_path: the path to the directory containing the test set problems.
+        :param used_observations: the observations that were used to learn the domain.
+        :param is_validation: whether the problems belong to the validation set or to the test set.
         """
         num_triplets = sum([len(observation.components) for observation in used_observations])
         self.logger.info("Solving the test set problems using the learned domain!")
         script_file_name = "solver_execution_script.sh"
         execution_script_path = test_set_directory_path / script_file_name if not is_validation \
             else self.validation_directory_path / script_file_name
-        problems_dir_path = test_set_directory_path if is_validation else self.validation_directory_path
+        problems_dir_path = test_set_directory_path if not is_validation else self.validation_directory_path
         self.solver.write_batch_and_execute_solver(
             script_file_path=execution_script_path,
             problems_directory_path=problems_dir_path,
@@ -95,27 +97,27 @@ class SafeDomainValidator:
 
     @staticmethod
     def _clear_plans(test_set_directory: Path) -> NoReturn:
-        """
+        """Clears the plan filed from the directory.
 
-        :param test_set_directory:
+        :param test_set_directory: the path to the directory containg the plans.
         """
         for solver_output_path in test_set_directory.glob("*.solution"):
             os.remove(solver_output_path)
 
     def clear_validation_problems(self) -> NoReturn:
-        """"""
-        for problem_file_path in self.validation_set_stats.glob("pfile*.pddl"):
+        """Clears the copied validation set problems."""
+        for problem_file_path in self.validation_directory_path.glob("pfile*.pddl"):
             os.remove(problem_file_path)
 
     def write_statistics(self, fold_num: int) -> NoReturn:
         """Writes the statistics of the learned model into a CSV file.
 
-        :param fold_num:
+        :param fold_num: the index of the fold that is currently being tested.
         """
         output_statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}" \
                                                          f"_problem_solving_stats_{fold_num}.csv"
         validation_statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}" \
-                                                             f"validation_testing_stats_{fold_num}.csv"
+                                                             f"_validation_testing_stats_{fold_num}.csv"
         with open(output_statistics_path, 'wt', newline='') as csv_file, \
                 open(validation_statistics_path, 'wt', newline='') as validations_stats_file:
             test_set_writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
@@ -128,10 +130,10 @@ class SafeDomainValidator:
             #     test_set_writer.writerow(data)
 
     def _validate_solution_content(self, solution_file_path: Path) -> int:
-        """
+        """Validates that the solution file contains a valid plan.
 
-        :param solution_file_path:
-        :return:
+        :param solution_file_path: the path to the solution file.
+        :return: 1 if there is a plan in the solution file, zero otherwise.
         """
         if self.learning_algorithm == LearningAlgorithmType.numeric_sam:
             return 1 if MetricFFParser().is_valid_plan_file(solution_file_path) else 0
