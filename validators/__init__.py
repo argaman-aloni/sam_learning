@@ -1,0 +1,1 @@
+from .safe_domain_validator import DomainValidator

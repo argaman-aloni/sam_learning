@@ -6,8 +6,9 @@ import shutil
 from pathlib import Path
 from typing import NoReturn, Dict, List, Any, Union, Optional
 
-from pddl_plus_parser.exporters import MetricFFParser
-from pddl_plus_parser.models import Observation
+from pddl_plus_parser.exporters import MetricFFParser, TrajectoryExporter
+from pddl_plus_parser.models import Observation, Domain
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 
 from experiments.util_types import LearningAlgorithmType, SolverType
 from solvers import FastDownwardSolver, MetricFFSolver
@@ -21,11 +22,17 @@ SOLVING_STATISTICS = [
     "learning_algorithm",
     "num_trajectories",
     "num_trajectory_triplets",
-    "#problems_solved",
+    "ok",
+    "no-solution",
+    "timeout",
+    "not-applicable"
 ]
 
+OK = "ok"
+NOT_APPLICABLE = "not-applicable"
 
-class SafeDomainValidator:
+
+class DomainValidator:
     """Validates that the learned domain can create plans.
 
     Note:
@@ -33,7 +40,7 @@ class SafeDomainValidator:
     """
 
     logger: logging.Logger
-    expected_domain_path: str
+    reference_domain: Domain
     solver: Union[FastDownwardSolver, MetricFFSolver]
     solving_stats: List[Dict[str, Any]]
     validation_set_stats: List[Dict[str, Any]]
@@ -42,7 +49,7 @@ class SafeDomainValidator:
     validation_directory_path: Path
 
     def __init__(self, working_directory_path: Path, solver_type: SolverType,
-                 learning_algorithm: LearningAlgorithmType):
+                 learning_algorithm: LearningAlgorithmType, reference_domain_path: Path):
         self.logger = logging.getLogger(__name__)
         self.solver = SOLVER_TYPES[solver_type]()
         self.solving_stats = []
@@ -50,6 +57,7 @@ class SafeDomainValidator:
         self.learning_algorithm = learning_algorithm
         self.validation_directory_path = working_directory_path / "validation_set"
         self.results_dir_path = working_directory_path / "results_directory"
+        self.reference_domain = DomainParser(domain_path=reference_domain_path, partial_parsing=False).parse_domain()
 
     def copy_validation_problems(self, tested_domain_file_path: Path, validation_set_problems: List[Path]) -> NoReturn:
         """Copies the problems that were used in the learning process to the validation set directory.
@@ -82,16 +90,17 @@ class SafeDomainValidator:
             problems_directory_path=problems_dir_path,
             domain_file_path=tested_domain_file_path
         )
-        num_valid_solutions = 0
+        solving_stats = {"ok": 0, "no-solution": 0, "timeout": 0, "not-applicable": 0}
         for solution_file_path in test_set_directory_path.glob("*.solution"):
-            num_valid_solutions += self._validate_solution_content(solution_file_path)
+            problem_file_path = problems_dir_path / f"{solution_file_path.stem}.pddl"
+            self._validate_solution_content(solution_file_path, problem_file_path, solving_stats)
 
-        solver_stats = self.solving_stats if not is_validation else self.validation_set_stats
-        solver_stats.append({
+        validation_stats = self.solving_stats if not is_validation else self.validation_set_stats
+        validation_stats.append({
             "learning_algorithm": self.learning_algorithm.name,
             "num_trajectories": len(used_observations),
             "num_trajectory_triplets": num_triplets,
-            "#problems_solved": num_valid_solutions,
+            **solving_stats
         })
         self._clear_plans(problems_dir_path)
 
@@ -126,16 +135,30 @@ class SafeDomainValidator:
             validation_set_writer.writeheader()
             validation_set_writer.writerows(self.validation_set_stats)
             test_set_writer.writerows(self.solving_stats)
-            # for data in self.solving_stats:
-            #     test_set_writer.writerow(data)
 
-    def _validate_solution_content(self, solution_file_path: Path) -> int:
+    def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
+                                   iteration_statistics: Dict[str, int]) -> NoReturn:
         """Validates that the solution file contains a valid plan.
 
         :param solution_file_path: the path to the solution file.
         :return: 1 if there is a plan in the solution file, zero otherwise.
         """
         if self.learning_algorithm == LearningAlgorithmType.numeric_sam:
-            return 1 if MetricFFParser().is_valid_plan_file(solution_file_path) else 0
+            solution_status, sequence = MetricFFParser().get_solving_status(solution_file_path)
+            if solution_status == OK:
+                self.logger.debug("The planner created a solution! "
+                                  "Will now validate that the action sequence is applicable!")
+                problem = ProblemParser(problem_file_path, self.reference_domain).parse_problem()
+                try:
+                    TrajectoryExporter(self.reference_domain).parse_plan(problem=problem, action_sequence=sequence)
+                    iteration_statistics[OK] += 1
+                    return
 
-        return 0  # TODO: complete for fast downward.
+                except ValueError:
+                    self.logger.warning("Found a solution that was not applicable!")
+                    iteration_statistics[NOT_APPLICABLE] += 1
+
+            iteration_statistics[solution_status] += 1
+            return
+
+        return  # TODO: complete for fast downward.

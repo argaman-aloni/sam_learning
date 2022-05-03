@@ -10,10 +10,10 @@ from pddl_plus_parser.models import Observation
 
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
-from validators.safe_domain_validator import SafeDomainValidator
 from experiments.util_types import LearningAlgorithmType, SolverType
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner
+from validators import DomainValidator
 
 DEFAULT_SPLIT = 3
 
@@ -34,7 +34,7 @@ class POL:
     learning_statistics_manager: LearningStatisticsManager
     _learning_algorithm: LearningAlgorithmType
     _solver: SolverType
-    domain_validator: SafeDomainValidator  # TODO: add unsafe domain validators.
+    domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
@@ -54,11 +54,8 @@ class POL:
             with open(fluents_map_path, "rt") as json_file:
                 self.fluents_map = json.load(json_file)
 
-        if learning_algorithm in SAFE_LEARNER_TYPES:
-            self.domain_validator = SafeDomainValidator(self.working_directory_path, solver, learning_algorithm)
-        else:
-            self.domain_validator = None
-            # TODO: add unsafe domain validation.
+        self.domain_validator = DomainValidator(
+            self.working_directory_path, solver, learning_algorithm, self.working_directory_path / domain_file_name)
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
@@ -91,6 +88,7 @@ class POL:
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
+            self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map)
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
@@ -111,7 +109,6 @@ class POL:
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param validation_problems: the problems to use as validation set.
-        :return:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.domain_validator.copy_validation_problems(domain_file_path, validation_problems)
@@ -135,13 +132,21 @@ class POL:
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
 
-if __name__ == '__main__':
+def main():
     args = sys.argv
-    logging.basicConfig(level=logging.INFO)
-    offline_learner = POL(
-        working_directory_path=Path("/sise/home/mordocha/numeric_planning/domains/farmland"),
-        domain_file_name="farmland.pddl",
-        learning_algorithm=LearningAlgorithmType.numeric_sam,
-        solver=SolverType.metric_ff,
-        fluents_map_path=Path("/sise/home/mordocha/numeric_planning/domains/farmland/farmland_fluents_map.json"))
+    working_directory_path = Path(args[1])
+    domain_file_name = args[2]
+    learning_algorithm = LearningAlgorithmType.numeric_sam
+    solver = SolverType.metric_ff
+    fluents_map_path = Path(args[3])
+    offline_learner = POL(working_directory_path=working_directory_path,
+                          domain_file_name=domain_file_name,
+                          learning_algorithm=learning_algorithm,
+                          solver=solver,
+                          fluents_map_path=fluents_map_path)
     offline_learner.run_cross_validation()
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    main()

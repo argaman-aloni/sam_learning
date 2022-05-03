@@ -15,7 +15,7 @@ execution_script = """#!/bin/bash
 
 #SBATCH --partition main			### specify partition name where to run a job. short: 7 days limit; gtx1080: 7 days; debug: 2 hours limit and 1 job at a time
 #SBATCH --time 0-03:30:00			### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
-#SBATCH --job-name metric_planner_job			### name of the job
+#SBATCH --job-name metric_ff_planner_job			### name of the job
 #SBATCH --output job-%J.out			### output log for running job - %J for job number
 ##SBATCH --mail-user=aaa.bbb@ccc	### user's email for sending job status messages
 ##SBATCH --mail-type=END			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
@@ -32,7 +32,7 @@ source activate pol_framework
 
 METRIC_FF_DIRECTORY = "/sise/home/mordocha/numeric_planning/Metric-FF-v2.1/"
 BATCH_JOB_SUBMISSION_REGEX = re.compile(b"Submitted batch job (?P<batch_id>\d+)")
-MAX_RUNNING_TIME = 300  # seconds
+MAX_RUNNING_TIME = 60  # seconds
 
 
 class MetricFFSolver:
@@ -82,6 +82,12 @@ class MetricFFSolver:
             self.logger.info("Solver finished its execution!")
             self.logger.debug("Cleaning the sbatch file from the problems directory.")
             os.remove(script_file_path)
+            for job_file_path in Path(METRIC_FF_DIRECTORY).glob("job-*.out"):
+                self.logger.debug("Removing the temp job file!")
+                try:
+                    os.remove(job_file_path)
+                except FileNotFoundError:
+                    continue
 
         return
 
@@ -90,6 +96,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     solver = MetricFFSolver()
     solver.write_batch_and_execute_solver(
-        Path("/sise/home/mordocha/numeric_planning/domains/farmland/execution_script.sh"),
-        Path("/sise/home/mordocha/numeric_planning/domains/farmland/"),
-        Path("/sise/home/mordocha/numeric_planning/domains/farmland/farmland.pddl"))
+        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests2/Rovers/Numeric/execution_script.sh"),
+        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests2/Rovers/Numeric/"),
+        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests2/Rovers/Numeric/NumRover.pddl"))

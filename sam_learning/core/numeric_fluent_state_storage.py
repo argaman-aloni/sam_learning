@@ -1,7 +1,6 @@
 """Module that stores an action's numeric state fluents and handles its access."""
 import itertools
 import logging
-import math
 from collections import defaultdict
 from enum import Enum
 from typing import Dict, List, NoReturn, Tuple, Union, Optional
