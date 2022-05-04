@@ -49,6 +49,25 @@ def test_add_new_action_with_single_trajectory_component_adds_action_data_to_lea
     assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(lift-at ?lift ?f1)"]
 
 
+def test_deduce_initial_inequality_preconditions_deduce_that_all_objects_with_same_type_should_not_be_equal(
+        sam_learning: SAMLearner):
+    sam_learning.deduce_initial_inequality_preconditions()
+    example_action_name = "move-up-slow"
+    action = sam_learning.partial_domain.actions[example_action_name]
+    assert action.inequality_preconditions == {("?f1", "?f2")}
+
+
+def test_verify_parameter_duplication_removes_inequality_if_found_action_with_duplicated_items_in_observation(
+        sam_learning: SAMLearner):
+    sam_learning.deduce_initial_inequality_preconditions()
+    example_action_name = "move-up-slow"
+    action = sam_learning.partial_domain.actions[example_action_name]
+    assert action.inequality_preconditions == {("?f1", "?f2")}
+    duplicated_action_call = ActionCall(name=example_action_name, grounded_parameters=["slow-lift", "c1", "c1"])
+    sam_learning._verify_parameter_duplication(duplicated_action_call)
+    assert len(action.inequality_preconditions) == 0
+
+
 def test_update_action_with_two_trajectory_component_updates_action_data_correctly(
         sam_learning: SAMLearner, elevators_observation: Observation):
     first_observation_component = elevators_observation.components[0]
@@ -79,7 +98,8 @@ def test_handle_single_trajectory_component_not_allowing_actions_with_duplicated
         sam_learning: SAMLearner, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]
     test_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow2-0", "n17", "n17"])
-    component = ObservedComponent(observation_component.previous_state, test_action_call, observation_component.next_state)
+    component = ObservedComponent(observation_component.previous_state, test_action_call,
+                                  observation_component.next_state)
     sam_learning.handle_single_trajectory_component(component)
 
     added_action_name = "move-down-slow"
@@ -101,6 +121,7 @@ def test_handle_single_trajectory_component_learns_preconditions_and_effects_whe
     assert preconditions_str.issuperset(["(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"])
     assert [p.untyped_representation for p in learned_action_data.add_effects] == ["(lift-at ?lift ?f2)"]
     assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(lift-at ?lift ?f1)"]
+
 
 def test_learn_action_model_returns_learned_model(sam_learning: SAMLearner, elevators_observation: Observation):
     learned_model, learning_report = sam_learning.learn_action_model([elevators_observation])

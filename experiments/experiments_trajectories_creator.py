@@ -41,7 +41,7 @@ class ExperimentTrajectoriesCreator:
                 triplets = trajectory_exporter.parse_plan(problem, solution_file_path)
                 trajectory_exporter.export_to_file(triplets, trajectory_file_path)
 
-            except Exception:
+            except (ValueError, IndexError):
                 continue
 
 

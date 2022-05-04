@@ -1,5 +1,7 @@
 """The Safe Action Model Learning algorithm module."""
 import logging
+from collections import defaultdict
+from itertools import combinations
 from typing import List, Tuple, NoReturn, Dict
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent
@@ -115,7 +117,18 @@ class SAMLearner:
         :param grounded_action: the grounded action observed in the trajectory triplet.
         :return: whether the action contains duplicated parameters.
         """
-        return contains_duplicates(grounded_action.parameters)
+        has_duplicates = contains_duplicates(grounded_action.parameters)
+        if has_duplicates:
+            action = self.partial_domain.actions[grounded_action.name]
+            grounded_signature_map = defaultdict(list)
+            for grounded_param, lifted_param in zip(grounded_action.parameters, action.parameter_names):
+                grounded_signature_map[grounded_param].append(lifted_param)
+
+            for lifted_duplicates_list in grounded_signature_map.values():
+                for (obj1, obj2) in combinations(lifted_duplicates_list, 2):
+                    action.inequality_preconditions.discard((obj1, obj2))
+
+        return has_duplicates
 
     def handle_single_trajectory_component(self, component: ObservedComponent) -> NoReturn:
         """Handles a single trajectory component as a part of the learning process.
@@ -144,9 +157,18 @@ class SAMLearner:
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
+        self.deduce_initial_inequality_preconditions()
         for observation in observations:
             for component in observation.components:
                 self.handle_single_trajectory_component(component)
 
         learning_report = {action_name: "OK" for action_name in self.partial_domain.actions}
         return self.partial_domain, learning_report
+
+    def deduce_initial_inequality_preconditions(self) -> NoReturn:
+        """Tries to deduce which objects in the actions' signature cannot be equal."""
+        self.logger.debug("Starting to deduce inequality preconditions")
+        for action_name, action_data in self.partial_domain.actions.items():
+            for (lifted_param1, lifted_param2) in combinations(action_data.parameter_names, 2):
+                if action_data.signature[lifted_param1] == action_data.signature[lifted_param2]:
+                    action_data.inequality_preconditions.add((lifted_param1, lifted_param2))

@@ -92,7 +92,8 @@ class NumericFluentStateStorage:
         _, indices = sympy.Matrix(values_matrix).T.rref()
         X = np.array([values_matrix[index] for index in indices])
         if X.shape[0] < num_dimensions:
-            failure_reason = "There are too few independent rows of data! cannot solve linear equations!"
+            failure_reason = f"There are too few independent rows of data! " \
+                             f"cannot solve linear equations for action - {self.action_name}!"
             self.logger.warning(failure_reason)
             raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 

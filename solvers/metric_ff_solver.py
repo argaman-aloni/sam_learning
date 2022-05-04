@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import NoReturn
@@ -93,9 +94,9 @@ class MetricFFSolver:
 
 
 if __name__ == '__main__':
+    args = sys.argv
     logging.basicConfig(level=logging.DEBUG)
     solver = MetricFFSolver()
-    solver.write_batch_and_execute_solver(
-        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests2/Rovers/Numeric/execution_script.sh"),
-        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests2/Rovers/Numeric/"),
-        Path("/sise/home/mordocha/numeric_planning/domains/IPC3/Tests2/Rovers/Numeric/NumRover.pddl"))
+    solver.write_batch_and_execute_solver(script_file_path=Path(args[1]),
+                                          problems_directory_path=Path(args[2]),
+                                          domain_file_path=Path(args[3]))

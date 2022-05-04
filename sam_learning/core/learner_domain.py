@@ -6,7 +6,6 @@ from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLCons
 
 from .numeric_fluent_state_storage import ConditionType
 
-
 DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
 
 
@@ -17,6 +16,7 @@ class LearnerAction:
     signature: SignatureType
     positive_preconditions: Set[Predicate]
     negative_preconditions: Set[Predicate]
+    inequality_preconditions: Set[Tuple[str, str]]
     numeric_preconditions: Tuple[List[str], ConditionType]
     add_effects: Set[Predicate]
     delete_effects: Set[Predicate]
@@ -27,6 +27,7 @@ class LearnerAction:
         self.signature = signature
         self.positive_preconditions = set()
         self.negative_preconditions = set()
+        self.inequality_preconditions = set()
         self.numeric_preconditions = tuple()
         self.add_effects = set()
         self.delete_effects = set()
@@ -62,6 +63,11 @@ class LearnerAction:
         :return:
         """
         positive_preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
+        inequality_precondition_str = ""
+        if len(self.inequality_preconditions) > 0:
+            inequality_precondition_str = " ".join(f"(not (= {obj[0]} {obj[1]}))" for obj in
+                                                   self.inequality_preconditions)
+
         if len(self.numeric_preconditions) > 0:
             numeric_preconditions = self.numeric_preconditions[0]
             conditions_type = self.numeric_preconditions[1]
@@ -75,7 +81,7 @@ class LearnerAction:
             return f"(and {' '.join(positive_preconditions)}\n" \
                    f"\t\t{preconditions_str})"
 
-        return f"(and {' '.join(positive_preconditions)})"
+        return f"(and {' '.join(positive_preconditions)} {inequality_precondition_str})"
 
     def _effects_to_pddl(self) -> str:
         add_effects = [effect.untyped_representation for effect in self.add_effects]
