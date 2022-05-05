@@ -7,4 +7,4 @@ sympy~=1.10
 scikit-learn~=1.0.2
 pathlib2==2.3.7.post1
 networkx==2.8
-pddl-plus-parser==1.0.10
+pddl-plus-parser==1.0.15

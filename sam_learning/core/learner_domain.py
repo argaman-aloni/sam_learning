@@ -67,6 +67,7 @@ class LearnerAction:
         if len(self.inequality_preconditions) > 0:
             inequality_precondition_str = " ".join(f"(not (= {obj[0]} {obj[1]}))" for obj in
                                                    self.inequality_preconditions)
+            inequality_precondition_str += "\n"
 
         if len(self.numeric_preconditions) > 0:
             numeric_preconditions = self.numeric_preconditions[0]
@@ -79,6 +80,7 @@ class LearnerAction:
                 preconditions_str = "\t\t\n".join(numeric_preconditions)
 
             return f"(and {' '.join(positive_preconditions)}\n" \
+                   f"\t\t{inequality_precondition_str}" \
                    f"\t\t{preconditions_str})"
 
         return f"(and {' '.join(positive_preconditions)} {inequality_precondition_str})"

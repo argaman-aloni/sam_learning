@@ -70,6 +70,7 @@ class NumericSAMLearner(SAMLearner):
         self.logger.info("Starting to learn the action model!")
         allowed_actions = {}
         learning_metadata = {}
+        super().deduce_initial_inequality_preconditions()
         for observation in observations:
             for component in observation.components:
                 self.handle_single_trajectory_component(component)
@@ -83,6 +84,7 @@ class NumericSAMLearner(SAMLearner):
             if len(self.preconditions_fluent_map[action_name]) > 0:
                 action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
                     self.preconditions_fluent_map[action_name])
+
             try:
                 action.numeric_effects = self.storage[action_name].construct_assignment_equations()
                 allowed_actions[action_name] = action

@@ -15,7 +15,7 @@ from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner
 from validators import DomainValidator
 
-DEFAULT_SPLIT = 3
+DEFAULT_SPLIT = 4
 
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
@@ -34,12 +34,14 @@ class POL:
     learning_statistics_manager: LearningStatisticsManager
     _learning_algorithm: LearningAlgorithmType
     _solver: SolverType
+    debug: bool
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, solver: SolverType, fluents_map_path: Optional[Path]):
         self.logger = logging.getLogger(__name__)
+        self.debug = False
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path, n_split=DEFAULT_SPLIT,
                                  domain_file_name=domain_file_name)
@@ -111,12 +113,14 @@ class POL:
         :param validation_problems: the problems to use as validation set.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
-        self.domain_validator.copy_validation_problems(domain_file_path, validation_problems)
-        self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                              used_observations=allowed_observations,
-                                              test_set_directory_path=self.working_directory_path / "validation_set",
-                                              is_validation=True)
-        self.domain_validator.clear_validation_problems()
+        if self.debug:
+            self.domain_validator.copy_validation_problems(domain_file_path, validation_problems)
+            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                                  used_observations=allowed_observations,
+                                                  test_set_directory_path=self.working_directory_path / "validation_set",
+                                                  is_validation=True)
+            self.domain_validator.clear_validation_problems()
+
         self.logger.debug("Checking that the test set problems can solved using the learned domain.")
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,

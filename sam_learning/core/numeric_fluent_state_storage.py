@@ -211,7 +211,7 @@ class NumericFluentStateStorage:
             plt.show()
 
     def _validate_safe_equation_solving(self, lifted_function):
-        num_variables = len(self.next_state_storage)
+        num_variables = len(self.previous_state_storage)
         num_equations = len(self.previous_state_storage[lifted_function])
         # validate that it is possible to solve linear equations at all.
         if num_equations < num_variables:
@@ -219,6 +219,15 @@ class NumericFluentStateStorage:
             self.logger.warning(failure_reason)
             raise NotSafeActionError(
                 self.action_name, failure_reason, EquationSolutionType.not_enough_data)
+
+    def _remove_duplicated_variables(self) -> NoReturn:
+        """removes variables that are basically duplication of other variables. This happens in some domains."""
+        duplicated_numeric_functions = []
+        for function1, function2 in itertools.combinations(self.previous_state_storage, 2):
+            if self.previous_state_storage[function1] == self.previous_state_storage[function2]:
+                duplicated_numeric_functions.append(function2)
+        for func in duplicated_numeric_functions:
+            del self.previous_state_storage[func]
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
@@ -272,7 +281,7 @@ class NumericFluentStateStorage:
         :return: the constructed assignment statements.
         """
         assignment_statements = []
-        for index, (lifted_function, next_state_values) in enumerate(self.next_state_storage.items()):
+        for lifted_function, next_state_values in self.next_state_storage.items():
             # check if the action changed the value from the previous state at all.
             if not any([(next_value - prev_value) != 0 for
                         prev_value, next_value in zip(self.previous_state_storage[lifted_function],
@@ -284,6 +293,7 @@ class NumericFluentStateStorage:
                 const_assigned_value = self.next_state_storage[lifted_function][0]
                 return [f"(assign {lifted_function} {const_assigned_value})"]
 
+            self._remove_duplicated_variables()
             self._validate_safe_equation_solving(lifted_function)
 
             function_post_values = np.array(next_state_values)
@@ -293,14 +303,15 @@ class NumericFluentStateStorage:
             self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
 
             functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
-            if coefficient_vector[index] != 0:
+            if coefficient_vector[list(self.previous_state_storage.keys()).index(lifted_function)] != 0:
                 self.logger.debug("the assigned party is a part of the equation, "
                                   "cannot use circular dependency so changing the format!")
                 coefficients_map = {lifted_func: coef for lifted_func, coef in
                                     zip(functions_including_dummy, coefficient_vector)}
                 assignment_statements.append(
                     self._construct_non_circular_assignment(lifted_function, coefficients_map,
-                        self.previous_state_storage[lifted_function][0], self.next_state_storage[lifted_function][0]))
+                                                            self.previous_state_storage[lifted_function][0],
+                                                            self.next_state_storage[lifted_function][0]))
                 continue
 
             multiplication_functions = _construct_multiplication_strings(
