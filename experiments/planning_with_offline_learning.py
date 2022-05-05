@@ -43,7 +43,7 @@ class POL:
         self.logger = logging.getLogger(__name__)
         self.debug = False
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, n_split=DEFAULT_SPLIT,
+        self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
                                  domain_file_name=domain_file_name)
         self.domain_file_name = domain_file_name
         self.learning_statistics_manager = LearningStatisticsManager(
@@ -133,6 +133,8 @@ class POL:
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
+            self.domain_validator.clear_statistics()
+            self.learning_statistics_manager.clear_statistics()
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
 

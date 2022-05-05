@@ -136,6 +136,11 @@ class DomainValidator:
             validation_set_writer.writerows(self.validation_set_stats)
             test_set_writer.writerows(self.solving_stats)
 
+    def clear_statistics(self) -> NoReturn:
+        """Clears the statistics so that each fold will have no relation to its predecessors."""
+        self.validation_set_stats.clear()
+        self.solving_stats.clear()
+
     def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
                                    iteration_statistics: Dict[str, int]) -> NoReturn:
         """Validates that the solution file contains a valid plan.

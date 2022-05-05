@@ -31,7 +31,7 @@ class KFoldSplit:
     domain_file_path: Path
     validation_directory_path: Path
 
-    def __init__(self, working_directory_path: Path, n_split: int, domain_file_name: str):
+    def __init__(self, working_directory_path: Path, domain_file_name: str, n_split: int = 0):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.n_split = n_split
@@ -65,7 +65,8 @@ class KFoldSplit:
             trajectory_paths.append(trajectory_file_path)
             problem_paths.append(self.working_directory_path / f"{trajectory_file_path.stem}.pddl")
 
-        for test_set_indices in create_test_set_indices(len(problem_paths), self.n_split):
+        num_splits = len(trajectory_paths) if self.n_split == 0 else self.n_split
+        for test_set_indices in create_test_set_indices(len(problem_paths), num_splits):
             self.train_set_dir_path.mkdir(exist_ok=True)
             self.test_set_dir_path.mkdir(exist_ok=True)
             self.validation_directory_path.mkdir(exist_ok=True)

@@ -1,10 +1,21 @@
 from collections import defaultdict
-from typing import Dict, Set, NoReturn
+from typing import Dict, Set, NoReturn, List
 
 from pddl_plus_parser.models import Action
 
 from sam_learning.core import LearnerAction
 
+PRECISION_RECALL_FIELD_NAMES = [
+    "preconditions_precision",
+    "add_effects_precision",
+    "delete_effects_precision",
+    "preconditions_recall",
+    "add_effects_recall",
+    "delete_effects_recall",
+    "action_precision",
+    "action_recall",
+    "f1_score"
+]
 
 def calculate_true_positive_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
     """
@@ -79,6 +90,8 @@ class PrecisionRecallCalculator:
     ground_truth_add_effects: Dict[str, Set[str]]
     delete_effects: Dict[str, Set[str]]
     ground_truth_delete_effects: Dict[str, Set[str]]
+    _observed_action_names: List[str]
+    _unobserved_action_names: List[str]
 
     def __init__(self):
         self.preconditions = defaultdict(set)
@@ -90,7 +103,8 @@ class PrecisionRecallCalculator:
         self._compared_tuples = [(self.preconditions, self.ground_truth_preconditions),
                                  (self.add_effects, self.ground_truth_add_effects),
                                  (self.delete_effects, self.ground_truth_delete_effects)]
-        self._action_names = []
+        self._observed_action_names = []
+        self._unobserved_action_names = []
 
     def add_action_data(self, learned_action: LearnerAction, model_action: Action) -> NoReturn:
         """
@@ -99,7 +113,7 @@ class PrecisionRecallCalculator:
         :param model_action:
         :return:
         """
-        self._action_names.append(learned_action.name)
+        self._observed_action_names.append(learned_action.name)
         self.preconditions[learned_action.name] = \
             {p.untyped_representation for p in learned_action.positive_preconditions}
         self.ground_truth_preconditions[model_action.name] = \
@@ -110,12 +124,23 @@ class PrecisionRecallCalculator:
         self.ground_truth_delete_effects[model_action.name] = \
             {p.untyped_representation for p in model_action.delete_effects}
 
+    def add_unobserved_action(self, action_name: str) -> NoReturn:
+        """
+        
+        :param action_name: 
+        :return:
+        """
+        self._unobserved_action_names.append(action_name)
+
     def calculate_action_precision(self, action_name: str) -> float:
         """
 
         :param action_name:
         :return:
         """
+        if action_name in self._unobserved_action_names:
+            return 0
+
         true_positives = sum(
             calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         false_positives = sum(
@@ -128,6 +153,9 @@ class PrecisionRecallCalculator:
         :param action_name:
         :return:
         """
+        if action_name in self._unobserved_action_names:
+            return 0
+
         true_positives = sum(
             calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         false_negatives = sum(
@@ -140,6 +168,9 @@ class PrecisionRecallCalculator:
         :param action_name:
         :return:
         """
+        if action_name in self._unobserved_action_names:
+            return {field: 0 for field in PRECISION_RECALL_FIELD_NAMES}
+
         action_precision = self.calculate_action_precision(action_name)
         action_recall = self.calculate_action_recall(action_name)
         action_f1_score = 2 * (action_precision * action_recall) / (action_precision + action_recall)
@@ -166,13 +197,13 @@ class PrecisionRecallCalculator:
 
         :return:
         """
-        true_positives = sum([sum(calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                  self._compared_tuples) for action_name in self._action_names])
-        false_positives = sum([sum(calculate_false_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                   self._compared_tuples) for action_name in self._action_names])
-        if true_positives + false_positives == 0:
+        if len(self._observed_action_names) == 0:
             return 0
 
+        true_positives = sum([sum(calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
+                                  self._compared_tuples) for action_name in self._observed_action_names])
+        false_positives = sum([sum(calculate_false_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
+                                   self._compared_tuples) for action_name in self._observed_action_names])
         return true_positives / (true_positives + false_positives)
 
     def calculate_model_recall(self) -> float:
@@ -180,11 +211,11 @@ class PrecisionRecallCalculator:
 
         :return:
         """
-        true_positives = sum([sum(calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                  self._compared_tuples) for action_name in self._action_names])
-        false_negatives = sum([sum(calculate_false_negative_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                   self._compared_tuples) for action_name in self._action_names])
-        if true_positives + false_negatives == 0:
+        if len(self._observed_action_names) == 0:
             return 0
-        
+
+        true_positives = sum([sum(calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
+                                  self._compared_tuples) for action_name in self._observed_action_names])
+        false_negatives = sum([sum(calculate_false_negative_rate(tup[0][action_name], tup[1][action_name]) for tup in
+                                   self._compared_tuples) for action_name in self._observed_action_names])
         return true_positives / (true_positives + false_negatives)
