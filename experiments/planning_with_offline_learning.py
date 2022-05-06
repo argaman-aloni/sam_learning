@@ -137,6 +137,8 @@ class POL:
             self.learning_statistics_manager.clear_statistics()
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
+        self.domain_validator.write_complete_joint_statistics()
+
 
 def main():
     args = sys.argv

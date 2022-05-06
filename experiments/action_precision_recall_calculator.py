@@ -17,6 +17,7 @@ PRECISION_RECALL_FIELD_NAMES = [
     "f1_score"
 ]
 
+
 def calculate_true_positive_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
     """
 
@@ -24,6 +25,12 @@ def calculate_true_positive_rate(learned_predicates: Set[str], expected_predicat
     :param expected_predicates:
     :return:
     """
+    if len(learned_predicates) == 0:
+        if len(expected_predicates) == 0:
+            return 1
+
+        return 0
+
     return len(learned_predicates.intersection(expected_predicates))
 
 
@@ -34,6 +41,12 @@ def calculate_false_positive_rate(learned_predicates: Set[str], expected_predica
     :param expected_predicates:
     :return:
     """
+    if len(learned_predicates) == 0:
+        if len(expected_predicates) == 0:
+            return 1
+
+        return 0
+
     return len(learned_predicates.difference(expected_predicates))
 
 
@@ -44,6 +57,12 @@ def calculate_false_negative_rate(learned_predicates: Set[str], expected_predica
     :param expected_predicates:
     :return:
     """
+    if len(learned_predicates) == 0:
+        if len(expected_predicates) == 0:
+            return 1
+
+        return 0
+
     return len(expected_predicates.difference(learned_predicates))
 
 

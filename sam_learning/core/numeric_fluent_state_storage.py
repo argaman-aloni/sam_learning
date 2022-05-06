@@ -125,11 +125,15 @@ class NumericFluentStateStorage:
         :param storage_name: the name of the storage to take the values from.
         :return: the array containing the functions' values.
         """
-        if storage_name == "previous_state":
-            storage = {fluent: self.previous_state_storage[fluent] for fluent in relevant_fluents} \
-                if relevant_fluents is not None else self.previous_state_storage
-        else:
+        if storage_name != "previous_state":
             storage = self.next_state_storage
+
+        elif relevant_fluents is not None:
+            storage_fluents = set(relevant_fluents).intersection(self.previous_state_storage.keys())
+            storage = {fluent: self.previous_state_storage[fluent] for fluent in storage_fluents}
+
+        else:
+            storage = self.previous_state_storage
 
         array = list(map(list, itertools.zip_longest(*storage.values(), fillvalue=None)))
         return np.array(array)
@@ -193,7 +197,7 @@ class NumericFluentStateStorage:
             b = -hull.equations[:, num_dimensions]
             return [_prettify_coefficients(row) for row in A], _prettify_coefficients(b)
 
-        except QhullError:
+        except (QhullError, ValueError):
             failure_reason = "Convex hull encountered an error condition and no solution was found"
             self.logger.warning(failure_reason)
             raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.convex_hull_not_found)
@@ -226,8 +230,9 @@ class NumericFluentStateStorage:
         for function1, function2 in itertools.combinations(self.previous_state_storage, 2):
             if self.previous_state_storage[function1] == self.previous_state_storage[function2]:
                 duplicated_numeric_functions.append(function2)
+
         for func in duplicated_numeric_functions:
-            del self.previous_state_storage[func]
+            self.previous_state_storage.pop(func, None)
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
