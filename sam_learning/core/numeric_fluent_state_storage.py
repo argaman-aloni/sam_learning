@@ -289,8 +289,9 @@ class NumericFluentStateStorage:
         for lifted_function, next_state_values in self.next_state_storage.items():
             # check if the action changed the value from the previous state at all.
             if not any([(next_value - prev_value) != 0 for
-                        prev_value, next_value in zip(self.previous_state_storage[lifted_function],
-                                                      next_state_values)]) and should_optimize:
+                        prev_value, next_value in
+                        zip(self.previous_state_storage.get(lifted_function, itertools.cycle([0])),
+                            next_state_values)]) and should_optimize:
                 continue
 
             # check if all the values consist of a change to a constant value C.
@@ -332,8 +333,8 @@ class NumericFluentStateStorage:
         :param relevant_fluent: the fluent only fluent that is relevant to the preconditions' creation.
         :return: the preconditions string and the condition type.
         """
-        min_value = min(self.previous_state_storage[relevant_fluent])
-        max_value = max(self.previous_state_storage[relevant_fluent])
+        min_value = min(self.previous_state_storage.get(relevant_fluent, [0]))
+        max_value = max(self.previous_state_storage.get(relevant_fluent, [0]))
         return [f"(>= {relevant_fluent} {min_value})", f"(<= {relevant_fluent} {max_value})"], ConditionType.injunctive
 
     def _construct_non_circular_assignment(self, lifted_function: str, coefficients_map: Dict[str, float],

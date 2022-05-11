@@ -16,7 +16,8 @@ class NumericFunctionMatcher:
         self.logger = logging.getLogger(__name__)
         self.matcher_domain = domain
 
-    def create_possible_function_signatures(self, action_parameters: List[str],
+    @staticmethod
+    def create_possible_function_signatures(action_parameters: List[str],
                                             numeric_function: PDDLFunction) -> List[str]:
         """Create all possible grounded calls of the function.
 
@@ -49,9 +50,15 @@ class NumericFunctionMatcher:
         grounded_objects = list(grounded_function.signature.keys())
         lifted_signature = {}
         for function_obj in grounded_objects:
-            lifted_param_name = lifted_parameters[grounded_call_parameters.index(function_obj)]
-            lifted_param_type = executed_action.signature[lifted_param_name]
-            lifted_signature[lifted_param_name] = lifted_param_type
+            if function_obj in self.matcher_domain.constants:
+                lifted_signature[function_obj] = self.matcher_domain.constants[function_obj].type
+
+            else:
+                if executed_action.name == "load":
+                    print(grounded_call_parameters.index(function_obj), function_obj)
+                lifted_param_name = lifted_parameters[grounded_call_parameters.index(function_obj)]
+                lifted_param_type = executed_action.signature[lifted_param_name]
+                lifted_signature[lifted_param_name] = lifted_param_type
 
         lifted_state_function = PDDLFunction(name=grounded_function.name,
                                              signature=lifted_signature)
@@ -69,7 +76,7 @@ class NumericFunctionMatcher:
         self.logger.info(f"Starting to search for matches for the grounded action - {str(action_call)}")
         possible_matches = {}
         for domain_function in self.matcher_domain.functions.values():
-            if len(domain_function.signature) > len(action_call.parameters):
+            if len(domain_function.signature) > len(action_call.parameters) and len(self.matcher_domain.constants) == 0:
                 self.logger.debug(f"Function - {domain_function.name} has too many parameters, skipping.")
                 continue
 
@@ -82,11 +89,12 @@ class NumericFunctionMatcher:
                 possible_matches[domain_function.untyped_representation] = matched_function
                 continue
 
+            call_parameters = action_call.parameters + list(self.matcher_domain.constants.keys())
             possible_function_signatures = self.create_possible_function_signatures(
-                action_call.parameters, domain_function)
+                call_parameters, domain_function)
             for unsigned_representation in possible_function_signatures:
                 if unsigned_representation in grounded_state_fluents:
-                    self.logger.debug(f"found a possible match to the action - {unsigned_representation}")
+                    self.logger.info(f"found a possible match to the action - {unsigned_representation}")
                     matched_lifted_function = self.lift_matched_parameters(
                         self.matcher_domain.actions[action_call.name],
                         action_call.parameters,

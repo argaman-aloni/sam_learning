@@ -5,12 +5,14 @@
 import argparse
 import itertools
 import random
-import string
 from enum import Enum
+from pathlib import Path
 
 import networkx as nx
 
-TEMPLATE_FILE_PATH = "template.pddl"
+from .common import get_problem_template
+
+TEMPLATE_FILE_PATH = Path("farmland_template.pddl")
 
 
 class GraphGeneratorTypes(Enum):
@@ -18,17 +20,7 @@ class GraphGeneratorTypes(Enum):
     strogaz = 2
 
 
-def get_problem_template() -> string.Template:
-    """
-
-    :return:
-    """
-    with open(TEMPLATE_FILE_PATH, "rt") as template_file:
-        text = template_file.read()
-        return string.Template(text)
-
-
-def generate_adjacent_graph(graph_generator, num_farms) -> nx.Graph:
+def generate_adjacent_graph(graph_generator: GraphGeneratorTypes, num_farms: int) -> nx.Graph:
     """
 
     :param graph_generator:
@@ -56,7 +48,7 @@ def generate_instance(
     :param graph_generator:
     :return:
     """
-    template = get_problem_template()
+    template = get_problem_template(TEMPLATE_FILE_PATH)
     template_mapping = {"instance_name": instance_name, "domain_name": "farmland"}
 
     G = generate_adjacent_graph(graph_generator, num_farms)
@@ -118,12 +110,13 @@ def generate_multiple_problems(min_farms, max_farms, min_num_units, max_num_unit
     farms_range = [i for i in range(min_farms, max_farms + 1)]
     units_range = [i for i in range(min_num_units, max_num_units + 1)]
     for num_farms, num_units in itertools.product(farms_range, units_range):
-        with open(f"/sise/home/mordocha/numeric_planning/domains/farmland/pfile{num_farms}_{num_units}.pddl", "wt") as problem_file:
+        with open(f"/sise/home/mordocha/numeric_planning/domains/farmland/pfile{num_farms}_{num_units}.pddl",
+                  "wt") as problem_file:
             problem_file.write(generate_instance(f"instance_{num_farms}_{num_units}", num_farms, num_units,
-                                GraphGeneratorTypes.star))
+                                                 GraphGeneratorTypes.star))
 
         # print(generate_instance(f"instance_{num_farms}_{num_units}", num_farms, num_units,
-                                # GraphGeneratorTypes.star))
+        # GraphGeneratorTypes.star))
         #     'instance_' + str(args.num_farms) + '_' + str(args.num_units) + '_' + str(args.random_seed) + '_' + str(
         #         args.graph_generator), int(args.num_farms), int(args.num_units), args.graph_generator))
 

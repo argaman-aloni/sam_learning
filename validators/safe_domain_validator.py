@@ -150,7 +150,7 @@ class DomainValidator:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
         self.validation_set_stats.clear()
         self.aggregated_solving_path.extend(self.solving_stats)
-        self.solving_stats.clear()
+        self.solving_stats = []
 
     def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
                                    iteration_statistics: Dict[str, int]) -> NoReturn:
