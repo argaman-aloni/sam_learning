@@ -73,8 +73,11 @@ def calculate_recall(learned_predicates: Set[str], actual_predicates: Set[str]) 
     :param actual_predicates:
     :return:
     """
-    if len(actual_predicates) == 0:
+    if len(learned_predicates) == 0:
         return 1
+
+    if len(actual_predicates) == 0:
+        return 0
 
     true_positives = calculate_true_positive_rate(learned_predicates, actual_predicates)
     false_negatives = calculate_false_negative_rate(learned_predicates, actual_predicates)

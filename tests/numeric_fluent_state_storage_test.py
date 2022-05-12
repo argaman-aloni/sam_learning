@@ -2,9 +2,9 @@
 import numpy as np
 from pddl_plus_parser.lisp_parsers import PDDLTokenizer
 from pddl_plus_parser.models import PDDLFunction, construct_expression_tree, NumericalExpressionTree
-from pytest import fixture, fail
+from pytest import fixture, fail, raises
 
-from sam_learning.core import NumericFluentStateStorage, ConditionType
+from sam_learning.core import NumericFluentStateStorage, ConditionType, NotSafeActionError
 from tests.consts import TRUCK_TYPE
 
 FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
@@ -329,6 +329,27 @@ def test_construct_assignment_equations_with_an_increase_change_results_in_corre
     assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
     assert len(assignment_equations) == 1
     print(assignment_equations)
+
+
+def test_construct_assignment_equations_only_one_observation_raises_not_safe_error(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(0)
+    CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(7)
+    simple_prev_state_fluents = {
+        "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+        "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+    }
+    load_action_state_fluent_storage.add_to_previous_state_storage(simple_prev_state_fluents)
+    LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(0)
+    CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(8)
+    simple_next_state_fluents = {
+        "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+        "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+    }
+    load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
+
+    with raises(NotSafeActionError):
+        load_action_state_fluent_storage.construct_assignment_equations()
 
 
 def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_degraded_conditions(

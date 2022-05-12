@@ -129,7 +129,7 @@ class NumericFluentStateStorage:
             storage = self.next_state_storage
 
         elif relevant_fluents is not None:
-            storage_fluents = set(relevant_fluents).intersection(self.previous_state_storage.keys())
+            storage_fluents = [fluent for fluent in relevant_fluents if fluent in self.previous_state_storage]
             storage = {fluent: self.previous_state_storage[fluent] for fluent in storage_fluents}
 
         else:
@@ -216,9 +216,9 @@ class NumericFluentStateStorage:
 
     def _validate_safe_equation_solving(self, lifted_function):
         num_variables = len(self.previous_state_storage)
-        num_equations = len(self.previous_state_storage[lifted_function])
+        num_equations = len(self.next_state_storage[lifted_function])
         # validate that it is possible to solve linear equations at all.
-        if num_equations < num_variables:
+        if num_equations < num_variables or num_equations == num_variables == 1:
             failure_reason = "Cannot solve linear equations when too little input equations given."
             self.logger.warning(failure_reason)
             raise NotSafeActionError(
@@ -249,6 +249,10 @@ class NumericFluentStateStorage:
         """
         for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
             self.next_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
+            if len(self.previous_state_storage.get(state_fluent_lifted_str, [])) != \
+                    len(self.next_state_storage[state_fluent_lifted_str]):
+                self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
+                self.next_state_storage[state_fluent_lifted_str].append(0)
 
     def filter_out_inconsistent_state_variables(self) -> NoReturn:
         """
@@ -295,7 +299,7 @@ class NumericFluentStateStorage:
                 continue
 
             # check if all the values consist of a change to a constant value C.
-            if len(set(self.next_state_storage[lifted_function])) <= 1:
+            if len(set(self.next_state_storage[lifted_function])) <= 1 < len(self.next_state_storage[lifted_function]):
                 const_assigned_value = self.next_state_storage[lifted_function][0]
                 return [f"(assign {lifted_function} {const_assigned_value})"]
 

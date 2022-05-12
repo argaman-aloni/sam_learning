@@ -43,7 +43,7 @@ class DomainValidator:
     reference_domain: Domain
     solver: Union[FastDownwardSolver, MetricFFSolver]
     solving_stats: List[Dict[str, Any]]
-    aggregated_solving_path: List[Dict[str, Any]]
+    aggregated_solving_stats: List[Dict[str, Any]]
     validation_set_stats: List[Dict[str, Any]]
     learning_algorithm: LearningAlgorithmType
     results_dir_path: Path
@@ -55,7 +55,7 @@ class DomainValidator:
         self.solver = SOLVER_TYPES[solver_type]()
         self.solving_stats = []
         self.validation_set_stats = []
-        self.aggregated_solving_path = []
+        self.aggregated_solving_stats = []
         self.learning_algorithm = learning_algorithm
         self.validation_directory_path = working_directory_path / "validation_set"
         self.results_dir_path = working_directory_path / "results_directory"
@@ -144,13 +144,13 @@ class DomainValidator:
         with open(output_path, 'wt', newline='') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
             writer.writeheader()
-            writer.writerows(self.validation_set_stats)
+            writer.writerows(self.aggregated_solving_stats)
 
     def clear_statistics(self) -> NoReturn:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
         self.validation_set_stats.clear()
-        self.aggregated_solving_path.extend(self.solving_stats)
-        self.solving_stats = []
+        self.aggregated_solving_stats.extend(self.solving_stats)
+        self.solving_stats.clear()
 
     def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
                                    iteration_statistics: Dict[str, int]) -> NoReturn:

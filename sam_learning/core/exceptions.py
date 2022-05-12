@@ -1,13 +1,12 @@
 """Module for exceptions that will be used in the algorithms."""
 from enum import Enum
 
+
 class EquationSolutionType(Enum):
     no_solution_found = 1
     not_enough_data = 2
     convex_hull_not_found = 3
     ok = 4
-
-
 
 
 class NotSafeActionError(Exception):
