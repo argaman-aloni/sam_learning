@@ -61,10 +61,11 @@ class NumericSAMLearner(SAMLearner):
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
 
-    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
+    def learn_action_model(self, observations: List[Observation], is_baseline: bool = False) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input observations.
 
         :param observations: the list of trajectories that are used to learn the safe action model.
+        :param is_baseline: whether the current learning is a baseline learning process.
         :return: a domain containing the actions that were learned and the metadata about the learning.
         """
         self.logger.info("Starting to learn the action model!")
@@ -82,7 +83,7 @@ class NumericSAMLearner(SAMLearner):
 
             self.storage[action_name].filter_out_inconsistent_state_variables()
             try:
-                if len(self.preconditions_fluent_map[action_name]) > 0:
+                if len(self.preconditions_fluent_map[action_name]) > 0 and not is_baseline:
                     action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
                         self.preconditions_fluent_map[action_name])
 

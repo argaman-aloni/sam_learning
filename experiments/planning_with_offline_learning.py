@@ -19,10 +19,9 @@ DEFAULT_SPLIT = 4
 
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
-    LearningAlgorithmType.numeric_sam: NumericSAMLearner
+    LearningAlgorithmType.numeric_sam: NumericSAMLearner,
+    LearningAlgorithmType.numeric_sam_baseline: NumericSAMLearner
 }
-
-SAFE_LEARNER_TYPES = [LearningAlgorithmType.sam_learning, LearningAlgorithmType.numeric_sam]
 
 
 class POL:
@@ -36,13 +35,16 @@ class POL:
     _solver: SolverType
     debug: bool
     domain_validator: DomainValidator
+    is_baseline: bool
     fluents_map: Dict[str, List[str]]
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 learning_algorithm: LearningAlgorithmType, solver: SolverType, fluents_map_path: Optional[Path]):
+                 learning_algorithm: LearningAlgorithmType, solver: SolverType,
+                 fluents_map_path: Optional[Path], is_baseline: bool = False):
         self.logger = logging.getLogger(__name__)
         self.debug = False
         self.working_directory_path = working_directory_path
+        self.is_baseline = is_baseline
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
                                  domain_file_name=domain_file_name)
         self.domain_file_name = domain_file_name
@@ -93,15 +95,16 @@ class POL:
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map)
-            learned_model, learning_report = learner.learn_action_model(allowed_observations)
+            learned_model, learning_report = learner.learn_action_model(allowed_observations,
+                                                                        is_baseline=self.is_baseline)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, validation_problems)
+            # self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, validation_problems)
 
         if self._learning_algorithm == LearningAlgorithmType.numeric_sam:
             self.learning_statistics_manager.export_numeric_learning_statistics(fold_number=fold_num)
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
-        self.domain_validator.write_statistics(fold_num)
+        # self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
                                 test_set_dir_path: Path, validation_problems: List[Path]) -> NoReturn:
@@ -144,14 +147,16 @@ def main():
     args = sys.argv
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
-    learning_algorithm = LearningAlgorithmType.numeric_sam
+    learning_algorithm = LearningAlgorithmType.numeric_sam_baseline
     solver = SolverType.metric_ff
     fluents_map_path = Path(args[3])
+    is_baseline = True
     offline_learner = POL(working_directory_path=working_directory_path,
                           domain_file_name=domain_file_name,
                           learning_algorithm=learning_algorithm,
                           solver=solver,
-                          fluents_map_path=fluents_map_path)
+                          fluents_map_path=fluents_map_path,
+                          is_baseline=is_baseline)
     offline_learner.run_cross_validation()
 
 

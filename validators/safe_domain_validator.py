@@ -159,7 +159,7 @@ class DomainValidator:
         :param solution_file_path: the path to the solution file.
         :return: 1 if there is a plan in the solution file, zero otherwise.
         """
-        if self.learning_algorithm == LearningAlgorithmType.numeric_sam:
+        if self.learning_algorithm in [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.numeric_sam_baseline]:
             solution_status, sequence = MetricFFParser().get_solving_status(solution_file_path)
             if solution_status == OK:
                 self.logger.debug("The planner created a solution! "

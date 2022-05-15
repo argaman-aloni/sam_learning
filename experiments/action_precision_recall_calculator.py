@@ -19,59 +19,41 @@ PRECISION_RECALL_FIELD_NAMES = [
 
 
 def calculate_true_positive_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
+    """Calculates the number of predicates that appear both in the model domain and in the learned domain.
+
+    :param learned_predicates: the predicates that belong in the learned domain.
+    :param expected_predicates: the predicates that belong to the model domain.
+    :return: the number of predicates that match in both domains.
     """
-
-    :param learned_predicates:
-    :param expected_predicates:
-    :return:
-    """
-    if len(learned_predicates) == 0:
-        if len(expected_predicates) == 0:
-            return 1
-
-        return 0
-
     return len(learned_predicates.intersection(expected_predicates))
 
 
 def calculate_false_positive_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
+    """Calculates the number of predicates that appear in the learned domain but are not in the model domain.
+
+    :param learned_predicates: the predicates that belong in the learned domain.
+    :param expected_predicates: the predicates that belong to the model domain.
+    :return: the number of predicates that belong to the learned domain and not the model domain.
     """
-
-    :param learned_predicates:
-    :param expected_predicates:
-    :return:
-    """
-    if len(learned_predicates) == 0:
-        if len(expected_predicates) == 0:
-            return 1
-
-        return 0
-
     return len(learned_predicates.difference(expected_predicates))
 
 
 def calculate_false_negative_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
+    """Calculates the number of predicates that are missing in the learned domain from the model domain.
+
+    :param learned_predicates: the predicates that belong in the learned domain.
+    :param expected_predicates: the predicates that belong to the model domain.
+    :return: the number of predicates missing in the learned domain.
     """
-
-    :param learned_predicates:
-    :param expected_predicates:
-    :return:
-    """
-    if len(learned_predicates) == 0:
-        if len(expected_predicates) == 0:
-            return 1
-
-        return 0
-
     return len(expected_predicates.difference(learned_predicates))
 
 
 def calculate_recall(learned_predicates: Set[str], actual_predicates: Set[str]) -> float:
-    """
+    """Calculates the recall value of the input predicates.
 
-    :param learned_predicates:
-    :param actual_predicates:
-    :return:
+    :param learned_predicates: the predicates learned using the learning algorithm.
+    :param actual_predicates: the predicates belonging to the model domain.
+    :return: the recall value.
     """
     if len(learned_predicates) == 0:
         return 1
@@ -85,11 +67,11 @@ def calculate_recall(learned_predicates: Set[str], actual_predicates: Set[str]) 
 
 
 def calculate_precision(learned_predicates: Set[str], actual_predicates: Set[str]) -> float:
-    """
+    """Calculates the precision value of the input predicates.
 
-    :param learned_predicates:
-    :param actual_predicates:
-    :return:
+    :param learned_predicates: the predicates learned using the learning algorithm.
+    :param actual_predicates: the predicates belonging to the model domain.
+    :return: the precision value.
     """
     if len(learned_predicates) == 0:
         if len(actual_predicates) == 0:
@@ -144,18 +126,17 @@ class PrecisionRecallCalculator:
             {p.untyped_representation for p in model_action.delete_effects}
 
     def add_unobserved_action(self, action_name: str) -> NoReturn:
-        """
+        """Adds an action that was not observed in the trajectory to the appropriate list.
         
-        :param action_name: 
-        :return:
+        :param action_name: the name of the action that was not observed in the trajectory.
         """
         self._unobserved_action_names.append(action_name)
 
     def calculate_action_precision(self, action_name: str) -> float:
-        """
+        """calculates the precision value of a certain action.
 
-        :param action_name:
-        :return:
+        :param action_name: the name of the action that is being tested.
+        :return: the action's precision.
         """
         if action_name in self._unobserved_action_names:
             return 0
@@ -167,10 +148,10 @@ class PrecisionRecallCalculator:
         return true_positives / (true_positives + false_positives)
 
     def calculate_action_recall(self, action_name: str) -> float:
-        """
+        """calculates the recall value of a certain action.
 
-        :param action_name:
-        :return:
+        :param action_name: the name of the action that is being tested.
+        :return: the action's recall.
         """
         if action_name in self._unobserved_action_names:
             return 0
@@ -212,9 +193,9 @@ class PrecisionRecallCalculator:
         }
 
     def calculate_model_precision(self) -> float:
-        """
+        """calculates the precision value of a learned domain.
 
-        :return:
+        :return: the model's precision.
         """
         if len(self._observed_action_names) == 0:
             return 0
@@ -226,9 +207,9 @@ class PrecisionRecallCalculator:
         return true_positives / (true_positives + false_positives)
 
     def calculate_model_recall(self) -> float:
-        """
+        """calculates the recall value of a learned domain.
 
-        :return:
+        :return: the model's recall.
         """
         if len(self._observed_action_names) == 0:
             return 0
