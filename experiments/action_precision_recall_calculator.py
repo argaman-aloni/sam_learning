@@ -145,6 +145,9 @@ class PrecisionRecallCalculator:
             calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         false_positives = sum(
             calculate_false_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+        if true_positives == 0 and false_positives == 0:
+            return 1
+
         return true_positives / (true_positives + false_positives)
 
     def calculate_action_recall(self, action_name: str) -> float:
@@ -160,6 +163,10 @@ class PrecisionRecallCalculator:
             calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         false_negatives = sum(
             calculate_false_negative_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+
+        if true_positives == 0 and false_negatives == 0:
+            return 1
+
         return true_positives / (true_positives + false_negatives)
 
     def export_action_statistics(self, action_name: str) -> Dict[str, float]:
@@ -204,6 +211,9 @@ class PrecisionRecallCalculator:
                                   self._compared_tuples) for action_name in self._observed_action_names])
         false_positives = sum([sum(calculate_false_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
                                    self._compared_tuples) for action_name in self._observed_action_names])
+        if true_positives == 0 and false_positives == 0:
+            return 1
+
         return true_positives / (true_positives + false_positives)
 
     def calculate_model_recall(self) -> float:
@@ -218,4 +228,7 @@ class PrecisionRecallCalculator:
                                   self._compared_tuples) for action_name in self._observed_action_names])
         false_negatives = sum([sum(calculate_false_negative_rate(tup[0][action_name], tup[1][action_name]) for tup in
                                    self._compared_tuples) for action_name in self._observed_action_names])
+        if true_positives == 0 and false_negatives == 0:
+            return 1
+
         return true_positives / (true_positives + false_negatives)
