@@ -66,6 +66,28 @@ class POL:
         self.domain_validator = DomainValidator(
             self.working_directory_path, solver, learning_algorithm, self.working_directory_path / domain_file_name)
 
+    def _init_numeric_performance_calculator(self):
+        """
+
+        :return:
+        """
+        if self._learning_algorithm not in NUMERIC_ALGORITHMS:
+            return
+
+        domain_path = self.working_directory_path / self.domain_file_name
+        model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
+        observations = []
+        for trajectory_file_path in self.working_directory_path.glob("*.trajectory"):
+            problem_path = self.working_directory_path / f"{trajectory_file_path.stem}.pddl"
+            problem = ProblemParser(problem_path, partial_domain).parse_problem()
+            new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
+            observations.append(new_observation)
+
+        self.numeric_performance_calc = NumericPerformanceCalculator(model_domain=model_domain,
+                                                                     observations=observations,
+                                                                     working_directory_path=self.working_directory_path,
+                                                                     learning_algorithm=self._learning_algorithm)
+
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
@@ -104,7 +126,8 @@ class POL:
             learned_model, learning_report = learner.learn_action_model(allowed_observations,
                                                                         is_baseline=self.is_baseline)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, validation_problems)
+            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path,
+                                                               validation_problems)
 
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
             self.learning_statistics_manager.export_numeric_learning_statistics(fold_number=fold_num)
@@ -154,35 +177,14 @@ class POL:
         self.domain_validator.write_complete_joint_statistics()
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
             self.numeric_performance_calc.export_numeric_learning_performance()
-
-    def _init_numeric_performance_calculator(self):
-        """
-
-        :return:
-        """
-        if self._learning_algorithm not in NUMERIC_ALGORITHMS:
-            return
-
-        domain_path = self.working_directory_path / self.domain_file_name
-        model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
-        observations = []
-        for trajectory_file_path in self.working_directory_path .glob("*.trajectory"):
-            problem_path = self.working_directory_path  / f"{trajectory_file_path.stem}.pddl"
-            problem = ProblemParser(problem_path, partial_domain).parse_problem()
-            new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
-            observations.append(new_observation)
-
-        self.numeric_performance_calc = NumericPerformanceCalculator(model_domain=model_domain,
-                                                                     observations=observations,
-                                                                     working_directory_path=self.working_directory_path,
-                                                                     learning_algorithm=self._learning_algorithm)
+            self.learning_statistics_manager.write_complete_joint_statistics()
 
 
 def main():
     args = sys.argv
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
-    learning_algorithm = LearningAlgorithmType.numeric_sam_baseline
+    learning_algorithm = LearningAlgorithmType.numeric_sam
     solver = SolverType.metric_ff
     fluents_map_path = Path(args[3])
     is_baseline = False

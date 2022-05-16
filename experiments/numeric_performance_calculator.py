@@ -56,6 +56,9 @@ class NumericPerformanceCalculator:
         for observation in self.dataset_observations:
             for observation_component in observation.components:
                 action_call = observation_component.grounded_action_call
+                if action_call.name not in learned_domain.actions:
+                    continue
+
                 grounded_operator = self._ground_tested_operator(action_call, learned_domain)
                 if grounded_operator.is_applicable(observation_component.previous_state):
                     num_true_positives[action_call.name] += 1
@@ -80,6 +83,9 @@ class NumericPerformanceCalculator:
         for observation in self.dataset_observations:
             for observation_component in observation.components:
                 action_call = observation_component.grounded_action_call
+                if action_call.name not in learned_domain.actions:
+                    continue
+
                 grounded_operator = self._ground_tested_operator(action_call, learned_domain)
                 previous_state = observation_component.previous_state
                 learned_next_state_fluents = grounded_operator.update_state_functions(previous_state)

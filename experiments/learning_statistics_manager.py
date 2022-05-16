@@ -71,6 +71,7 @@ class LearningStatisticsManager:
     results_dir_path: Path
     action_learning_stats: List[Dict[str, Any]]
     numeric_learning_stats: List[Dict[str, Any]]
+    merged_numeric_stats: List[Dict[str, Any]]
 
     def __init__(self, working_directory_path: Path, domain_path: Path, learning_algorithm: LearningAlgorithmType):
         self.working_directory_path = working_directory_path
@@ -78,6 +79,7 @@ class LearningStatisticsManager:
         self.learning_algorithm = learning_algorithm
         self.action_learning_stats = []
         self.numeric_learning_stats = []
+        self.merged_numeric_stats = []
         self.results_dir_path = self.working_directory_path / "results_directory"
 
     def create_results_directory(self) -> NoReturn:
@@ -101,8 +103,6 @@ class LearningStatisticsManager:
         for action_name in self.model_domain.actions:
             if action_name not in learned_domain.actions:
                 precision_recall_calculator.add_unobserved_action(action_name)
-                self._report_unobserved_action(
-                    used_observations, num_triplets, action_name, precision_recall_calculator)
                 continue
 
             action_data = learned_domain.actions[action_name]
@@ -163,6 +163,7 @@ class LearningStatisticsManager:
 
     def clear_statistics(self) -> NoReturn:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
+        self.merged_numeric_stats.extend(self.numeric_learning_stats)
         self.numeric_learning_stats.clear()
         self.action_learning_stats.clear()
 
@@ -199,33 +200,10 @@ class LearningStatisticsManager:
         }
         self.numeric_learning_stats.append(model_stats)
 
-    def _report_unobserved_action(self, used_observations: List[Observation], num_triplets: int,
-                                  action_name: str, precision_recall_calculator: PrecisionRecallCalculator):
-        """
-
-        :param used_observations:
-        :param num_triplets:
-        :param action_name:
-        :param precision_recall_calculator:
-        :return:
-        """
-        action_stats = {
-            "learning_algorithm": self.learning_algorithm.name,
-            "domain_name": self.model_domain.name,
-            "num_trajectories": len(used_observations),
-            "num_trajectory_triplets": num_triplets,
-            "total_number_of_actions": len(self.model_domain.actions),
-            "learned_action_name": action_name,
-            "num_triplets_action_appeared": 0,
-            "learned_discrete_preconditions": [],
-            "learned_discrete_add_effects": [],
-            "learned_discrete_delete_effects": [],
-            "ground_truth_preconditions": [p.untyped_representation for p in
-                                           self.model_domain.actions[action_name].positive_preconditions],
-            "ground_truth_add_effects": [p.untyped_representation for p in
-                                         self.model_domain.actions[action_name].add_effects],
-            "ground_truth_delete_effects": [p.untyped_representation for p in
-                                            self.model_domain.actions[action_name].delete_effects],
-            **precision_recall_calculator.export_action_statistics(action_name)
-        }
-        self.action_learning_stats.append(action_stats)
+    def write_complete_joint_statistics(self) -> NoReturn:
+        """Writes a statistics file containing all the folds combined data."""
+        output_path = self.results_dir_path / f"{self.learning_algorithm.name}_all_folds_numeric_learning_stats.csv"
+        with open(output_path, 'wt', newline='') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=NUMERIC_LEARNING_STAT_COLUMNS)
+            writer.writeheader()
+            writer.writerows(self.merged_numeric_stats)
