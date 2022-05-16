@@ -176,7 +176,7 @@ class PrecisionRecallCalculator:
         :return:
         """
         if action_name in self._unobserved_action_names:
-            return {field: 0 for field in PRECISION_RECALL_FIELD_NAMES}
+            return {field: 1 for field in PRECISION_RECALL_FIELD_NAMES}
 
         action_precision = self.calculate_action_precision(action_name)
         action_recall = self.calculate_action_recall(action_name)

@@ -4,3 +4,4 @@ from .learning_statistics_manager import LearningStatisticsManager
 from .action_precision_recall_calculator import PrecisionRecallCalculator
 from .planning_with_offline_learning import POL
 from .util_types import LearningAlgorithmType, SolverType
+from .numeric_performance_calculator import NumericPerformanceCalculator

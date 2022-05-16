@@ -10,12 +10,15 @@ from pddl_plus_parser.models import Observation
 
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
+from experiments.numeric_performance_calculator import NumericPerformanceCalculator
 from experiments.util_types import LearningAlgorithmType, SolverType
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 4
+
+NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.numeric_sam_baseline]
 
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
@@ -37,6 +40,7 @@ class POL:
     domain_validator: DomainValidator
     is_baseline: bool
     fluents_map: Dict[str, List[str]]
+    numeric_performance_calc: NumericPerformanceCalculator
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, solver: SolverType,
@@ -58,6 +62,7 @@ class POL:
             with open(fluents_map_path, "rt") as json_file:
                 self.fluents_map = json.load(json_file)
 
+        self.numeric_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, solver, learning_algorithm, self.working_directory_path / domain_file_name)
 
@@ -86,6 +91,7 @@ class POL:
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_observations = []
         validation_problems = []
+        learned_domain_path = None
         for trajectory_file_path in train_set_dir_path.glob("*.trajectory"):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             validation_problems.append(problem_path)
@@ -98,22 +104,24 @@ class POL:
             learned_model, learning_report = learner.learn_action_model(allowed_observations,
                                                                         is_baseline=self.is_baseline)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            # self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, validation_problems)
+            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, validation_problems)
 
-        if self._learning_algorithm == LearningAlgorithmType.numeric_sam:
+        if self._learning_algorithm in NUMERIC_ALGORITHMS:
             self.learning_statistics_manager.export_numeric_learning_statistics(fold_number=fold_num)
+            self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
-        # self.domain_validator.write_statistics(fold_num)
+        self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
-                                test_set_dir_path: Path, validation_problems: List[Path]) -> NoReturn:
+                                test_set_dir_path: Path, validation_problems: List[Path]) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param validation_problems: the problems to use as validation set.
+        :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         if self.debug:
@@ -130,9 +138,12 @@ class POL:
                                               used_observations=allowed_observations,
                                               is_validation=False)
 
+        return domain_file_path
+
     def run_cross_validation(self) -> NoReturn:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
+        self._init_numeric_performance_calculator()
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
@@ -141,6 +152,30 @@ class POL:
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
         self.domain_validator.write_complete_joint_statistics()
+        if self._learning_algorithm in NUMERIC_ALGORITHMS:
+            self.numeric_performance_calc.export_numeric_learning_performance()
+
+    def _init_numeric_performance_calculator(self):
+        """
+
+        :return:
+        """
+        if self._learning_algorithm not in NUMERIC_ALGORITHMS:
+            return
+
+        domain_path = self.working_directory_path / self.domain_file_name
+        model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
+        observations = []
+        for trajectory_file_path in self.working_directory_path .glob("*.trajectory"):
+            problem_path = self.working_directory_path  / f"{trajectory_file_path.stem}.pddl"
+            problem = ProblemParser(problem_path, partial_domain).parse_problem()
+            new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
+            observations.append(new_observation)
+
+        self.numeric_performance_calc = NumericPerformanceCalculator(model_domain=model_domain,
+                                                                     observations=observations,
+                                                                     working_directory_path=self.working_directory_path,
+                                                                     learning_algorithm=self._learning_algorithm)
 
 
 def main():
@@ -150,7 +185,7 @@ def main():
     learning_algorithm = LearningAlgorithmType.numeric_sam_baseline
     solver = SolverType.metric_ff
     fluents_map_path = Path(args[3])
-    is_baseline = True
+    is_baseline = False
     offline_learner = POL(working_directory_path=working_directory_path,
                           domain_file_name=domain_file_name,
                           learning_algorithm=learning_algorithm,
