@@ -139,7 +139,7 @@ class NumericFluentStateStorage:
         return np.array(array)
 
     def _construct_pddl_inequality_scheme(self, coefficient_matrix: np.ndarray, border_points: np.ndarray,
-                                          relevant_fluents: List[str]) -> List[str]:
+                                          relevant_fluents: Optional[List[str]] = None) -> List[str]:
         """Construct the inequality strings in the appropriate PDDL format.
 
         :param coefficient_matrix: the matrix containing the coefficient vectors for each inequality.
@@ -148,7 +148,8 @@ class NumericFluentStateStorage:
         """
         inequalities = set()
         for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
-            multiplication_functions = _construct_multiplication_strings(inequality_coefficients, relevant_fluents)
+            function_names = relevant_fluents if relevant_fluents is not None else self.previous_state_storage.keys()
+            multiplication_functions = _construct_multiplication_strings(inequality_coefficients, function_names)
             constructed_left_side = self._construct_linear_equation_string(multiplication_functions)
             inequalities.add(f"(<= {constructed_left_side} {border_point})")
 
@@ -252,7 +253,7 @@ class NumericFluentStateStorage:
             if len(self.previous_state_storage.get(state_fluent_lifted_str, [])) != \
                     len(self.next_state_storage[state_fluent_lifted_str]):
                 self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
-                self.next_state_storage[state_fluent_lifted_str].append(0)
+                self.previous_state_storage[state_fluent_lifted_str].append(0)
 
     def filter_out_inconsistent_state_variables(self) -> NoReturn:
         """
@@ -265,7 +266,7 @@ class NumericFluentStateStorage:
         self.next_state_storage = {lifted_function: state_values for lifted_function, state_values in
                                    self.next_state_storage.items() if len(state_values) == max_function_len}
 
-    def construct_safe_linear_inequalities(self, relevant_fluents: List[str]) -> Tuple[List[str], ConditionType]:
+    def construct_safe_linear_inequalities(self, relevant_fluents: Optional[List[str]] = None) -> Tuple[List[str], ConditionType]:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
@@ -274,7 +275,9 @@ class NumericFluentStateStorage:
             self.logger.debug("Only one dimension is needed in the preconditions!")
             return self._construct_single_dimension_inequalities(relevant_fluents[0])
 
-        num_required_dimensions = len(relevant_fluents) + 1
+        num_required_dimensions = len(relevant_fluents) + 1 if relevant_fluents is not None else \
+            len(self.previous_state_storage.keys()) + 1
+
         previous_state_matrix = self._convert_to_array_format("previous_state", relevant_fluents)
         if previous_state_matrix.shape[0] < num_required_dimensions:
             return self._create_disjunctive_preconditions(previous_state_matrix)
@@ -297,11 +300,6 @@ class NumericFluentStateStorage:
                         zip(self.previous_state_storage.get(lifted_function, itertools.cycle([0])),
                             next_state_values)]) and should_optimize:
                 continue
-
-            # check if all the values consist of a change to a constant value C.
-            if len(set(self.next_state_storage[lifted_function])) <= 1 < len(self.next_state_storage[lifted_function]):
-                const_assigned_value = self.next_state_storage[lifted_function][0]
-                return [f"(assign {lifted_function} {const_assigned_value})"]
 
             self._remove_duplicated_variables()
             self._validate_safe_equation_solving(lifted_function)

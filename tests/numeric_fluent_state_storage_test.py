@@ -251,7 +251,7 @@ def test_construct_assignment_equations_when_change_is_caused_by_constant_return
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
     assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
-    assert assignment_equations == ["(assign (current_load ?z) 10)"]
+    assert assignment_equations == ["(assign (current_load ?z) 10.0)"]
 
 
 def test_construct_assignment_equations_with_simple_2d_equations_returns_correct_string_representation(

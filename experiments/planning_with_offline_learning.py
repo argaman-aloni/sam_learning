@@ -62,6 +62,9 @@ class POL:
             with open(fluents_map_path, "rt") as json_file:
                 self.fluents_map = json.load(json_file)
 
+        else:
+            self.fluents_map = None
+
         self.numeric_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, solver, learning_algorithm, self.working_directory_path / domain_file_name)
@@ -186,7 +189,7 @@ def main():
     domain_file_name = args[2]
     learning_algorithm = LearningAlgorithmType.numeric_sam
     solver = SolverType.metric_ff
-    fluents_map_path = Path(args[3])
+    fluents_map_path = Path(args[3]) if len(args) == 4 else None
     is_baseline = False
     offline_learner = POL(working_directory_path=working_directory_path,
                           domain_file_name=domain_file_name,

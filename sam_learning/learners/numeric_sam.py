@@ -1,6 +1,6 @@
 """Extension to SAM Learning that can learn numeric state variables."""
 
-from typing import List, NoReturn, Dict, Tuple
+from typing import List, NoReturn, Dict, Tuple, Optional
 
 from pddl_plus_parser.models import Observation, ActionCall, State, Domain
 
@@ -15,7 +15,7 @@ class NumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Dict[str, List[str]]):
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)
@@ -61,7 +61,8 @@ class NumericSAMLearner(SAMLearner):
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
 
-    def learn_action_model(self, observations: List[Observation], is_baseline: bool = False) -> Tuple[LearnerDomain, Dict[str, str]]:
+    def learn_action_model(self, observations: List[Observation], is_baseline: bool = False) -> Tuple[
+        LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input observations.
 
         :param observations: the list of trajectories that are used to learn the safe action model.
@@ -83,9 +84,12 @@ class NumericSAMLearner(SAMLearner):
 
             self.storage[action_name].filter_out_inconsistent_state_variables()
             try:
-                if len(self.preconditions_fluent_map[action_name]) > 0 and not is_baseline:
+                if self.preconditions_fluent_map is not None and len(
+                        self.preconditions_fluent_map[action_name]) > 0 and not is_baseline:
+                    relevant_fluents = self.preconditions_fluent_map[action_name] if \
+                        self.preconditions_fluent_map is not None else None
                     action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
-                        self.preconditions_fluent_map[action_name])
+                        relevant_fluents)
 
                 action.numeric_effects = self.storage[action_name].construct_assignment_equations()
                 allowed_actions[action_name] = action
