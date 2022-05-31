@@ -1,8 +1,7 @@
-"""Module that stores an action's numeric state fluents and handles its access."""
+"""Module that stores amd learns an action's numeric state fluents."""
 import itertools
 import logging
 from collections import defaultdict
-from enum import Enum
 from typing import Dict, List, NoReturn, Tuple, Union, Optional
 
 import matplotlib.pyplot as plt
@@ -13,15 +12,11 @@ from scipy.spatial import ConvexHull, convex_hull_plot_2d
 from scipy.spatial.qhull import QhullError
 from sklearn.linear_model import LinearRegression
 
-from sam_learning.core.exceptions import NotSafeActionError, EquationSolutionType
+from sam_learning.core.exceptions import NotSafeActionError
+from sam_learning.core.learning_types import EquationSolutionType, ConditionType
 
 EPSILON = 1e-10
 LEGAL_LEARNING_SCORE = 1.00
-
-
-class ConditionType(Enum):
-    injunctive = 1
-    disjunctive = 2
 
 
 def _construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List[float]],
@@ -58,7 +53,7 @@ def _prettify_coefficients(coefficients: List[float]) -> List[float]:
 
 
 class NumericFluentStateStorage:
-    """Stores the numeric state fluents of a single action."""
+    """Stores and learned the numeric state fluents of a single action."""
 
     logger: logging.Logger
     action_name: str
@@ -90,12 +85,24 @@ class NumericFluentStateStorage:
         """
         num_dimensions = values_matrix.shape[1]
         _, indices = sympy.Matrix(values_matrix).T.rref()
-        X = np.array([values_matrix[index] for index in indices])
-        if X.shape[0] < num_dimensions:
-            failure_reason = f"There are too few independent rows of data! " \
-                             f"cannot solve linear equations for action - {self.action_name}!"
+        independent_rows_matrix = np.array([values_matrix[index] for index in indices])
+        if independent_rows_matrix.shape[0] >= num_dimensions:
+            return
+
+        failure_reason = f"There are too few independent rows of data! " \
+                         f"cannot solve linear equations for action - {self.action_name}!"
+        self.logger.warning(failure_reason)
+        raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
+
+    def _validate_safe_equation_solving(self, lifted_function):
+        num_variables = len(self.previous_state_storage)
+        num_equations = len(self.next_state_storage[lifted_function])
+        # validate that it is possible to solve linear equations at all.
+        if num_equations < num_variables or num_equations == num_variables == 1:
+            failure_reason = "Cannot solve linear equations when too little input equations given."
             self.logger.warning(failure_reason)
-            raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
+            raise NotSafeActionError(
+                self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 
     def _solve_function_linear_equations(self, values_matrix: np.ndarray,
                                          function_post_values: np.ndarray) -> Tuple[List[float], float]:
@@ -107,7 +114,6 @@ class NumericFluentStateStorage:
         :param function_post_values: the resulting values after the linear change.
         :return: the vector representing the coefficients for the function variables and the learning score (R^2).
         """
-        self._validate_legal_equations(values_matrix)
         reg = LinearRegression().fit(values_matrix, function_post_values)
         learning_score = reg.score(values_matrix, function_post_values)
         if learning_score < LEGAL_LEARNING_SCORE:
@@ -144,6 +150,8 @@ class NumericFluentStateStorage:
 
         :param coefficient_matrix: the matrix containing the coefficient vectors for each inequality.
         :param border_points: the convex hull point which ensures that Ax <= b.
+        :param relevant_fluents: the fluents relevant to the creation of the preconditions if exists, if not,
+            should be ALL the previous state variables.
         :return: the inequalities PDDL formatted strings.
         """
         inequalities = set()
@@ -215,16 +223,6 @@ class NumericFluentStateStorage:
             plt.title(f"{self.action_name} - convex hull")
             plt.show()
 
-    def _validate_safe_equation_solving(self, lifted_function):
-        num_variables = len(self.previous_state_storage)
-        num_equations = len(self.next_state_storage[lifted_function])
-        # validate that it is possible to solve linear equations at all.
-        if num_equations < num_variables or num_equations == num_variables == 1:
-            failure_reason = "Cannot solve linear equations when too little input equations given."
-            self.logger.warning(failure_reason)
-            raise NotSafeActionError(
-                self.action_name, failure_reason, EquationSolutionType.not_enough_data)
-
     def _remove_duplicated_variables(self) -> NoReturn:
         """removes variables that are basically duplication of other variables. This happens in some domains."""
         duplicated_numeric_functions = []
@@ -234,100 +232,6 @@ class NumericFluentStateStorage:
 
         for func in duplicated_numeric_functions:
             self.previous_state_storage.pop(func, None)
-
-    def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
-        """Adds the matched lifted state fluents to the previous state storage.
-
-        :param state_fluents: the lifted state fluents that were matched for the action.
-        """
-        for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
-            self.previous_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
-
-    def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
-        """Adds the matched lifted state fluents to the next state storage.
-
-        :param state_fluents: the lifted state fluents that were matched for the action.
-        """
-        for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
-            self.next_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
-            if len(self.previous_state_storage.get(state_fluent_lifted_str, [])) != \
-                    len(self.next_state_storage[state_fluent_lifted_str]):
-                self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
-                self.previous_state_storage[state_fluent_lifted_str].append(0)
-
-    def filter_out_inconsistent_state_variables(self) -> NoReturn:
-        """
-
-        :return:
-        """
-        max_function_len = max([len(values) for values in self.previous_state_storage.values()])
-        self.previous_state_storage = {lifted_function: state_values for lifted_function, state_values in
-                                       self.previous_state_storage.items() if len(state_values) == max_function_len}
-        self.next_state_storage = {lifted_function: state_values for lifted_function, state_values in
-                                   self.next_state_storage.items() if len(state_values) == max_function_len}
-
-    def construct_safe_linear_inequalities(self, relevant_fluents: Optional[List[str]] = None) -> Tuple[List[str], ConditionType]:
-        """Constructs the linear inequalities strings that will be used in the learned model later.
-
-        :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
-        """
-        if len(relevant_fluents) == 1:
-            self.logger.debug("Only one dimension is needed in the preconditions!")
-            return self._construct_single_dimension_inequalities(relevant_fluents[0])
-
-        num_required_dimensions = len(relevant_fluents) + 1 if relevant_fluents is not None else \
-            len(self.previous_state_storage.keys()) + 1
-
-        previous_state_matrix = self._convert_to_array_format("previous_state", relevant_fluents)
-        if previous_state_matrix.shape[0] < num_required_dimensions:
-            return self._create_disjunctive_preconditions(previous_state_matrix)
-
-        A, b = self._create_convex_hull_linear_inequalities(previous_state_matrix)
-        inequalities_strs = self._construct_pddl_inequality_scheme(A, b, relevant_fluents)
-        return inequalities_strs, ConditionType.injunctive
-
-    def construct_assignment_equations(self, should_optimize: bool = True) -> List[str]:
-        """Constructs the assignment statements for the action according to the changed value functions.
-
-        :param should_optimize: whether to optimize the search and claim that there is no numeric effect.
-        :return: the constructed assignment statements.
-        """
-        assignment_statements = []
-        for lifted_function, next_state_values in self.next_state_storage.items():
-            # check if the action changed the value from the previous state at all.
-            if not any([(next_value - prev_value) != 0 for
-                        prev_value, next_value in
-                        zip(self.previous_state_storage.get(lifted_function, itertools.cycle([0])),
-                            next_state_values)]) and should_optimize:
-                continue
-
-            self._remove_duplicated_variables()
-            self._validate_safe_equation_solving(lifted_function)
-
-            function_post_values = np.array(next_state_values)
-            values_matrix = self._convert_to_array_format("previous_state")
-            coefficient_vector, learning_score = self._solve_function_linear_equations(values_matrix,
-                                                                                       function_post_values)
-            self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
-
-            functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
-            if coefficient_vector[list(self.previous_state_storage.keys()).index(lifted_function)] != 0:
-                self.logger.debug("the assigned party is a part of the equation, "
-                                  "cannot use circular dependency so changing the format!")
-                coefficients_map = {lifted_func: coef for lifted_func, coef in
-                                    zip(functions_including_dummy, coefficient_vector)}
-                assignment_statements.append(
-                    self._construct_non_circular_assignment(lifted_function, coefficients_map,
-                                                            self.previous_state_storage[lifted_function][0],
-                                                            self.next_state_storage[lifted_function][0]))
-                continue
-
-            multiplication_functions = _construct_multiplication_strings(
-                coefficient_vector, functions_including_dummy)
-            constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
-            assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
-
-        return assignment_statements
 
     def _construct_single_dimension_inequalities(self, relevant_fluent: str) -> Tuple[List[str], ConditionType]:
         """Construct a single dimension precondition representation.
@@ -368,3 +272,100 @@ class NumericFluentStateStorage:
 
         self.logger.debug("The action caused the value of the function to decrease!")
         return f"(decrease {lifted_function} {constructed_right_side})"
+
+    def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+        """Adds the matched lifted state fluents to the previous state storage.
+
+        :param state_fluents: the lifted state fluents that were matched for the action.
+        """
+        for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
+            self.previous_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
+
+    def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+        """Adds the matched lifted state fluents to the next state storage.
+
+        :param state_fluents: the lifted state fluents that were matched for the action.
+        """
+        for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
+            self.next_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
+            if len(self.previous_state_storage.get(state_fluent_lifted_str, [])) != \
+                    len(self.next_state_storage[state_fluent_lifted_str]):
+                self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
+                self.previous_state_storage[state_fluent_lifted_str].append(0)
+
+    def filter_out_inconsistent_state_variables(self) -> NoReturn:
+        """Filters out fluents that appear only in part of the states since they are not safe.
+
+        :return: only the safe state variables that appear in *all* states.
+        """
+        max_function_len = max([len(values) for values in self.previous_state_storage.values()])
+        self.previous_state_storage = {lifted_function: state_values for lifted_function, state_values in
+                                       self.previous_state_storage.items() if len(state_values) == max_function_len}
+        self.next_state_storage = {lifted_function: state_values for lifted_function, state_values in
+                                   self.next_state_storage.items() if len(state_values) == max_function_len}
+
+    def construct_safe_linear_inequalities(
+            self, relevant_fluents: Optional[List[str]] = None) -> Tuple[List[str], ConditionType]:
+        """Constructs the linear inequalities strings that will be used in the learned model later.
+
+        :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
+        """
+        if len(relevant_fluents) == 1:
+            self.logger.debug("Only one dimension is needed in the preconditions!")
+            return self._construct_single_dimension_inequalities(relevant_fluents[0])
+
+        num_required_dimensions = len(relevant_fluents) + 1 if relevant_fluents is not None else \
+            len(self.previous_state_storage.keys()) + 1
+
+        previous_state_matrix = self._convert_to_array_format("previous_state", relevant_fluents)
+        if previous_state_matrix.shape[0] < num_required_dimensions:
+            return self._create_disjunctive_preconditions(previous_state_matrix)
+
+        A, b = self._create_convex_hull_linear_inequalities(previous_state_matrix)
+        inequalities_strs = self._construct_pddl_inequality_scheme(A, b, relevant_fluents)
+        return inequalities_strs, ConditionType.injunctive
+
+    def construct_assignment_equations(self) -> List[str]:
+        """Constructs the assignment statements for the action according to the changed value functions.
+
+        :return: the constructed assignment statements.
+        """
+        self.logger.info("Constructing the fluent assignment equations.")
+        assignment_statements = []
+        for lifted_function, next_state_values in self.next_state_storage.items():
+            self._remove_duplicated_variables()
+            self._validate_safe_equation_solving(lifted_function)
+            function_post_values = np.array(next_state_values)
+            values_matrix = self._convert_to_array_format("previous_state")
+            self._validate_legal_equations(values_matrix)
+            self.logger.debug("After validating that the learning process is safe then trying to see if the "
+                              "action affects the numeric fluent.")
+
+            # check if the action changed the value from the previous state at all.
+            if not any([(next_val - prev_val) != 0 for
+                        prev_val, next_val in zip(self.previous_state_storage[lifted_function], next_state_values)]):
+                self.logger.debug(f"The action {self.action_name} does not affect the fluent - {lifted_function}")
+                continue
+
+            coefficient_vector, learning_score = self._solve_function_linear_equations(values_matrix,
+                                                                                       function_post_values)
+            self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
+
+            functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
+            if coefficient_vector[list(self.previous_state_storage.keys()).index(lifted_function)] != 0:
+                self.logger.debug("the assigned party is a part of the equation, "
+                                  "cannot use circular dependency so changing the format!")
+                coefficients_map = {lifted_func: coef for lifted_func, coef in
+                                    zip(functions_including_dummy, coefficient_vector)}
+                assignment_statements.append(
+                    self._construct_non_circular_assignment(lifted_function, coefficients_map,
+                                                            self.previous_state_storage[lifted_function][0],
+                                                            self.next_state_storage[lifted_function][0]))
+                continue
+
+            multiplication_functions = _construct_multiplication_strings(
+                coefficient_vector, functions_including_dummy)
+            constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
+            assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
+
+        return assignment_statements

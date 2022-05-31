@@ -1,15 +1,13 @@
 """Module for exceptions that will be used in the algorithms."""
-from enum import Enum
-
-
-class EquationSolutionType(Enum):
-    no_solution_found = 1
-    not_enough_data = 2
-    convex_hull_not_found = 3
-    ok = 4
+from sam_learning.core.learning_types import EquationSolutionType
 
 
 class NotSafeActionError(Exception):
+    """An exception type indicating that the learning process is not safe.
+
+    Note:
+        The exception contains the reason for the action not being safe to learn. Can be used in the reports.
+    """
     action_name: str
     reason: str
     solution_type: EquationSolutionType

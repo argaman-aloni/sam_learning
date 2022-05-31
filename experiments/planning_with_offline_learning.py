@@ -126,8 +126,7 @@ class POL:
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map)
-            learned_model, learning_report = learner.learn_action_model(allowed_observations,
-                                                                        is_baseline=self.is_baseline)
+            learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path,
                                                                validation_problems)

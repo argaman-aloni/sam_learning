@@ -1,26 +1,26 @@
-"""class representing the datatype of the learner domain since it differs from the original domain in terms of the actions."""
+"""Module containing the datatype of the output domain that the learning algorithms return."""
 from collections import defaultdict
 from typing import Set, List, Dict, Tuple
 
 from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain
 
-from .numeric_fluent_state_storage import ConditionType
+from .learning_types import ConditionType
 
 DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
 
 
 class LearnerAction:
-    """Class representing an instantaneous action in a PDDL+ problems."""
+    """Class representing an action that the learning algorithm outputs."""
 
     name: str
     signature: SignatureType
     positive_preconditions: Set[Predicate]
     negative_preconditions: Set[Predicate]
-    inequality_preconditions: Set[Tuple[str, str]]
-    numeric_preconditions: Tuple[List[str], ConditionType]
+    inequality_preconditions: Set[Tuple[str, str]]  # set of parameters names that should not be equal.
+    numeric_preconditions: Tuple[List[str], ConditionType]  # tuple mapping the numeric preconditions to their type.
     add_effects: Set[Predicate]
     delete_effects: Set[Predicate]
-    numeric_effects: List[str]
+    numeric_effects: List[str]  # set of the strings representing the equations creating the numeric effect.
 
     def __init__(self, name: str, signature: SignatureType):
         self.name = name
@@ -46,9 +46,9 @@ class LearnerAction:
         return list(self.signature.keys())
 
     def _signature_to_pddl(self) -> str:
-        """
+        """Converts the action's signature to the PDDL format.
 
-        :return:
+        :return: the PDDL format of the signature.
         """
         signature_str_items = []
         for parameter_name, parameter_type in self.signature.items():
@@ -57,35 +57,53 @@ class LearnerAction:
         signature_str = " ".join(signature_str_items)
         return f"({signature_str})"
 
-    def _preconditions_to_pddl(self) -> str:
-        """
+    def _extract_inequality_preconditions(self) -> str:
+        """Extracts the inequality preconditions from the learned action.
 
-        :return:
+        :return: the inequality precondition of the action.
         """
-        positive_preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
         inequality_precondition_str = ""
         if len(self.inequality_preconditions) > 0:
             inequality_precondition_str = " ".join(f"(not (= {obj[0]} {obj[1]}))" for obj in
                                                    self.inequality_preconditions)
             inequality_precondition_str += "\n"
+        return inequality_precondition_str
 
+    def _extract_numeric_preconditions(self, positive_preconditions, precondition_str) -> str:
+        """Extract the numeric preconditions from the action.
+
+        :param positive_preconditions: the positive predicates to append to the string.
+        :param precondition_str: the precondition string up to this point.
+        :return: the string containing the numeric preconditions.
+        """
+        numeric_preconditions = self.numeric_preconditions[0]
+        conditions_type = self.numeric_preconditions[1]
+        numeric_preconditions_str = "\t\t\n".join(numeric_preconditions)
+
+        if conditions_type == ConditionType.disjunctive:
+            numeric_preconditions_str = f"(or {numeric_preconditions_str})"
+
+        return f"(and {' '.join(positive_preconditions)}\n" \
+               f"\t\t{precondition_str}" \
+               f"\t\t{numeric_preconditions_str})"
+
+    def _preconditions_to_pddl(self) -> str:
+        """Converts the action's preconditions to the needed PDDL format.
+
+        :return: the preconditions in PDDL format.
+        """
+        positive_preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
+        precondition_str = self._extract_inequality_preconditions()
         if len(self.numeric_preconditions) > 0:
-            numeric_preconditions = self.numeric_preconditions[0]
-            conditions_type = self.numeric_preconditions[1]
-            if conditions_type == ConditionType.disjunctive:
-                preconds_str = "\t\t\n".join(numeric_preconditions)
-                preconditions_str = f"(or {preconds_str})"
+            return self._extract_numeric_preconditions(positive_preconditions, precondition_str)
 
-            else:
-                preconditions_str = "\t\t\n".join(numeric_preconditions)
-
-            return f"(and {' '.join(positive_preconditions)}\n" \
-                   f"\t\t{inequality_precondition_str}" \
-                   f"\t\t{preconditions_str})"
-
-        return f"(and {' '.join(positive_preconditions)} {inequality_precondition_str})"
+        return f"(and {' '.join(positive_preconditions)} {precondition_str})"
 
     def _effects_to_pddl(self) -> str:
+        """Converts the effects to the needed PDDL format.
+
+        :return: the PDDL format of the effects.
+        """
         add_effects = [effect.untyped_representation for effect in self.add_effects]
         delete_effects = [effect.untyped_representation for effect in self.delete_effects]
         delete_effects_str = ""
@@ -127,7 +145,7 @@ class LearnerDomain:
     def __init__(self, domain: Domain):
         self.name = domain.name
         self.requirements = domain.requirements
-        if not DISJUNCTIVE_PRECONDITIONS_REQ in self.requirements:
+        if DISJUNCTIVE_PRECONDITIONS_REQ not in self.requirements:
             self.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
 
         self.types = domain.types
@@ -189,13 +207,17 @@ class LearnerDomain:
         return "\n".join(types_strs)
 
     def _functions_to_pddl(self) -> str:
-        """
+        """Converts the functions to PDDL format.
 
-        :return:
+        :return: the PDDL format of the functions.
         """
         return "\n\t".join([str(f) for f in self.functions.values()])
 
     def to_pddl(self) -> str:
+        """Converts the domain into a PDDL string format.
+
+        :return: the PDDL string representing the domain.
+        """
         predicates = "\n\t".join([str(p) for p in self.predicates.values()])
         actions = "\n".join(action.to_pddl() for action in self.actions.values())
         constants = f"(:constants {self._constants_to_pddl()}\n)\n\n" if len(self.constants) > 0 else ""

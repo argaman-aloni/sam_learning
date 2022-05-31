@@ -1,3 +1,4 @@
+"""Auxiliary functions to help the matching process."""
 from itertools import permutations
 from typing import List, Tuple, Set
 
@@ -22,12 +23,12 @@ def contains_duplicates(parameter_objects: List[str]) -> bool:
     """Validate that the predicate has only one possible match in the literal.
 
     :param parameter_objects: the of objects to test if contains duplicates.
-    :return: whether or not there are duplicates.
+    :return: whether there are duplicates.
     """
     return len(set(parameter_objects)) != len(parameter_objects)
 
-def extract_effects(previous_state: State,
-                    next_state: State) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
+
+def extract_effects(previous_state: State, next_state: State) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
     """Extracts discrete the effects from the state object.
 
     :param previous_state: the previous state object containing the grounded literals.
@@ -48,7 +49,7 @@ def extract_effects(previous_state: State,
 
         add_effects.update(grounded_predicates.difference(prev_state_predicate[lifted_predicate]))
 
-    # Checking all the delete effects
+    # Checking all delete effects
     for lifted_predicate, grounded_predicates in prev_state_predicate.items():
         delete_effects.update(grounded_predicates.difference(next_state_predicate[lifted_predicate]))
 

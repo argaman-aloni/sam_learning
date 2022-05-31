@@ -17,7 +17,8 @@ class PredicatesMatcher:
         self.logger = logging.getLogger(__name__)
         self.matcher_domain = domain
 
-    def _extract_combinations_data(self, possible_combinations: Tuple[Tuple[str]]) -> Tuple[List[str], List[str]]:
+    @staticmethod
+    def _extract_combinations_data(possible_combinations: Tuple[Tuple[str]]) -> Tuple[List[str], List[str]]:
         """extracts the data of the combinations so that the matcher would be able to use it.
 
         :param possible_combinations: the possible combinations of the parameters.

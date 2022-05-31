@@ -37,6 +37,8 @@ MAX_RUNNING_TIME = 60  # seconds
 
 
 class MetricFFSolver:
+    """Class designated to use to activate the metric-FF solver on the cluster and parse its result."""
+
     logger: logging.Logger
 
     def __init__(self):
@@ -54,6 +56,7 @@ class MetricFFSolver:
         os.chdir(METRIC_FF_DIRECTORY)
         self.logger.info("Starting to solve the input problems using MetricFF solver.")
         for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
+            self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
             completed_file_str = execution_script.format(
                 domain_file_path=str(domain_file_path.absolute()),
