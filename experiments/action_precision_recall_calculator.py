@@ -18,7 +18,7 @@ PRECISION_RECALL_FIELD_NAMES = [
 ]
 
 
-def calculate_true_positive_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
+def calculate_number_true_positives(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
     """Calculates the number of predicates that appear both in the model domain and in the learned domain.
 
     :param learned_predicates: the predicates that belong in the learned domain.
@@ -28,7 +28,7 @@ def calculate_true_positive_rate(learned_predicates: Set[str], expected_predicat
     return len(learned_predicates.intersection(expected_predicates))
 
 
-def calculate_false_positive_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
+def calculate_number_false_positives(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
     """Calculates the number of predicates that appear in the learned domain but are not in the model domain.
 
     :param learned_predicates: the predicates that belong in the learned domain.
@@ -38,7 +38,7 @@ def calculate_false_positive_rate(learned_predicates: Set[str], expected_predica
     return len(learned_predicates.difference(expected_predicates))
 
 
-def calculate_false_negative_rate(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
+def calculate_number_false_negatives(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
     """Calculates the number of predicates that are missing in the learned domain from the model domain.
 
     :param learned_predicates: the predicates that belong in the learned domain.
@@ -61,8 +61,8 @@ def calculate_recall(learned_predicates: Set[str], actual_predicates: Set[str]) 
     if len(actual_predicates) == 0:
         return 0
 
-    true_positives = calculate_true_positive_rate(learned_predicates, actual_predicates)
-    false_negatives = calculate_false_negative_rate(learned_predicates, actual_predicates)
+    true_positives = calculate_number_true_positives(learned_predicates, actual_predicates)
+    false_negatives = calculate_number_false_negatives(learned_predicates, actual_predicates)
     return true_positives / (true_positives + false_negatives)
 
 
@@ -79,20 +79,20 @@ def calculate_precision(learned_predicates: Set[str], actual_predicates: Set[str
 
         return 0
 
-    true_positives = calculate_true_positive_rate(learned_predicates, actual_predicates)
-    false_positives = calculate_false_positive_rate(learned_predicates, actual_predicates)
+    true_positives = calculate_number_true_positives(learned_predicates, actual_predicates)
+    false_positives = calculate_number_false_positives(learned_predicates, actual_predicates)
     return true_positives / (true_positives + false_positives)
 
 
 class PrecisionRecallCalculator:
+    """Class that manages the calculation of the precision and recall of the learned model."""
     preconditions: Dict[str, Set[str]]
     ground_truth_preconditions: Dict[str, Set[str]]
     add_effects: Dict[str, Set[str]]
     ground_truth_add_effects: Dict[str, Set[str]]
     delete_effects: Dict[str, Set[str]]
     ground_truth_delete_effects: Dict[str, Set[str]]
-    _observed_action_names: List[str]
-    _unobserved_action_names: List[str]
+    _learned_actions: List[str]
 
     def __init__(self):
         self.preconditions = defaultdict(set)
@@ -104,17 +104,15 @@ class PrecisionRecallCalculator:
         self._compared_tuples = [(self.preconditions, self.ground_truth_preconditions),
                                  (self.add_effects, self.ground_truth_add_effects),
                                  (self.delete_effects, self.ground_truth_delete_effects)]
-        self._observed_action_names = []
-        self._unobserved_action_names = []
+        self._learned_actions = []
 
     def add_action_data(self, learned_action: LearnerAction, model_action: Action) -> NoReturn:
-        """
+        """Adds the discrete action's data to the class data to calculate the precision and recall values.
 
-        :param learned_action:
-        :param model_action:
-        :return:
+        :param learned_action: the action that was learned using the action model learning algorithm.
+        :param model_action: the expected action of the original domain.
         """
-        self._observed_action_names.append(learned_action.name)
+        self._learned_actions.append(learned_action.name)
         self.preconditions[learned_action.name] = \
             {p.untyped_representation for p in learned_action.positive_preconditions}
         self.ground_truth_preconditions[model_action.name] = \
@@ -125,26 +123,16 @@ class PrecisionRecallCalculator:
         self.ground_truth_delete_effects[model_action.name] = \
             {p.untyped_representation for p in model_action.delete_effects}
 
-    def add_unobserved_action(self, action_name: str) -> NoReturn:
-        """Adds an action that was not observed in the trajectory to the appropriate list.
-        
-        :param action_name: the name of the action that was not observed in the trajectory.
-        """
-        self._unobserved_action_names.append(action_name)
-
     def calculate_action_precision(self, action_name: str) -> float:
         """calculates the precision value of a certain action.
 
         :param action_name: the name of the action that is being tested.
         :return: the action's precision.
         """
-        if action_name in self._unobserved_action_names:
-            return 0
-
         true_positives = sum(
-            calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+            calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         false_positives = sum(
-            calculate_false_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+            calculate_number_false_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         if true_positives == 0 and false_positives == 0:
             return 1
 
@@ -156,13 +144,10 @@ class PrecisionRecallCalculator:
         :param action_name: the name of the action that is being tested.
         :return: the action's recall.
         """
-        if action_name in self._unobserved_action_names:
-            return 0
-
         true_positives = sum(
-            calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+            calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         false_negatives = sum(
-            calculate_false_negative_rate(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+            calculate_number_false_negatives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
 
         if true_positives == 0 and false_negatives == 0:
             return 1
@@ -170,14 +155,11 @@ class PrecisionRecallCalculator:
         return true_positives / (true_positives + false_negatives)
 
     def export_action_statistics(self, action_name: str) -> Dict[str, float]:
-        """
+        """Export the statistics of an action that was observed during the learning process.
 
-        :param action_name:
-        :return:
+        :param action_name: the name of the action that was learned.
+        :return: the dictionary containing the precision and recall statistics of the action.
         """
-        if action_name in self._unobserved_action_names:
-            return {field: 1 for field in PRECISION_RECALL_FIELD_NAMES}
-
         action_precision = self.calculate_action_precision(action_name)
         action_recall = self.calculate_action_recall(action_name)
         action_f1_score = 2 * (action_precision * action_recall) / (action_precision + action_recall)
@@ -204,13 +186,10 @@ class PrecisionRecallCalculator:
 
         :return: the model's precision.
         """
-        if len(self._observed_action_names) == 0:
-            return 0
-
-        true_positives = sum([sum(calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                  self._compared_tuples) for action_name in self._observed_action_names])
-        false_positives = sum([sum(calculate_false_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                   self._compared_tuples) for action_name in self._observed_action_names])
+        true_positives = sum([sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in
+                                  self._compared_tuples) for action_name in self._learned_actions])
+        false_positives = sum([sum(calculate_number_false_positives(tup[0][action_name], tup[1][action_name]) for tup in
+                                   self._compared_tuples) for action_name in self._learned_actions])
         if true_positives == 0 and false_positives == 0:
             return 1
 
@@ -221,13 +200,10 @@ class PrecisionRecallCalculator:
 
         :return: the model's recall.
         """
-        if len(self._observed_action_names) == 0:
-            return 0
-
-        true_positives = sum([sum(calculate_true_positive_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                  self._compared_tuples) for action_name in self._observed_action_names])
-        false_negatives = sum([sum(calculate_false_negative_rate(tup[0][action_name], tup[1][action_name]) for tup in
-                                   self._compared_tuples) for action_name in self._observed_action_names])
+        true_positives = sum([sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in
+                                  self._compared_tuples) for action_name in self._learned_actions])
+        false_negatives = sum([sum(calculate_number_false_negatives(tup[0][action_name], tup[1][action_name]) for tup in
+                                   self._compared_tuples) for action_name in self._learned_actions])
         if true_positives == 0 and false_negatives == 0:
             return 1
 

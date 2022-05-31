@@ -9,6 +9,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 
 
 class ExperimentTrajectoriesCreator:
+    """Class responsible for creating the trajectories that will be used in the experiments."""
     domain_file_name: str
     working_directory_path: Path
     logger: logging.Logger

@@ -1,3 +1,4 @@
+"""Runs the POL experiments offline on the cluster server."""
 import os
 import sys
 

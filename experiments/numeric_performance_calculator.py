@@ -36,11 +36,11 @@ class NumericPerformanceCalculator:
 
     @staticmethod
     def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain) -> Operator:
-        """
+        """Ground the tested action based on the trajectory data.
 
-        :param action_call:
-        :param learned_domain:
-        :return:
+        :param action_call: the grounded action call in the observation component.
+        :param learned_domain: the domain that was learned using the action model learning algorithm.
+        :return: the grounded operator.
         """
         grounded_operator = Operator(
             action=learned_domain.actions[action_call.name],
@@ -50,8 +50,12 @@ class NumericPerformanceCalculator:
         return grounded_operator
 
     def calculate_precondition_performance(self, learned_domain: Domain) -> Tuple[Dict[str, float], Dict[str, float]]:
+        """Calculates the precision recall values of the learned preconditions.
+
+        :param learned_domain: the action model that was learned using the action model learning algorithm
+        :return: the precision and recall dictionaries.
+        """
         num_true_positives = defaultdict(int)
-        num_false_positives = defaultdict(int)
         num_false_negatives = defaultdict(int)
         for observation in self.dataset_observations:
             for observation_component in observation.components:
@@ -60,24 +64,27 @@ class NumericPerformanceCalculator:
                     continue
 
                 grounded_operator = self._ground_tested_operator(action_call, learned_domain)
-                if grounded_operator.is_applicable(observation_component.previous_state):
-                    num_true_positives[action_call.name] += 1
-                else:
-                    num_false_negatives[action_call.name] += 1
+                is_applicable = grounded_operator.is_applicable(observation_component.previous_state)
+                num_true_positives[action_call.name] += int(is_applicable == True)
+                num_false_negatives[action_call.name] += int(is_applicable == False)
 
         precision_dict = {}
         recall_dict = {}
         for action_name, tp_rate in num_true_positives.items():
-            precision_dict[action_name] = tp_rate / (tp_rate + num_false_positives[action_name])
+            precision_dict[action_name] = tp_rate / (tp_rate + 0)
             recall_dict[action_name] = tp_rate / (tp_rate + num_false_negatives[action_name])
 
         return precision_dict, recall_dict
 
     def calculate_effects_performance(self, learned_domain: Domain) -> Dict[str, float]:
-        """
+        """Calculates the effects MSE value using the actual state fluents and the ones generated using the learned
+            action.
 
-        :param learned_domain:
-        :return:
+        Note:
+            MSE is calculated as follows - 1/n * Sum((x-x')^2)
+
+        :param learned_domain: the domain that was learned by the action model learning algorithm.
+        :return: a mapping between the action name and its MSE value.
         """
         squared_errors = defaultdict(list)
         for observation in self.dataset_observations:
@@ -100,11 +107,10 @@ class NumericPerformanceCalculator:
         }
 
     def calculate_performance(self, learned_domain_path: Path, num_used_observations: int) -> NoReturn:
-        """Calculates the model's performance using t
+        """Calculates the model's performance with both the precision and the recall values calculated.
 
-        :param learned_domain_path:
-        :param num_used_observations:
-        :return:
+        :param learned_domain_path: the path to the learned action model.
+        :param num_used_observations: the number of observations used to learn the action model.
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
         precision, recall = self.calculate_precondition_performance(learned_domain)
@@ -120,10 +126,7 @@ class NumericPerformanceCalculator:
             self.combined_stats.append(action_stats)
 
     def export_numeric_learning_performance(self) -> NoReturn:
-        """
-
-        :return:
-        """
+        """Export the numeric learning statistics to a CSV report file."""
         statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" \
                                                   f"_numeric_learning_performance_stats.csv"
         with open(statistics_path, "wt", newline='') as statistics_file:

@@ -2,7 +2,7 @@
 from typing import Dict, Set
 
 from pddl_plus_parser.lisp_parsers import DomainParser
-from pddl_plus_parser.models import Domain, GroundedPredicate, PDDLFunction, State
+from pddl_plus_parser.models import Domain, GroundedPredicate, State
 from pytest import fixture
 
 from sam_learning.core import extract_effects
@@ -49,8 +49,7 @@ def previous_state_predicates(domain: Domain) -> Dict[str, Set[GroundedPredicate
 
 
 @fixture()
-def valid_previous_state(domain: Domain,
-                         previous_state_predicates: Dict[str, Set[GroundedPredicate]]) -> State:
+def valid_previous_state(previous_state_predicates: Dict[str, Set[GroundedPredicate]]) -> State:
     return State(predicates=previous_state_predicates, fluents={})
 
 
@@ -66,12 +65,13 @@ def test_extract_effects_with_only_predicate_added_adds_to_add_effects(
     next_state_predicates = {name: {*predicates} for name, predicates in previous_state_predicates.items()}
     next_state_predicates["(clear ?x)"].add(
         GroundedPredicate(name="clear", signature=clear_predicate.signature,
-                              object_mapping={"?x": "x2"}))
+                          object_mapping={"?x": "x2"}))
     next_state = State(predicates=next_state_predicates, fluents={})
     add_effects, delete_effects = extract_effects(valid_previous_state, next_state)
 
     assert len(add_effects) == 1
     assert len(delete_effects) == 0
+
 
 def test_extract_effects_with_only_predicate_removed_adds_to_delete_effects(
         valid_previous_state: State, previous_state_predicates: Dict[str, Set[GroundedPredicate]], domain: Domain):
@@ -79,7 +79,7 @@ def test_extract_effects_with_only_predicate_removed_adds_to_delete_effects(
     next_state_predicates = {name: {*predicates} for name, predicates in previous_state_predicates.items()}
     next_state_predicates["(clear ?x)"].add(
         GroundedPredicate(name="clear", signature=clear_predicate.signature,
-                              object_mapping={"?x": "x2"}))
+                          object_mapping={"?x": "x2"}))
     next_state = State(predicates=next_state_predicates, fluents={})
     add_effects, delete_effects = extract_effects(next_state, valid_previous_state)
 

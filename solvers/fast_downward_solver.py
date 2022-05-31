@@ -62,15 +62,15 @@ BATCH_JOB_SUBMISSION_REGEX = re.compile(b"Submitted batch job (?P<batch_id>\d+)"
 
 
 class FastDownwardSolver:
-	logger: logging.Logger
+    logger: logging.Logger
 
-	def __init__(self):
-		self.logger = logging.getLogger(__name__)
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
 
-	def write_batch_and_execute_solver(
-			self, output_file_path: Path, test_set_directory_path: Path, problems_regex: str,
-			domain_file_path: str) -> NoReturn:
-		"""
+    def write_batch_and_execute_solver(
+            self, output_file_path: Path, test_set_directory_path: Path, problems_regex: str,
+            domain_file_path: str) -> NoReturn:
+        """
 
 		:param output_file_path:
 		:param test_set_directory_path:
@@ -78,33 +78,33 @@ class FastDownwardSolver:
 		:param domain_file_path:
 		:return:
 		"""
-		os.chdir(output_file_path.parent)
-		self.logger.info("Starting to solve the input problems using fast downward solver.")
-		completed_file_str = script_headers
-		completed_file_str += script_execution_headers.format(
-			test_set_directory_path=str(test_set_directory_path),
-			problems_regex=problems_regex,
-			domain_file_path=domain_file_path
-		)
-		completed_file_str += script_execution_lines
+        os.chdir(output_file_path.parent)
+        self.logger.info("Starting to solve the input problems using fast downward solver.")
+        completed_file_str = script_headers
+        completed_file_str += script_execution_headers.format(
+            test_set_directory_path=str(test_set_directory_path),
+            problems_regex=problems_regex,
+            domain_file_path=domain_file_path
+        )
+        completed_file_str += script_execution_lines
 
-		with open(output_file_path, "wt") as run_script_file:
-			run_script_file.write(completed_file_str)
+        with open(output_file_path, "wt") as run_script_file:
+            run_script_file.write(completed_file_str)
 
-		submission_str = subprocess.check_output(["sbatch", str(output_file_path)])
-		match = BATCH_JOB_SUBMISSION_REGEX.match(submission_str)
-		batch_id = match.group("batch_id")
-		# waiting for fast downward process to start
-		time.sleep(1)
-		execution_state = subprocess.check_output(["squeue", "--me"])
-		while batch_id in execution_state:
-			self.logger.debug(f"Solver with the id - {batch_id} is still running...")
-			execution_state = subprocess.check_output(["squeue", "--me"])
-			time.sleep(1)
-			continue
+        submission_str = subprocess.check_output(["sbatch", str(output_file_path)])
+        match = BATCH_JOB_SUBMISSION_REGEX.match(submission_str)
+        batch_id = match.group("batch_id")
+        # waiting for fast downward process to start
+        time.sleep(1)
+        execution_state = subprocess.check_output(["squeue", "--me"])
+        while batch_id in execution_state:
+            self.logger.debug(f"Solver with the id - {batch_id} is still running...")
+            execution_state = subprocess.check_output(["squeue", "--me"])
+            time.sleep(1)
+            continue
 
-		self.logger.info("Solver finished its execution!")
+        self.logger.info("Solver finished its execution!")
 
-		self.logger.debug("Cleaning the sbatch file from the problems directory.")
-		os.remove(output_file_path)
-		return
+        self.logger.debug("Cleaning the sbatch file from the problems directory.")
+        os.remove(output_file_path)
+        return
