@@ -16,7 +16,7 @@ from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner
 from validators import DomainValidator
 
-DEFAULT_SPLIT = 4
+DEFAULT_SPLIT = 5
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.numeric_sam_baseline]
 
@@ -50,7 +50,8 @@ class POL:
         self.working_directory_path = working_directory_path
         self.is_baseline = is_baseline
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
-                                 domain_file_name=domain_file_name)
+                                 domain_file_name=domain_file_name,
+                                 n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self.learning_statistics_manager = LearningStatisticsManager(
             working_directory_path=working_directory_path,
@@ -67,7 +68,7 @@ class POL:
 
         self.numeric_performance_calc = None
         self.domain_validator = DomainValidator(
-            self.working_directory_path, solver, learning_algorithm, self.working_directory_path / domain_file_name)
+            self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name)
 
     def _init_numeric_performance_calculator(self):
         """
@@ -187,7 +188,7 @@ def main():
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
     learning_algorithm = LearningAlgorithmType.numeric_sam
-    solver = SolverType.metric_ff
+    solver = SolverType.enhsp
     fluents_map_path = Path(args[3]) if len(args) == 4 else None
     is_baseline = False
     offline_learner = POL(working_directory_path=working_directory_path,

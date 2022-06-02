@@ -82,19 +82,16 @@ class NumericSAMLearner(SAMLearner):
 
             self.storage[action_name].filter_out_inconsistent_state_variables()
             try:
-                relevant_fluents = None
-                if self.preconditions_fluent_map is not None and len(
-                        self.preconditions_fluent_map[action_name]) > 0:
-                    relevant_fluents = self.preconditions_fluent_map[action_name]
+                if len(self.preconditions_fluent_map[action_name]) > 0:
+                    action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
+                        self.preconditions_fluent_map[action_name])
 
-                action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
-                    relevant_fluents)
                 action.numeric_effects = self.storage[action_name].construct_assignment_equations()
                 allowed_actions[action_name] = action
                 learning_metadata[action_name] = "OK"
 
             except NotSafeActionError as e:
-                self.logger.debug(f"The action -{e.action_name} is not safe for execution, reason - {e.reason}")
+                self.logger.debug(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")
                 learning_metadata[action_name] = e.solution_type.name
 
         self.partial_domain.actions = allowed_actions

@@ -3,15 +3,16 @@ import csv
 import logging
 import os
 import shutil
+from enum import Enum
 from pathlib import Path
-from typing import NoReturn, Dict, List, Any, Union, Optional
+from typing import NoReturn, Dict, List, Any, Optional
 
-from pddl_plus_parser.exporters import MetricFFParser, TrajectoryExporter
-from pddl_plus_parser.models import Observation, Domain
+from pddl_plus_parser.exporters import TrajectoryExporter, ENHSPParser
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
+from pddl_plus_parser.models import Observation, Domain
 
 from experiments.util_types import LearningAlgorithmType, SolverType
-from solvers import FastDownwardSolver, MetricFFSolver
+from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 
 SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,
@@ -29,8 +30,14 @@ SOLVING_STATISTICS = [
 ]
 
 OK = "ok"
-NOT_APPLICABLE = "not-applicable"
+NOT_APPLICABLE = "no_applicable"
 
+
+class SolutionOutputTypes(Enum):
+    ok = 1
+    no_solution = 2
+    timeout = 3
+    not_applicable = 4
 
 class DomainValidator:
     """Validates that the learned domain can create plans.
@@ -41,7 +48,7 @@ class DomainValidator:
 
     logger: logging.Logger
     reference_domain: Domain
-    solver: Union[FastDownwardSolver, MetricFFSolver]
+    solver: ENHSPSolver
     solving_stats: List[Dict[str, Any]]
     aggregated_solving_stats: List[Dict[str, Any]]
     validation_set_stats: List[Dict[str, Any]]
@@ -49,10 +56,10 @@ class DomainValidator:
     results_dir_path: Path
     validation_directory_path: Path
 
-    def __init__(self, working_directory_path: Path, solver_type: SolverType,
+    def __init__(self, working_directory_path: Path,
                  learning_algorithm: LearningAlgorithmType, reference_domain_path: Path):
         self.logger = logging.getLogger(__name__)
-        self.solver = SOLVER_TYPES[solver_type]()
+        self.solver = ENHSPSolver()
         self.solving_stats = []
         self.validation_set_stats = []
         self.aggregated_solving_stats = []
@@ -83,19 +90,22 @@ class DomainValidator:
         """
         num_triplets = sum([len(observation.components) for observation in used_observations])
         self.logger.info("Solving the test set problems using the learned domain!")
-        script_file_name = "solver_execution_script.sh"
-        execution_script_path = test_set_directory_path / script_file_name if not is_validation \
-            else self.validation_directory_path / script_file_name
         problems_dir_path = test_set_directory_path if not is_validation else self.validation_directory_path
-        self.solver.write_batch_and_execute_solver(
-            script_file_path=execution_script_path,
+        solving_report = self.solver.execute_solver(
             problems_directory_path=problems_dir_path,
             domain_file_path=tested_domain_file_path
         )
-        solving_stats = {"ok": 0, "no-solution": 0, "timeout": 0, "not-applicable": 0}
-        for solution_file_path in test_set_directory_path.glob("*.solution"):
-            problem_file_path = problems_dir_path / f"{solution_file_path.stem}.pddl"
-            self._validate_solution_content(solution_file_path, problem_file_path, solving_stats)
+        solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
+        for problem_file_name, entry in solving_report.items():
+            if entry == SolutionOutputTypes.ok.name:
+                solution_file_path = problems_dir_path / f"{problem_file_name}.solution"
+                problem_file_path = problems_dir_path / f"{problem_file_name}.pddl"
+                self._validate_solution_content(solution_file_path=solution_file_path,
+                                                problem_file_path=problem_file_path,
+                                                iteration_statistics=solving_stats)
+                continue
+
+            solving_stats[entry] += 1
 
         validation_stats = self.solving_stats if not is_validation else self.validation_set_stats
         validation_stats.append({
@@ -159,22 +169,13 @@ class DomainValidator:
         :param solution_file_path: the path to the solution file.
         :return: 1 if there is a plan in the solution file, zero otherwise.
         """
-        if self.learning_algorithm in [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.numeric_sam_baseline]:
-            solution_status, sequence = MetricFFParser().get_solving_status(solution_file_path)
-            if solution_status == OK:
-                self.logger.debug("The planner created a solution! "
-                                  "Will now validate that the action sequence is applicable!")
-                problem = ProblemParser(problem_file_path, self.reference_domain).parse_problem()
-                try:
-                    TrajectoryExporter(self.reference_domain).parse_plan(problem=problem, action_sequence=sequence)
-                    iteration_statistics[OK] += 1
-                    return
-
-                except ValueError:
-                    self.logger.warning("Found a solution that was not applicable!")
-                    iteration_statistics[NOT_APPLICABLE] += 1
-
-            iteration_statistics[solution_status] += 1
+        sequence = ENHSPParser().parse_plan_content(solution_file_path)
+        problem = ProblemParser(problem_file_path, self.reference_domain).parse_problem()
+        try:
+            TrajectoryExporter(self.reference_domain).parse_plan(problem=problem, action_sequence=sequence)
+            iteration_statistics[SolutionOutputTypes.ok.name] += 1
             return
 
-        return  # TODO: complete for fast downward.
+        except ValueError:
+            self.logger.warning("Found a solution that was not applicable!")
+            iteration_statistics[SolutionOutputTypes.not_applicable.name] += 1

@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from pddl_plus_parser.exporters import MetricFFParser, TrajectoryExporter
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import Operator
 
@@ -28,7 +27,6 @@ class PlanMinerTrajectoriesCreator:
         """Creates the domain trajectory files."""
         domain_file_path = self.working_directory_path / self.domain_file_name
         domain = DomainParser(domain_file_path).parse_domain()
-        pm_trajectories = []
         for trajectory_file_path in self.working_directory_path.glob("*.trajectory"):
             plan_miner_trajectory_file_path = self.working_directory_path / f"{trajectory_file_path.stem}.pts"
             if plan_miner_trajectory_file_path.exists():
@@ -56,9 +54,10 @@ class PlanMinerTrajectoriesCreator:
                                     f"{action_trace}\n\n" \
                                     f"{state_trace}"
 
-            pm_trajectories.append(plan_miner_trajectory)
+            with open(plan_miner_trajectory_file_path, "wt") as plan_miner_trajectory_file:
+                plan_miner_trajectory_file.write(plan_miner_trajectory)
 
 
 if __name__ == '__main__':
     trajectory_creator = PlanMinerTrajectoriesCreator(sys.argv[1], Path(sys.argv[2]))
-    trajectory_creator.create_domain_trajectories()
+    trajectory_creator.create_plan_miner_trajectories()

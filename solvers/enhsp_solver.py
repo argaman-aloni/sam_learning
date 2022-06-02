@@ -1,17 +1,20 @@
 """Module responsible for running the Expressive Numeric Heuristic Planner (ENHSP)."""
+import json
 import logging
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn, Dict
 
 from jdk4py import JAVA
-from typing import Dict
 
 ENHSP_FILE_PATH = "/sise/home/mordocha/numeric_planning/ENHSP/enhsp.jar"
 MAX_RUNNING_TIME = 60  # seconds
 
 TIMEOUT_ERROR_CODE = b"Timeout has been reached"
 PROBLEM_SOLVED = b"Problem Solved"
+NO_SOLUTION_FOR_PROBLEM = b"Problem Detected as Unsolvable"
+OTHER_NO_SOLUTION_TYPE = b"Problem unsolvable"
 
 
 class ENHSPSolver:
@@ -22,12 +25,11 @@ class ENHSPSolver:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def write_batch_and_execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
+    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
         :param domain_file_path: the path to the domain file.
-        :return: dictionary mapping the problem file name to its solution status.
         """
         solving_stats = {}
         self.logger.info("Starting to solve the input problems using ENHSP solver.")
@@ -46,7 +48,7 @@ class ENHSPSolver:
                     self.logger.debug(f"Solver succeeded in solving problem - {problem_file_path.stem}")
                     solving_stats[problem_file_path.stem] = "ok"
 
-                else:
+                elif NO_SOLUTION_FOR_PROBLEM in process.stdout or OTHER_NO_SOLUTION_TYPE in process.stdout:
                     self.logger.debug(f"Solver could not solve problem - {problem_file_path.stem}")
                     solving_stats[problem_file_path.stem] = "no_solution"
 
@@ -66,5 +68,5 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.DEBUG)
     solver = ENHSPSolver()
-    solver.write_batch_and_execute_solver(problems_directory_path=Path(args[1]),
-                                          domain_file_path=Path(args[2]))
+    solver.execute_solver(problems_directory_path=Path(args[1]),
+                          domain_file_path=Path(args[2]))
