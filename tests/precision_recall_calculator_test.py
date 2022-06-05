@@ -192,13 +192,13 @@ def test_export_action_statistics_calculates_statistics_correctly(
     statistics = precision_recall_calculator.export_action_statistics(TEST_ACTION_NAME)
     expected_f1_score = 2 * (0.75 / 1.75)
     assert statistics == {
-            "preconditions_precision": 0.5,
-            "add_effects_precision": 1,
-            "delete_effects_precision": 1,
-            "preconditions_recall": 1,
-            "add_effects_recall": 1,
-            "delete_effects_recall": 1,
-            "action_precision": 0.75,
-            "action_recall": 1,
-            "f1_score": expected_f1_score
-        }
+        "preconditions_precision": 0.5,
+        "add_effects_precision": 1,
+        "delete_effects_precision": 1,
+        "preconditions_recall": 1,
+        "add_effects_recall": 1,
+        "delete_effects_recall": 1,
+        "action_precision": 0.75,
+        "action_recall": 1,
+        "f1_score": expected_f1_score
+    }

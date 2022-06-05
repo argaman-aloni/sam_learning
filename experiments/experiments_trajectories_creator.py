@@ -6,7 +6,7 @@ from typing import NoReturn
 
 from pddl_plus_parser.exporters import MetricFFParser, TrajectoryExporter, ENHSPParser
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from experiments.util_types import SolverType
+from utilities import SolverType
 
 
 class ExperimentTrajectoriesCreator:

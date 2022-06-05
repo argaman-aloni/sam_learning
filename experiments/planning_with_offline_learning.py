@@ -11,19 +11,18 @@ from pddl_plus_parser.models import Observation
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
-from experiments.util_types import LearningAlgorithmType, SolverType
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner
+from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
 
-NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.numeric_sam_baseline]
+NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner]
 
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
     LearningAlgorithmType.numeric_sam: NumericSAMLearner,
-    LearningAlgorithmType.numeric_sam_baseline: NumericSAMLearner
 }
 
 
@@ -71,10 +70,7 @@ class POL:
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name)
 
     def _init_numeric_performance_calculator(self):
-        """
-
-        :return:
-        """
+        """Initializes the algorithm of the numeric precision / recall calculator."""
         if self._learning_algorithm not in NUMERIC_ALGORITHMS:
             return
 
@@ -116,11 +112,9 @@ class POL:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_observations = []
-        validation_problems = []
         learned_domain_path = None
         for trajectory_file_path in train_set_dir_path.glob("*.trajectory"):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
-            validation_problems.append(problem_path)
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
@@ -129,8 +123,7 @@ class POL:
                                                                     preconditions_fluent_map=self.fluents_map)
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path,
-                                                               validation_problems)
+            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
 
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
             self.learning_statistics_manager.export_numeric_learning_statistics(fold_number=fold_num)
@@ -140,29 +133,19 @@ class POL:
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
-                                test_set_dir_path: Path, validation_problems: List[Path]) -> Path:
+                                test_set_dir_path: Path) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
-        :param validation_problems: the problems to use as validation set.
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
-        if self.debug:
-            self.domain_validator.copy_validation_problems(domain_file_path, validation_problems)
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  used_observations=allowed_observations,
-                                                  test_set_directory_path=self.working_directory_path / "validation_set",
-                                                  is_validation=True)
-            self.domain_validator.clear_validation_problems()
-
         self.logger.debug("Checking that the test set problems can solved using the learned domain.")
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
-                                              used_observations=allowed_observations,
-                                              is_validation=False)
+                                              used_observations=allowed_observations)
 
         return domain_file_path
 
@@ -201,5 +184,8 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO)
     main()

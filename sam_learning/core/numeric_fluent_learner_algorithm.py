@@ -223,15 +223,22 @@ class NumericFluentStateStorage:
             plt.title(f"{self.action_name} - convex hull")
             plt.show()
 
-    def _remove_duplicated_variables(self) -> NoReturn:
-        """removes variables that are basically duplication of other variables. This happens in some domains."""
+    def _remove_duplicated_variables(self) -> Dict[str, str]:
+        """removes variables that are basically duplication of other variables. This happens in some domains.
+
+        :return: the mapping between the removed function to the one that is identical to it.
+        """
         duplicated_numeric_functions = []
+        duplicate_map = {}
         for function1, function2 in itertools.combinations(self.previous_state_storage, 2):
             if self.previous_state_storage[function1] == self.previous_state_storage[function2]:
                 duplicated_numeric_functions.append(function2)
+                duplicate_map[function2] = function1
 
         for func in duplicated_numeric_functions:
             self.previous_state_storage.pop(func, None)
+
+        return duplicate_map
 
     def _construct_single_dimension_inequalities(self, relevant_fluent: str) -> Tuple[List[str], ConditionType]:
         """Construct a single dimension precondition representation.
@@ -332,8 +339,8 @@ class NumericFluentStateStorage:
         """
         self.logger.info("Constructing the fluent assignment equations.")
         assignment_statements = []
+        duplicate_map = self._remove_duplicated_variables()
         for lifted_function, next_state_values in self.next_state_storage.items():
-            self._remove_duplicated_variables()
             self._validate_safe_equation_solving(lifted_function)
             function_post_values = np.array(next_state_values)
             values_matrix = self._convert_to_array_format("previous_state")
@@ -342,8 +349,9 @@ class NumericFluentStateStorage:
                               "action affects the numeric fluent.")
 
             # check if the action changed the value from the previous state at all.
+            searched_function = lifted_function if lifted_function not in duplicate_map else duplicate_map[lifted_function]
             if not any([(next_val - prev_val) != 0 for
-                        prev_val, next_val in zip(self.previous_state_storage[lifted_function], next_state_values)]):
+                        prev_val, next_val in zip(self.previous_state_storage[searched_function], next_state_values)]):
                 self.logger.debug(f"The action {self.action_name} does not affect the fluent - {lifted_function}")
                 continue
 
@@ -365,6 +373,11 @@ class NumericFluentStateStorage:
 
             multiplication_functions = _construct_multiplication_strings(
                 coefficient_vector, functions_including_dummy)
+            if len(multiplication_functions) == 0:
+                self.logger.debug("The algorithm designated a vector of zeros to the equation "
+                                  "which means that there are not coefficients. Continuing.")
+                continue
+
             constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 

@@ -1,10 +1,9 @@
 """Module responsible for running the Expressive Numeric Heuristic Planner (ENHSP)."""
-import json
 import logging
 import subprocess
 import sys
 from pathlib import Path
-from typing import NoReturn, Dict
+from typing import Dict
 
 from jdk4py import JAVA
 
