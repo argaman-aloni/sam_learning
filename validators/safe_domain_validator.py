@@ -7,7 +7,7 @@ from typing import NoReturn, Dict, List, Any, Optional
 
 from pddl_plus_parser.exporters import TrajectoryExporter, ENHSPParser
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import Observation, Domain, State
+from pddl_plus_parser.models import Observation, Domain
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
@@ -43,7 +43,6 @@ class DomainValidator:
     aggregated_solving_stats: List[Dict[str, Any]]
     learning_algorithm: LearningAlgorithmType
     results_dir_path: Path
-    validation_directory_path: Path
 
     def __init__(self, working_directory_path: Path,
                  learning_algorithm: LearningAlgorithmType, reference_domain_path: Path):
@@ -52,7 +51,6 @@ class DomainValidator:
         self.solving_stats = []
         self.aggregated_solving_stats = []
         self.learning_algorithm = learning_algorithm
-        self.validation_directory_path = working_directory_path / "validation_set"
         self.results_dir_path = working_directory_path / "results_directory"
         self.reference_domain = DomainParser(domain_path=reference_domain_path, partial_parsing=False).parse_domain()
 
@@ -60,10 +58,27 @@ class DomainValidator:
     def _clear_plans(test_set_directory: Path) -> NoReturn:
         """Clears the plan filed from the directory.
 
-        :param test_set_directory: the path to the directory containg the plans.
+        :param test_set_directory: the path to the directory containing the plans.
         """
         for solver_output_path in test_set_directory.glob("*.solution"):
             os.remove(solver_output_path)
+
+    def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
+                                   iteration_statistics: Dict[str, int]) -> NoReturn:
+        """Validates that the solution file contains a valid plan.
+
+        :param solution_file_path: the path to the solution file.
+        """
+        sequence = ENHSPParser().parse_plan_content(solution_file_path)
+        problem = ProblemParser(problem_file_path, self.reference_domain).parse_problem()
+        try:
+            TrajectoryExporter(self.reference_domain).parse_plan(problem=problem, action_sequence=sequence)
+            iteration_statistics[SolutionOutputTypes.ok.name] += 1
+            return
+
+        except ValueError:
+            self.logger.warning("Found a solution that was not applicable!")
+            iteration_statistics[SolutionOutputTypes.not_applicable.name] += 1
 
     def validate_domain(self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
                         used_observations: List[Observation] = None) -> NoReturn:
@@ -123,20 +138,3 @@ class DomainValidator:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
         self.aggregated_solving_stats.extend(self.solving_stats)
         self.solving_stats.clear()
-
-    def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
-                                   iteration_statistics: Dict[str, int]) -> NoReturn:
-        """Validates that the solution file contains a valid plan.
-
-        :param solution_file_path: the path to the solution file.
-        """
-        sequence = ENHSPParser().parse_plan_content(solution_file_path)
-        problem = ProblemParser(problem_file_path, self.reference_domain).parse_problem()
-        try:
-            TrajectoryExporter(self.reference_domain).parse_plan(problem=problem, action_sequence=sequence)
-            iteration_statistics[SolutionOutputTypes.ok.name] += 1
-            return
-
-        except ValueError:
-            self.logger.warning("Found a solution that was not applicable!")
-            iteration_statistics[SolutionOutputTypes.not_applicable.name] += 1

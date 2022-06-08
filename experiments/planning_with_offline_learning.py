@@ -37,17 +37,15 @@ class POL:
     _solver: SolverType
     debug: bool
     domain_validator: DomainValidator
-    is_baseline: bool
     fluents_map: Dict[str, List[str]]
     numeric_performance_calc: NumericPerformanceCalculator
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, solver: SolverType,
-                 fluents_map_path: Optional[Path], is_baseline: bool = False):
+                 fluents_map_path: Optional[Path]):
         self.logger = logging.getLogger(__name__)
         self.debug = False
         self.working_directory_path = working_directory_path
-        self.is_baseline = is_baseline
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
                                  domain_file_name=domain_file_name,
                                  n_split=DEFAULT_SPLIT)
@@ -173,13 +171,11 @@ def main():
     learning_algorithm = LearningAlgorithmType.numeric_sam
     solver = SolverType.enhsp
     fluents_map_path = Path(args[3]) if len(args) == 4 else None
-    is_baseline = False
     offline_learner = POL(working_directory_path=working_directory_path,
                           domain_file_name=domain_file_name,
                           learning_algorithm=learning_algorithm,
                           solver=solver,
-                          fluents_map_path=fluents_map_path,
-                          is_baseline=is_baseline)
+                          fluents_map_path=fluents_map_path)
     offline_learner.run_cross_validation()
 
 

@@ -24,7 +24,7 @@ class PlanMinerTrajectoriesCreator:
         self.logger = logging.getLogger(__name__)
 
     def create_plan_miner_trajectories(self) -> NoReturn:
-        """Creates the domain trajectory files."""
+        """Creates the trajectories in the format file that PlanMiner requires.."""
         domain_file_path = self.working_directory_path / self.domain_file_name
         domain = DomainParser(domain_file_path).parse_domain()
         for trajectory_file_path in self.working_directory_path.glob("*.trajectory"):

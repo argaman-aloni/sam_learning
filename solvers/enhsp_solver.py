@@ -51,6 +51,10 @@ class ENHSPSolver:
                     self.logger.debug(f"Solver could not solve problem - {problem_file_path.stem}")
                     solving_stats[problem_file_path.stem] = "no_solution"
 
+                else:
+                    self.logger.warning(f"While solving face unknown error - {process.stdout}")
+                    solving_stats[problem_file_path.stem] = "no_solution"
+
             except subprocess.TimeoutExpired:
                 self.logger.debug(f"Learning algorithm did not finish in time so was killed "
                                   f"while trying to solve - {problem_file_path.stem}")

@@ -1,23 +1,33 @@
 """Create a train and test set split for the input directory for the action model learning algorithms to use."""
 import logging
-import random
 import shutil
 from pathlib import Path
 from typing import Tuple, List, NoReturn, Iterator
 
+from sklearn.model_selection import train_test_split, KFold
 
-def create_test_set_indices(array_size: int, n_split: int) -> Iterator[List[int]]:
+RANDOM_STATE = 42  # it is always good to seed something according to the most important number in the world!
+DEFAULT_TEST_SIZE = 0.2
+
+
+def create_test_set_indices(array_size: int, n_split: int,
+                            only_train_test: bool = False) -> Iterator[Tuple[List[int], List[int]]]:
     """Creates the indices to use to create the train and the test set of the problems.
 
     :param array_size: the size of the array containing the problems.
     :param n_split: the number of splits to divide the dataset to.
-    :return: a list containing the indices of the problems that will be used in the test set in each fold.
+    :param only_train_test: whether to only split to train and test.
+    :return: the train and the test set indices for each fold.
     """
-    random.seed(42)  # it is always good to seed something according to the most important number in the world!
     indices = list(range(array_size))
-    random.shuffle(indices)
-    for i in range(n_split):
-        yield indices[i::n_split]
+    if not only_train_test:
+        kf = KFold(n_splits=n_split, random_state=RANDOM_STATE, shuffle=True)
+        for train, test in kf.split(indices):
+            yield train, test
+
+    else:
+        train, test = train_test_split(indices, test_size=DEFAULT_TEST_SIZE, random_state=RANDOM_STATE, shuffle=True)
+        yield train, test
 
 
 class KFoldSplit:
@@ -29,16 +39,17 @@ class KFoldSplit:
     train_set_dir_path: Path
     test_set_dir_path: Path
     domain_file_path: Path
-    validation_directory_path: Path
+    only_train_test: bool
 
-    def __init__(self, working_directory_path: Path, domain_file_name: str, n_split: int = 0):
+    def __init__(self, working_directory_path: Path, domain_file_name: str, n_split: int = 0,
+                 only_train_test: bool = False):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.n_split = n_split
         self.train_set_dir_path = working_directory_path / "train"
         self.test_set_dir_path = working_directory_path / "test"
-        self.validation_directory_path = working_directory_path / "validation_set"
         self.domain_file_path = working_directory_path / domain_file_name
+        self.only_train_test = only_train_test
 
     def _copy_domain(self) -> NoReturn:
         """Copies the domain to the train set directory so that it'd be used in the learning process."""
@@ -66,14 +77,14 @@ class KFoldSplit:
             problem_paths.append(self.working_directory_path / f"{trajectory_file_path.stem}.pddl")
 
         num_splits = len(trajectory_paths) if self.n_split == 0 else self.n_split
-        for test_set_indices in create_test_set_indices(len(problem_paths), num_splits):
+        for train_set_indices, test_set_indices in create_test_set_indices(
+                len(problem_paths), num_splits, self.only_train_test):
             self.train_set_dir_path.mkdir(exist_ok=True)
             self.test_set_dir_path.mkdir(exist_ok=True)
-            self.validation_directory_path.mkdir(exist_ok=True)
 
             self._copy_domain()
             test_set_problems = [problem_paths[i] for i in test_set_indices]
-            train_set_problems = list(filter(lambda x: x not in test_set_problems, problem_paths))
+            train_set_problems = [problem_paths[i] for i in train_set_indices]
             train_set_trajectories = [trajectory_paths[i] for i in range(len(trajectory_paths)) if
                                       i not in test_set_indices]
             self.logger.info(f"Created a new fold - train set has the following problems: {train_set_problems} "
