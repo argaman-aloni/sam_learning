@@ -14,6 +14,7 @@ TIMEOUT_ERROR_CODE = b"Timeout has been reached"
 PROBLEM_SOLVED = b"Problem Solved"
 NO_SOLUTION_FOR_PROBLEM = b"Problem Detected as Unsolvable"
 OTHER_NO_SOLUTION_TYPE = b"Problem unsolvable"
+GOAL_NOT_REACHABLE = b"Goal is not reachable"
 
 
 class ENHSPSolver:
@@ -51,8 +52,13 @@ class ENHSPSolver:
                     self.logger.debug(f"Solver could not solve problem - {problem_file_path.stem}")
                     solving_stats[problem_file_path.stem] = "no_solution"
 
+                elif GOAL_NOT_REACHABLE in process.stderr:
+                    self.logger.warning("Solver declared goal unreachable!")
+                    solving_stats[problem_file_path.stem] = "no_solution"
+
                 else:
-                    self.logger.warning(f"While solving face unknown error - {process.stdout}")
+                    self.logger.warning(f"While solving face unknown error STDOUT - {process.stdout}")
+                    self.logger.warning(f"While solving face unknown error STDERR - {process.stderr}")
                     solving_stats[problem_file_path.stem] = "no_solution"
 
             except subprocess.TimeoutExpired:

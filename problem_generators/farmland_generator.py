@@ -10,7 +10,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from .common import get_problem_template
+from problem_generators.common import get_problem_template
 
 TEMPLATE_FILE_PATH = Path("farmland_template.pddl")
 
@@ -122,7 +122,7 @@ def generate_multiple_problems(min_farms, max_farms, min_num_units, max_num_unit
 
 
 def main():
-    generate_multiple_problems(3, 10, 10, 20)
+    generate_multiple_problems(10, 15, 10, 20)
     # args = parse_arguments()
     # generate_instance(
     #     'instance_' + str(args.num_farms) + '_' + str(args.num_units) + '_' + str(args.random_seed) + '_' + str(

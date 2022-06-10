@@ -222,7 +222,7 @@ class LearnerDomain:
         actions = "\n".join(action.to_pddl() for action in self.actions.values())
         constants = f"(:constants {self._constants_to_pddl()}\n)\n\n" if len(self.constants) > 0 else ""
         functions = f"(:functions {self._functions_to_pddl()}\n)\n\n" if len(self.functions) > 0 else ""
-        return f"(define (domain: {self.name})\n" \
+        return f"(define (domain {self.name})\n" \
                f"(:requirements {' '.join(self.requirements)})\n" \
                f"(:types {self._types_to_pddl()}\n)\n\n" \
                f"(:predicates {predicates}\n)\n\n" \

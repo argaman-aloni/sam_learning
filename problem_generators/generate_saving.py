@@ -50,7 +50,7 @@ def generate_multiple_problems(
 
 
 def main():
-    generate_multiple_problems(1, 6, 1, 3, 100, Path("/sise/home/mordocha/numeric_planning/domains/sailing/"))
+    generate_multiple_problems(6, 9, 3, 5, 100, Path("/sise/home/mordocha/numeric_planning/domains/sailing/"))
     # args = parse_arguments()
     # generate_multiple_problems(args.min_boats, args.max_boats, args.min_people, args.max_people, args.max_dist_goal,
     #                            Path(args.output_folder))
