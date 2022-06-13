@@ -151,11 +151,12 @@ class FaultRepair:
 
     def execute_plans_on_agent(
             self, plans_dir_path: Path,
-            faulty_domain_path: Path) -> Tuple[List[Observation], List[Observation], Dict[str, str]]:
+            faulty_domain_path: Path, is_repaired_model: bool = False) -> Tuple[List[Observation], List[Observation], Dict[str, str]]:
         """
 
         :param faulty_domain_path:
         :param plans_dir_path:
+        :param is_repaired_model: whether the model has been repaired or not.
         :return:
         """
         faulty_action_observations = []
@@ -189,7 +190,7 @@ class FaultRepair:
                 valid_action_observations.append(valid_observation)
                 faulty_action_observations.append(faulty_observation)
 
-        if faulty_action_name is None:
+        if faulty_action_name is None and not is_repaired_model:
             self.logger.warning("No fault detected!")
             raise ValueError("No fault detected!")
 

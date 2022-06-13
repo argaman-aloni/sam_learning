@@ -121,7 +121,7 @@ class ModelFaultDiagnosis:
         statistics["problems_type"] = problems_type
 
         valid_observations, faulty_observations, faults_detected = self.fault_repair.execute_plans_on_agent(
-            problems_dir_path, domain_file_path)
+            problems_dir_path, domain_file_path, is_repaired_model=domain_type == "safe")
 
         counted_fault_detection = Counter(list(faults_detected.values()))
         statistics["ok"] = counted_fault_detection["ok"]
@@ -157,21 +157,21 @@ class ModelFaultDiagnosis:
         learned_domain_file_path = test_set_dir_path / self.model_domain_file_name
 
         self.logger.debug("Solving the test set problems using the learned SAFE domain.")
-        safe_test_stats = self._solve_and_validate(
+        _, _, safe_test_stats = self._solve_and_validate(
             problems_dir_path=test_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="safe",
             problems_type="test")
         all_diagnosis_stats.append(safe_test_stats)
         self._clear_plans(test_set_dir_path)
 
         self.logger.debug("solving the test set problems using the FAULTY domain.")
-        faulty_test_set_stats = self._solve_and_validate(
+        _, _, faulty_test_set_stats = self._solve_and_validate(
             problems_dir_path=test_set_dir_path, domain_file_path=faulty_domain_path, domain_type="faulty",
             problems_type="test")
         all_diagnosis_stats.append(faulty_test_set_stats)
         self._clear_plans(train_set_dir_path)
 
         self.logger.debug("solving the train set problems (again for validation) using the SAFE learned domain.")
-        safe_train_stats = self._solve_and_validate(
+        _, _, safe_train_stats = self._solve_and_validate(
             problems_dir_path=train_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="safe",
             problems_type="train")
         all_diagnosis_stats.append(safe_train_stats)
