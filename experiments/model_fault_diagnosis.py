@@ -20,8 +20,8 @@ FAULTY_DOMAIN_PDDL = "faulty_domain.pddl"
 
 random.seed(42)
 DIAGNOSIS_COLUMNS = ["domain_type", "problems_type", "ok", "no_solution", "timeout", "not_applicable",
-                     "state_difference"]
-ACTION_FAULT_DETECTION_COLUMNS = ["action_name", "is_precondition_faulty", "is_effect_faulty"]
+                     "state_difference", "action_name"]
+ACTION_FAULT_DETECTION_COLUMNS = ["action_name", "is_precondition_faulty", "is_effect_faulty", "difference"]
 
 
 class ModelFaultDiagnosis:
@@ -176,6 +176,7 @@ class ModelFaultDiagnosis:
             problems_type="train")
         all_diagnosis_stats.append(safe_train_stats)
 
+        self.logger.debug("Finished the fault diagnosis simulation!")
         self._write_diagnosis(all_diagnosis_stats)
 
     def run_fault_diagnosis(self) -> NoReturn:
