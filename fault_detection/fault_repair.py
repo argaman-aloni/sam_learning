@@ -12,9 +12,6 @@ from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Do
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericSAMLearner
 
-DIAGNOSIS_ANALYSIS_COLUMNS = ["problem_name", "plan_applicable", "plan_differ_from_reference",
-                              "faulty_action", "fault_location"]
-
 
 class FaultRepair:
     """Class that detects and repairs faults in planning domains."""
@@ -94,7 +91,7 @@ class FaultRepair:
         :param plan_sequence: The plan sequence to observe.
         :param faulty_domain: the domain with the faulty action.
         :param problem: the problem that was solved using the plan sequence.
-        :return:
+        :return: the faulty and the valid observation and the name of the faulty action.
         """
         valid_observation = Observation()
         faulty_observation = Observation()
@@ -151,7 +148,8 @@ class FaultRepair:
 
     def execute_plans_on_agent(
             self, plans_dir_path: Path,
-            faulty_domain_path: Path, is_repaired_model: bool = False) -> Tuple[List[Observation], List[Observation], Dict[str, str]]:
+            faulty_domain_path: Path, is_repaired_model: bool = False) -> Tuple[
+        List[Observation], List[Observation], Dict[str, str]]:
         """
 
         :param faulty_domain_path:

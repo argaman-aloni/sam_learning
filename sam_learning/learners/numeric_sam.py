@@ -4,7 +4,8 @@ from typing import List, NoReturn, Dict, Tuple, Optional
 
 from pddl_plus_parser.models import Observation, ActionCall, State, Domain
 
-from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError
+from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
+    PolynomialFluentsLearningAlgorithm
 from .sam_learning import SAMLearner
 
 
@@ -96,3 +97,33 @@ class NumericSAMLearner(SAMLearner):
 
         self.partial_domain.actions = allowed_actions
         return self.partial_domain, learning_metadata
+
+
+class PolynomialSAMLearning(NumericSAMLearner):
+    storage: Dict[str, PolynomialFluentsLearningAlgorithm]
+    polynom_degree: int
+
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 polynomial_degree: int = 1):
+        super().__init__(partial_domain, preconditions_fluent_map)
+        self.polynom_degree = polynomial_degree
+
+    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
+        """Adds a new action to the learned domain.
+
+        :param grounded_action: the grounded action that was executed according to the observation.
+        :param previous_state: the state that the action was executed on.
+        :param next_state: the state that was created after executing the action on the previous
+            state.
+        """
+        super().add_new_action(grounded_action, previous_state, next_state)
+        self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(
+            grounded_action, previous_state.state_fluents)
+        next_state_lifted_matches = self.function_matcher.match_state_functions(
+            grounded_action, next_state.state_fluents)
+        self.storage[grounded_action.name] = PolynomialFluentsLearningAlgorithm(
+            grounded_action.name, self.polynom_degree)
+        self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
+        self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
+        self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")

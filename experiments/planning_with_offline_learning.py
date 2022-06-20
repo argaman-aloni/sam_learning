@@ -12,17 +12,19 @@ from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import SAMLearner, NumericSAMLearner
+from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
 
-NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner]
+NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
+                      LearningAlgorithmType.polynomial_sam]
 
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
     LearningAlgorithmType.numeric_sam: NumericSAMLearner,
+    LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
 }
 
 
@@ -168,7 +170,7 @@ def main():
     args = sys.argv
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
-    learning_algorithm = LearningAlgorithmType.numeric_sam
+    learning_algorithm = LearningAlgorithmType.polynomial_sam
     solver = SolverType.enhsp
     fluents_map_path = Path(args[3]) if len(args) == 4 else None
     offline_learner = POL(working_directory_path=working_directory_path,

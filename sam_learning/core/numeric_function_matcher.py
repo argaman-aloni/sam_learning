@@ -54,8 +54,6 @@ class NumericFunctionMatcher:
                 lifted_signature[function_obj] = self.matcher_domain.constants[function_obj].type
 
             else:
-                if executed_action.name == "load":
-                    print(grounded_call_parameters.index(function_obj), function_obj)
                 lifted_param_name = lifted_parameters[grounded_call_parameters.index(function_obj)]
                 lifted_param_type = executed_action.signature[lifted_param_name]
                 lifted_signature[lifted_param_name] = lifted_param_type

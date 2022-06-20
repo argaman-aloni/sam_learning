@@ -5,3 +5,4 @@ from .numeric_fluent_learner_algorithm import NumericFluentStateStorage, Conditi
 from .numeric_function_matcher import NumericFunctionMatcher
 from .predicates_matcher import PredicatesMatcher
 from .learning_types import EquationSolutionType, ConditionType
+from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm

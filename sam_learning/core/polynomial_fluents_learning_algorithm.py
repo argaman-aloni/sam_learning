@@ -1,0 +1,88 @@
+"""Module that learns polynomial preconditions and effects from a domain."""
+import itertools
+from typing import Dict, NoReturn, List
+
+import numpy
+from pddl_plus_parser.models import PDDLFunction
+
+from sam_learning.core.numeric_fluent_learner_algorithm import NumericFluentStateStorage
+
+
+class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
+    """Class that learns polynomial preconditions and effects from a domain.
+
+    Note:
+        If the polynom degree is 0 the algorithm reverts to its linear version.
+        degree of 1 is the multiplication of each couple of state fluents.
+        degree 2 and above is the maximal degree of the polynomial.
+    """
+    polynom_degree: int
+
+    def __init__(self, action_name: str, polynom_degree: int):
+        super().__init__(action_name)
+        self.polynom_degree = polynom_degree
+
+    def _create_polynomial_string_recursive(self, fluents: List[str]) -> str:
+        """
+
+        :param fluents:
+        :return:
+        """
+        if len(fluents) == 1:
+            return fluents[0]
+
+        return f"(* {fluents[0]} {self._create_polynomial_string_recursive(fluents[1:])})"
+
+    def create_polynomial_string(self, fluents: List[str]) -> str:
+        """
+
+        :param fluents:
+        :return:
+        """
+        return self._create_polynomial_string_recursive(fluents)
+
+    def _add_polynom_to_storage(self, state_fluents: Dict[str, PDDLFunction],
+                                storage: Dict[str, List[float]]) -> NoReturn:
+        """Adds the polynomial representation of the state fluents to the storage.
+
+        :param state_fluents: the numeric fluents present in the input state.
+        :param storage: the storage to update.
+        """
+        if self.polynom_degree == 1:
+            for first_fluent, second_fluent in itertools.combinations(list(state_fluents.keys()), r=2):
+                multiplied_fluent = self.create_polynomial_string([first_fluent, second_fluent])
+                storage[multiplied_fluent].append(
+                    state_fluents[first_fluent].value * state_fluents[second_fluent].value)
+            return
+
+        for degree in range(2, self.polynom_degree + 1):
+            for fluent_combination in itertools.combinations_with_replacement(
+                    list(state_fluents.keys()), r=degree):
+                polynomial_fluent = self.create_polynomial_string(list(fluent_combination))
+                values = [state_fluents[fluent].value for fluent in fluent_combination]
+                self.previous_state_storage[polynomial_fluent].append(numpy.prod(values))
+
+    def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+        """Adds the matched lifted state fluents to the previous state storage.
+
+        :param state_fluents: the lifted state fluents that were matched for the action.
+        """
+        super().add_to_previous_state_storage(state_fluents)
+        if self.polynom_degree == 0:
+            return
+
+        self._add_polynom_to_storage(state_fluents, self.previous_state_storage)
+
+    def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+        """Adds the matched lifted state fluents to the next state storage.
+
+        :param state_fluents: the lifted state fluents that were matched for the action.
+        """
+        super().add_to_next_state_storage(state_fluents)
+        if self.polynom_degree == 0:
+            return
+
+        for fluent in self.next_state_storage:
+            if len(self.previous_state_storage.get(fluent, [])) != len(self.next_state_storage[fluent]):
+                self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
+                self.previous_state_storage[fluent].append(0)
