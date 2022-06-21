@@ -57,8 +57,8 @@ class ENHSPSolver:
                     solving_stats[problem_file_path.stem] = "no_solution"
 
                 else:
-                    self.logger.warning(f"While solving face unknown error STDOUT - {process.stdout}")
-                    self.logger.warning(f"While solving face unknown error STDERR - {process.stderr}")
+                    self.logger.warning(f"While solving problem encountered unknown error! STDOUT - {process.stdout}")
+                    self.logger.warning(f"While solving problem encountered unknown error! STDERR - {process.stderr}")
                     solving_stats[problem_file_path.stem] = "no_solution"
 
             except subprocess.TimeoutExpired:

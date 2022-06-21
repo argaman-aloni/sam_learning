@@ -1,10 +1,11 @@
 """Module that learns polynomial preconditions and effects from a domain."""
 import itertools
-from typing import Dict, NoReturn, List
+from typing import Dict, NoReturn, List, Optional, Tuple
 
 import numpy
 from pddl_plus_parser.models import PDDLFunction
 
+from sam_learning.core import ConditionType
 from sam_learning.core.numeric_fluent_learner_algorithm import NumericFluentStateStorage
 
 
@@ -86,3 +87,25 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
             if len(self.previous_state_storage.get(fluent, [])) != len(self.next_state_storage[fluent]):
                 self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
                 self.previous_state_storage[fluent].append(0)
+
+    def construct_safe_linear_inequalities(
+            self, relevant_fluents: Optional[List[str]] = None) -> Tuple[List[str], ConditionType]:
+        """Constructs the linear inequalities strings that will be used in the learned model later.
+
+        :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
+        """
+        polynomial_relevant_fluents = [*relevant_fluents]
+        if self.polynom_degree == 0:
+            return super().construct_safe_linear_inequalities(relevant_fluents)
+
+        if self.polynom_degree == 1:
+            for first_fluent, second_fluent in itertools.combinations(relevant_fluents, r=2):
+                polynomial_relevant_fluents.append(self.create_polynomial_string([first_fluent, second_fluent]))
+
+            return super().construct_safe_linear_inequalities(polynomial_relevant_fluents)
+
+        for degree in range(2, self.polynom_degree + 1):
+            for fluent_combination in itertools.combinations_with_replacement(relevant_fluents, r=degree):
+                polynomial_relevant_fluents.append(self.create_polynomial_string(list(fluent_combination)))
+
+        return super().construct_safe_linear_inequalities(polynomial_relevant_fluents)
