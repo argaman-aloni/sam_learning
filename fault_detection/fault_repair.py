@@ -1,8 +1,12 @@
 """Module that repairs faulty domains by fixing the action that contains the defect."""
 import json
 import logging
+import os
+import re
+import subprocess
+import time
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, NoReturn
+from typing import List, Tuple, Optional, Dict, NoReturn, Iterator
 
 from pddl_plus_parser.exporters import ENHSPParser
 from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call, ActionDescriptor
@@ -11,6 +15,11 @@ from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Do
 
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericSAMLearner
+from validators import VALIDATOR_DIRECTORY, EXECUTION_SCRIPT, VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
+from validators.validator_script_data import BATCH_JOB_SUBMISSION_REGEX, write_batch_and_validate_plan
+
+FAULTY_ACTION_LOCATOR_REGEX = re.compile(r"Plan failed because of unsatisfied precondition in:\n\((\w+) [\w+ ]*\)",
+                                         flags=re.MULTILINE)
 
 
 class FaultRepair:
@@ -68,24 +77,85 @@ class FaultRepair:
 
         return True
 
-    def _generate_grounded_operators(self, action_descriptor: ActionDescriptor,
+    def _generate_grounded_operators(self, action_name: str,
                                      faulty_domain: Domain, parameters: List[str]) -> Tuple[Operator, Operator]:
         """Generates the valid and faulty grounded operators from the action descriptor.
 
-        :param action_descriptor: the description of the currently executed action.
+        :param action_name: the name of the action that contains a defect.
         :param faulty_domain: the domain the contains a defect.
         :param parameters: the parameters with which the action was executed.
         :return: the faulty and valid grounded operators.
         """
-        valid_operator = Operator(action=self.model_domain.actions[action_descriptor.name],
+        valid_operator = Operator(action=self.model_domain.actions[action_name],
                                   domain=self.model_domain, grounded_action_call=parameters)
-        possibly_faulty_operator = Operator(action=faulty_domain.actions[action_descriptor.name],
+        possibly_faulty_operator = Operator(action=faulty_domain.actions[action_name],
                                             domain=faulty_domain, grounded_action_call=parameters)
         return possibly_faulty_operator, valid_operator
 
+    def _write_batch_and_validate_plan(self, problem_file_path: Path, solution_file_path: Path) -> Tuple[Path, Path]:
+        """Validates that the plan for the input problem.
+
+        :param problem_file_path: the path to the problem file.
+        :param solution_file_path: the path to the solution file.
+        :return: the path to the script file and the path to the validation log file.
+        """
+        os.chdir(VALIDATOR_DIRECTORY)
+        self.logger.info("Running VAL to validate the plan's correctness.")
+        script_file_path = VALIDATOR_DIRECTORY / "validate_script.sh"
+        validation_file_path = VALIDATOR_DIRECTORY / "validation_log.txt"
+        completed_file_str = EXECUTION_SCRIPT.format(
+            domain_file_path=str(self.model_domain_file_path),
+            problem_file_path=str(problem_file_path.absolute()),
+            solution_file_path=str(solution_file_path.absolute()),
+            validation_log_file_path=str(validation_file_path.absolute())
+        )
+        with open(script_file_path, "wt") as run_script_file:
+            run_script_file.write(completed_file_str)
+
+        self.logger.info("Finished writing the script to the cluster. Submitting the job.")
+        submission_str = subprocess.check_output(["sbatch", str(script_file_path)])
+        match = BATCH_JOB_SUBMISSION_REGEX.match(submission_str)
+        batch_id = match.group("batch_id")
+        time.sleep(1)
+        execution_state = subprocess.check_output(["squeue", "--me"])
+        while batch_id in execution_state:
+            execution_state = subprocess.check_output(["squeue", "--me"])
+            time.sleep(1)
+            continue
+
+        self.logger.info("Finished executing the validation script.")
+        return script_file_path, validation_file_path
+
+    def _is_plan_applicable(self, problem_file_path: Path, solution_file_path: Path) -> Tuple[bool, Optional[str]]:
+        """Validates that the solution file contains a valid plan.
+
+        :param problem_file_path: the path to the problem file.
+        :param solution_file_path: the path to the solution file.
+
+        :return: whether the plan is valid and the name of the faulty action if it is not.
+        """
+        script_file_path, validation_file_path = \
+            write_batch_and_validate_plan(logger=self.logger, domain_path=self.model_domain_file_path,
+                                          problem_file_path=problem_file_path, solution_file_path=solution_file_path)
+
+        self.logger.debug("Cleaning the sbatch and output file from the problems directory.")
+        script_file_path.unlink(missing_ok=True)
+        for job_file_path in Path(VALIDATOR_DIRECTORY).glob("job-*.out"):
+            job_file_path.unlink(missing_ok=True)
+
+        with open(validation_file_path, "r") as validation_file:
+            validation_file_content = validation_file.read()
+            if VALID_PLAN in validation_file_content or GOAL_NOT_REACHED in validation_file_content:
+                return True, None
+
+            if INAPPLICABLE_PLAN in validation_file_content:
+                match = FAULTY_ACTION_LOCATOR_REGEX.search(validation_file_content)
+                faulty_action_name = match.group(1)
+                return False, faulty_action_name
+
     def _observe_single_plan(
-            self, plan_sequence: List[str], faulty_domain: Domain,
-            problem: Problem) -> Tuple[Optional[Observation], Optional[Observation], Optional[str]]:
+            self, faulty_domain: Domain, problem_file_path: Path,
+            solution_file_path: Path) -> Tuple[Optional[Observation], Optional[Observation], Optional[str]]:
         """Observes a single plan and determines whether there are faults in it and where they might be.
 
         :param plan_sequence: The plan sequence to observe.
@@ -93,38 +163,38 @@ class FaultRepair:
         :param problem: the problem that was solved using the plan sequence.
         :return: the faulty and the valid observation and the name of the faulty action.
         """
+
+        plan_applicable, inapplicable_action = self._is_plan_applicable(problem_file_path, solution_file_path)
+        if not plan_applicable:
+            return None, None, inapplicable_action
+
+        plan_sequence = ENHSPParser().parse_plan_content(solution_file_path)
+        problem = ProblemParser(problem_file_path, self.model_domain).parse_problem()
         valid_observation = Observation()
         faulty_observation = Observation()
         faulty_action_name = None
         valid_previous_state = State(predicates=problem.initial_state_predicates,
                                      fluents=problem.initial_state_fluents, is_init=True)
-        possibly_invalid_previous_state = valid_previous_state
+        faulty_previous_state = valid_previous_state
 
         for grounded_action in plan_sequence:
             self.logger.info(f"The executed action: {grounded_action}")
-            action_descriptor = parse_action_call(grounded_action)
-            parameters = action_descriptor.parameters
-            possibly_faulty_operator, valid_operator = self._generate_grounded_operators(
-                action_descriptor, faulty_domain, parameters)
-
-            if not valid_operator.is_applicable(valid_previous_state):
-                self.logger.debug(f"The action {grounded_action} is not applicable according to the executing agent!")
-                return None, None, action_descriptor.name
+            descriptor = parse_action_call(grounded_action)
+            action_name = descriptor.name
+            parameters = descriptor.parameters
+            faulty_operator, valid_operator = self._generate_grounded_operators(action_name, faulty_domain, parameters)
 
             valid_next_state = valid_operator.apply(valid_previous_state)
-            possibly_faulty_next_state = possibly_faulty_operator.apply(possibly_invalid_previous_state)
-            if not self._validate_applied_action(action_descriptor.name, valid_next_state, possibly_faulty_next_state):
-                faulty_action_name = action_descriptor.name if faulty_action_name is None else faulty_action_name
-                faulty_observation.add_component(
-                    possibly_invalid_previous_state, ActionCall(action_descriptor.name, action_descriptor.parameters),
-                    possibly_faulty_next_state)
-
-            valid_observation.add_component(
-                valid_previous_state, ActionCall(action_descriptor.name, action_descriptor.parameters),
-                valid_next_state)
+            faulty_next_state = faulty_operator.apply(faulty_previous_state)
+            valid_observation.add_component(valid_previous_state, ActionCall(action_name, parameters), valid_next_state)
+            is_state_identical = self._validate_applied_action(action_name, valid_next_state, faulty_next_state)
+            if not is_state_identical:
+                faulty_action_name = faulty_action_name or action_name
+                faulty_observation.add_component(faulty_previous_state, ActionCall(action_name, parameters),
+                                                 faulty_next_state)
 
             valid_previous_state = valid_next_state
-            possibly_invalid_previous_state = possibly_faulty_next_state
+            faulty_previous_state = faulty_next_state
 
         return valid_observation, faulty_observation, faulty_action_name
 
@@ -147,15 +217,15 @@ class FaultRepair:
             faulty_observation.components = relevant_faulty_components
 
     def execute_plans_on_agent(
-            self, plans_dir_path: Path,
-            faulty_domain_path: Path, is_repaired_model: bool = False) -> Tuple[
-        List[Observation], List[Observation], Dict[str, str]]:
-        """
+            self, plans_dir_path: Path, faulty_domain_path: Path,
+            is_repaired_model: bool = False) -> Tuple[List[Observation], List[Observation], Dict[str, str]]:
+        """Executes the plans on the agent and returns the learned information about the possible faults and the
+        execution status.
 
-        :param faulty_domain_path:
-        :param plans_dir_path:
+        :param faulty_domain_path: the path to the domain file that might be either faulty or the fixed file.
+        :param plans_dir_path: the path to the directory containing the plans.
         :param is_repaired_model: whether the model has been repaired or not.
-        :return:
+        :return: the statistics about the execution of the plans and the observations.
         """
         faulty_action_observations = []
         valid_action_observations = []
@@ -164,24 +234,21 @@ class FaultRepair:
         faulty_domain = DomainParser(domain_path=faulty_domain_path).parse_domain()
         for solution_file_path in plans_dir_path.glob("*.solution"):
             problem_file_path = plans_dir_path / f"{solution_file_path.stem}.pddl"
-            plan_sequence = ENHSPParser().parse_plan_content(solution_file_path)
-            problem = ProblemParser(problem_file_path, self.model_domain).parse_problem()
-            valid_observation, faulty_observation, possibly_faulty_action = self._observe_single_plan(plan_sequence,
-                                                                                                      faulty_domain,
-                                                                                                      problem)
-            if possibly_faulty_action is None:
+            valid_observation, faulty_observation, faulty_action = self._observe_single_plan(
+                faulty_domain, problem_file_path, solution_file_path)
+            if faulty_action is None:
                 self.logger.debug(f"The plan {solution_file_path.stem} was validated and is applicable!")
                 observed_plans[solution_file_path.stem] = "ok"
 
             if valid_observation is None:
-                faulty_action_name = possibly_faulty_action
+                faulty_action_name = faulty_action
                 self.logger.debug(f"The plan {solution_file_path.stem} is not valid!")
                 observed_plans[solution_file_path.stem] = "not_applicable"
 
-            if possibly_faulty_action is not None:
-                faulty_action_name = possibly_faulty_action
+            if faulty_action is not None:
+                faulty_action_name = faulty_action
                 self.logger.debug(f"Detected a faulty action in plan {solution_file_path.stem}! "
-                                  f"The action {possibly_faulty_action} is faulty!")
+                                  f"The action {faulty_action} is faulty!")
                 observed_plans[solution_file_path.stem] = "state_difference"
 
             if valid_observation is not None:

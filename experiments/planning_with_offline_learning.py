@@ -170,9 +170,9 @@ def main():
     args = sys.argv
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
-    learning_algorithm = LearningAlgorithmType.polynomial_sam
+    learning_algorithm = LearningAlgorithmType.numeric_sam
     solver = SolverType.enhsp
-    fluents_map_path = Path(args[3]) if len(args) == 4 else None
+    fluents_map_path = Path(args[3]) or None
     offline_learner = POL(working_directory_path=working_directory_path,
                           domain_file_name=domain_file_name,
                           learning_algorithm=learning_algorithm,

@@ -44,14 +44,13 @@ class FaultGenerator:
             self.logger.debug(f"Altered precondition: {precondition_to_alter.to_pddl()}")
             return
 
-    def alter_action_numeric_effect(self, faulty_action: Action) -> NoReturn:
-        """Alter the action's effects so that it will contain a defect.
+    @staticmethod
+    def _alter_numeric_expression(expression: NumericalExpressionTree) -> NoReturn:
+        """Alters a numeric expression.
 
-        :param faulty_action: the action to alter.
+        :param expression: the expression to alter.
         """
-        self.logger.info(f"Altering the action - {faulty_action.name} effects!")
-        effect_to_alter: NumericalExpressionTree = random.choice(list(faulty_action.numeric_effects))
-        node = effect_to_alter.root
+        node = expression.root
         increase_by = random.randint(1, 10)
         while not node.is_leaf:
             node = node.children[1]
@@ -70,6 +69,24 @@ class FaultGenerator:
             left_sibling = node.parent.children[0]
             node.parent.children = (left_sibling, new_add_node)
 
+    def alter_action_numeric_precondition_value(self, faulty_action: Action) -> NoReturn:
+        """Alter the action's effects so that it will contain a defect.
+
+        :param faulty_action: the action to alter.
+        """
+        self.logger.info(f"Altering the action - {faulty_action.name} numeric precondition value!")
+        precondition_to_alter: NumericalExpressionTree = random.choice(list(faulty_action.numeric_preconditions))
+        self._alter_numeric_expression(precondition_to_alter)
+        self.logger.debug(f"Altered precondition: {precondition_to_alter.to_pddl()}")
+
+    def alter_action_numeric_effect(self, faulty_action: Action) -> NoReturn:
+        """Alter the action's effects so that it will contain a defect.
+
+        :param faulty_action: the action to alter.
+        """
+        self.logger.info(f"Altering the action - {faulty_action.name} effects!")
+        effect_to_alter: NumericalExpressionTree = random.choice(list(faulty_action.numeric_effects))
+        self._alter_numeric_expression(effect_to_alter)
         self.logger.debug(f"Altered effect: {effect_to_alter.to_pddl()}")
 
     def remove_predicate_from_action(self, faulty_action: Action) -> NoReturn:
@@ -99,8 +116,14 @@ class FaultGenerator:
         :param defect_type: the type of defect to add to the action.
         """
         self.logger.debug(f"Altering the action - {faulty_action.name}!")
-        if defect_type == DefectType.numeric_precondition:
+        if defect_type == DefectType.numeric_precondition_sign:
             self.alter_action_numeric_precondition(faulty_action)
+
+        elif defect_type == DefectType.numeric_precondition_sign:
+            self.alter_action_numeric_precondition(faulty_action)
+
+        elif defect_type == DefectType.numeric_precondition_numeric_change:
+            self.alter_action_numeric_precondition_value(faulty_action)
 
         elif defect_type == DefectType.numeric_effect:
             self.alter_action_numeric_effect(faulty_action)

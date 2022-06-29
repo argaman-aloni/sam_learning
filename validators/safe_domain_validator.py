@@ -2,15 +2,18 @@
 import csv
 import logging
 import os
+import re
+import subprocess
+import time
 from pathlib import Path
-from typing import NoReturn, Dict, List, Any, Optional
+from typing import NoReturn, Dict, List, Any, Optional, Tuple
 
-from pddl_plus_parser.exporters import TrajectoryExporter, ENHSPParser
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import Observation, Domain
+from pddl_plus_parser.models import Observation
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
+from validators.validator_script_data import EXECUTION_SCRIPT, VALIDATOR_DIRECTORY, VALID_PLAN, INAPPLICABLE_PLAN, \
+    GOAL_NOT_REACHED, BATCH_JOB_SUBMISSION_REGEX, write_batch_and_validate_plan
 
 SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,
@@ -25,8 +28,11 @@ SOLVING_STATISTICS = [
     "ok",
     "no_solution",
     "timeout",
-    "not_applicable"
+    "not_applicable",
+    "goal_not_achieved",
 ]
+
+MAX_RUNNING_TIME = 60
 
 
 class DomainValidator:
@@ -37,11 +43,11 @@ class DomainValidator:
     """
 
     logger: logging.Logger
-    reference_domain: Domain
     solver: ENHSPSolver
     solving_stats: List[Dict[str, Any]]
     aggregated_solving_stats: List[Dict[str, Any]]
     learning_algorithm: LearningAlgorithmType
+    reference_domain_path: Path
     results_dir_path: Path
 
     def __init__(self, working_directory_path: Path,
@@ -52,7 +58,7 @@ class DomainValidator:
         self.aggregated_solving_stats = []
         self.learning_algorithm = learning_algorithm
         self.results_dir_path = working_directory_path / "results_directory"
-        self.reference_domain = DomainParser(domain_path=reference_domain_path, partial_parsing=False).parse_domain()
+        self.reference_domain_path = reference_domain_path
 
     @staticmethod
     def _clear_plans(test_set_directory: Path) -> NoReturn:
@@ -61,7 +67,7 @@ class DomainValidator:
         :param test_set_directory: the path to the directory containing the plans.
         """
         for solver_output_path in test_set_directory.glob("*.solution"):
-            os.remove(solver_output_path)
+            solver_output_path.unlink(missing_ok=True)
 
     def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
                                    iteration_statistics: Dict[str, int]) -> NoReturn:
@@ -69,16 +75,26 @@ class DomainValidator:
 
         :param solution_file_path: the path to the solution file.
         """
-        sequence = ENHSPParser().parse_plan_content(solution_file_path)
-        problem = ProblemParser(problem_file_path, self.reference_domain).parse_problem()
-        try:
-            TrajectoryExporter(self.reference_domain).parse_plan(problem=problem, action_sequence=sequence)
-            iteration_statistics[SolutionOutputTypes.ok.name] += 1
-            return
+        script_file_path, validation_file_path = \
+            write_batch_and_validate_plan(logger=self.logger, domain_path=self.reference_domain_path,
+                                          problem_file_path=problem_file_path, solution_file_path=solution_file_path)
 
-        except ValueError:
-            self.logger.warning("Found a solution that was not applicable!")
-            iteration_statistics[SolutionOutputTypes.not_applicable.name] += 1
+        self.logger.debug("Cleaning the sbatch and output file from the problems directory.")
+        script_file_path.unlink(missing_ok=True)
+        for job_file_path in Path(VALIDATOR_DIRECTORY).glob("job-*.out"):
+            job_file_path.unlink(missing_ok=True)
+
+        with open(validation_file_path, "r") as validation_file:
+            validation_file_content = validation_file.read()
+            if VALID_PLAN in validation_file_content:
+                self.logger.info("The plan is valid.")
+                iteration_statistics["ok"] += 1
+            elif INAPPLICABLE_PLAN in validation_file_content:
+                self.logger.info("The plan is not applicable.")
+                iteration_statistics["not_applicable"] += 1
+            elif GOAL_NOT_REACHED in validation_file_content:
+                self.logger.info("The plan did not reach the required goal.")
+                iteration_statistics["goal_not_achieved"] += 1
 
     def validate_domain(self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
                         used_observations: List[Observation] = None) -> NoReturn:

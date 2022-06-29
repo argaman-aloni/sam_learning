@@ -20,3 +20,4 @@ class SolutionOutputTypes(Enum):
     no_solution = 2
     timeout = 3
     not_applicable = 4
+    goal_not_achieved = 5

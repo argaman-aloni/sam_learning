@@ -101,7 +101,11 @@ class ModelFaultDiagnosis:
                 self.logger.info(f"Generating faulty domain for action: {action_name} "
                                  f"by altering its numeric preconditions!")
                 faulty_domain = self._generate_faulty_domain_based_on_defect_type(
-                    action_name, directory_path, DefectType.numeric_precondition)
+                    action_name, directory_path, DefectType.numeric_precondition_sign)
+                yield action_name, faulty_domain
+
+                faulty_domain = self._generate_faulty_domain_based_on_defect_type(
+                    action_name, directory_path, DefectType.numeric_precondition_numeric_change)
                 yield action_name, faulty_domain
 
             if len(action_data.numeric_effects) > 0:
@@ -109,13 +113,6 @@ class ModelFaultDiagnosis:
                                  f"by altering its numeric effect!")
                 faulty_domain = self._generate_faulty_domain_based_on_defect_type(
                     action_name, directory_path, DefectType.numeric_effect)
-                yield action_name, faulty_domain
-
-            if len(action_data.positive_preconditions) > 0:
-                self.logger.info(f"Generating faulty domain for action: {action_name} "
-                                 f"by removing a predicate from it's preconditions!")
-                faulty_domain = self._generate_faulty_domain_based_on_defect_type(
-                    action_name, directory_path, DefectType.removed_predicate)
                 yield action_name, faulty_domain
 
     def _write_diagnosis(self, all_diagnosis_stats: List[Dict[str, Any]]) -> NoReturn:
@@ -256,7 +253,7 @@ def parse_arguments() -> argparse.Namespace:
 
 if __name__ == '__main__':
     logging.basicConfig(
-        format="%(asctime)s %(levelname)-8s %(message)s",
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.DEBUG)
     args = parse_arguments()

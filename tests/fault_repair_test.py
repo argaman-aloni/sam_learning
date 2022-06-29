@@ -1,5 +1,5 @@
 """Module test for the fault repair functionality."""
-from pddl_plus_parser.exporters import ENHSPParser
+
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import Domain, Problem, State, Operator
 from pytest import fixture
@@ -75,20 +75,20 @@ def test_validate_applied_action_returns_false_if_the_faulty_action_differs_from
 
 
 def test_observe_single_plan_on_a_faulty_plan_returns_lift_as_faulty_action(
-        fault_repair: FaultRepair, problem: Problem, faulty_domain: Domain):
+        fault_repair: FaultRepair, faulty_domain: Domain):
     """Test that the observe_single_plan function returns the faulty action name."""
-    plan_sequence = ENHSPParser().parse_plan_content(DEPOT_FAULTY_PLAN_PATH)
     _, _, faulty_action_name = fault_repair._observe_single_plan(
-        plan_sequence=plan_sequence, faulty_domain=faulty_domain, problem=problem)
+        faulty_domain=faulty_domain, problem_file_path=DEPOT_REPAIR_TEST_PROBLEM_PATH,
+        solution_file_path=DEPOT_FAULTY_PLAN_PATH)
     assert faulty_action_name == "lift"
 
 
 def test_filter_redundant_observations_removes_states_of_actions_that_are_not_faulty(
-        fault_repair: FaultRepair, problem: Problem, faulty_domain: Domain):
+        fault_repair: FaultRepair, faulty_domain: Domain):
     """Test that the filter_redundant_observations function removes states of actions that are not faulty."""
-    plan_sequence = ENHSPParser().parse_plan_content(DEPOT_FAULTY_PLAN_PATH)
     valid_observation, faulty_observation, faulty_action_name = fault_repair._observe_single_plan(
-        plan_sequence=plan_sequence, faulty_domain=faulty_domain, problem=problem)
+        faulty_domain=faulty_domain, problem_file_path=DEPOT_REPAIR_TEST_PROBLEM_PATH,
+        solution_file_path=DEPOT_FAULTY_PLAN_PATH)
     valid_observations = [valid_observation]
     faulty_observations = [faulty_observation]
     fault_repair._filter_redundant_observations("lift", valid_observations, faulty_observations)
@@ -97,11 +97,11 @@ def test_filter_redundant_observations_removes_states_of_actions_that_are_not_fa
 
 
 def test_repair_model_fix_numeric_effect_when_given_valid_observation(
-        fault_repair: FaultRepair, problem: Problem, faulty_domain: Domain, fault_generator: FaultGenerator):
+        fault_repair: FaultRepair, faulty_domain: Domain, fault_generator: FaultGenerator):
     """Test that the repair_model fixes the numeric effect of the faulty action when given a valid observation."""
-    plan_sequence = ENHSPParser().parse_plan_content(DEPOT_FAULTY_PLAN_PATH)
     valid_observation, faulty_observation, faulty_action_name = fault_repair._observe_single_plan(
-        plan_sequence=plan_sequence, faulty_domain=faulty_domain, problem=problem)
+        faulty_domain=faulty_domain, problem_file_path=DEPOT_REPAIR_TEST_PROBLEM_PATH,
+        solution_file_path=DEPOT_FAULTY_PLAN_PATH)
     valid_observations = [valid_observation]
     faulty_observations = [faulty_observation]
     faulty_learner_domain = fault_generator.generate_faulty_domain(
