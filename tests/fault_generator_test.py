@@ -44,6 +44,16 @@ def test_alter_action_numeric_precondition_change_numeric_precondition_sign_to_g
     assert load_action.numeric_preconditions.pop().root.value == ">="
 
 
+def test_alter_action_numeric_effect_adds_an_additional_add_expression_to_the_expression_tree(
+        fault_generator: FaultGenerator, load_action: Action):
+    """Test that the numeric effect is increased by five."""
+    mock_randint = lambda x, y: 5
+    with mock.patch('random.randint', mock_randint):
+        fault_generator.alter_action_numeric_effect(faulty_action=load_action)
+        pddl_altered_effect = "(increase (current_load ?z) (+ (weight ?y) 5))"
+        assert load_action.numeric_effects.pop().to_pddl() == pddl_altered_effect
+
+
 def test_alter_action_numeric_effect_increases_numeric_expression_by_five(
         fault_generator: FaultGenerator, drive_action: Action):
     """Test that the numeric effect is increased by five."""
@@ -54,14 +64,14 @@ def test_alter_action_numeric_effect_increases_numeric_expression_by_five(
         assert drive_action.numeric_effects.pop().to_pddl() == pddl_altered_effect
 
 
-def test_alter_action_numeric_effect_adds_an_additional_add_expression_to_the_expression_tree(
+def test_alter_action_numeric_precondition_additional_add_expression_to_the_expression_tree(
         fault_generator: FaultGenerator, load_action: Action):
     """Test that the numeric effect is increased by five."""
     mock_randint = lambda x, y: 5
     with mock.patch('random.randint', mock_randint):
-        fault_generator.alter_action_numeric_effect(faulty_action=load_action)
-        pddl_altered_effect = "(increase (current_load ?z) (+ (weight ?y) 5))"
-        assert load_action.numeric_effects.pop().to_pddl() == pddl_altered_effect
+        fault_generator.alter_action_numeric_precondition_value(faulty_action=load_action)
+        pddl_altered_preconditions = "(<= (+ (current_load ?z) (weight ?y)) (+ (load_limit ?z) 5))"
+        assert load_action.numeric_preconditions.pop().to_pddl() == pddl_altered_preconditions
 
 
 def test_remove_predicate_from_action_removes_predicate_from_action(
@@ -82,3 +92,14 @@ def test_select_action_to_alter_returns_correct_action(
     with mock.patch('random.choice', mock_randchoice):
         selected_action = fault_generator._select_action_to_alter(altered_domain=domain)
         assert selected_action == load_action
+
+
+def test_remove_numeric_precondition_from_action_removes_precondition_from_action(
+        fault_generator: FaultGenerator, load_action: Action):
+    """Test that the predicate is removed from the action."""
+    preconditions = list(load_action.numeric_preconditions)
+    precondition_to_remove = preconditions[0]
+    mock_randchoice = lambda x: precondition_to_remove
+    with mock.patch('random.choice', mock_randchoice):
+        fault_generator.remove_numeric_precondition(faulty_action=load_action)
+        assert precondition_to_remove not in list(load_action.numeric_preconditions)

@@ -45,27 +45,31 @@ class FaultGenerator:
             return
 
     @staticmethod
-    def _alter_numeric_expression(expression: NumericalExpressionTree) -> NoReturn:
+    def _alter_numeric_expression(expression: NumericalExpressionTree, should_decrease: bool = False) -> NoReturn:
         """Alters a numeric expression.
 
         :param expression: the expression to alter.
+        :param should_decrease: whether the expression should be decreased or increased.
         """
         node = expression.root
-        increase_by = random.randint(1, 10)
+        alter_by = random.randint(1, 20)
         while not node.is_leaf:
             node = node.children[1]
 
         if isinstance(node.value, float):
-            node.value = node.value + increase_by
+            node.value = node.value + alter_by
             node.id = str(node.value)
 
         else:
             function_name = node.id
             function_value = node.value
-            new_add_node = AnyNode(id="+", value="+", children=[
-                AnyNode(id=function_name, value=function_value),
-                AnyNode(id=str(increase_by), value=increase_by)
-            ])
+            new_add_node = AnyNode(
+                id="-" if should_decrease else "+",
+                value="-" if should_decrease else "+",
+                children=[
+                    AnyNode(id=function_name, value=function_value),
+                    AnyNode(id=str(alter_by), value=alter_by)
+                ])
             left_sibling = node.parent.children[0]
             node.parent.children = (left_sibling, new_add_node)
 
@@ -76,7 +80,9 @@ class FaultGenerator:
         """
         self.logger.info(f"Altering the action - {faulty_action.name} numeric precondition value!")
         precondition_to_alter: NumericalExpressionTree = random.choice(list(faulty_action.numeric_preconditions))
-        self._alter_numeric_expression(precondition_to_alter)
+        root_node = precondition_to_alter.root
+        should_decrease = root_node.value == ">="
+        self._alter_numeric_expression(precondition_to_alter, should_decrease)
         self.logger.debug(f"Altered precondition: {precondition_to_alter.to_pddl()}")
 
     def alter_action_numeric_effect(self, faulty_action: Action) -> NoReturn:
@@ -96,6 +102,15 @@ class FaultGenerator:
         """
         self.logger.info("Removing a predicate from the action's precondition!")
         faulty_action.positive_preconditions.remove(random.choice(list(faulty_action.positive_preconditions)))
+
+    def remove_numeric_precondition(self, faulty_action: Action) -> NoReturn:
+        """Remove a numeric precondition from the action's precondition.
+
+        :param faulty_action: the action to remove the numeric precondition from.
+        """
+        self.logger.info("Removing a predicate from the action's precondition!")
+        faulty_action.numeric_preconditions.remove(random.choice(list(faulty_action.numeric_preconditions)))
+
 
     @staticmethod
     def _select_action_to_alter(altered_domain: Domain) -> Action:

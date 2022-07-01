@@ -9,3 +9,4 @@ class DefectType(Enum):
     numeric_precondition_numeric_change = 2
     numeric_effect = 3
     removed_predicate = 4
+    removed_numeric_precondition = 5
