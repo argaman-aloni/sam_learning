@@ -83,7 +83,10 @@ class NumericSAMLearner(SAMLearner):
 
             self.storage[action_name].filter_out_inconsistent_state_variables()
             try:
-                if len(self.preconditions_fluent_map[action_name]) > 0:
+                if self.preconditions_fluent_map is None:
+                    action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
+
+                elif len(self.preconditions_fluent_map[action_name]) > 0:
                     action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
                         self.preconditions_fluent_map[action_name])
 

@@ -18,10 +18,12 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
         degree 2 and above is the maximal degree of the polynomial.
     """
     polynom_degree: int
+    is_verbose: bool
 
-    def __init__(self, action_name: str, polynom_degree: int):
+    def __init__(self, action_name: str, polynom_degree: int, is_verbose: bool = False):
         super().__init__(action_name)
         self.polynom_degree = polynom_degree
+        self.is_verbose = is_verbose
 
     def _create_polynomial_string_recursive(self, fluents: List[str]) -> str:
         """
@@ -94,9 +96,14 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
-        polynomial_relevant_fluents = [*relevant_fluents]
+        algorithm_relevant_fluents = relevant_fluents or list(self.previous_state_storage.keys())
+        polynomial_relevant_fluents = [*algorithm_relevant_fluents]
         if self.polynom_degree == 0:
             return super().construct_safe_linear_inequalities(relevant_fluents)
+
+        if self.is_verbose:
+            self.logger.debug(f"Fluents are given as verbose - so only learning the fluents given as input!")
+            return super().construct_safe_linear_inequalities(algorithm_relevant_fluents)
 
         if self.polynom_degree == 1:
             for first_fluent, second_fluent in itertools.combinations(relevant_fluents, r=2):

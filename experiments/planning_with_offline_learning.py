@@ -13,7 +13,7 @@ from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
@@ -24,6 +24,8 @@ NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.p
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
     LearningAlgorithmType.numeric_sam: NumericSAMLearner,
+    # difference is that the learner is not given any fluents to assist in learning
+    LearningAlgorithmType.raw_numeric_sam: NumericSAMLearner,
     LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
 }
 
@@ -36,17 +38,13 @@ class POL:
     domain_file_name: str
     learning_statistics_manager: LearningStatisticsManager
     _learning_algorithm: LearningAlgorithmType
-    _solver: SolverType
-    debug: bool
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
     numeric_performance_calc: NumericPerformanceCalculator
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 learning_algorithm: LearningAlgorithmType, solver: SolverType,
-                 fluents_map_path: Optional[Path]):
+                 learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path]):
         self.logger = logging.getLogger(__name__)
-        self.debug = False
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
                                  domain_file_name=domain_file_name,
@@ -57,7 +55,6 @@ class POL:
             domain_path=self.working_directory_path / domain_file_name,
             learning_algorithm=learning_algorithm)
         self._learning_algorithm = learning_algorithm
-        self._solver = solver
         if fluents_map_path is not None:
             with open(fluents_map_path, "rt") as json_file:
                 self.fluents_map = json.load(json_file)
@@ -69,7 +66,7 @@ class POL:
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name)
 
-    def _init_numeric_performance_calculator(self):
+    def _init_numeric_performance_calculator(self) -> NoReturn:
         """Initializes the algorithm of the numeric precision / recall calculator."""
         if self._learning_algorithm not in NUMERIC_ALGORITHMS:
             return
@@ -125,10 +122,7 @@ class POL:
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
 
-        if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self.learning_statistics_manager.export_numeric_learning_statistics(fold_number=fold_num)
-            self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
-
+        self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
@@ -170,13 +164,15 @@ def main():
     args = sys.argv
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
-    learning_algorithm = LearningAlgorithmType.numeric_sam
-    solver = SolverType.enhsp
-    fluents_map_path = Path(args[3]) or None
+    learning_algorithm = LearningAlgorithmType.raw_numeric_sam
+    if len(args) > 3:
+        fluents_map_path = Path(args[3])
+    else:
+        fluents_map_path = None
+
     offline_learner = POL(working_directory_path=working_directory_path,
                           domain_file_name=domain_file_name,
                           learning_algorithm=learning_algorithm,
-                          solver=solver,
                           fluents_map_path=fluents_map_path)
     offline_learner.run_cross_validation()
 

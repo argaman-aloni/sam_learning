@@ -1,19 +1,15 @@
 """Module to validate the correctness of the learned action models that were generated."""
 import csv
 import logging
-import os
-import re
-import subprocess
-import time
 from pathlib import Path
-from typing import NoReturn, Dict, List, Any, Optional, Tuple
+from typing import NoReturn, Dict, List, Any, Optional
 
 from pddl_plus_parser.models import Observation
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
-from validators.validator_script_data import EXECUTION_SCRIPT, VALIDATOR_DIRECTORY, VALID_PLAN, INAPPLICABLE_PLAN, \
-    GOAL_NOT_REACHED, BATCH_JOB_SUBMISSION_REGEX, write_batch_and_validate_plan
+from validators.validator_script_data import VALIDATOR_DIRECTORY, VALID_PLAN, INAPPLICABLE_PLAN, \
+    GOAL_NOT_REACHED, write_batch_and_validate_plan
 
 SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,

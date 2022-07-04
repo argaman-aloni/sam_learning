@@ -29,7 +29,6 @@ class SVMFluentsLearning(PolynomialFluentsLearningAlgorithm):
         :return:
         """
         self.logger.info("Running linear SVC model to learn the fluents coefficients...")
-
         labels = np.array([1] * len(self.positive_observations) + [0] * len(self.negative_observations))
         features = np.array(list(self.positive_observations.values()) + list(self.negative_observations.values()))
 

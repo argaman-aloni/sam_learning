@@ -5,8 +5,9 @@ class LearningAlgorithmType(Enum):
     sam_learning = 1
     esam_learning = 2
     numeric_sam = 3
-    plan_miner = 4
-    polynomial_sam = 5
+    raw_numeric_sam = 4
+    plan_miner = 5
+    polynomial_sam = 6
 
 
 class SolverType(Enum):
