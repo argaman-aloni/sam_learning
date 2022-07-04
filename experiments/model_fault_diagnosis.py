@@ -20,7 +20,7 @@ FAULTY_DOMAIN_PDDL = "faulty_domain.pddl"
 
 random.seed(42)
 DIAGNOSIS_COLUMNS = ["domain_type", "problems_type", "ok", "no_solution", "timeout", "not_applicable",
-                     "state_difference", "action_name"]
+                     "goal_not_achieved", "state_difference", "action_name"]
 ACTION_FAULT_DETECTION_COLUMNS = ["action_name", "is_precondition_faulty", "is_effect_faulty", "difference"]
 
 
@@ -114,6 +114,8 @@ class ModelFaultDiagnosis:
                     action_name, directory_path, DefectType.numeric_precondition_numeric_change)
                 yield action_name, faulty_domain, DefectType.numeric_precondition_numeric_change
 
+                self.logger.info(f"Generating faulty domain for action: {action_name} "
+                                 f"by removing one numeric precondition!")
                 faulty_domain = self._generate_faulty_domain_based_on_defect_type(
                     action_name, directory_path, DefectType.removed_numeric_precondition)
                 yield action_name, faulty_domain, DefectType.removed_numeric_precondition
@@ -126,10 +128,9 @@ class ModelFaultDiagnosis:
                 yield action_name, faulty_domain, DefectType.numeric_effect
 
     def _write_diagnosis(self, all_diagnosis_stats: List[Dict[str, Any]]) -> NoReturn:
-        """
+        """Write the diagnosis statistics to a file.
 
-        :param all_diagnosis_stats:
-        :return:
+        :param all_diagnosis_stats: the collected diagnosis statistics.
         """
         output_path = self.results_dir_path / f"diagnosis_statistics.csv"
         with open(output_path, 'wt', newline='') as csv_file:
@@ -140,13 +141,14 @@ class ModelFaultDiagnosis:
     def _solve_and_validate(
             self, problems_dir_path: Path, domain_file_path: Path,
             domain_type: str, problems_type: str) -> Tuple[List[Observation], List[Observation], Dict[str, Any]]:
-        """
+        """Solves a set of problems and validates the solutions.
 
-        :param problems_dir_path:
-        :param domain_file_path:
-        :param domain_type:
-        :param problems_type:
-        :return:
+        :param problems_dir_path: the path to the directory containing the problems.
+        :param domain_file_path: the path to the domain file.
+        :param domain_type: the type of domain (repaired or faulty).
+        :param problems_type: the type of problems (test or train).
+        :return: the observations of the test valid plan execution and the observations of the
+            faulty execution and the solving statistics.
         """
         self.logger.info(f"Starting to work on solving the problems in the directory - {problems_dir_path.absolute()}")
         solving_report = self.solver.execute_solver(
@@ -180,8 +182,18 @@ class ModelFaultDiagnosis:
         (test_set_dir_path / self.model_domain_file_name).unlink(missing_ok=True)
         (train_set_dir_path / FAULTY_DOMAIN_PDDL).unlink(missing_ok=True)
 
-    def _repair_action_model(self, defect_type, faulty_action_name, faulty_domain, test_set_dir_path,
-                             valid_observations):
+    def _repair_action_model(self, defect_type: DefectType, faulty_action_name: str, faulty_domain: LearnerDomain,
+                             test_set_dir_path: Path, valid_observations: List[Observation]) -> Path:
+        """Repairs the action model of the faulty action by learning the preconditions and effects from valid
+            observations.
+
+        :param defect_type: the type of defect that was injected to the faulty action.
+        :param faulty_action_name: the name of the faulty action.
+        :param faulty_domain: the faulty domain (containing the action with the injected fault).
+        :param test_set_dir_path: the path to the test set directory.
+        :param valid_observations: the valid observations that were created by executing the plans on an agent.
+        :return: the path to the repaired domain file.
+        """
         self.logger.debug(f"Found a defected action! action - {faulty_action_name}")
         repaired_domain = self.fault_repair.repair_model(faulty_domain, valid_observations, faulty_action_name)
         self._export_domain(domain=repaired_domain, domain_directory_path=test_set_dir_path,
@@ -190,8 +202,15 @@ class ModelFaultDiagnosis:
         learned_domain_file_path = test_set_dir_path / self.model_domain_file_name
         return learned_domain_file_path
 
-    def run_repaired_model_on_test(self, all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
-                                   test_set_dir_path):
+    def _run_repaired_model_on_test(self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str,
+                                    learned_domain_file_path: Path, test_set_dir_path: Path) -> NoReturn:
+        """Tries to solve the test set problems using the repaired domain.
+
+        :param all_diagnosis_stats: the collected diagnosis statistics.
+        :param faulty_action_name: the name of the faulty action.
+        :param learned_domain_file_path: the path to the learned domain file.
+        :param test_set_dir_path: the path to the test set directory.
+        """
         self.logger.debug("Solving the test set problems using the learned SAFE domain.")
         _, _, safe_test_stats = self._solve_and_validate(
             problems_dir_path=test_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="safe",
@@ -200,25 +219,55 @@ class ModelFaultDiagnosis:
         all_diagnosis_stats.append(safe_test_stats)
         self._clear_plans(test_set_dir_path)
 
-    def run_faulty_model_on_test(self, all_diagnosis_stats, faulty_action, faulty_domain_path, test_set_dir_path,
-                                 train_set_dir_path):
+    def run_faulty_model_on_test(
+            self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str,
+            faulty_domain_path: Path, test_set_dir_path: Path, train_set_dir_path: Path) -> NoReturn:
+        """Tries to solve the test set problems using the faulty domain.
+
+        :param all_diagnosis_stats: the collected diagnosis statistics.
+        :param faulty_action_name: the name of the faulty action.
+        :param faulty_domain_path: the path to the faulty domain file.
+        :param test_set_dir_path: the path to the test set directory.
+        :param train_set_dir_path: the path to the train set directory.
+        """
         self.logger.debug("solving the test set problems using the FAULTY domain.")
         _, _, faulty_test_set_stats = self._solve_and_validate(
             problems_dir_path=test_set_dir_path, domain_file_path=faulty_domain_path, domain_type="faulty",
             problems_type="test")
-        faulty_test_set_stats["action_name"] = faulty_action
+        faulty_test_set_stats["action_name"] = faulty_action_name
         all_diagnosis_stats.append(faulty_test_set_stats)
         self._clear_plans(train_set_dir_path)
 
-    def run_repair_model_on_train(self, all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
-                                  train_set_dir_path):
+    def run_repair_model_on_train(
+            self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str, repaired_domain_file_path: Path,
+            train_set_dir_path: Path) -> NoReturn:
+        """Tries to solve the train set problems using the repaired domain.
+
+        :param all_diagnosis_stats: the collected diagnosis statistics.
+        :param faulty_action_name: the name of the faulty action.
+        :param repaired_domain_file_path: the path to the repaired domain file.
+        :param train_set_dir_path: the path to the train set directory.
+        """
         self.logger.debug("solving the train set problems (again for validation) using the SAFE learned domain.")
         _, _, safe_train_stats = self._solve_and_validate(
-            problems_dir_path=train_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="safe",
+            problems_dir_path=train_set_dir_path, domain_file_path=repaired_domain_file_path, domain_type="safe",
             problems_type="train")
         safe_train_stats["action_name"] = faulty_action_name
         all_diagnosis_stats.append(safe_train_stats)
         self._clear_plans(train_set_dir_path)
+
+    def _write_action_diagnosis_stats(self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action: str) -> NoReturn:
+        """Writes the diagnosis statistics for a single action to a file.
+
+        :param all_diagnosis_stats: the list of all diagnosis statistics.
+        :param faulty_action: the name of the action that is faulty.
+        """
+        action_diagnosis_stats = [stats for stats in all_diagnosis_stats if stats["action_name"] == faulty_action]
+        action_diagnosis_stats_file_path = self.results_dir_path / f"{faulty_action}_diagnosis_stats.csv"
+        with action_diagnosis_stats_file_path.open("w") as action_diagnosis_stats_file:
+            writer = csv.DictWriter(action_diagnosis_stats_file, fieldnames=DIAGNOSIS_COLUMNS)
+            writer.writeheader()
+            writer.writerows(action_diagnosis_stats)
 
     def _run_single_fault_detection(
             self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action: str, faulty_domain: LearnerDomain,
@@ -246,8 +295,8 @@ class ModelFaultDiagnosis:
         faulty_action_name = valid_observations[0].components[0].grounded_action_call.name
         learned_domain_file_path = self._repair_action_model(defect_type, faulty_action_name, faulty_domain,
                                                              test_set_dir_path, valid_observations)
-        self.run_repaired_model_on_test(all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
-                                        test_set_dir_path)
+        self._run_repaired_model_on_test(all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
+                                         test_set_dir_path)
         self.run_faulty_model_on_test(all_diagnosis_stats, faulty_action, faulty_domain_path, test_set_dir_path,
                                       train_set_dir_path)
         self.run_repair_model_on_train(all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
@@ -267,6 +316,7 @@ class ModelFaultDiagnosis:
                 self._run_single_fault_detection(
                     all_diagnosis_stats, faulty_action, faulty_domain, test_set_dir_path, train_set_dir_path,
                     defect_type)
+                self._write_action_diagnosis_stats(all_diagnosis_stats, faulty_action)
 
             except ValueError:
                 self.logger.debug("The injected fault did not cause any problems in the train set.")

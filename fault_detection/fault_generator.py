@@ -108,9 +108,8 @@ class FaultGenerator:
 
         :param faulty_action: the action to remove the numeric precondition from.
         """
-        self.logger.info("Removing a predicate from the action's precondition!")
+        self.logger.info("Removing a numeric precondition from the action's precondition!")
         faulty_action.numeric_preconditions.remove(random.choice(list(faulty_action.numeric_preconditions)))
-
 
     @staticmethod
     def _select_action_to_alter(altered_domain: Domain) -> Action:
@@ -134,8 +133,8 @@ class FaultGenerator:
         if defect_type == DefectType.numeric_precondition_sign:
             self.alter_action_numeric_precondition(faulty_action)
 
-        elif defect_type == DefectType.numeric_precondition_sign:
-            self.alter_action_numeric_precondition(faulty_action)
+        elif defect_type == DefectType.removed_numeric_precondition:
+            self.remove_numeric_precondition(faulty_action)
 
         elif defect_type == DefectType.numeric_precondition_numeric_change:
             self.alter_action_numeric_precondition_value(faulty_action)

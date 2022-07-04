@@ -96,10 +96,11 @@ def test_select_action_to_alter_returns_correct_action(
 
 def test_remove_numeric_precondition_from_action_removes_precondition_from_action(
         fault_generator: FaultGenerator, load_action: Action):
-    """Test that the predicate is removed from the action."""
+    """Test that the numeric expression is removed from the action."""
     preconditions = list(load_action.numeric_preconditions)
     precondition_to_remove = preconditions[0]
     mock_randchoice = lambda x: precondition_to_remove
+    assert precondition_to_remove in list(load_action.numeric_preconditions)
     with mock.patch('random.choice', mock_randchoice):
         fault_generator.remove_numeric_precondition(faulty_action=load_action)
         assert precondition_to_remove not in list(load_action.numeric_preconditions)

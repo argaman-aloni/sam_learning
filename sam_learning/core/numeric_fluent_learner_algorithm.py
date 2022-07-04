@@ -317,6 +317,9 @@ class NumericFluentStateStorage:
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
+        if relevant_fluents is None:
+            relevant_fluents = self.previous_state_storage.keys()
+
         if len(relevant_fluents) == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")
             return self._construct_single_dimension_inequalities(relevant_fluents[0])

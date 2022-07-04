@@ -455,3 +455,20 @@ def test_construct_safe_linear_inequalities_with_one_dimension_variable_select_m
     expected_conditions = ["(<= (fuel-cost ) 28.0)",
                            "(>= (fuel-cost ) -19.0)"]
     assert set(output_conditions) == set(expected_conditions)
+
+
+def test_construct_safe_linear_when_not_given_relevant_fluents_uses_all_variables_in_previous_state(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    pre_state_input_values = [(-19.0, 32.0), (14.0, 52.0), (28.0, 12.0), (-7.0, 13.0)]
+    for fuel_cost_val, current_limit_val in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_limit_val)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
+    print(output_conditions)
+    assert all(["(fuel-cost )" in condition and "(current_load ?z)" in condition for condition in output_conditions])
