@@ -134,14 +134,9 @@ class FaultRepair:
 
         :return: whether the plan is valid and the name of the faulty action if it is not.
         """
-        script_file_path, validation_file_path = \
-            write_batch_and_validate_plan(logger=self.logger, domain_path=self.model_domain_file_path,
+        validation_file_path = \
+            write_batch_and_validate_plan(domain_file_path=self.model_domain_file_path,
                                           problem_file_path=problem_file_path, solution_file_path=solution_file_path)
-
-        self.logger.debug("Cleaning the sbatch and output file from the problems directory.")
-        script_file_path.unlink(missing_ok=True)
-        for job_file_path in Path(VALIDATOR_DIRECTORY).glob("job-*.out"):
-            job_file_path.unlink(missing_ok=True)
 
         with open(validation_file_path, "r") as validation_file:
             validation_file_content = validation_file.read()

@@ -14,7 +14,7 @@ from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
-PLAN_MINER_FILE_PATH = "path/to/plan_miner.py"  # TODO: Fix this.
+PLAN_MINER_DIR_PATH = "/home/mordocha/numeric_planning/PlanMiner/bin/"
 
 
 class PlanMinerExperimentRunner:
@@ -62,10 +62,13 @@ class PlanMinerExperimentRunner:
         :param domain_name: the name of the domain that will be given to both the file and the domain PDDL object.
         :return: the path to the newly learned domain file.
         """
+        os.chdir(PLAN_MINER_DIR_PATH)
         self.logger.info("Running PlanMiner on the input trajectories!")
-        process = subprocess.run([PLAN_MINER_FILE_PATH, concatenated_trajectory_path, domain_name], capture_output=True)
-        if process.returncode != 0:
-            self.logger.error(f"PlanMiner failed with the following error: {process.stderr}")
+        try:
+            subprocess.check_output(["./PlanMiner", concatenated_trajectory_path, domain_name])
+
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"PlanMiner failed with the following return code: {e.returncode}")
             raise Exception("PlanMiner failed!")
 
         self.logger.info("PlanMiner finished successfully!")
@@ -83,7 +86,8 @@ class PlanMinerExperimentRunner:
         learned_domain_path.unlink()
         return test_set_dir_path / learned_domain_path.name
 
-    def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> NoReturn:
+    def learn_model_using_plan_miner(self, fold_num: int, train_set_dir_path: Path,
+                                     test_set_dir_path: Path) -> NoReturn:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
@@ -91,22 +95,22 @@ class PlanMinerExperimentRunner:
         :param test_set_dir_path: the directory containing the test set problems in which the learned model should be
             used to solve.
         """
-        self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
+        self.logger.info(f"Evaluating PlanMiner's model learning for the fold - {fold_num}!")
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_observations = []
         for trajectory_file_path in train_set_dir_path.glob("*.pts"):
+            self.logger.debug(f"Adding the trajectory file - {trajectory_file_path}!")
             allowed_observations.append(trajectory_file_path)
-            concatenated_trajectory_path = self.concatenate_trajectories(allowed_observations)
+            concatenated_trajectory_path = self.concatenate_trajectories(train_set_dir_path, allowed_observations)
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learned_domain_path = self.run_plan_miner(concatenated_trajectory_path, domain_name=partial_domain.name)
             self.validate_learned_domain(allowed_observations, learned_domain_path, test_set_dir_path)
 
         self.domain_validator.write_statistics(fold_num)
 
-    def validate_learned_domain(
-            self, allowed_observations: List[Path], learned_domain_path: Path,
-            test_set_dir_path: Path) -> NoReturn:
+    def validate_learned_domain(self, allowed_observations: List[Path], learned_domain_path: Path,
+                                test_set_dir_path: Path) -> NoReturn:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
@@ -123,9 +127,10 @@ class PlanMinerExperimentRunner:
 
     def run_cross_validation(self) -> NoReturn:
         """Runs that cross validation process on the domain's working directory and validates the results."""
-        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
+        for fold_num, (train_dir_path, test_dir_path) in enumerate(
+                self.k_fold.create_k_fold(trajectory_suffix="*.pts")):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
-            self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
+            self.learn_model_using_plan_miner(fold_num, train_dir_path, test_dir_path)
             self.domain_validator.clear_statistics()
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 

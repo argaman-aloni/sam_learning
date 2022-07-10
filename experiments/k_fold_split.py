@@ -63,16 +63,17 @@ class KFoldSplit:
         self.logger.debug("Deleting the test set directory!")
         shutil.rmtree(self.test_set_dir_path)
 
-    def create_k_fold(self) -> Iterator[Tuple[Path, Path]]:
+    def create_k_fold(self, trajectory_suffix: str = "*.trajectory") -> Iterator[Tuple[Path, Path]]:
         """Creates a generator that will be used for the next algorithm to know where the train and test set
             directories reside.
 
+        :param trajectory_suffix: the suffix of the trajectory files to be used.
         :return: a generator for the train and test set directories.
         """
         self.logger.info("Starting to create the folds for the cross validation process.")
         trajectory_paths = []
         problem_paths = []
-        for trajectory_file_path in self.working_directory_path.glob("*.trajectory"):
+        for trajectory_file_path in self.working_directory_path.glob(trajectory_suffix):
             trajectory_paths.append(trajectory_file_path)
             problem_paths.append(self.working_directory_path / f"{trajectory_file_path.stem}.pddl")
 

@@ -7,7 +7,7 @@ from typing import Dict
 
 from jdk4py import JAVA
 
-ENHSP_FILE_PATH = "/sise/home/mordocha/numeric_planning/ENHSP/enhsp.jar"
+ENHSP_FILE_PATH = "/home/mordocha/numeric_planning/ENHSP/enhsp.jar"
 MAX_RUNNING_TIME = 60  # seconds
 
 TIMEOUT_ERROR_CODE = b"Timeout has been reached"

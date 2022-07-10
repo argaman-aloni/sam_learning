@@ -1,14 +1,15 @@
 """Module to validate the correctness of the learned action models that were generated."""
 import csv
 import logging
+import re
 from pathlib import Path
-from typing import NoReturn, Dict, List, Any, Optional
+from typing import NoReturn, Dict, List, Any, Optional, Union
 
 from pddl_plus_parser.models import Observation
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
-from validators.validator_script_data import VALIDATOR_DIRECTORY, VALID_PLAN, INAPPLICABLE_PLAN, \
+from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, \
     GOAL_NOT_REACHED, write_batch_and_validate_plan
 
 SOLVER_TYPES = {
@@ -29,6 +30,8 @@ SOLVING_STATISTICS = [
 ]
 
 MAX_RUNNING_TIME = 60
+
+ACTION_LINE_REGEX = r"(\[\d+, \d+\]): \(.*\)"
 
 
 class DomainValidator:
@@ -71,14 +74,9 @@ class DomainValidator:
 
         :param solution_file_path: the path to the solution file.
         """
-        script_file_path, validation_file_path = \
-            write_batch_and_validate_plan(logger=self.logger, domain_path=self.reference_domain_path,
-                                          problem_file_path=problem_file_path, solution_file_path=solution_file_path)
-
-        self.logger.debug("Cleaning the sbatch and output file from the problems directory.")
-        script_file_path.unlink(missing_ok=True)
-        for job_file_path in Path(VALIDATOR_DIRECTORY).glob("job-*.out"):
-            job_file_path.unlink(missing_ok=True)
+        validation_file_path = write_batch_and_validate_plan(domain_file_path=self.reference_domain_path,
+                                                             problem_file_path=problem_file_path,
+                                                             solution_file_path=solution_file_path)
 
         with open(validation_file_path, "r") as validation_file:
             validation_file_content = validation_file.read()
@@ -92,15 +90,35 @@ class DomainValidator:
                 self.logger.info("The plan did not reach the required goal.")
                 iteration_statistics["goal_not_achieved"] += 1
 
+    @staticmethod
+    def _extract_num_triplets(used_observations: Union[List[Observation], List[Path]] = None) -> int:
+        """Extracts the number of trajectory triplets from the observations.
+
+        :param used_observations: the observations used to generate the plans.
+        :return: the number of trajectory triplets in the used observations.
+        """
+        for observation in used_observations:
+            if type(observation) is not Observation:
+                with open(observation, "r") as observation_file:
+                    num_operators = 0
+                    for line in observation_file.readlines():
+                        match = re.match(ACTION_LINE_REGEX, line)
+                        num_operators = num_operators + 1 if match else num_operators
+
+                    return num_operators
+
+        num_triplets = sum([len(observation.components) for observation in used_observations])
+        return num_triplets
+
     def validate_domain(self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
-                        used_observations: List[Observation] = None) -> NoReturn:
+                        used_observations: Union[List[Observation], List[Path]] = None) -> NoReturn:
         """Validates that using the input domain problems can be solved.
 
         :param tested_domain_file_path: the path of the domain that was learned using POL.
         :param test_set_directory_path: the path to the directory containing the test set problems.
         :param used_observations: the observations that were used to learn the domain.
         """
-        num_triplets = sum([len(observation.components) for observation in used_observations])
+        num_triplets = self._extract_num_triplets(used_observations)
         self.logger.info("Solving the test set problems using the learned domain!")
         solving_report = self.solver.execute_solver(
             problems_directory_path=test_set_directory_path,
