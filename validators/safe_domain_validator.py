@@ -10,7 +10,7 @@ from pddl_plus_parser.models import Observation
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, \
-    GOAL_NOT_REACHED, write_batch_and_validate_plan
+    GOAL_NOT_REACHED, run_validate_script
 
 SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,
@@ -74,9 +74,9 @@ class DomainValidator:
 
         :param solution_file_path: the path to the solution file.
         """
-        validation_file_path = write_batch_and_validate_plan(domain_file_path=self.reference_domain_path,
-                                                             problem_file_path=problem_file_path,
-                                                             solution_file_path=solution_file_path)
+        validation_file_path = run_validate_script(domain_file_path=self.reference_domain_path,
+                                                   problem_file_path=problem_file_path,
+                                                   solution_file_path=solution_file_path)
 
         with open(validation_file_path, "r") as validation_file:
             validation_file_content = validation_file.read()

@@ -16,7 +16,7 @@ from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Do
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericSAMLearner
 from validators import VALIDATOR_DIRECTORY, EXECUTION_SCRIPT, VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
-from validators.validator_script_data import BATCH_JOB_SUBMISSION_REGEX, write_batch_and_validate_plan
+from validators.validator_script_data import BATCH_JOB_SUBMISSION_REGEX, run_validate_script
 
 FAULTY_ACTION_LOCATOR_REGEX = re.compile(r"Plan failed because of unsatisfied precondition in:\n\((\w+) [\w+ ]*\)",
                                          flags=re.MULTILINE)
@@ -135,8 +135,8 @@ class FaultRepair:
         :return: whether the plan is valid and the name of the faulty action if it is not.
         """
         validation_file_path = \
-            write_batch_and_validate_plan(domain_file_path=self.model_domain_file_path,
-                                          problem_file_path=problem_file_path, solution_file_path=solution_file_path)
+            run_validate_script(domain_file_path=self.model_domain_file_path,
+                                problem_file_path=problem_file_path, solution_file_path=solution_file_path)
 
         with open(validation_file_path, "r") as validation_file:
             validation_file_content = validation_file.read()

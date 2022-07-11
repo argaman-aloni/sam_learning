@@ -142,7 +142,7 @@ class NumericFluentStateStorage:
             storage = self.previous_state_storage
 
         array = list(map(list, itertools.zip_longest(*storage.values(), fillvalue=None)))
-        return np.array(array)
+        return np.unique(np.array(array), axis=0)
 
     def _construct_pddl_inequality_scheme(self, coefficient_matrix: np.ndarray, border_points: np.ndarray,
                                           relevant_fluents: Optional[List[str]] = None) -> List[str]:
@@ -190,7 +190,7 @@ class NumericFluentStateStorage:
         return injunctive_conditions, ConditionType.disjunctive
 
     def _create_convex_hull_linear_inequalities(self, points: np.ndarray,
-                                                display_mode: bool = True) -> tuple[List[List[float]], List[float]]:
+                                                display_mode: bool = False) -> tuple[List[List[float]], List[float]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :param points: the points that represent the values of the function in the states of the observations.
@@ -331,7 +331,7 @@ class NumericFluentStateStorage:
         if previous_state_matrix.shape[0] < num_required_dimensions:
             return self._create_disjunctive_preconditions(previous_state_matrix)
 
-        A, b = self._create_convex_hull_linear_inequalities(previous_state_matrix)
+        A, b = self._create_convex_hull_linear_inequalities(previous_state_matrix, display_mode=False)
         inequalities_strs = self._construct_pddl_inequality_scheme(A, b, relevant_fluents)
         return inequalities_strs, ConditionType.injunctive
 

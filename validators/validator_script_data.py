@@ -15,7 +15,7 @@ MAX_RUNNING_TIME = 60
 logger = logging.getLogger(__name__)
 
 
-def write_batch_and_validate_plan(domain_file_path: Path, problem_file_path: Path, solution_file_path: Path) -> Path:
+def run_validate_script(domain_file_path: Path, problem_file_path: Path, solution_file_path: Path) -> Path:
     """Validates that the plan for the input problem.
 
     :param domain_file_path: the path to the domain file.
@@ -26,9 +26,10 @@ def write_batch_and_validate_plan(domain_file_path: Path, problem_file_path: Pat
     os.chdir(VALIDATOR_DIRECTORY)
     logger.info("Running VAL to validate the plan's correctness.")
     validation_file_path = domain_file_path.parent / "validation_log.txt"
+    run_command = f"./Validate -v -t 0.01 {domain_file_path} {problem_file_path} " \
+                  f"{solution_file_path} > {validation_file_path}"
     try:
-        subprocess.check_output(
-            f"./Validate -v -t 0.01 {domain_file_path} {problem_file_path} {solution_file_path} > {validation_file_path}")
+        subprocess.check_output(run_command)
 
     except subprocess.CalledProcessError as e:
         logger.error(f"VAL returned status code {e.returncode}.")
