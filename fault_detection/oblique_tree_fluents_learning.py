@@ -16,7 +16,7 @@ from sam_learning.core.polynomial_fluents_learning_algorithm import PolynomialFl
 TOLERANCE = 0.01
 
 
-class SVMFluentsLearning:
+class ObliqueTreeFluentsLearning:
     """Learns models by using linear SVM classifier and evaluating the coefficients of the fluents."""
 
     positive_observations: Dict[str, List[float]]
@@ -27,7 +27,6 @@ class SVMFluentsLearning:
         self.negative_observations = {}
         self.polynom_degree = polynomial_degree
         self.logger = logging.getLogger(__name__)
-        self.oblique_tree = BUTIF(linear_model=LinearSVC(random_state=0, tol=1e-5), task="classification", max_leaf=10)
         super().__init__(action_name, polynomial_degree)
 
     def _create_polynomial_string_recursive(self, fluents: List[str]) -> str:

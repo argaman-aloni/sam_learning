@@ -45,11 +45,11 @@ class ENHSPSolver:
                                          timeout=MAX_RUNNING_TIME + 1)
                 self.logger.info("ENHSP finished its execution!")
                 if PROBLEM_SOLVED in process.stdout:
-                    self.logger.debug(f"Solver succeeded in solving problem - {problem_file_path.stem}")
+                    self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
                     solving_stats[problem_file_path.stem] = "ok"
 
                 elif NO_SOLUTION_FOR_PROBLEM in process.stdout or OTHER_NO_SOLUTION_TYPE in process.stdout:
-                    self.logger.debug(f"Solver could not solve problem - {problem_file_path.stem}")
+                    self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
                     solving_stats[problem_file_path.stem] = "no_solution"
 
                 elif GOAL_NOT_REACHABLE in process.stderr:
@@ -57,8 +57,8 @@ class ENHSPSolver:
                     solving_stats[problem_file_path.stem] = "no_solution"
 
                 else:
-                    self.logger.warning(f"While solving problem encountered unknown error! STDOUT - {process.stdout}")
-                    self.logger.warning(f"While solving problem encountered unknown error! STDERR - {process.stderr}")
+                    self.logger.critical(f"While solving problem encountered unknown error! STDOUT - {process.stdout}")
+                    self.logger.critical(f"While solving problem encountered unknown error! STDERR - {process.stderr}")
                     solving_stats[problem_file_path.stem] = "no_solution"
 
             except subprocess.TimeoutExpired:

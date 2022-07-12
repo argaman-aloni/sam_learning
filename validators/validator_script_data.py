@@ -29,7 +29,7 @@ def run_validate_script(domain_file_path: Path, problem_file_path: Path, solutio
     run_command = f"./Validate -v -t 0.01 {domain_file_path} {problem_file_path} " \
                   f"{solution_file_path} > {validation_file_path}"
     try:
-        subprocess.check_output(run_command)
+        subprocess.check_output(run_command, shell=True)
 
     except subprocess.CalledProcessError as e:
         logger.error(f"VAL returned status code {e.returncode}.")
