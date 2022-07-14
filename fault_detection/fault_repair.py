@@ -6,17 +6,17 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, NoReturn, Iterator
+from typing import List, Tuple, Optional, Dict, NoReturn
 
 from pddl_plus_parser.exporters import ENHSPParser
-from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call, ActionDescriptor
+from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Domain, Problem
+from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Domain
 
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericSAMLearner
-from validators import VALIDATOR_DIRECTORY, EXECUTION_SCRIPT, VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
-from validators.validator_script_data import BATCH_JOB_SUBMISSION_REGEX, run_validate_script
+from validators import VALIDATOR_DIRECTORY, VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
+from validators.validator_script_data import run_validate_script
 
 FAULTY_ACTION_LOCATOR_REGEX = re.compile(r"Plan failed because of unsatisfied precondition in:\n\((\w+) [\w+ ]*\)",
                                          flags=re.MULTILINE)

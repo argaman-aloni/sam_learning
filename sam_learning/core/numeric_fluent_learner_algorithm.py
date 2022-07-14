@@ -11,6 +11,7 @@ import sympy
 from pddl_plus_parser.models import PDDLFunction
 from scipy.spatial import ConvexHull, convex_hull_plot_2d
 from scipy.spatial.qhull import QhullError
+from scipy import stats
 from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.exceptions import NotSafeActionError
@@ -66,6 +67,7 @@ class NumericFluentStateStorage:
         self.action_name = action_name
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
+        # TODO: remove this once the action is fully tested.
         self.convex_hull_error_file_path = Path("/home/mordocha/numeric_planning/domains/convex_hull_errors.txt")
 
     def _construct_linear_equation_string(self, multiplication_parts: List[str]) -> str:
@@ -188,12 +190,15 @@ class NumericFluentStateStorage:
             concatenated_str = " ".join(functions_equality_strings)
             return [concatenated_str], ConditionType.injunctive
 
-        injunctive_conditions = equality_conditions
+        injunctive_conditions = []
         for state_values in previous_state_matrix:
             for function_variable, value in zip(self.previous_state_storage, state_values):
                 functions_equality_strings.append(f"(= {function_variable} {value})")
 
             concatenated_str = " ".join(functions_equality_strings)
+            if len(equality_conditions) > 0:
+                concatenated_str += " " + " ".join(equality_conditions)
+
             injunctive_conditions.append(f"(and {concatenated_str})")
             functions_equality_strings = []
 
@@ -255,7 +260,8 @@ class NumericFluentStateStorage:
 
         return duplicate_map
 
-    def _construct_single_dimension_inequalities(self, relevant_fluent: str, equality_strs: List[str] = []) -> Tuple[List[str], ConditionType]:
+    def _construct_single_dimension_inequalities(self, relevant_fluent: str, equality_strs: List[str] = []) -> Tuple[
+        List[str], ConditionType]:
         """Construct a single dimension precondition representation.
 
         :param relevant_fluent: the fluent only fluent that is relevant to the preconditions' creation.
@@ -297,6 +303,60 @@ class NumericFluentStateStorage:
 
         self.logger.debug("The action caused the value of the function to decrease!")
         return f"(decrease {lifted_function} {constructed_right_side})"
+
+    def _filter_constant_features(self, previous_state_matrix: np.ndarray) -> Tuple[np.ndarray, List[str], List[str]]:
+        """Filters out fluents that contain only constant values since they do not contribute to the convex hull.
+
+        :param previous_state_matrix: the matrix of the previous state values.
+        :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal.
+        """
+        equal_columns = np.all(previous_state_matrix == previous_state_matrix[0, :], axis=0)
+        columns_to_remove = [i for i, is_equal in enumerate(equal_columns) if is_equal]
+        if len(columns_to_remove) == 0:
+            self.logger.debug("No columns with only single constant value found found!")
+            return previous_state_matrix, [], []
+
+        equal_fluent_strs = []
+        self.logger.debug(f"The columns {columns_to_remove} is containing only constant values, removing it.")
+        fluents = list(self.previous_state_storage.keys())
+        removed_fluents = []
+        for column_index in columns_to_remove:
+            fluent_name = fluents[column_index]
+            equal_fluent_strs.append(f"(= {fluent_name} {self.previous_state_storage[fluent_name][0]})")
+            removed_fluents.append(fluent_name)
+
+        filtered_matrix = np.delete(previous_state_matrix, columns_to_remove, axis=1)
+        return filtered_matrix, equal_fluent_strs, removed_fluents
+
+    def _detect_linear_dependent_features(self, previous_state_matrix: np.ndarray,
+                                          remained_fluents: List[str]) -> Tuple[np.ndarray, List[str], List[str]]:
+        """Removes features that are identical to one another since they prevent from the convex hull from working.
+
+        Notice:
+            This method does not ignore the identical features but adds a new condition stating that these
+            features must be equal.
+
+        :param previous_state_matrix: the matrix of the previous state values.
+        :return: the matrix after the filtering process ended and the filtered matrix and the equality strings, i.e.
+            the strings of the values that are identical.
+        """
+        linear_dependent_fluent_strs = []
+        fluents_indexes_to_remove = []
+        removed_fluents = []
+        for function1, function2 in itertools.combinations(self.previous_state_storage, 2):
+            function1_values = self.previous_state_storage[function1]
+            function2_values = self.previous_state_storage[function2]
+            correlation_coeff, p_value = stats.pearsonr(function1_values, function2_values)
+            if abs(correlation_coeff - 1) <= EPSILON:
+                self.logger.debug(f"The two functions {function1} and {function2} are linearly dependent.")
+                # extracting the linear dependency parameter
+                linear_coeff = (np.array(function1_values) / np.array(function2_values))[0]
+                linear_dependent_fluent_strs.append(f"(= {function1} (* {linear_coeff} {function2}))")
+                fluents_indexes_to_remove.append(remained_fluents.index(function2))
+                removed_fluents.append(function2)
+
+        filtered_matrix = np.delete(previous_state_matrix, fluents_indexes_to_remove, axis=1)
+        return filtered_matrix, linear_dependent_fluent_strs, removed_fluents
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
@@ -371,14 +431,24 @@ class NumericFluentStateStorage:
         :return: the equality strings, the filtered matrix and the remaining fluents that will be used to create
          the convex hull.
         """
-        no_constant_columns_matrix, equality_strs, removed_fluents = self._filter_out_inconsistent_state_variables(
+        non_convexed_conditions = []
+        self.logger.debug(f"Now checking to see if there are columns that linearly dependent.")
+        if previous_state_matrix.shape[0] == 1:
+            self.logger.debug("There is only one sample of information to learn from, "
+                              "not enough to learn of linear dependency!")
+            return [], previous_state_matrix, relevant_fluents
+
+        no_constant_columns_matrix, equality_strs, removed_fluents = self._filter_constant_features(
             previous_state_matrix)
         relevant_fluents = [fluent for fluent in relevant_fluents if fluent not in removed_fluents]
         filtered_previous_state_matrix, column_equality_strs, removed_fluents = \
-            self._remove_equal_feature_fluent_columns(no_constant_columns_matrix, relevant_fluents)
+            self._detect_linear_dependent_features(no_constant_columns_matrix, relevant_fluents)
         remained_fluents = [fluent for fluent in relevant_fluents if fluent not in removed_fluents]
         equality_strs.extend(column_equality_strs)
-        return equality_strs, filtered_previous_state_matrix, remained_fluents
+        if len(equality_strs) > 0:
+            non_convexed_conditions.extend(equality_strs)
+
+        return non_convexed_conditions, filtered_previous_state_matrix, remained_fluents
 
     def construct_assignment_equations(self) -> List[str]:
         """Constructs the assignment statements for the action according to the changed value functions.
@@ -431,57 +501,3 @@ class NumericFluentStateStorage:
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 
         return assignment_statements
-
-    def _filter_out_inconsistent_state_variables(
-            self, previous_state_matrix: np.ndarray) -> Tuple[np.ndarray, List[str], List[str]]:
-        """Filters out fluents that contain only constant values since they do not contribute to the convex hull.
-
-        :param previous_state_matrix: the matrix of the previous state values.
-        :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal.
-        """
-        equal_columns = np.all(previous_state_matrix == previous_state_matrix[0, :], axis=0)
-        columns_to_remove = [i for i, is_equal in enumerate(equal_columns) if is_equal]
-        if len(columns_to_remove) == 0:
-            self.logger.debug("No columns with only single constant value found found!")
-            return previous_state_matrix, [], []
-
-        equal_fluent_strs = []
-        self.logger.debug(f"The columns {columns_to_remove} is containing only constant values, removing it.")
-        fluents = list(self.previous_state_storage.keys())
-        removed_fluents = []
-        for column_index in columns_to_remove:
-            fluent_name = fluents[column_index]
-            equal_fluent_strs.append(f"(= {fluent_name} {self.previous_state_storage[fluent_name][0]})")
-            removed_fluents.append(fluent_name)
-
-        filtered_matrix = np.delete(previous_state_matrix, columns_to_remove, axis=1)
-        return filtered_matrix, equal_fluent_strs, removed_fluents
-
-    def _remove_equal_feature_fluent_columns(
-            self, previous_state_matrix: np.ndarray,
-            remained_fluents: List[str]) -> Tuple[np.ndarray, List[str], List[str]]:
-        """Removes features that are identical to one another since they prevent from the convex hull from working.
-
-        Notice:
-            This method does not ignore the identical features but adds a new condition stating that these
-            features must be equal.
-
-        :param previous_state_matrix: the matrix of the previous state values.
-        :return: the matrix after the filtering process ended and the filtered matrix and the equality strings, i.e.
-            the strings of the values that are identical.
-        """
-        self.logger.debug(f"Now checking to see if there are columns that are equal to one another.")
-        equal_columns = self._remove_duplicated_variables(silent=True)
-        equal_fluent_strs = []
-        fluents_indexes_to_remove = []
-        removed_fluents = []
-        for fluent_name, identical_fluents in equal_columns.items():
-            if identical_fluents not in remained_fluents:
-                continue
-
-            equal_fluent_strs.append(f"(= {fluent_name} {identical_fluents})")
-            fluents_indexes_to_remove.append(remained_fluents.index(identical_fluents))
-            removed_fluents.append(identical_fluents)
-
-        filtered_matrix = np.delete(previous_state_matrix, fluents_indexes_to_remove, axis=1)
-        return filtered_matrix, equal_fluent_strs, removed_fluents

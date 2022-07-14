@@ -391,9 +391,12 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_t
     load_action_state_fluent_storage.add_to_previous_state_storage(another_simple_state_fluents)
     output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities(
         ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"])
+    expected_output = {
+        "(and (= (fuel-cost ) 34.0) (= (current_load ?z) 121.0) (= (fuel-cost ) (* 0.0827250608272506 (load_limit ?z))))",
+        "(and (= (fuel-cost ) 35.0) (= (current_load ?z) 121.0) (= (fuel-cost ) (* 0.0827250608272506 (load_limit ?z))))"}
     assert condition_type == ConditionType.disjunctive
-    assert output_conditions == ["(and (= (fuel-cost ) 34.0) (= (load_limit ?z) 411.0) (= (current_load ?z) 121.0))",
-                                 "(and (= (fuel-cost ) 35.0) (= (load_limit ?z) 413.0) (= (current_load ?z) 121.0))"]
+    assert len(output_conditions) == len(expected_output)
+    assert set(output_conditions) == expected_output
 
 
 def test_construct_safe_linear_inequalities_will_create_correct_inequalities_when_given_three_points_for_two_variables(
@@ -472,3 +475,110 @@ def test_construct_safe_linear_when_not_given_relevant_fluents_uses_all_variable
     output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities()
     print(output_conditions)
     assert all(["(fuel-cost )" in condition and "(current_load ?z)" in condition for condition in output_conditions])
+
+
+def test_detect_linear_dependent_features_when_given_only_one_sample_matrix_does_not_change_input_data(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    linear_dependant_matrix = np.array([[1.0], [1.0]])
+    relevant_fluents = ["(fuel-cost )", "(current_load ?z)"]
+    output_matrix, linear_dependent_fluents, remained_fluents = \
+        load_action_state_fluent_storage._detect_linear_dependent_features(
+            linear_dependant_matrix, relevant_fluents)
+    assert output_matrix.shape == linear_dependant_matrix.shape
+    assert linear_dependent_fluents == []
+    assert remained_fluents == []
+
+
+def test_detect_linear_dependent_features_detects_that_two_equal_features_are_linear_dependant(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    linear_dependant_matrix = np.array([[1.0, 2.0], [1.0, 2.0]])
+
+    pre_state_input_values = [(1.0, 1.0), (2.0, 2.0)]
+    for fuel_cost_val, current_limit_val in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_limit_val)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    relevant_fluents = ["(fuel-cost )", "(current_load ?z)"]
+    output_matrix, linear_dependent_fluent_strs, removed_fluents = \
+        load_action_state_fluent_storage._detect_linear_dependent_features(
+            linear_dependant_matrix, relevant_fluents)
+
+    assert linear_dependent_fluent_strs == ["(= (fuel-cost ) (* 1.0 (current_load ?z)))"]
+    assert removed_fluents == ["(current_load ?z)"]
+    assert output_matrix.shape[1] == 1
+
+
+def test_detect_linear_dependent_features_detects_that_two_linear_dependent_features_are_linear_dependant(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    linear_dependant_matrix = np.array([[1.0, 2.0], [2.0, 4.0]])
+
+    pre_state_input_values = [(1.0, 2.0), (2.0, 4.0)]
+    for fuel_cost_val, current_limit_val in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_limit_val)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    relevant_fluents = ["(fuel-cost )", "(current_load ?z)"]
+    output_matrix, linear_dependent_fluent_strs, removed_fluents = \
+        load_action_state_fluent_storage._detect_linear_dependent_features(
+            linear_dependant_matrix, relevant_fluents)
+
+    assert linear_dependent_fluent_strs == ["(= (fuel-cost ) (* 0.5 (current_load ?z)))"]
+    assert removed_fluents == ["(current_load ?z)"]
+    assert output_matrix.shape[1] == 1
+
+
+def test_detect_linear_dependent_features_detects_when_variables_are_independent(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    linear_dependant_matrix = np.array([[-19.0, 32.0], [14.0, 52.0], [28.0, 12.0]])
+
+    pre_state_input_values = [(-19.0, 32.0), (14.0, 52.0), (28.0, 12.0)]
+    for fuel_cost_val, current_limit_val in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_limit_val)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    relevant_fluents = ["(fuel-cost )", "(current_load ?z)"]
+    output_matrix, linear_dependent_fluent_strs, removed_fluents = \
+        load_action_state_fluent_storage._detect_linear_dependent_features(
+            linear_dependant_matrix, relevant_fluents)
+
+    assert linear_dependent_fluent_strs == []
+    assert removed_fluents == []
+    assert output_matrix.shape[1] == 2
+
+
+def test_filter_constant_features_detects_features_that_equal_to_a_single_constant_value(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    matrix_with_constant_column = np.array([[1.0, 15.0, 33.0], [32.0, 12.0, 33.0], [95.0, 65.0, 33.0]])
+
+    pre_state_input_values = [[1.0, 15.0, 33.0], [32.0, 12.0, 33.0], [95.0, 65.0, 33.0]]
+    for fuel_cost_val, current_load_val, current_limit in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_load_val)
+        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(current_limit)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION,
+            "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    filtered_matrix, equal_fluent_strs, removed_fluents = \
+        load_action_state_fluent_storage._filter_constant_features(matrix_with_constant_column)
+    assert filtered_matrix.shape[1] == 2
+    assert equal_fluent_strs == ["(= (load_limit ?z) 33.0)"]
+    assert removed_fluents == ["(load_limit ?z)"]
