@@ -183,7 +183,8 @@ class ModelFaultDiagnosis:
         (train_set_dir_path / FAULTY_DOMAIN_PDDL).unlink(missing_ok=True)
 
     def _repair_action_model(self, defect_type: DefectType, faulty_action_name: str, faulty_domain: LearnerDomain,
-                             test_set_dir_path: Path, valid_observations: List[Observation]) -> Path:
+                             test_set_dir_path: Path, valid_observations: List[Observation],
+                             faulty_observations: List[Observation]) -> Path:
         """Repairs the action model of the faulty action by learning the preconditions and effects from valid
             observations.
 
@@ -195,7 +196,8 @@ class ModelFaultDiagnosis:
         :return: the path to the repaired domain file.
         """
         self.logger.debug(f"Found a defected action! action - {faulty_action_name}")
-        repaired_domain = self.fault_repair.repair_model(faulty_domain, valid_observations, faulty_action_name)
+        repaired_domain = self.fault_repair.repair_model(faulty_domain, valid_observations, faulty_observations,
+                                                         faulty_action_name)
         self._export_domain(domain=repaired_domain, domain_directory_path=test_set_dir_path,
                             domain_file_name=None, is_faulty=False, defect_type=defect_type,
                             action_name=faulty_action_name)
@@ -294,7 +296,7 @@ class ModelFaultDiagnosis:
 
         faulty_action_name = valid_observations[0].components[0].grounded_action_call.name
         learned_domain_file_path = self._repair_action_model(defect_type, faulty_action_name, faulty_domain,
-                                                             test_set_dir_path, valid_observations)
+                                                             test_set_dir_path, valid_observations, faulty_observations)
         self._run_repaired_model_on_test(all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
                                          test_set_dir_path)
         self.run_faulty_model_on_test(all_diagnosis_stats, faulty_action, faulty_domain_path, test_set_dir_path,

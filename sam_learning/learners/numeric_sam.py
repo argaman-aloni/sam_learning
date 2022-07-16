@@ -103,6 +103,7 @@ class NumericSAMLearner(SAMLearner):
 
 
 class PolynomialSAMLearning(NumericSAMLearner):
+    """The Extension of SAM that is able to learn polynomial state variables."""
     storage: Dict[str, PolynomialFluentsLearningAlgorithm]
     polynom_degree: int
 

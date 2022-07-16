@@ -1,12 +1,8 @@
 """Module test for the polynomial state storage."""
-from pddl_plus_parser.models import PDDLFunction
 
 from sam_learning.core import PolynomialFluentsLearningAlgorithm
-from tests.consts import TRUCK_TYPE
-
-FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
-LOAD_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"?z": TRUCK_TYPE})
-CURRENT_LOAD_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"?z": TRUCK_TYPE})
+from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, \
+    CURRENT_LOAD_TRAJECTORY_FUNCTION
 
 
 def test_create_polynomial_string_returns_correct_string():

@@ -3,55 +3,23 @@ import itertools
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, NoReturn, Tuple, Union, Optional
+from typing import Dict, List, NoReturn, Tuple, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import sympy
 from pddl_plus_parser.models import PDDLFunction
+from scipy import stats
 from scipy.spatial import ConvexHull, convex_hull_plot_2d
 from scipy.spatial.qhull import QhullError
-from scipy import stats
 from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
+from sam_learning.core.numeric_utils import prettify_coefficients, construct_multiplication_strings
 
 EPSILON = 1e-10
 LEGAL_LEARNING_SCORE = 1.00
-
-
-def _construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List[float]],
-                                      function_variables: List[str]) -> List[str]:
-    """Constructs the strings representing the multiplications of the function variables with the coefficient.
-
-    :param coefficients_vector: the coefficient that multiplies the function vector.
-    :param function_variables: the name of the numeric fluents that are being used.
-    :return: the representation of the fluents multiplied by the coefficients.
-    """
-    product_components = []
-    for func, coefficient in zip(function_variables, coefficients_vector):
-        if coefficient == 0.0:
-            continue
-
-        if func == "(dummy)":
-            product_components.append(f"{coefficient}")
-
-        else:
-            product_components.append(f"(* {func} {coefficient})")
-
-    return product_components
-
-
-def _prettify_coefficients(coefficients: List[float]) -> List[float]:
-    """Converts the coefficients into a prettier form so that the created equations would be more presentable.
-
-    :param coefficients: the RAW coefficients received from the linear regression.
-    :return: the prettified version of the coefficients.
-    """
-    coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = [round(value, 2) for value in coefficients]
-    return prettified_coefficients
 
 
 class NumericFluentStateStorage:
@@ -118,15 +86,16 @@ class NumericFluentStateStorage:
         :param function_post_values: the resulting values after the linear change.
         :return: the vector representing the coefficients for the function variables and the learning score (R^2).
         """
-        reg = LinearRegression().fit(values_matrix, function_post_values)
-        learning_score = reg.score(values_matrix, function_post_values)
+        regressor = LinearRegression()
+        regressor.fit(values_matrix, function_post_values)
+        learning_score = regressor.score(values_matrix, function_post_values)
         if learning_score < LEGAL_LEARNING_SCORE:
             reason = "The learned effects are not safe since the R^2 is not high enough."
             self.logger.warning(reason)
             raise NotSafeActionError(self.action_name, reason, EquationSolutionType.no_solution_found)
 
-        coefficients = list(reg.coef_) + [reg.intercept_]
-        coefficients = _prettify_coefficients(coefficients)
+        coefficients = list(regressor.coef_) + [regressor.intercept_]
+        coefficients = prettify_coefficients(coefficients)
         return coefficients, learning_score
 
     def _convert_to_array_format(self, storage_name: str, relevant_fluents: Optional[List[str]] = None,
@@ -166,8 +135,8 @@ class NumericFluentStateStorage:
         """
         inequalities = set()
         for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
-            function_names = relevant_fluents if relevant_fluents is not None else self.previous_state_storage.keys()
-            multiplication_functions = _construct_multiplication_strings(inequality_coefficients, function_names)
+            function_names = relevant_fluents or self.previous_state_storage.keys()
+            multiplication_functions = construct_multiplication_strings(inequality_coefficients, function_names)
             constructed_left_side = self._construct_linear_equation_string(multiplication_functions)
             inequalities.add(f"(<= {constructed_left_side} {border_point})")
 
@@ -175,12 +144,14 @@ class NumericFluentStateStorage:
 
     def _create_disjunctive_preconditions(
             self, previous_state_matrix: np.ndarray,
-            equality_conditions: List[str] = []) -> Tuple[List[str], ConditionType]:
+            equality_conditions=None) -> Tuple[List[str], ConditionType]:
         """Create the disjunctive representation of the preconditions.
 
         :param previous_state_matrix: the matrix containing the previous state values.
         :return: a disjunctive representation for the precondition in case a convex hull cannot be created.
         """
+        if equality_conditions is None:
+            equality_conditions = []
         functions_equality_strings = []
         if previous_state_matrix.shape[0] == 1:
             self.logger.debug("There is only one state, creating a single precondition")
@@ -196,7 +167,7 @@ class NumericFluentStateStorage:
                 functions_equality_strings.append(f"(= {function_variable} {value})")
 
             concatenated_str = " ".join(functions_equality_strings)
-            if len(equality_conditions) > 0:
+            if equality_conditions is not None and len(equality_conditions) > 0:
                 concatenated_str += " " + " ".join(equality_conditions)
 
             injunctive_conditions.append(f"(and {concatenated_str})")
@@ -219,7 +190,7 @@ class NumericFluentStateStorage:
             self._display_convex_hull(display_mode, hull, num_dimensions)
             A = hull.equations[:, :num_dimensions]
             b = -hull.equations[:, num_dimensions]
-            return [_prettify_coefficients(row) for row in A], _prettify_coefficients(b)
+            return [prettify_coefficients(row) for row in A], prettify_coefficients(b)
 
         except (QhullError, ValueError) as e:
             with open(self.convex_hull_error_file_path, "at") as error_file:
@@ -293,7 +264,7 @@ class NumericFluentStateStorage:
         if len(normalized_coefficients) == 1:
             normalized_coefficients = {k: abs(v) for k, v in normalized_coefficients.items()}
 
-        multiplication_functions = _construct_multiplication_strings(
+        multiplication_functions = construct_multiplication_strings(
             list(normalized_coefficients.values()), list(normalized_coefficients.keys()))
         constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
 
@@ -358,6 +329,35 @@ class NumericFluentStateStorage:
         filtered_matrix = np.delete(previous_state_matrix, fluents_indexes_to_remove, axis=1)
         return filtered_matrix, linear_dependent_fluent_strs, removed_fluents
 
+    def _filter_all_convex_hull_inconsistencies(
+            self, previous_state_matrix: np.ndarray,
+            relevant_fluents: List[str]) -> Tuple[List[str], np.ndarray, List[str]]:
+        """Filters out features that might prevent from the convex hull algorithm to work properly.
+
+        :param previous_state_matrix: the matrix of the previous state containing numeric values.
+        :param relevant_fluents: the fluents that are relevant for the current action.
+        :return: the equality strings, the filtered matrix and the remaining fluents that will be used to create
+         the convex hull.
+        """
+        non_convexed_conditions = []
+        self.logger.debug(f"Now checking to see if there are columns that linearly dependent.")
+        if previous_state_matrix.shape[0] == 1:
+            self.logger.debug("There is only one sample of information to learn from, "
+                              "not enough to learn of linear dependency!")
+            return [], previous_state_matrix, relevant_fluents
+
+        no_constant_columns_matrix, equality_strs, removed_fluents = self._filter_constant_features(
+            previous_state_matrix)
+        relevant_fluents = [fluent for fluent in relevant_fluents if fluent not in removed_fluents]
+        filtered_previous_state_matrix, column_equality_strs, removed_fluents = \
+            self._detect_linear_dependent_features(no_constant_columns_matrix, relevant_fluents)
+        remained_fluents = [fluent for fluent in relevant_fluents if fluent not in removed_fluents]
+        equality_strs.extend(column_equality_strs)
+        if len(equality_strs) > 0:
+            non_convexed_conditions.extend(equality_strs)
+
+        return non_convexed_conditions, filtered_previous_state_matrix, remained_fluents
+
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
 
@@ -421,35 +421,6 @@ class NumericFluentStateStorage:
 
         return inequalities_strs, ConditionType.injunctive
 
-    def _filter_all_convex_hull_inconsistencies(
-            self, previous_state_matrix: np.ndarray,
-            relevant_fluents: List[str]) -> Tuple[List[str], np.ndarray, List[str]]:
-        """Filters out features that might prevent from the convex hull algorithm to work properly.
-
-        :param previous_state_matrix: the matrix of the previous state containing numeric values.
-        :param relevant_fluents: the fluents that are relevant for the current action.
-        :return: the equality strings, the filtered matrix and the remaining fluents that will be used to create
-         the convex hull.
-        """
-        non_convexed_conditions = []
-        self.logger.debug(f"Now checking to see if there are columns that linearly dependent.")
-        if previous_state_matrix.shape[0] == 1:
-            self.logger.debug("There is only one sample of information to learn from, "
-                              "not enough to learn of linear dependency!")
-            return [], previous_state_matrix, relevant_fluents
-
-        no_constant_columns_matrix, equality_strs, removed_fluents = self._filter_constant_features(
-            previous_state_matrix)
-        relevant_fluents = [fluent for fluent in relevant_fluents if fluent not in removed_fluents]
-        filtered_previous_state_matrix, column_equality_strs, removed_fluents = \
-            self._detect_linear_dependent_features(no_constant_columns_matrix, relevant_fluents)
-        remained_fluents = [fluent for fluent in relevant_fluents if fluent not in removed_fluents]
-        equality_strs.extend(column_equality_strs)
-        if len(equality_strs) > 0:
-            non_convexed_conditions.extend(equality_strs)
-
-        return non_convexed_conditions, filtered_previous_state_matrix, remained_fluents
-
     def construct_assignment_equations(self) -> List[str]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
@@ -490,7 +461,7 @@ class NumericFluentStateStorage:
                                                             self.next_state_storage[lifted_function][0]))
                 continue
 
-            multiplication_functions = _construct_multiplication_strings(
+            multiplication_functions = construct_multiplication_strings(
                 coefficient_vector, functions_including_dummy)
             if len(multiplication_functions) == 0:
                 self.logger.debug("The algorithm designated a vector of zeros to the equation "

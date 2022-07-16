@@ -4,7 +4,8 @@ from pddl_plus_parser.models import Domain, PDDLFunction, ActionCall, Problem, O
 from pytest import fixture
 
 from sam_learning.core import NumericFunctionMatcher
-from tests.consts import NUMERIC_DOMAIN_PATH, TRUCK_TYPE, NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH
+from tests.consts import NUMERIC_DOMAIN_PATH, TRUCK_TYPE, NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, \
+    FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION
 
 TEST_NUMERIC_LOAD_LIMIT_FUNCTION = PDDLFunction(name="load_limit", signature={
     "?t": TRUCK_TYPE
@@ -14,8 +15,6 @@ TEST_GROUNDED_NUMERIC_LOAD_LIMIT_FUNCTION = PDDLFunction(name="load_limit", sign
     "tru1": TRUCK_TYPE
 })
 
-FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
-LOAD_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"truck1": TRUCK_TYPE})
 CURRENT_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"truck1": TRUCK_TYPE})
 
 

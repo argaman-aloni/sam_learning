@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-from pddl_plus_parser.models import PDDLType, Predicate
+from pddl_plus_parser.models import PDDLType, Predicate, PDDLFunction
 
 CWD = os.getcwd()
 EXAMPLES_DIR_PATH = Path(CWD, "examples")
@@ -37,3 +37,6 @@ AT_TRUCK_PREDICATE = Predicate(name="at",
                                signature={"?a": AGENT_TYPE,
                                           "?loc": LOCATION_TYPE})
 
+FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
+LOAD_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"?z": TRUCK_TYPE})
+CURRENT_LOAD_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"?z": TRUCK_TYPE})

@@ -1,15 +1,12 @@
 """Module test for the numeric state storage."""
 import numpy as np
 from pddl_plus_parser.lisp_parsers import PDDLTokenizer
-from pddl_plus_parser.models import PDDLFunction, construct_expression_tree, NumericalExpressionTree
+from pddl_plus_parser.models import construct_expression_tree, NumericalExpressionTree
 from pytest import fixture, fail, raises
 
 from sam_learning.core import NumericFluentStateStorage, ConditionType, NotSafeActionError
-from tests.consts import TRUCK_TYPE
-
-FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
-LOAD_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"?z": TRUCK_TYPE})
-CURRENT_LOAD_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"?z": TRUCK_TYPE})
+from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, \
+    CURRENT_LOAD_TRAJECTORY_FUNCTION
 
 TEST_DOMAIN_FUNCTIONS = {
     "load_limit": LOAD_LIMIT_TRAJECTORY_FUNCTION,

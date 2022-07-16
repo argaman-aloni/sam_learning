@@ -10,3 +10,10 @@ class DefectType(Enum):
     numeric_effect = 3
     removed_predicate = 4
     removed_numeric_precondition = 5
+
+
+class RepairAlgorithmType(Enum):
+
+    numeric_sam = 1
+    oblique_tree = 2
+    extended_svc = 3

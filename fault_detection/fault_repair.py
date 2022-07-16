@@ -1,10 +1,7 @@
 """Module that repairs faulty domains by fixing the action that contains the defect."""
 import json
 import logging
-import os
 import re
-import subprocess
-import time
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, NoReturn
 
@@ -13,9 +10,11 @@ from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Domain
 
+from fault_detection.defect_types import RepairAlgorithmType
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericSAMLearner
-from validators import VALIDATOR_DIRECTORY, VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
+from sam_learning.learners.oblique_tree_model_learner import ObliqueTreeModelLearner
+from validators import VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
 from validators.validator_script_data import run_validate_script
 
 FAULTY_ACTION_LOCATOR_REGEX = re.compile(r"Plan failed because of unsatisfied precondition in:\n\((\w+) [\w+ ]*\)",
@@ -91,40 +90,6 @@ class FaultRepair:
         possibly_faulty_operator = Operator(action=faulty_domain.actions[action_name],
                                             domain=faulty_domain, grounded_action_call=parameters)
         return possibly_faulty_operator, valid_operator
-
-    def _write_batch_and_validate_plan(self, problem_file_path: Path, solution_file_path: Path) -> Tuple[Path, Path]:
-        """Validates that the plan for the input problem.
-
-        :param problem_file_path: the path to the problem file.
-        :param solution_file_path: the path to the solution file.
-        :return: the path to the script file and the path to the validation log file.
-        """
-        os.chdir(VALIDATOR_DIRECTORY)
-        self.logger.info("Running VAL to validate the plan's correctness.")
-        script_file_path = VALIDATOR_DIRECTORY / "validate_script.sh"
-        validation_file_path = VALIDATOR_DIRECTORY / "validation_log.txt"
-        completed_file_str = EXECUTION_SCRIPT.format(
-            domain_file_path=str(self.model_domain_file_path),
-            problem_file_path=str(problem_file_path.absolute()),
-            solution_file_path=str(solution_file_path.absolute()),
-            validation_log_file_path=str(validation_file_path.absolute())
-        )
-        with open(script_file_path, "wt") as run_script_file:
-            run_script_file.write(completed_file_str)
-
-        self.logger.info("Finished writing the script to the cluster. Submitting the job.")
-        submission_str = subprocess.check_output(["sbatch", str(script_file_path)])
-        match = BATCH_JOB_SUBMISSION_REGEX.match(submission_str)
-        batch_id = match.group("batch_id")
-        time.sleep(1)
-        execution_state = subprocess.check_output(["squeue", "--me"])
-        while batch_id in execution_state:
-            execution_state = subprocess.check_output(["squeue", "--me"])
-            time.sleep(1)
-            continue
-
-        self.logger.info("Finished executing the validation script.")
-        return script_file_path, validation_file_path
 
     def _is_plan_applicable(self, problem_file_path: Path, solution_file_path: Path) -> Tuple[bool, Optional[str]]:
         """Validates that the solution file contains a valid plan.
@@ -258,19 +223,31 @@ class FaultRepair:
 
         return valid_action_observations, faulty_action_observations, observed_plans
 
-    def repair_model(self, faulty_domain: LearnerDomain, valid_observations: List[Observation],
-                     faulty_action_name: str) -> LearnerDomain:
-        """Repairds an action model that contains a defect by learning valid observations.
+    def repair_model(
+            self, faulty_domain: LearnerDomain, valid_observations: List[Observation],
+            faulty_observations: List[Observation] = None, faulty_action_name: str = None,
+            repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam) -> LearnerDomain:
+        """Repairs an action model that contains a defect by learning valid observations.
 
         :param faulty_domain: the domain that contains a defected action.
         :param valid_observations: the valid observations obtained from executing the actions on the agent.
+        :param faulty_observations: the observations containing the defect in them.
         :param faulty_action_name: the name of the action that contains a defect.
+        :param repair_algorithm_type: the algorithm that will be used to repair the model.
         :return: the action model with the defect repaired.
         """
         partial_domain = DomainParser(domain_path=self.model_domain_file_path).parse_domain()
-        learner = NumericSAMLearner(partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map)
-        learned_model, _ = learner.learn_action_model(valid_observations)
-        repaired_action = learned_model.actions[faulty_action_name]
-        faulty_domain.actions[faulty_action_name] = repaired_action
+        repaired_action = None
+        if repair_algorithm_type == RepairAlgorithmType.numeric_sam:
+            learner = NumericSAMLearner(partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map)
+            learned_model, _ = learner.learn_action_model(valid_observations)
+            repaired_action = learned_model.actions[faulty_action_name]
 
+        elif repair_algorithm_type == RepairAlgorithmType.oblique_tree:
+            learner = ObliqueTreeModelLearner(partial_domain=partial_domain,
+                                              preconditions_fluent_map=self.fluents_map, polynomial_degree=0)
+            learned_model, _ = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
+            repaired_action = learned_model.actions[faulty_action_name]
+
+        faulty_domain.actions[faulty_action_name] = repaired_action
         return faulty_domain
