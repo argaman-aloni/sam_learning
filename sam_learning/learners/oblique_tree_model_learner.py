@@ -13,9 +13,7 @@ class ObliqueTreeModelLearner(PolynomialSAMLearning):
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
                  polynomial_degree: int = 1):
-        self.logger.info("Initializing the Oblique Tree Learner.")
         super().__init__(partial_domain, preconditions_fluent_map, polynomial_degree)
-        self.logger.info("Done initializing the Oblique Tree Learner.")
 
     def learn_unsafe_action_model(self, positive_observations: List[Observation],
                                   negative_observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
@@ -35,6 +33,10 @@ class ObliqueTreeModelLearner(PolynomialSAMLearning):
                 super().handle_single_trajectory_component(component)
 
         for action_name, action in self.partial_domain.actions.items():
+            if action_name not in self.storage:
+                self.logger.debug(f"The action - {action_name} has not been observed in the trajectories!")
+                continue
+
             numeric_preconditions_learner = ObliqueTreeFluentsLearning(
                 action_name, self.polynom_degree, self.partial_domain)
             self.storage[action_name].filter_out_inconsistent_state_variables()

@@ -16,4 +16,4 @@ class RepairAlgorithmType(Enum):
 
     numeric_sam = 1
     oblique_tree = 2
-    extended_svc = 3
+    # extended_svc = 3
