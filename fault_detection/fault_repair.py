@@ -12,8 +12,7 @@ from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Do
 
 from fault_detection.defect_types import RepairAlgorithmType
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import NumericSAMLearner
-from sam_learning.learners.oblique_tree_model_learner import ObliqueTreeModelLearner
+from sam_learning.learners import NumericSAMLearner, ObliqueTreeModelLearner, SVCModelLearner
 from validators import VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
 from validators.validator_script_data import run_validate_script
 
@@ -245,7 +244,14 @@ class FaultRepair:
 
         elif repair_algorithm_type == RepairAlgorithmType.oblique_tree:
             learner = ObliqueTreeModelLearner(partial_domain=partial_domain,
-                                              preconditions_fluent_map=self.fluents_map, polynomial_degree=0)
+                                              preconditions_fluent_map=self.fluents_map, polynomial_degree=0,
+                                              faulty_action_name=faulty_action_name)
+            learned_model, _ = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
+            repaired_action = learned_model.actions[faulty_action_name]
+
+        elif repair_algorithm_type == RepairAlgorithmType.extended_svc:
+            learner = SVCModelLearner(partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map,
+                                      polynomial_degree=0, faulty_action_name=faulty_action_name)
             learned_model, _ = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 

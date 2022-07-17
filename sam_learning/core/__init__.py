@@ -8,3 +8,4 @@ from .learning_types import EquationSolutionType, ConditionType
 from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
 from .numeric_utils import construct_multiplication_strings, prettify_coefficients, prettify_floating_point_number
 from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
+from .svm_fluents_learning import SVMFluentsLearning

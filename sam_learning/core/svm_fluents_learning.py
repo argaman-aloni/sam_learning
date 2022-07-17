@@ -22,7 +22,7 @@ class SVMFluentsLearning(UnsafeFluentsLearning):
         super().__init__(action_name, polynomial_degree, partial_domain)
 
     @staticmethod
-    def calculate_expression_class(row_values: np.ndarray, coefficients: List[float], intercept: float) -> bool:
+    def _calculate_expression_class(row_values: np.ndarray, coefficients: List[float], intercept: float) -> bool:
         """Indicate whether the row has been incorrectly classified.
 
         :param row_values: the row values to be classified.
@@ -39,14 +39,15 @@ class SVMFluentsLearning(UnsafeFluentsLearning):
 
     def _remove_rows_with_accurate_classification(
             self, input_df: pd.DataFrame, coefficients: List[float], intercept: float) -> pd.DataFrame:
-        """
+        """Removes the rows with accurate classification, i.e the ones that the SVC had classified correctly
+            with the internal linear SVC equation.
 
-        :param input_df:
-        :param coefficients:
-        :param intercept:
-        :return:
+        :param input_df: the dataframe containing data that is classified correctly and some that is miss classified.
+        :param coefficients: the coefficients of the SVC model.
+        :param intercept: the intercept of the SVC model.
+        :return: the filtered dataframe with only the miss classified rows.
         """
-        indicator_function = lambda row_values: self.calculate_expression_class(row_values, coefficients, intercept)
+        indicator_function = lambda row_values: self._calculate_expression_class(row_values, coefficients, intercept)
         return input_df[input_df.apply(indicator_function, axis=1)]
 
     def run_linear_svc(self, dataframe: pd.DataFrame) -> Tuple[List[float], float]:

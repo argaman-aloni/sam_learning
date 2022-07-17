@@ -10,9 +10,7 @@ from sam_learning.core.learning_types import ConditionType
 from sam_learning.core.numeric_utils import prettify_coefficients, prettify_floating_point_number
 from sam_learning.core.unsafe_numeric_fluents_learning_base import UnsafeFluentsLearning, CLASS_COLUMN
 
-
 TOLERANCE = 0.01
-C = 23
 
 
 class ObliqueTreeFluentsLearning(UnsafeFluentsLearning):
@@ -74,7 +72,7 @@ class ObliqueTreeFluentsLearning(UnsafeFluentsLearning):
         """
         self.logger.info("Learning the preconditions of the action using oblique tree.")
         dataframe = self._create_pre_state_classification_dataset(positive_observations, negative_observations)
-        stree = Stree(C=C, random_state=42, max_depth=5, splitter="cfs").fit(
+        stree = Stree(random_state=42, max_depth=5, splitter="cfs").fit(
             dataframe.loc[:, dataframe.columns != CLASS_COLUMN], dataframe[CLASS_COLUMN])
         self.logger.debug("The tree has been built.")
         intercepts_path = []
