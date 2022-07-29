@@ -50,9 +50,9 @@ class DomainValidator:
     results_dir_path: Path
 
     def __init__(self, working_directory_path: Path,
-                 learning_algorithm: LearningAlgorithmType, reference_domain_path: Path):
+                 learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, use_metric_ff: bool = False):
         self.logger = logging.getLogger(__name__)
-        self.solver = ENHSPSolver()
+        self.solver = MetricFFSolver() if use_metric_ff else ENHSPSolver()
         self.solving_stats = []
         self.aggregated_solving_stats = []
         self.learning_algorithm = learning_algorithm

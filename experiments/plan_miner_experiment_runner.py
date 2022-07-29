@@ -8,8 +8,10 @@ from pathlib import Path
 from typing import NoReturn, List
 
 from pddl_plus_parser.lisp_parsers import DomainParser
+from pddl_plus_parser.models import Domain
 
 from experiments.k_fold_split import KFoldSplit
+from sam_learning.core import LearnerDomain, ConditionType
 from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
@@ -24,6 +26,7 @@ class PlanMinerExperimentRunner:
     k_fold: KFoldSplit
     domain_file_name: str
     domain_validator: DomainValidator
+    base_domain: Domain
 
     def __init__(self, working_directory_path: Path, domain_file_name: str):
         self.logger = logging.getLogger(__name__)
@@ -35,6 +38,31 @@ class PlanMinerExperimentRunner:
         self.domain_validator = DomainValidator(
             self.working_directory_path, LearningAlgorithmType.plan_miner,
             self.working_directory_path / domain_file_name)
+        self.base_domain = DomainParser(domain_path=self.working_directory_path / domain_file_name,
+                                        partial_parsing=True).parse_domain()
+
+    def _create_fixed_domain(self, plan_miner_domain: Domain) -> str:
+        """Fixes the domain created by plan miner to be a readable domain.
+
+        :param plan_miner_domain: the domain created by plan miner.
+        :return: the fixed domain string.
+        """
+        learner_domain = LearnerDomain(self.base_domain)
+        for action_name, action_data in plan_miner_domain.actions.items():
+            learner_domain.actions[action_name].signature = action_data.signature
+            learner_domain.actions[action_name].positive_preconditions = action_data.positive_preconditions
+            learner_domain.actions[action_name].inequality_preconditions = action_data.inequality_preconditions
+            if len(action_data.numeric_preconditions) == 0:
+                learner_domain.actions[action_name].numeric_preconditions = tuple()
+            else:
+                learner_domain.actions[action_name].numeric_preconditions = (
+                    [precondition.to_pddl() for precondition in action_data.numeric_preconditions],
+                    ConditionType.injunctive)
+            learner_domain.actions[action_name].add_effects = action_data.add_effects
+            learner_domain.actions[action_name].delete_effects = action_data.delete_effects
+            learner_domain.actions[action_name].numeric_effects = [effect.to_pddl() for effect in
+                                                                   action_data.numeric_effects]
+        return learner_domain.to_pddl()
 
     def concatenate_trajectories(self, train_set_dir_path: Path, allowed_observations: List[Path]) -> Path:
         """Concatenates the trajectories into a single file.
@@ -81,6 +109,14 @@ class PlanMinerExperimentRunner:
         :param test_set_dir_path: the path to the test set directory.
         :return: the path to the copied domain file.
         """
+        self.logger.info("Fixing a bug in the PlanMiner algorithm domain generation!")
+        plan_miner_domain = DomainParser(domain_path=learned_domain_path,
+                                         partial_parsing=False, enable_conjunctions=True).parse_domain()
+        pddl_domain_str = self._create_fixed_domain(plan_miner_domain)
+        print(pddl_domain_str)
+        with open(learned_domain_path, "wt") as domain_file:
+            domain_file.write(pddl_domain_str)
+
         self.logger.info("Copying the learned domain to the test set directory!")
         shutil.copy(learned_domain_path, test_set_dir_path)
         learned_domain_path.unlink()
@@ -104,8 +140,13 @@ class PlanMinerExperimentRunner:
             allowed_observations.append(trajectory_file_path)
             concatenated_trajectory_path = self.concatenate_trajectories(train_set_dir_path, allowed_observations)
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            learned_domain_path = self.run_plan_miner(concatenated_trajectory_path, domain_name=partial_domain.name)
-            self.validate_learned_domain(allowed_observations, learned_domain_path, test_set_dir_path)
+            try:
+                learned_domain_path = self.run_plan_miner(concatenated_trajectory_path, domain_name=partial_domain.name)
+                self.validate_learned_domain(allowed_observations, learned_domain_path, test_set_dir_path)
+
+            except Exception:
+                self.logger.error("PlanMiner failed to learn an action model!")
+                continue
 
         self.domain_validator.write_statistics(fold_num)
 
@@ -147,7 +188,7 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(
-        format="%(asctime)s %(levelname)-8s %(message)s",
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.INFO)
     main()

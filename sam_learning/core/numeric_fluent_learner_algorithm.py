@@ -1,6 +1,7 @@
 """Module that stores amd learns an action's numeric state fluents."""
 import itertools
 import logging
+import math
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, NoReturn, Tuple, Optional
@@ -20,6 +21,7 @@ from sam_learning.core.numeric_utils import prettify_coefficients, construct_mul
 
 EPSILON = 1e-10
 LEGAL_LEARNING_SCORE = 1.00
+np.seterr(divide='ignore', invalid='ignore')
 
 
 class NumericFluentStateStorage:
@@ -66,12 +68,17 @@ class NumericFluentStateStorage:
         self.logger.warning(failure_reason)
         raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 
-    def _validate_safe_equation_solving(self, lifted_function):
+    def _validate_safe_equation_solving(self, lifted_function: str) -> NoReturn:
+        """Conducts a first validation on whether it is safe to solve the linear equations.
+
+        :param lifted_function: the number of the function to be validated.
+        """
         num_variables = len(self.previous_state_storage)
         num_equations = len(self.next_state_storage[lifted_function])
         # validate that it is possible to solve linear equations at all.
         if num_equations < num_variables or num_equations == num_variables == 1:
-            failure_reason = "Cannot solve linear equations when too little input equations given."
+            failure_reason = f"Cannot solve linear equations when too little input equations given for " \
+                             f"action - {self.action_name}."
             self.logger.warning(failure_reason)
             raise NotSafeActionError(
                 self.action_name, failure_reason, EquationSolutionType.not_enough_data)
@@ -275,12 +282,14 @@ class NumericFluentStateStorage:
         self.logger.debug("The action caused the value of the function to decrease!")
         return f"(decrease {lifted_function} {constructed_right_side})"
 
-    def _filter_constant_features(self, previous_state_matrix: np.ndarray) -> Tuple[np.ndarray, List[str], List[str]]:
+    def _filter_constant_features(self, previous_state_matrix: np.ndarray, relevant_fluents: List[str]) -> Tuple[
+        np.ndarray, List[str], List[str]]:
         """Filters out fluents that contain only constant values since they do not contribute to the convex hull.
 
         :param previous_state_matrix: the matrix of the previous state values.
         :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal.
         """
+        self.logger.info("Filtering out features that are equal to a constant value...")
         equal_columns = np.all(previous_state_matrix == previous_state_matrix[0, :], axis=0)
         columns_to_remove = [i for i, is_equal in enumerate(equal_columns) if is_equal]
         if len(columns_to_remove) == 0:
@@ -289,15 +298,32 @@ class NumericFluentStateStorage:
 
         equal_fluent_strs = []
         self.logger.debug(f"The columns {columns_to_remove} is containing only constant values, removing it.")
-        fluents = list(self.previous_state_storage.keys())
         removed_fluents = []
         for column_index in columns_to_remove:
-            fluent_name = fluents[column_index]
+            fluent_name = relevant_fluents[column_index]
             equal_fluent_strs.append(f"(= {fluent_name} {self.previous_state_storage[fluent_name][0]})")
             removed_fluents.append(fluent_name)
 
         filtered_matrix = np.delete(previous_state_matrix, columns_to_remove, axis=1)
+        self.logger.info(f"Removed the fluents {removed_fluents}.")
         return filtered_matrix, equal_fluent_strs, removed_fluents
+
+    @staticmethod
+    def _extract_numeric_linear_coefficient(function1_values: List[float], function2_values: List[float]) -> float:
+        """Extract the first real numeric value from the two lists of values since there might be NaN values.
+
+        :param function1_values: the values of the first function.
+        :param function2_values: the values of the second function.
+        :return: the first numeric divisor.
+        """
+        linear_coeff = 0
+        division_res = (np.array(function1_values) / np.array(function2_values))
+        for value in division_res:
+            if not math.isnan(value):
+                linear_coeff = value
+                break
+
+        return linear_coeff
 
     def _detect_linear_dependent_features(self, previous_state_matrix: np.ndarray,
                                           remained_fluents: List[str]) -> Tuple[np.ndarray, List[str], List[str]]:
@@ -308,25 +334,33 @@ class NumericFluentStateStorage:
             features must be equal.
 
         :param previous_state_matrix: the matrix of the previous state values.
+        :param remained_fluents: the list of fluents remained after removing constant features.
         :return: the matrix after the filtering process ended and the filtered matrix and the equality strings, i.e.
             the strings of the values that are identical.
         """
+        self.logger.info(f"Detecting linear dependent features and removing them for action - {self.action_name}")
         linear_dependent_fluent_strs = []
         fluents_indexes_to_remove = []
         removed_fluents = []
+        filtered_matrix = previous_state_matrix.copy()
         for function1, function2 in itertools.combinations(self.previous_state_storage, 2):
+            if function1 not in remained_fluents or function2 not in remained_fluents:
+                continue
+
             function1_values = self.previous_state_storage[function1]
             function2_values = self.previous_state_storage[function2]
             correlation_coeff, p_value = stats.pearsonr(function1_values, function2_values)
             if abs(correlation_coeff - 1) <= EPSILON:
                 self.logger.debug(f"The two functions {function1} and {function2} are linearly dependent.")
                 # extracting the linear dependency parameter
-                linear_coeff = (np.array(function1_values) / np.array(function2_values))[0]
+                linear_coeff = self._extract_numeric_linear_coefficient(function1_values, function2_values)
                 linear_dependent_fluent_strs.append(f"(= {function1} (* {linear_coeff} {function2}))")
                 fluents_indexes_to_remove.append(remained_fluents.index(function2))
                 removed_fluents.append(function2)
 
-        filtered_matrix = np.delete(previous_state_matrix, fluents_indexes_to_remove, axis=1)
+        if len(fluents_indexes_to_remove) > 0:
+            filtered_matrix = np.delete(previous_state_matrix, fluents_indexes_to_remove, axis=1)
+
         return filtered_matrix, linear_dependent_fluent_strs, removed_fluents
 
     def _filter_all_convex_hull_inconsistencies(
@@ -347,7 +381,7 @@ class NumericFluentStateStorage:
             return [], previous_state_matrix, relevant_fluents
 
         no_constant_columns_matrix, equality_strs, removed_fluents = self._filter_constant_features(
-            previous_state_matrix)
+            previous_state_matrix, relevant_fluents)
         relevant_fluents = [fluent for fluent in relevant_fluents if fluent not in removed_fluents]
         filtered_previous_state_matrix, column_equality_strs, removed_fluents = \
             self._detect_linear_dependent_features(no_constant_columns_matrix, relevant_fluents)

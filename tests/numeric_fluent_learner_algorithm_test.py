@@ -6,7 +6,7 @@ from pytest import fixture, fail, raises
 
 from sam_learning.core import NumericFluentStateStorage, ConditionType, NotSafeActionError
 from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, \
-    CURRENT_LOAD_TRAJECTORY_FUNCTION
+    CURRENT_LOAD_TRAJECTORY_FUNCTION, WEIGHT_FUNCTION
 
 TEST_DOMAIN_FUNCTIONS = {
     "load_limit": LOAD_LIMIT_TRAJECTORY_FUNCTION,
@@ -575,7 +575,34 @@ def test_filter_constant_features_detects_features_that_equal_to_a_single_consta
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
 
     filtered_matrix, equal_fluent_strs, removed_fluents = \
-        load_action_state_fluent_storage._filter_constant_features(matrix_with_constant_column)
+        load_action_state_fluent_storage._filter_constant_features(matrix_with_constant_column,
+                                                                   relevant_fluents=list(simple_state_fluents.keys()))
     assert filtered_matrix.shape[1] == 2
     assert equal_fluent_strs == ["(= (load_limit ?z) 33.0)"]
     assert removed_fluents == ["(load_limit ?z)"]
+
+
+def test_filter_constant_features_with_two_constant_detects_both_and_removes_them(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    matrix_with_constant_column = np.array([[1.0, 15.0, 33.0, 5.0], [32.0, 12.0, 33.0, 5.0], [95.0, 65.0, 33.0, 5.0]])
+
+    pre_state_input_values = [[1.0, 15.0, 33.0, 5.0], [32.0, 12.0, 33.0, 5.0], [95.0, 65.0, 33.0, 5.0]]
+    for fuel_cost_val, current_load_val, current_limit, weight in pre_state_input_values:
+        FUEL_COST_FUNCTION.set_value(fuel_cost_val)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(current_load_val)
+        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(current_limit)
+        WEIGHT_FUNCTION.set_value(weight)
+        simple_state_fluents = {
+            "(fuel-cost )": FUEL_COST_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION,
+            "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+            "(weight ?z)": WEIGHT_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
+
+    filtered_matrix, equal_fluent_strs, removed_fluents = \
+        load_action_state_fluent_storage._filter_constant_features(matrix_with_constant_column,
+                                                                   relevant_fluents=list(simple_state_fluents.keys()))
+    assert filtered_matrix.shape[1] == 2
+    assert equal_fluent_strs == ["(= (load_limit ?z) 33.0)", "(= (weight ?z) 5.0)"]
+    assert removed_fluents == ["(load_limit ?z)", "(weight ?z)"]

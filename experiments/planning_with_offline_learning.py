@@ -43,7 +43,8 @@ class POL:
     numeric_performance_calc: NumericPerformanceCalculator
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path]):
+                 learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
+                 use_metric_ff: bool = False):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
@@ -64,7 +65,8 @@ class POL:
 
         self.numeric_performance_calc = None
         self.domain_validator = DomainValidator(
-            self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name)
+            self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
+            use_metric_ff=use_metric_ff)
 
     def _init_numeric_performance_calculator(self) -> NoReturn:
         """Initializes the algorithm of the numeric precision / recall calculator."""
@@ -164,7 +166,7 @@ def main():
     args = sys.argv
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
-    learning_algorithm = LearningAlgorithmType.raw_numeric_sam
+    learning_algorithm = LearningAlgorithmType.numeric_sam
     if len(args) > 3:
         fluents_map_path = Path(args[3])
     else:
@@ -173,7 +175,8 @@ def main():
     offline_learner = POL(working_directory_path=working_directory_path,
                           domain_file_name=domain_file_name,
                           learning_algorithm=learning_algorithm,
-                          fluents_map_path=fluents_map_path)
+                          fluents_map_path=fluents_map_path,
+                          use_metric_ff=False)
     offline_learner.run_cross_validation()
 
 

@@ -127,7 +127,7 @@ class PolynomialSAMLearning(NumericSAMLearner):
         next_state_lifted_matches = self.function_matcher.match_state_functions(
             grounded_action, next_state.state_fluents)
         self.storage[grounded_action.name] = PolynomialFluentsLearningAlgorithm(
-            grounded_action.name, self.polynom_degree)
+            grounded_action.name, self.polynom_degree, is_verbose=True)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")

@@ -1,39 +1,16 @@
 import logging
 import os
-import re
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import NoReturn
+from typing import Dict, NoReturn
 
-execution_script = """#!/bin/bash
+from pddl_plus_parser.exporters import MetricFFParser
 
-################################################################################################
-### sbatch configuration parameters must start with #SBATCH and must precede any other commands.
-### To ignore, just add another # - like so: ##SBATCH
-################################################################################################
+METRIC_FF_DIRECTORY = "/home/mordocha/numeric_planning/Metric-FF-v2.1/"
 
-#SBATCH --partition main			### specify partition name where to run a job. short: 7 days limit; gtx1080: 7 days; debug: 2 hours limit and 1 job at a time
-#SBATCH --time 0-03:30:00			### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
-#SBATCH --job-name metric_ff_planner_job			### name of the job
-#SBATCH --output job-%J.out			### output log for running job - %J for job number
-##SBATCH --mail-user=aaa.bbb@ccc	### user's email for sending job status messages
-##SBATCH --mail-type=END			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
-
-##SBATCH --mem=32G				### amount of RAM memory
-##SBATCH --cpus-per-task=6			### number of CPU cores
-
-module load anaconda
-conda info --envs
-source activate pol_framework
-
-./ff -o {domain_file_path} -f {problem_file_path} -s 0 > {solution_file_path}
-"""
-
-METRIC_FF_DIRECTORY = "/sise/home/mordocha/numeric_planning/Metric-FF-v2.1/"
-BATCH_JOB_SUBMISSION_REGEX = re.compile(b"Submitted batch job (?P<batch_id>\d+)")
-MAX_RUNNING_TIME = 60  # seconds
+MAX_RUNNING_TIME = 5  # seconds
 
 
 class MetricFFSolver:
@@ -43,63 +20,75 @@ class MetricFFSolver:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.parser = MetricFFParser()
 
-    def write_batch_and_execute_solver(self, script_file_path: Path, problems_directory_path: Path,
-                                       domain_file_path: Path) -> NoReturn:
-        """Writes the batch file script to run on the cluster and then executes the solver algorithm.
+    def _run_metric_ff_process(self, run_command: str, solution_path: Path,
+                               problem_file_path: Path, solving_stats: Dict[str, str]) -> NoReturn:
+        """Runs the metric-ff process."""
+        self.logger.info(f"Metric-FF solver is working on - {problem_file_path.stem}")
+        process = subprocess.Popen(run_command, shell=True)
+        process_start_time = time.time()
+        process_running_time = 0
+        for _ in range(MAX_RUNNING_TIME):
+            if process.poll() is not None:
+                break
+            else:
+                process_running_time = time.time() - process_start_time
+                time.sleep(1)
 
-        :param script_file_path: the path to output the learning script.
-        :param problems_directory_path: the directory containing the problems that are needed to be solved.
-        :param domain_file_path: the path to the domain file that will be used as an input to the planner.
+        if process_running_time > MAX_RUNNING_TIME:
+            self.logger.warning(f"Metric-FF solver took more than {MAX_RUNNING_TIME} seconds to finish.")
+            process.kill()
+            solution_path.unlink(missing_ok=True)
+            solving_stats[problem_file_path.stem] = "timeout"
+            return
+
+        if process.returncode is None:
+            solving_stats[problem_file_path.stem] = "timeout"
+            solution_path.unlink(missing_ok=True)
+            return
+
+        if process.returncode != 0:
+            self.logger.warning(f"Solver returned status code {process.returncode}.")
+            solving_stats[problem_file_path.stem] = "no_solution"
+            solution_path.unlink(missing_ok=True)
+            return
+
+        self.logger.info("Solver finished its execution!")
+        solving_status = self.parser.get_solving_status(solution_path)[0]
+        if solving_status == "ok":
+            self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
+            solving_stats[problem_file_path.stem] = solving_status
+            self.parser.parse_plan(solution_path, solution_path)
+
+        elif solving_status == "no-solution":
+            self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
+            solving_stats[problem_file_path.stem] = "no_solution"
+
+
+    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
+        """Solves numeric and PDDL+ problems using the Metric-FF algorithm and outputs the solution into a file.
+
+        :param problems_directory_path: the path to the problems directory.
+        :param domain_file_path: the path to the domain file.
         """
-        self.logger.info("Changing the current working directory to the MetricFF directory.")
+        solving_stats = {}
         os.chdir(METRIC_FF_DIRECTORY)
-        self.logger.info("Starting to solve the input problems using MetricFF solver.")
+        self.logger.info("Starting to solve the input problems using Metic-FF solver.")
         for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
             self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            completed_file_str = execution_script.format(
-                domain_file_path=str(domain_file_path.absolute()),
-                problem_file_path=str(problem_file_path.absolute()),
-                solution_file_path=str(solution_path.absolute())
-            )
+            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 0 > {solution_path}"
+            self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_stats)
 
-            with open(script_file_path, "wt") as run_script_file:
-                run_script_file.write(completed_file_str)
-
-            submission_str = subprocess.check_output(["sbatch", str(script_file_path)])
-            match = BATCH_JOB_SUBMISSION_REGEX.match(submission_str)
-            batch_id = match.group("batch_id")
-            # waiting for fast downward process to start
-            time.sleep(1)
-            start_time = time.time()
-            execution_state = subprocess.check_output(["squeue", "--me"])
-            while batch_id in execution_state:
-                self.logger.debug(f"Solver with the id - {batch_id} is still solving {problem_file_path.stem}...")
-                if (time.time() - start_time) > MAX_RUNNING_TIME:
-                    subprocess.check_output(["scancel", batch_id])
-
-                execution_state = subprocess.check_output(["squeue", "--me"])
-                time.sleep(1)
-                continue
-
-            self.logger.info("Solver finished its execution!")
-            self.logger.debug("Cleaning the sbatch file from the problems directory.")
-            os.remove(script_file_path)
-            for job_file_path in Path(METRIC_FF_DIRECTORY).glob("job-*.out"):
-                self.logger.debug("Removing the temp job file!")
-                try:
-                    os.remove(job_file_path)
-                except FileNotFoundError:
-                    continue
-
-        return
+        return solving_stats
 
 
 if __name__ == '__main__':
     args = sys.argv
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO)
     solver = MetricFFSolver()
-    solver.write_batch_and_execute_solver(script_file_path=Path(args[1]),
-                                          problems_directory_path=Path(args[2]),
-                                          domain_file_path=Path(args[3]))
+    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]))

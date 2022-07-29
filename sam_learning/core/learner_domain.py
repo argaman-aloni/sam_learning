@@ -92,6 +92,9 @@ class LearnerAction:
 
         :return: the preconditions in PDDL format.
         """
+        if len(self.positive_preconditions) == 0 and len(self.numeric_preconditions) == 0:
+            return "()"
+
         positive_preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
         precondition_str = self._extract_inequality_preconditions()
         if len(self.numeric_preconditions) > 0:

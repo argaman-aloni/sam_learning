@@ -30,6 +30,7 @@ TREATMENT_STATUS_TYPE = PDDLType(name="treatmentstatus", parent=OBJECT_TYPE)
 PART_TYPE = PDDLType(name="part", parent=WOODOBJ_TYPE)
 TAXI_TYPE = PDDLType(name="taxi", parent=AGENT_TYPE)
 TRUCK_TYPE = PDDLType(name="truck", parent=AGENT_TYPE)
+CRATE_TYPE = PDDLType(name="crate", parent=OBJECT_TYPE)
 AIRPLANE_TYPE = PDDLType(name="airplane", parent=AGENT_TYPE)
 LOCATION_TYPE = PDDLType(name="location", parent=OBJECT_TYPE)
 
@@ -40,3 +41,4 @@ AT_TRUCK_PREDICATE = Predicate(name="at",
 FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
 LOAD_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"?z": TRUCK_TYPE})
 CURRENT_LOAD_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"?z": TRUCK_TYPE})
+WEIGHT_FUNCTION = PDDLFunction(name="weight", signature={"?c": CRATE_TYPE})
