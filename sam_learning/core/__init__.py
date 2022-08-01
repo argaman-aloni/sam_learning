@@ -9,3 +9,4 @@ from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgo
 from .numeric_utils import construct_multiplication_strings, prettify_coefficients, prettify_floating_point_number
 from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from .svm_fluents_learning import SVMFluentsLearning
+from .vocabulary_creator import VocabularyCreator

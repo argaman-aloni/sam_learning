@@ -2,11 +2,11 @@
 import logging
 from collections import defaultdict
 from itertools import combinations
-from typing import List, Tuple, NoReturn, Dict
+from typing import List, Tuple, NoReturn, Dict, Set
 
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
 
-from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates
+from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, VocabularyCreator
 
 
 class SAMLearner:
@@ -24,6 +24,7 @@ class SAMLearner:
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
         self.observed_actions = []
+        self.vocabulary_creator = VocabularyCreator()
 
     def _handle_action_effects(
             self, grounded_action: ActionCall, previous_state: State,
@@ -60,24 +61,58 @@ class SAMLearner:
 
         if len(possible_preconditions) > 0:
             current_action.positive_preconditions.intersection_update(possible_preconditions)
+            current_action.negative_preconditions.difference_update(possible_preconditions)
 
         else:
             self.logger.warning(f"while handling the action {grounded_action.name} "
                                 f"inconsistency occurred, since we do not allow for duplicates we do not update the "
                                 f"preconditions.")
 
-    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
+    def _add_negative_predicates(self, grounded_action: ActionCall, previous_state: State,
+                                 observed_objects: Dict[str, PDDLObject]) -> Set[Predicate]:
+        """Adds a negative predicate to the action when it is first encountered.
+
+        :param grounded_action: the action that was encountered.
+        :param previous_state: the state previous to the action's activation.
+        :param observed_objects: the objects that were observed in the trajectory.
+        :return: the possible negative predicates that were added to the action.
+        """
+        possible_negative_preconditions = set()
+        vocabulary = self.vocabulary_creator.create_vocabulary(self.partial_domain, observed_objects)
+        for lifted_predicate_name, grounded_missing_predicates in vocabulary.items():
+            self.logger.debug(f"trying to match the predicate - {lifted_predicate_name} "
+                              f"to the action call - {str(grounded_action)}")
+            if lifted_predicate_name not in previous_state.state_predicates:
+                lifted_matches = self.matcher.get_possible_literal_matches(
+                    grounded_action, list(grounded_missing_predicates))
+                possible_negative_preconditions.update(lifted_matches)
+                continue
+
+            filtered_grounded_state_predicates = [predicate for predicate in grounded_missing_predicates if predicate
+                                                  not in previous_state.state_predicates[lifted_predicate_name]]
+            if len(filtered_grounded_state_predicates) > 0:
+                lifted_matches = self.matcher.get_possible_literal_matches(
+                    grounded_action, filtered_grounded_state_predicates)
+                possible_negative_preconditions.update(lifted_matches)
+
+        return possible_negative_preconditions
+
+    def add_new_action(self, grounded_action: ActionCall, previous_state: State,
+                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> NoReturn:
         """Create a new action in the domain.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
         :param previous_state: the state that the action was executed on.
         :param next_state: the state that was created after executing the action on the previous
+        :param observed_objects: the objects that were observed in the current trajectory.
             state.
         """
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
         possible_preconditions = set()
+        negative_predicates = self._add_negative_predicates(grounded_action, previous_state, observed_objects)
+
         for lifted_predicate_name, grounded_state_predicates in previous_state.state_predicates.items():
             self.logger.debug(f"trying to match the predicate - {lifted_predicate_name} "
                               f"to the action call - {str(grounded_action)}")
@@ -85,6 +120,7 @@ class SAMLearner:
             possible_preconditions.update(lifted_matches)
 
         observed_action.positive_preconditions.update(possible_preconditions)
+        observed_action.negative_preconditions.update(negative_predicates)
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
         observed_action.add_effects.update(lifted_add_effects)
@@ -130,10 +166,12 @@ class SAMLearner:
 
         return has_duplicates
 
-    def handle_single_trajectory_component(self, component: ObservedComponent) -> NoReturn:
+    def handle_single_trajectory_component(self, component: ObservedComponent,
+                                           observed_objects: Dict[str, PDDLObject]) -> NoReturn:
         """Handles a single trajectory component as a part of the learning process.
 
         :param component: the trajectory component that is being handled at the moment.
+        :param observed_objects: the objects that were observed in the current trajectory.
         """
         previous_state = component.previous_state
         grounded_action = component.grounded_action_call
@@ -145,7 +183,7 @@ class SAMLearner:
             return
 
         if action_name not in self.observed_actions:
-            self.add_new_action(grounded_action, previous_state, next_state)
+            self.add_new_action(grounded_action, previous_state, next_state, observed_objects)
 
         else:
             self.update_action(grounded_action, previous_state, next_state)
@@ -160,7 +198,7 @@ class SAMLearner:
         self.deduce_initial_inequality_preconditions()
         for observation in observations:
             for component in observation.components:
-                self.handle_single_trajectory_component(component)
+                self.handle_single_trajectory_component(component, observation.grounded_objects)
 
         learning_report = {action_name: "OK" for action_name in self.partial_domain.actions}
         return self.partial_domain, learning_report
@@ -172,3 +210,5 @@ class SAMLearner:
             for (lifted_param1, lifted_param2) in combinations(action_data.parameter_names, 2):
                 if action_data.signature[lifted_param1] == action_data.signature[lifted_param2]:
                     action_data.inequality_preconditions.add((lifted_param1, lifted_param2))
+
+

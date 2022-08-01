@@ -10,7 +10,7 @@ from pddl_plus_parser.exporters import MetricFFParser
 
 METRIC_FF_DIRECTORY = "/home/mordocha/numeric_planning/Metric-FF-v2.1/"
 
-MAX_RUNNING_TIME = 5  # seconds
+MAX_RUNNING_TIME = 60  # seconds
 
 
 class MetricFFSolver:
@@ -64,7 +64,6 @@ class MetricFFSolver:
         elif solving_status == "no-solution":
             self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "no_solution"
-
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the Metric-FF algorithm and outputs the solution into a file.

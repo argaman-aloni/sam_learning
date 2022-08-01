@@ -69,7 +69,7 @@ class LearnerAction:
             inequality_precondition_str += "\n"
         return inequality_precondition_str
 
-    def _extract_numeric_preconditions(self, positive_preconditions, precondition_str) -> str:
+    def _extract_numeric_preconditions(self, positive_preconditions, negative_preconditions, precondition_str) -> str:
         """Extract the numeric preconditions from the action.
 
         :param positive_preconditions: the positive predicates to append to the string.
@@ -84,6 +84,7 @@ class LearnerAction:
             numeric_preconditions_str = f"(or {numeric_preconditions_str})"
 
         return f"(and {' '.join(positive_preconditions)}\n" \
+               f"\t\t{' '.join(negative_preconditions)}\n" \
                f"\t\t{precondition_str}" \
                f"\t\t{numeric_preconditions_str})"
 
@@ -96,9 +97,11 @@ class LearnerAction:
             return "()"
 
         positive_preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
+        negative_preconditions = [f"(not {precond.untyped_representation})" for precond in self.negative_preconditions]
+
         precondition_str = self._extract_inequality_preconditions()
         if len(self.numeric_preconditions) > 0:
-            return self._extract_numeric_preconditions(positive_preconditions, precondition_str)
+            return self._extract_numeric_preconditions(positive_preconditions, negative_preconditions, precondition_str)
 
         return f"(and {' '.join(positive_preconditions)} {precondition_str})"
 

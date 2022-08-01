@@ -17,6 +17,7 @@ from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
+MAX_FOLD_SIZE = 65
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
                       LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]
@@ -111,12 +112,18 @@ class POL:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_observations = []
+        observed_objects = {}
         learned_domain_path = None
-        for trajectory_file_path in train_set_dir_path.glob("*.trajectory"):
+        for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
+            observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
+            if index % 2 != 0:
+                self.logger.info(f"Skipping the iteration {index} to save the total amount of time!")
+                continue
+
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map)
@@ -149,7 +156,7 @@ class POL:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
         self._init_numeric_performance_calculator()
-        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
+        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold(max_items=MAX_FOLD_SIZE)):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
             self.domain_validator.clear_statistics()

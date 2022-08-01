@@ -31,16 +31,18 @@ def sam_learning(elevators_domain: Domain) -> SAMLearner:
 
 
 def test_add_new_action_with_single_trajectory_component_adds_action_data_to_learned_domain(
-        sam_learning: SAMLearner, elevators_observation: Observation):
+        sam_learning: SAMLearner, elevators_observation: Observation, elevators_problem: Problem):
     observation_component = elevators_observation.components[0]
     previous_state = observation_component.previous_state
     next_state = observation_component.next_state
     test_action_call = observation_component.grounded_action_call
 
-    sam_learning.add_new_action(grounded_action=test_action_call, previous_state=previous_state, next_state=next_state)
+    sam_learning.add_new_action(grounded_action=test_action_call,
+                                previous_state=previous_state,
+                                next_state=next_state,
+                                observed_objects=elevators_problem.objects)
 
     added_action_name = "move-down-slow"
-
     assert added_action_name in sam_learning.partial_domain.actions
     learned_action_data = sam_learning.partial_domain.actions[added_action_name]
     preconditions_str = set([p.untyped_representation for p in learned_action_data.positive_preconditions])
@@ -77,7 +79,8 @@ def test_update_action_with_two_trajectory_component_updates_action_data_correct
 
     sam_learning.add_new_action(grounded_action=first_action_call,
                                 previous_state=first_observation_component.previous_state,
-                                next_state=first_observation_component.next_state)
+                                next_state=first_observation_component.next_state,
+                                observed_objects=elevators_observation.grounded_objects)
 
     print(second_observation_component.previous_state.serialize())
 
@@ -100,7 +103,7 @@ def test_handle_single_trajectory_component_not_allowing_actions_with_duplicated
     test_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow2-0", "n17", "n17"])
     component = ObservedComponent(observation_component.previous_state, test_action_call,
                                   observation_component.next_state)
-    sam_learning.handle_single_trajectory_component(component)
+    sam_learning.handle_single_trajectory_component(component, observed_objects=elevators_observation.grounded_objects)
 
     added_action_name = "move-down-slow"
     learned_action_data = sam_learning.partial_domain.actions[added_action_name]
@@ -112,7 +115,8 @@ def test_handle_single_trajectory_component_not_allowing_actions_with_duplicated
 def test_handle_single_trajectory_component_learns_preconditions_and_effects_when_given_a_non_duplicate_component(
         sam_learning: SAMLearner, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]
-    sam_learning.handle_single_trajectory_component(observation_component)
+    sam_learning.handle_single_trajectory_component(observation_component,
+                                                    observed_objects=elevators_observation.grounded_objects)
 
     added_action_name = "move-down-slow"
     learned_action_data = sam_learning.partial_domain.actions[added_action_name]

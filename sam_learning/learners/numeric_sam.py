@@ -2,7 +2,7 @@
 
 from typing import List, NoReturn, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, PDDLObject
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm
@@ -22,15 +22,17 @@ class NumericSAMLearner(SAMLearner):
         self.function_matcher = NumericFunctionMatcher(partial_domain)
         self.preconditions_fluent_map = preconditions_fluent_map
 
-    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
+    def add_new_action(self, grounded_action: ActionCall, previous_state: State,
+                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> NoReturn:
         """Adds a new action to the learned domain.
 
         :param grounded_action: the grounded action that was executed according to the observation.
         :param previous_state: the state that the action was executed on.
         :param next_state: the state that was created after executing the action on the previous
+        :param observed_objects: the objects that were observed in the trajectory.
             state.
         """
-        super().add_new_action(grounded_action, previous_state, next_state)
+        super().add_new_action(grounded_action, previous_state, next_state, observed_objects)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
         previous_state_lifted_matches = self.function_matcher.match_state_functions(
             grounded_action, previous_state.state_fluents)
@@ -40,6 +42,8 @@ class NumericSAMLearner(SAMLearner):
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
+        if grounded_action.name == "switch_on":
+            print(self.partial_domain.actions["switch_on"].to_pddl())
 
     def update_action(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
@@ -74,7 +78,7 @@ class NumericSAMLearner(SAMLearner):
         super().deduce_initial_inequality_preconditions()
         for observation in observations:
             for component in observation.components:
-                self.handle_single_trajectory_component(component)
+                self.handle_single_trajectory_component(component, observation.grounded_objects)
 
         for action_name, action in self.partial_domain.actions.items():
             if action_name not in self.storage:
@@ -112,15 +116,18 @@ class PolynomialSAMLearning(NumericSAMLearner):
         super().__init__(partial_domain, preconditions_fluent_map)
         self.polynom_degree = polynomial_degree
 
-    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
+    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State,
+                       observed_objects: Dict[str, PDDLObject]) -> NoReturn:
         """Adds a new action to the learned domain.
 
         :param grounded_action: the grounded action that was executed according to the observation.
         :param previous_state: the state that the action was executed on.
         :param next_state: the state that was created after executing the action on the previous
             state.
+        :param observed_objects: the objects that were observed in the trajectory.
+            state.
         """
-        super().add_new_action(grounded_action, previous_state, next_state)
+        super().add_new_action(grounded_action, previous_state, next_state, observed_objects=observed_objects)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
         previous_state_lifted_matches = self.function_matcher.match_state_functions(
             grounded_action, previous_state.state_fluents)

@@ -41,6 +41,11 @@ TEST_NOT_SYMMETRIC_EXPECTED_PRECONDITIONS = [
         name="in-city", signature={"?truck": OBJECT_TYPE, "?loc-from": LOCATION_TYPE})
 ]
 
+TEST_NEGATIVE_PRECONDITION = [
+    Predicate(
+        name="at", signature={"?truck": OBJECT_TYPE, "?loc-from": LOCATION_TYPE})
+]
+
 TEST_ACTION_NAME = "drive"
 
 
@@ -157,6 +162,25 @@ def test_calculate_action_precision_when_action_has_no_preconditions_in_model_do
     precision = precision_recall_calculator.calculate_action_precision(TEST_ACTION_NAME)
     assert precision == 0
 
+
+def test_calculate_action_precision_when_action_has_negative_precondition_does_not_fail(
+        expected_domain: Domain, precision_recall_calculator: PrecisionRecallCalculator):
+    expected_action = expected_domain.actions[TEST_ACTION_NAME]
+    expected_action.positive_preconditions = set()
+    expected_action.negative_preconditions = set(TEST_NEGATIVE_PRECONDITION)
+    expected_action.add_effects = set()
+    expected_action.delete_effects = set()
+
+    learned_action = LearnerAction(name=TEST_ACTION_NAME, signature=expected_action.signature)
+    learned_action.positive_preconditions = set()
+    learned_action.negative_preconditions = set(TEST_NEGATIVE_PRECONDITION)
+    learned_action.add_effects = set()
+    learned_action.delete_effects = set()
+
+    precision_recall_calculator.add_action_data(learned_action=learned_action,
+                                                model_action=expected_action)
+    precision = precision_recall_calculator.calculate_action_precision(TEST_ACTION_NAME)
+    assert precision == 1
 
 def test_calculate_action_recall_when_action_has_no_preconditions_in_model_domain_but_learned_action_contains_preconditions_returns_one(
         expected_domain: Domain, precision_recall_calculator: PrecisionRecallCalculator):

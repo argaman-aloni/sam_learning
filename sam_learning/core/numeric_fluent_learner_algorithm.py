@@ -460,7 +460,7 @@ class NumericFluentStateStorage:
 
         :return: the constructed assignment statements.
         """
-        self.logger.info("Constructing the fluent assignment equations.")
+        self.logger.info(f"Constructing the fluent assignment equations for action {self.action_name}.")
         assignment_statements = []
         duplicate_map = self._remove_duplicated_variables()
         for lifted_function, next_state_values in self.next_state_storage.items():
@@ -471,7 +471,6 @@ class NumericFluentStateStorage:
             self.logger.debug("After validating that the learning process is safe then trying to see if the "
                               "action affects the numeric fluent.")
 
-            # check if the action changed the value from the previous state at all.
             searched_function = lifted_function if lifted_function not in duplicate_map else duplicate_map[
                 lifted_function]
             if not any([(next_val - prev_val) != 0 for
@@ -484,14 +483,18 @@ class NumericFluentStateStorage:
             self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
 
             functions_including_dummy = list(self.previous_state_storage.keys()) + ["(dummy)"]
-            if coefficient_vector[list(self.previous_state_storage.keys()).index(lifted_function)] != 0:
+            if coefficient_vector[list(self.previous_state_storage.keys()).index(searched_function)] != 0:
                 self.logger.debug("the assigned party is a part of the equation, "
                                   "cannot use circular dependency so changing the format!")
                 coefficients_map = {lifted_func: coef for lifted_func, coef in
                                     zip(functions_including_dummy, coefficient_vector)}
+                if lifted_function not in coefficients_map:
+                    coefficients_map[lifted_function] = coefficients_map[searched_function]
+
                 assignment_statements.append(
-                    self._construct_non_circular_assignment(lifted_function, coefficients_map,
-                                                            self.previous_state_storage[lifted_function][0],
+                    self._construct_non_circular_assignment(lifted_function,
+                                                            coefficients_map,
+                                                            self.previous_state_storage[searched_function][0],
                                                             self.next_state_storage[lifted_function][0]))
                 continue
 

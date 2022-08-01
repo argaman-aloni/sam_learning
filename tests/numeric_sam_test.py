@@ -9,7 +9,8 @@ from pytest import fixture
 from sam_learning.learners.numeric_sam import NumericSAMLearner
 from tests.consts import NUMERIC_DOMAIN_PATH, \
     NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, DEPOT_FLUENTS_MAP_PATH, SATELLITE_DOMAIN_PATH, \
-    SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, SATELLITE_FLUENTS_MAP_PATH
+    SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, SATELLITE_FLUENTS_MAP_PATH, \
+    SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH
 
 
 @fixture()
@@ -51,6 +52,17 @@ def satellite_observation(satellite_domain: Domain, satellite_problem: Problem) 
 
 
 @fixture()
+def satellite_problem_problematic(satellite_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=SATELLITE_PROBLEMATIC_PROBLEM_PATH, domain=satellite_domain).parse_problem()
+
+
+@fixture()
+def satellite_observation_problematic(satellite_domain: Domain, satellite_problem_problematic: Problem) -> Observation:
+    return TrajectoryParser(satellite_domain, satellite_problem_problematic). \
+        parse_trajectory(SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH)
+
+
+@fixture()
 def satellite_fluents_map() -> Dict[str, List[str]]:
     with open(SATELLITE_FLUENTS_MAP_PATH, "rt") as json_file:
         return json.load(json_file)
@@ -77,6 +89,14 @@ def test_learn_action_model_returns_learned_model(numeric_sam_learning: NumericS
 def test_learn_action_model_for_satellite_domain_returns_learned_model(satellite_sam_learning: NumericSAMLearner,
                                                                        satellite_observation: Observation):
     learned_model, learning_metadata = satellite_sam_learning.learn_action_model([satellite_observation])
+    print()
+    print(learning_metadata)
+    print(learned_model.to_pddl())
+
+
+def test_learn_action_model_for_satellite__with_problematic_trajectory_domain_returns_learned_model(
+        satellite_sam_learning: NumericSAMLearner, satellite_observation_problematic: Observation):
+    learned_model, learning_metadata = satellite_sam_learning.learn_action_model([satellite_observation_problematic])
     print()
     print(learning_metadata)
     print(learned_model.to_pddl())
