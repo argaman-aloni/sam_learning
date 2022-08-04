@@ -116,11 +116,13 @@ class PrecisionRecallCalculator:
         self.preconditions[learned_action.name] = \
             {p.untyped_representation for p in learned_action.positive_preconditions}
         self.preconditions[learned_action.name].update(
-            {p.untyped_representation for p in learned_action.negative_preconditions})
+            {f"(not {p.untyped_representation})" for p in learned_action.negative_preconditions})
+
         self.ground_truth_preconditions[model_action.name] = \
             {p.untyped_representation for p in model_action.positive_preconditions}
         self.ground_truth_preconditions[model_action.name].update(
-            {p.untyped_representation for p in model_action.negative_preconditions})
+            {f"(not {p.untyped_representation})" for p in model_action.negative_preconditions})
+
         self.add_effects[learned_action.name] = {p.untyped_representation for p in learned_action.add_effects}
         self.ground_truth_add_effects[model_action.name] = {p.untyped_representation for p in model_action.add_effects}
         self.delete_effects[learned_action.name] = {p.untyped_representation for p in learned_action.delete_effects}

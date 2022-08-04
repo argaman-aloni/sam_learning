@@ -42,8 +42,6 @@ class NumericSAMLearner(SAMLearner):
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
-        if grounded_action.name == "switch_on":
-            print(self.partial_domain.actions["switch_on"].to_pddl())
 
     def update_action(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:

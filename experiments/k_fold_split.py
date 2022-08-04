@@ -75,7 +75,7 @@ class KFoldSplit:
         self.logger.info("Starting to create the folds for the cross validation process.")
         problem_paths = []
         trajectory_paths = list(self.working_directory_path.glob(trajectory_suffix))
-        items_per_fold = max_items if max_items > 0 else len(trajectory_paths)
+        items_per_fold = max_items if (max_items > 0 and max_items <= len(trajectory_paths)) else len(trajectory_paths)
         trajectory_paths = random.sample(trajectory_paths, k=items_per_fold)
         for trajectory_file_path in trajectory_paths:
             problem_paths.append(self.working_directory_path / f"{trajectory_file_path.stem}.pddl")

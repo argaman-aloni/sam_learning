@@ -1,8 +1,8 @@
 import logging
 import os
+import signal
 import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Dict, NoReturn
 
@@ -27,18 +27,12 @@ class MetricFFSolver:
         """Runs the metric-ff process."""
         self.logger.info(f"Metric-FF solver is working on - {problem_file_path.stem}")
         process = subprocess.Popen(run_command, shell=True)
-        process_start_time = time.time()
-        process_running_time = 0
-        for _ in range(MAX_RUNNING_TIME):
-            if process.poll() is not None:
-                break
-            else:
-                process_running_time = time.time() - process_start_time
-                time.sleep(1)
-
-        if process_running_time > MAX_RUNNING_TIME:
+        try:
+            process.wait(timeout=MAX_RUNNING_TIME)
+        except subprocess.TimeoutExpired:
             self.logger.warning(f"Metric-FF solver took more than {MAX_RUNNING_TIME} seconds to finish.")
-            process.kill()
+            os.kill(process.pid, signal.SIGTERM)
+            os.system("pkill -f ./ff")
             solution_path.unlink(missing_ok=True)
             solving_stats[problem_file_path.stem] = "timeout"
             return

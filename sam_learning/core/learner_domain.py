@@ -103,7 +103,7 @@ class LearnerAction:
         if len(self.numeric_preconditions) > 0:
             return self._extract_numeric_preconditions(positive_preconditions, negative_preconditions, precondition_str)
 
-        return f"(and {' '.join(positive_preconditions)} {precondition_str})"
+        return f"(and {' '.join(positive_preconditions)} \n\t\t{' '.join(negative_preconditions)} {precondition_str})"
 
     def _effects_to_pddl(self) -> str:
         """Converts the effects to the needed PDDL format.

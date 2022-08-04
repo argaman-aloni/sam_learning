@@ -95,6 +95,19 @@ class LearningStatisticsManager:
                 action_appearance_counter[component.grounded_action_call.name] += 1
         return action_appearance_counter
 
+    def _extract_all_preconditions(self, action_name, learned_domain):
+        learned_preconditions = [p.untyped_representation for p in
+                                 learned_domain.actions[action_name].positive_preconditions]
+        learned_preconditions.extend(
+            [f"(not {p.untyped_representation})" for p in
+             learned_domain.actions[action_name].negative_preconditions])
+        ground_truth_preconditions = [p.untyped_representation for p in
+                                      self.model_domain.actions[action_name].positive_preconditions]
+        ground_truth_preconditions.extend(
+            [f"(not {p.untyped_representation})" for p in
+             self.model_domain.actions[action_name].negative_preconditions])
+        return ground_truth_preconditions, learned_preconditions
+
     def create_results_directory(self) -> NoReturn:
         """Creates the results' directory that contains the learning results."""
         self.results_dir_path.mkdir(exist_ok=True)
@@ -113,6 +126,9 @@ class LearningStatisticsManager:
         precision_recall_calculator = PrecisionRecallCalculator()
         for action_name, action_data in learned_domain.actions.items():
             precision_recall_calculator.add_action_data(action_data, self.model_domain.actions[action_name])
+            ground_truth_preconditions, learned_preconditions = self._extract_all_preconditions(action_name,
+                                                                                                learned_domain)
+
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,
                 "domain_name": self.model_domain.name,
@@ -121,14 +137,12 @@ class LearningStatisticsManager:
                 "total_number_of_actions": len(self.model_domain.actions),
                 "learned_action_name": action_name,
                 "num_triplets_action_appeared": action_appearance_counter[action_name],
-                "learned_discrete_preconditions": [p.untyped_representation for p in
-                                                   learned_domain.actions[action_name].positive_preconditions],
+                "learned_discrete_preconditions": learned_preconditions,
                 "learned_discrete_add_effects": [p.untyped_representation for p in
                                                  learned_domain.actions[action_name].add_effects],
                 "learned_discrete_delete_effects": [p.untyped_representation for p in
                                                     learned_domain.actions[action_name].delete_effects],
-                "ground_truth_preconditions": [p.untyped_representation for p in
-                                               self.model_domain.actions[action_name].positive_preconditions],
+                "ground_truth_preconditions": ground_truth_preconditions,
                 "ground_truth_add_effects": [p.untyped_representation for p in
                                              self.model_domain.actions[action_name].add_effects],
                 "ground_truth_delete_effects": [p.untyped_representation for p in

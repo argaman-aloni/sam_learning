@@ -163,7 +163,7 @@ def test_calculate_action_precision_when_action_has_no_preconditions_in_model_do
     assert precision == 0
 
 
-def test_calculate_action_precision_when_action_has_negative_precondition_does_not_fail(
+def test_calculate_action_precision_when_action_has_negative_precondition_does_not_fail_and_matches_correctly(
         expected_domain: Domain, precision_recall_calculator: PrecisionRecallCalculator):
     expected_action = expected_domain.actions[TEST_ACTION_NAME]
     expected_action.positive_preconditions = set()

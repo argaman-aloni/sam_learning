@@ -145,7 +145,7 @@ class POL:
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
-        self.logger.debug("Checking that the test set problems can solved using the learned domain.")
+        self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
                                               used_observations=allowed_observations)
@@ -183,7 +183,7 @@ def main():
                           domain_file_name=domain_file_name,
                           learning_algorithm=learning_algorithm,
                           fluents_map_path=fluents_map_path,
-                          use_metric_ff=False)
+                          use_metric_ff=True)
     offline_learner.run_cross_validation()
 
 
