@@ -1,7 +1,7 @@
 """The POL main framework - Compile, Learn and Plan."""
+import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import NoReturn, List, Optional, Dict
 
@@ -17,7 +17,6 @@ from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
-MAX_FOLD_SIZE = 65
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
                       LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]
@@ -156,7 +155,7 @@ class POL:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
         self._init_numeric_performance_calculator()
-        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold(max_items=MAX_FOLD_SIZE)):
+        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
             self.domain_validator.clear_statistics()
@@ -169,20 +168,30 @@ class POL:
             self.learning_statistics_manager.write_complete_joint_statistics()
 
 
-def main():
-    args = sys.argv
-    working_directory_path = Path(args[1])
-    domain_file_name = args[2]
-    learning_algorithm = LearningAlgorithmType.numeric_sam
-    if len(args) > 3:
-        fluents_map_path = Path(args[3])
-    else:
-        fluents_map_path = None
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Runs the POL algorithm on the input domain.")
+    parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
+    parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
+    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6],
+                        help="The type of learning algorithm. "
+                             "\n 1: sam_learning\n2: esam_learning\n3: numeric_sam\n4: raw_numeric_sam\n"
+                             "6: polynomial_sam")
+    parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
+                                                                   "fluents", default=None)
+    parser.add_argument("--use_metric_ff_solver", required=False,
+                        help="Whether or not to solve the problems using metric-FF", default=False,
+                        action=argparse.BooleanOptionalAction)
 
-    offline_learner = POL(working_directory_path=working_directory_path,
-                          domain_file_name=domain_file_name,
-                          learning_algorithm=learning_algorithm,
-                          fluents_map_path=fluents_map_path,
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_arguments()
+    offline_learner = POL(working_directory_path=Path(args.working_directory_path),
+                          domain_file_name=args.domain_file_name,
+                          learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
+                          fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
                           use_metric_ff=True)
     offline_learner.run_cross_validation()
 

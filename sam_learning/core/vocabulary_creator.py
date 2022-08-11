@@ -3,8 +3,7 @@ from collections import defaultdict
 from itertools import permutations
 from typing import List, Tuple, Dict, Set
 
-from pddl_plus_parser.models import Domain, Predicate, Problem, PDDLObject, GroundedPredicate, PDDLType, SignatureType
-from scipy.sparse.linalg._isolve.tests.demo_lgmres import problem
+from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType
 
 from sam_learning.core import LearnerDomain
 

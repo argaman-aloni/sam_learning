@@ -16,7 +16,7 @@ from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
-PLAN_MINER_DIR_PATH = "/home/mordocha/numeric_planning/PlanMiner/bin/"
+PLAN_MINER_DIR_PATH = os.environ["PLAN_MINER_DIR_PATH"]
 
 
 class PlanMinerExperimentRunner:

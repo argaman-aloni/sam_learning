@@ -3,7 +3,7 @@ import os
 import subprocess
 from pathlib import Path
 
-VALIDATOR_DIRECTORY = Path("/home/mordocha/numeric_planning/VAL/")
+VALIDATOR_DIRECTORY = Path(os.environ["VALIDATOR_DIRECTORY"])
 
 VALID_PLAN = "Plan valid"
 INAPPLICABLE_PLAN = "Plan failed to execute"

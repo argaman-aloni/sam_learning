@@ -1,14 +1,14 @@
 """Module responsible for running the Expressive Numeric Heuristic Planner (ENHSP)."""
 import logging
+import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Dict
 
 from jdk4py import JAVA
 
-ENHSP_FILE_PATH = "/home/mordocha/numeric_planning/ENHSP/enhsp.jar"
+ENHSP_FILE_PATH = os.environ["ENHSP_FILE_PATH"]
 MAX_RUNNING_TIME = 60  # seconds
 
 TIMEOUT_ERROR_CODE = b"Timeout has been reached"

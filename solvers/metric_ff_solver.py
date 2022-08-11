@@ -8,7 +8,7 @@ from typing import Dict, NoReturn
 
 from pddl_plus_parser.exporters import MetricFFParser
 
-METRIC_FF_DIRECTORY = "/home/mordocha/numeric_planning/Metric-FF-v2.1/"
+METRIC_FF_DIRECTORY = os.environ["METRIC_FF_DIRECTORY"]
 
 MAX_RUNNING_TIME = 60  # seconds
 

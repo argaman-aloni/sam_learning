@@ -2,6 +2,7 @@
 import itertools
 import logging
 import math
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, NoReturn, Tuple, Optional
@@ -38,7 +39,7 @@ class NumericFluentStateStorage:
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
         # TODO: remove this once the action is fully tested.
-        self.convex_hull_error_file_path = Path("/home/mordocha/numeric_planning/domains/convex_hull_errors.txt")
+        self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
 
     def _construct_linear_equation_string(self, multiplication_parts: List[str]) -> str:
         """Construct the addition parts of the linear equation string.
