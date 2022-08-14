@@ -26,6 +26,8 @@ class ENHSPSolver:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
+    # def _execute_timed_run
+
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
 

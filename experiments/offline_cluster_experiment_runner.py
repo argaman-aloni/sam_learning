@@ -5,4 +5,6 @@ import sys
 if __name__ == '__main__':
     args = sys.argv
     os.system(f"nohup bash -c '{sys.executable} planning_with_offline_learning.py "
-              f"{args[1]} {args[2]} {args[3]}> results-{args[2]}.txt' &")
+              f"--working_directory_path {args[1]} --domain_file_name {args[2]} "
+              f"--learning_algorithm {args[3]} --fluents_map_path "
+              f"{args[4]} --use_metric_ff_solver > results-{args[2]}.txt' &")
