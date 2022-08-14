@@ -94,9 +94,9 @@ class NumericFunctionMatcher:
                 if unsigned_representation in grounded_state_fluents:
                     self.logger.info(f"found a possible match to the action - {unsigned_representation}")
                     matched_lifted_function = self.lift_matched_parameters(
-                        self.matcher_domain.actions[action_call.name],
-                        action_call.parameters,
-                        grounded_state_fluents[unsigned_representation])
+                        executed_action=self.matcher_domain.actions[action_call.name],
+                        grounded_call_parameters=action_call.parameters,
+                        grounded_function=grounded_state_fluents[unsigned_representation])
                     possible_matches[matched_lifted_function.untyped_representation] = matched_lifted_function
 
         return possible_matches

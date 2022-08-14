@@ -1,9 +1,9 @@
 import logging
 from collections import defaultdict
 from itertools import permutations
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict, Set, Union
 
-from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType
+from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain
 
 from sam_learning.core import LearnerDomain
 
@@ -25,11 +25,11 @@ class VocabularyCreator:
         self.logger = logging.getLogger(__name__)
 
     def _validate_type_matching(self, grounded_signatures: Dict[str, PDDLType], predicate: Predicate) -> bool:
-        """
+        """Validates that the types of the grounded signature match the types of the predicate signature.
 
-        :param grounded_signatures:
-        :param predicate:
-        :return:
+        :param grounded_signatures: the grounded predicate signature.
+        :param predicate: the lifted predicate.
+        :return: whether the types match.
         """
         for object_name, predicate_parameter in zip(grounded_signatures, predicate.signature):
             parameter_type = predicate.signature[predicate_parameter]
@@ -41,12 +41,12 @@ class VocabularyCreator:
 
         return True
 
-    def create_vocabulary(self, domain: LearnerDomain,
+    def create_vocabulary(self, domain: Union[LearnerDomain, Domain],
                           observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
         """Create a vocabulary of random combinations of the actions' parameters.
 
         :param domain: the domain containing the predicates and the action signatures.
-        :param observed_objects:
+        :param observed_objects: the objects that were observed in the trajectory.
         :return: list containing all the predicates with the different combinations of parameters.
         """
         vocabulary = defaultdict(set)

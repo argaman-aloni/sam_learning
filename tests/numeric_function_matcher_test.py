@@ -5,7 +5,8 @@ from pytest import fixture
 
 from sam_learning.core import NumericFunctionMatcher
 from tests.consts import NUMERIC_DOMAIN_PATH, TRUCK_TYPE, NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, \
-    FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION
+    FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION, \
+    LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION
 
 TEST_NUMERIC_LOAD_LIMIT_FUNCTION = PDDLFunction(name="load_limit", signature={
     "?t": TRUCK_TYPE
@@ -65,11 +66,11 @@ def test_lift_matched_parameters_creates_lifted_version_of_function(
 
 def test_match_state_functions_with_single_parameterized_grounded_function_finds_all_possible_matches(
         numeric_function_matcher: NumericFunctionMatcher):
-    LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
+    LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION.set_value(411.0)
     FUEL_COST_FUNCTION.set_value(34.0)
     simple_state_fluents = {
         "(fuel-cost )": FUEL_COST_FUNCTION,
-        "(load_limit truck1)": LOAD_LIMIT_TRAJECTORY_FUNCTION
+        "(load_limit truck1)": LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION
     }
     test_action_call = ActionCall(name="load", grounded_parameters=["hoist2", "crate1", "truck1", "distributor1"])
     matches = numeric_function_matcher.match_state_functions(action_call=test_action_call,
@@ -82,14 +83,14 @@ def test_match_state_functions_with_single_parameterized_grounded_function_finds
 
 def test_match_state_functions_with_small_number_of_grounded_functions_finds_all_possible_matches(
         numeric_function_matcher: NumericFunctionMatcher):
-    LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
-    CURRENT_LIMIT_TRAJECTORY_FUNCTION.set_value(121.0)
+    LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION.set_value(411.0)
+    CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION.set_value(121.0)
     FUEL_COST_FUNCTION.set_value(34.0)
 
     simple_state_fluents = {
         "(fuel-cost )": FUEL_COST_FUNCTION,
-        "(load_limit truck1)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
-        "(current_load truck1)": CURRENT_LIMIT_TRAJECTORY_FUNCTION
+        "(load_limit truck1)": LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION,
+        "(current_load truck1)": CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION
     }
     test_action_call = ActionCall(name="load", grounded_parameters=["hoist2", "crate1", "truck1", "distributor1"])
     matches = numeric_function_matcher.match_state_functions(action_call=test_action_call,

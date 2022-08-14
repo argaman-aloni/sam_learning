@@ -5,7 +5,7 @@ from pddl_plus_parser.models import GroundedPredicate, Domain, ActionCall, Predi
 from pytest import fixture
 
 from sam_learning.core import PredicatesMatcher
-from tests.consts import LOCATION_TYPE, AGENT_TYPE, DOMAIN_WITH_CONSTS_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
+from tests.consts import LOCATION_TYPE, AGENT_TYPE, WOODWORKING_DOMAIN_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
     TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, ELEVATORS_DOMAIN_PATH, \
     ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH, NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, \
     DEPOT_NUMERIC_TRAJECTORY_PATH
@@ -65,7 +65,7 @@ def elevators_observation(elevators_domain: Domain, elevators_problem: Problem) 
 
 @fixture()
 def discrete_domain_with_consts() -> Domain:
-    parser = DomainParser(DOMAIN_WITH_CONSTS_PATH, partial_parsing=True)
+    parser = DomainParser(WOODWORKING_DOMAIN_PATH, partial_parsing=True)
     return parser.parse_domain()
 
 

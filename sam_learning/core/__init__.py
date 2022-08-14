@@ -10,3 +10,4 @@ from .numeric_utils import construct_multiplication_strings, prettify_coefficien
 from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
+from .proxy_action_generator import ProxyActionGenerator

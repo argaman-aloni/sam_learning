@@ -7,7 +7,8 @@ from pddl_plus_parser.models import PDDLType, Predicate, PDDLFunction
 CWD = os.getcwd()
 EXAMPLES_DIR_PATH = Path(CWD, "examples")
 DOMAIN_NO_CONSTS_PATH = EXAMPLES_DIR_PATH / "domain-logistics.pddl"
-DOMAIN_WITH_CONSTS_PATH = EXAMPLES_DIR_PATH / "woodworking-domain.pddl"
+WOODWORKING_DOMAIN_PATH = EXAMPLES_DIR_PATH / "woodworking-domain.pddl"
+WOODWORKING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_problem.pddl"
 NUMERIC_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_numeric.pddl"
 NUMERIC_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile2.pddl"
 ELEVATORS_DOMAIN_PATH = EXAMPLES_DIR_PATH / "elevators_domain.pddl"
@@ -49,5 +50,7 @@ AT_TRUCK_PREDICATE = Predicate(name="at",
 
 FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
 LOAD_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"?z": TRUCK_TYPE})
+LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"truck1": TRUCK_TYPE})
 CURRENT_LOAD_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"?z": TRUCK_TYPE})
+CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"truck1": TRUCK_TYPE})
 WEIGHT_FUNCTION = PDDLFunction(name="weight", signature={"?c": CRATE_TYPE})
