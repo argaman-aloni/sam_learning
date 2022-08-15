@@ -4,7 +4,8 @@ from pddl_plus_parser.lisp_parsers import PDDLTokenizer
 from pddl_plus_parser.models import construct_expression_tree, NumericalExpressionTree
 from pytest import fixture, fail, raises
 
-from sam_learning.core import NumericFluentStateStorage, ConditionType, NotSafeActionError
+from sam_learning.core import NumericFluentStateStorage, ConditionType, NotSafeActionError, \
+    construct_non_circular_assignment
 from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, \
     CURRENT_LOAD_TRAJECTORY_FUNCTION, WEIGHT_FUNCTION
 
@@ -158,8 +159,7 @@ def test_construct_non_circular_assignment_constructs_correct_equation_with_corr
     }
     previous_value = 0.0
     next_value = 1.0
-    increase_statement = load_action_state_fluent_storage._construct_non_circular_assignment(
-        lifted_function, coefficient_map, previous_value, next_value)
+    increase_statement = construct_non_circular_assignment(lifted_function, coefficient_map, previous_value, next_value)
     assert increase_statement == "(increase (current_load ?z) (* (weight ?y) 1.0))"
 
 
@@ -173,8 +173,7 @@ def test_construct_non_circular_assignment_constructs_correct_equation_with_corr
     }
     previous_value = 1.0
     next_value = 0.0
-    increase_statement = load_action_state_fluent_storage._construct_non_circular_assignment(
-        lifted_function, coefficient_map, previous_value, next_value)
+    increase_statement = construct_non_circular_assignment(lifted_function, coefficient_map, previous_value, next_value)
     assert increase_statement == "(decrease (current_load ?z) (* (weight ?y) 1.0))"
 
 

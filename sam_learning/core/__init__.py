@@ -6,8 +6,8 @@ from .numeric_function_matcher import NumericFunctionMatcher
 from .predicates_matcher import PredicatesMatcher
 from .learning_types import EquationSolutionType, ConditionType
 from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
-from .numeric_utils import construct_multiplication_strings, prettify_coefficients, prettify_floating_point_number
+from .numeric_utils import construct_multiplication_strings, prettify_coefficients, prettify_floating_point_number, \
+    construct_linear_equation_string, construct_non_circular_assignment
 from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
-from .proxy_action_generator import ProxyActionGenerator

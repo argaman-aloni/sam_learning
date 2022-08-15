@@ -18,7 +18,8 @@ from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
-from sam_learning.core.numeric_utils import prettify_coefficients, construct_multiplication_strings
+from sam_learning.core.numeric_utils import prettify_coefficients, construct_multiplication_strings, \
+    construct_linear_equation_string, construct_non_circular_assignment
 
 EPSILON = 1e-10
 LEGAL_LEARNING_SCORE = 1.00
@@ -40,18 +41,6 @@ class NumericFluentStateStorage:
         self.next_state_storage = defaultdict(list)
         # TODO: remove this once the action is fully tested.
         self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
-
-    def _construct_linear_equation_string(self, multiplication_parts: List[str]) -> str:
-        """Construct the addition parts of the linear equation string.
-
-        :param multiplication_parts: the multiplication function strings that are multiplied by the coefficient.
-        :return: the string representing the sum of the linear variables.
-        """
-        if len(multiplication_parts) == 1:
-            return multiplication_parts[0]
-
-        inner_layer = self._construct_linear_equation_string(multiplication_parts[1:])
-        return f"(+ {multiplication_parts[0]} {inner_layer})"
 
     def _validate_legal_equations(self, values_matrix: np.ndarray) -> NoReturn:
         """Validates that there are enough independent equations which enable for a single solution for the equation.
@@ -145,7 +134,7 @@ class NumericFluentStateStorage:
         for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
             function_names = relevant_fluents or self.previous_state_storage.keys()
             multiplication_functions = construct_multiplication_strings(inequality_coefficients, function_names)
-            constructed_left_side = self._construct_linear_equation_string(multiplication_functions)
+            constructed_left_side = construct_linear_equation_string(multiplication_functions)
             inequalities.add(f"(<= {constructed_left_side} {border_point})")
 
         return list(inequalities)
@@ -252,36 +241,6 @@ class NumericFluentStateStorage:
         conditions = [f"(>= {relevant_fluent} {min_value})", f"(<= {relevant_fluent} {max_value})"]
         conditions.extend(equality_strs)
         return conditions, ConditionType.injunctive
-
-    def _construct_non_circular_assignment(self, lifted_function: str, coefficients_map: Dict[str, float],
-                                           previous_value: float, next_value: float) -> str:
-        """Changes circular assignment statements to be non-circular.
-
-        Note:
-            Since numeric solvers don't approve circular dependencies we need format the assignment operations to be
-            in the form of increase / decrease.
-
-        :param lifted_function: the assigned variable.
-        :param coefficients_map: the calculated coefficient map.
-        :param previous_value: the numeric value of the function prior to the action's execution.
-        :param next_value: the numeric value of the function after the action's execution.
-        :return: the formatted string without circular dependencies.
-        """
-        normalized_coefficients = {k: v / coefficients_map[lifted_function] for k, v in
-                                   coefficients_map.items() if k != lifted_function and v != 0}
-        if len(normalized_coefficients) == 1:
-            normalized_coefficients = {k: abs(v) for k, v in normalized_coefficients.items()}
-
-        multiplication_functions = construct_multiplication_strings(
-            list(normalized_coefficients.values()), list(normalized_coefficients.keys()))
-        constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
-
-        if previous_value < next_value:
-            self.logger.debug("The action caused the value of the function to increase!")
-            return f"(increase {lifted_function} {constructed_right_side})"
-
-        self.logger.debug("The action caused the value of the function to decrease!")
-        return f"(decrease {lifted_function} {constructed_right_side})"
 
     def _filter_constant_features(self, previous_state_matrix: np.ndarray, relevant_fluents: List[str]) -> Tuple[
         np.ndarray, List[str], List[str]]:
@@ -493,10 +452,10 @@ class NumericFluentStateStorage:
                     coefficients_map[lifted_function] = coefficients_map[searched_function]
 
                 assignment_statements.append(
-                    self._construct_non_circular_assignment(lifted_function,
-                                                            coefficients_map,
-                                                            self.previous_state_storage[searched_function][0],
-                                                            self.next_state_storage[lifted_function][0]))
+                    construct_non_circular_assignment(lifted_function,
+                                                      coefficients_map,
+                                                      self.previous_state_storage[searched_function][0],
+                                                      self.next_state_storage[lifted_function][0]))
                 continue
 
             multiplication_functions = construct_multiplication_strings(
@@ -506,7 +465,7 @@ class NumericFluentStateStorage:
                                   "which means that there are not coefficients. Continuing.")
                 continue
 
-            constructed_right_side = self._construct_linear_equation_string(multiplication_functions)
+            constructed_right_side = construct_linear_equation_string(multiplication_functions)
             assignment_statements.append(f"(assign {lifted_function} {constructed_right_side})")
 
         return assignment_statements
