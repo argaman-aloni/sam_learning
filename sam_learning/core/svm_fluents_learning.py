@@ -74,12 +74,13 @@ class SVMFluentsLearning(UnsafeFluentsLearning):
         :return: the list of preconditions to be connected with an OR statement.
         """
         self.logger.info("Learning the preconditions of an action using iterative linear SVC technique.")
-        dataframe = self._create_pre_state_classification_dataset(positive_observations, negative_observations)
-        feature_names = list(dataframe.columns.values.tolist())
+        dataframe = super()._create_pre_state_classification_dataset(positive_observations, negative_observations)
+        feature_names = dataframe.columns.values.tolist()[:-1]
         coefficients_route = []
         intercept_route = []
         current_iteration = 0
-        while current_iteration < MAX_ALLOWED_ITERATIONS and dataframe.shape[0] > 0:
+        while current_iteration < MAX_ALLOWED_ITERATIONS and dataframe.shape[0] > 0 \
+                and len(set(dataframe[CLASS_COLUMN].values)) > 1:
             coefficients, intercept = self.run_linear_svc(dataframe)
             coefficients_route.append(prettify_coefficients(list(coefficients)))
             intercept_route.append(prettify_floating_point_number(intercept))

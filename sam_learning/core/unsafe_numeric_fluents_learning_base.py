@@ -151,8 +151,14 @@ class UnsafeFluentsLearning(ABC):
         inequalities = set()
         for node_coefficients, intercept_value in zip(coefficients_path, intercepts_path):
             multiplication_functions = construct_multiplication_strings(node_coefficients, features_names)
+            if len(multiplication_functions) == 0:
+                continue
+
             coefficients_string = self._construct_linear_equation_string(multiplication_functions)
             inequalities.add(f"(>= (+ {coefficients_string} {intercept_value}) 0.0)")
+
+        if len(inequalities) == 0:
+            return []
 
         ordered_inequalities = ["(and"] + list(inequalities) + [")"]
         return ordered_inequalities

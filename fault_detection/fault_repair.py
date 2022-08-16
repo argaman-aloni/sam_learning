@@ -243,15 +243,14 @@ class FaultRepair:
             repaired_action = learned_model.actions[faulty_action_name]
 
         elif repair_algorithm_type == RepairAlgorithmType.oblique_tree:
-            learner = ObliqueTreeModelLearner(partial_domain=partial_domain,
-                                              preconditions_fluent_map=self.fluents_map, polynomial_degree=0,
+            learner = ObliqueTreeModelLearner(partial_domain=partial_domain, polynomial_degree=0,
                                               faulty_action_name=faulty_action_name)
             learned_model, _ = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 
         elif repair_algorithm_type == RepairAlgorithmType.extended_svc:
-            learner = SVCModelLearner(partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map,
-                                      polynomial_degree=0, faulty_action_name=faulty_action_name)
+            learner = SVCModelLearner(partial_domain=partial_domain, polynomial_degree=0,
+                                      faulty_action_name=faulty_action_name)
             learned_model, _ = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 
