@@ -163,7 +163,7 @@ class ModelFaultDiagnosis:
         statistics["problems_type"] = problems_type
 
         valid_observations, faulty_observations, faults_detected = self.fault_repair.execute_plans_on_agent(
-            problems_dir_path, domain_file_path, is_repaired_model=domain_type == "safe")
+            problems_dir_path, domain_file_path, is_repaired_model=domain_type == "repaired")
 
         counted_fault_detection = Counter(list(faults_detected.values()))
         statistics["ok"] = counted_fault_detection["ok"]
@@ -216,9 +216,9 @@ class ModelFaultDiagnosis:
         :param test_set_dir_path: the path to the test set directory.
         :param repair_method: the repair method used to repair the faulty action.
         """
-        self.logger.debug("Solving the test set problems using the learned SAFE domain.")
+        self.logger.debug("Solving the test set problems using the learned REPAIRED domain.")
         _, _, safe_test_stats = self._solve_and_validate(
-            problems_dir_path=test_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="safe",
+            problems_dir_path=test_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="repaired",
             problems_type="test")
         safe_test_stats["action_name"] = faulty_action_name
         safe_test_stats["repair_method"] = repair_method.name
@@ -256,9 +256,9 @@ class ModelFaultDiagnosis:
         :param train_set_dir_path: the path to the train set directory.
         :param repair_method: the repair method used to repair the faulty action.
         """
-        self.logger.debug("solving the train set problems (again for validation) using the SAFE learned domain.")
+        self.logger.debug("solving the train set problems (again for validation) using the REPAIRED learned domain.")
         _, _, safe_train_stats = self._solve_and_validate(
-            problems_dir_path=train_set_dir_path, domain_file_path=repaired_domain_file_path, domain_type="safe",
+            problems_dir_path=train_set_dir_path, domain_file_path=repaired_domain_file_path, domain_type="repaired",
             problems_type="train")
         safe_train_stats["action_name"] = faulty_action_name
         safe_train_stats["repair_method"] = repair_method.name
