@@ -6,6 +6,7 @@ from pddl_plus_parser.models import Domain, Problem, Observation, PDDLFunction, 
 from pytest import fixture
 
 from sam_learning.core import ObliqueTreeFluentsLearning
+from sam_learning.core.unsafe_numeric_fluents_learning_base import UnsafeFluentsLearning
 from tests.consts import NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, FUEL_COST_FUNCTION, \
     LOAD_LIMIT_TRAJECTORY_FUNCTION, TRUCK_TYPE
 
@@ -88,7 +89,8 @@ def test_add_lifted_functions_to_dataset_lifts_grounded_observation_and_adds_cor
     observed_component = depot_observation.components[0]
     test_dataset = defaultdict(list)
 
-    oblique_tree_fluents_learning_zero_degree_polynom._add_lifted_functions_to_dataset(observed_component, test_dataset)
+    parent: UnsafeFluentsLearning = oblique_tree_fluents_learning_zero_degree_polynom
+    parent._add_lifted_functions_to_dataset(observed_component, test_dataset)
     assert (len(test_dataset) == 3)
     assert (test_dataset["(fuel-cost )"] == [0.0])
     assert (test_dataset["(load_limit ?x)"] == [411.0])
@@ -103,9 +105,9 @@ def test_create_pre_state_classification_dataset_with_no_negative_observations_c
     action_observation.components = drive_action_components
     positive_observations = [action_observation]
     negative_observations = []
-    df = oblique_tree_fluents_learning_zero_degree_polynom._create_pre_state_classification_dataset(
-        positive_observations,
-        negative_observations)
+
+    parent: UnsafeFluentsLearning = oblique_tree_fluents_learning_zero_degree_polynom
+    df = parent._create_pre_state_classification_dataset(positive_observations, negative_observations)
     assert df.shape[0] == len(action_observation.components)
     assert df.shape[1] == 4
 

@@ -54,7 +54,7 @@ class ModelFaultDiagnosis:
                        domain_file_name: Optional[str] = None,
                        is_faulty: bool = False,
                        defect_type: DefectType = DefectType.numeric_precondition_sign,
-                       action_name: str = "") -> NoReturn:
+                       action_name: str = "", repair_type: str = "") -> NoReturn:
         """Exports a domain into a file so that it will be used to solve the test set problems.
 
         :param domain: the domain to export
@@ -68,7 +68,7 @@ class ModelFaultDiagnosis:
 
         self.logger.debug("Exporting the domain to the results directory!")
         faulty = "faulty" if is_faulty else "repaired"
-        with open(self.results_dir_path / f"{faulty}_domain_{action_name}_{defect_type.name}.pddl",
+        with open(self.results_dir_path / f"{faulty}_domain_{action_name}_{repair_type}_{defect_type.name}.pddl",
                   "wt") as domain_file:
             domain_file.write(domain.to_pddl())
 
@@ -201,7 +201,7 @@ class ModelFaultDiagnosis:
                                                          faulty_action_name, repair_algorithm_type)
         self._export_domain(domain=repaired_domain, domain_directory_path=test_set_dir_path,
                             domain_file_name=None, is_faulty=False, defect_type=defect_type,
-                            action_name=faulty_action_name)
+                            action_name=faulty_action_name, repair_type=repair_algorithm_type.name)
         learned_domain_file_path = test_set_dir_path / self.model_domain_file_name
         return learned_domain_file_path
 

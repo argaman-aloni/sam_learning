@@ -87,6 +87,19 @@ def test_construct_regression_data_with_multiple_triplets_creates_correct_datase
     assert len(post_state_values) == len(pre_state_values)
 
 
+def test_run_linear_svc_returns_correct_equations(svc_fluents_learning_zero_degree_polynom: SVMFluentsLearning):
+    dataset = {
+        "(fuel-cost )": [1, 2, 3, 4],
+        "(load_limit ?x)": [5, 6, 7, 8],
+        "(current_load ?x)": [9, 10, 19, 11],
+        "class": [1, -1, 1, -1]
+    }
+    dataframe = pd.DataFrame.from_dict(dataset)
+    coef, intercept = svc_fluents_learning_zero_degree_polynom.run_linear_svc(dataframe)
+    positive_points = dataframe[dataframe["class"] == 1].iloc[0].values[:-1]
+    assert sum(positive_points * coef) + intercept >= 0
+
+
 def test_solve_regression_returns_valid_coefficients_map(
         svc_fluents_learning_zero_degree_polynom: SVMFluentsLearning, depot_observation: Observation):
     label_col_name = "(load_limit ?x)_post_state"
@@ -96,9 +109,10 @@ def test_solve_regression_returns_valid_coefficients_map(
         label_col_name: [8, 0, 33, 33, 0]
     })
     coefficients_map = svc_fluents_learning_zero_degree_polynom._solve_regression(dataframe, label_col_name)
+    print(coefficients_map)
     assert coefficients_map["(fuel-cost )"] == 0.0
     assert coefficients_map["(load_limit ?x)"] == 1.0
-    assert coefficients_map["dummy"] - 1 < 0.00001
+    assert coefficients_map["(dummy)"] - 1 < 0.00001
 
 
 def test_learn_effects_learns_effects_correctly_and_outputs_equation_strings(
