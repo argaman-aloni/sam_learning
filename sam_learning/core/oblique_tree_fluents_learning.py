@@ -71,7 +71,7 @@ class ObliqueTreeFluentsLearning(UnsafeFluentsLearning):
         :return: the list of preconditions to be connected with an OR statement.
         """
         self.logger.info("Learning the preconditions of the action using oblique tree.")
-        dataframe = self._create_pre_state_classification_dataset(positive_observations, negative_observations)
+        dataframe = super()._create_pre_state_classification_dataset(positive_observations, negative_observations)
         stree = Stree(random_state=42, max_depth=5, splitter="cfs").fit(
             dataframe.loc[:, dataframe.columns != CLASS_COLUMN], dataframe[CLASS_COLUMN])
         self.logger.debug("The tree has been built.")

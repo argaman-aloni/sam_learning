@@ -193,7 +193,7 @@ class UnsafeFluentsLearning(ABC):
         coefficients_map = {
             column_name: coeff for column_name, coeff in zip(reg.feature_names_in_, prettify_coefficients(reg.coef_))
         }
-        coefficients_map["(dummy)"] = reg.intercept_
+        coefficients_map["(dummy)"] = prettify_floating_point_number(reg.intercept_)
         return coefficients_map
 
     def learn_preconditions(self, positive_observations: List[Observation],

@@ -242,6 +242,11 @@ class FaultRepair:
             learned_model, _ = learner.learn_action_model(valid_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 
+        elif repair_algorithm_type == RepairAlgorithmType.raw_numeric_sam:
+            learner = NumericSAMLearner(partial_domain=partial_domain)
+            learned_model, _ = learner.learn_action_model(valid_observations)
+            repaired_action = learned_model.actions[faulty_action_name]
+
         elif repair_algorithm_type == RepairAlgorithmType.oblique_tree:
             learner = ObliqueTreeModelLearner(partial_domain=partial_domain, polynomial_degree=0,
                                               faulty_action_name=faulty_action_name)

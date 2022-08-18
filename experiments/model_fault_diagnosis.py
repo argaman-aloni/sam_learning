@@ -21,7 +21,7 @@ FAULTY_DOMAIN_PDDL = "faulty_domain.pddl"
 
 random.seed(42)
 DIAGNOSIS_COLUMNS = ["repair_method", "domain_type", "problems_type", "ok", "no_solution", "timeout", "not_applicable",
-                     "goal_not_achieved", "state_difference", "action_name"]
+                     "goal_not_achieved", "state_difference", "action_name", "defect_type"]
 
 
 class ModelFaultDiagnosis:
@@ -207,7 +207,7 @@ class ModelFaultDiagnosis:
 
     def _run_repaired_model_on_test(self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str,
                                     learned_domain_file_path: Path, test_set_dir_path: Path,
-                                    repair_method: RepairAlgorithmType) -> NoReturn:
+                                    repair_method: RepairAlgorithmType, defect_type: DefectType) -> NoReturn:
         """Tries to solve the test set problems using the repaired domain.
 
         :param all_diagnosis_stats: the collected diagnosis statistics.
@@ -215,6 +215,7 @@ class ModelFaultDiagnosis:
         :param learned_domain_file_path: the path to the learned domain file.
         :param test_set_dir_path: the path to the test set directory.
         :param repair_method: the repair method used to repair the faulty action.
+        :param defect_type: the type of defect that was injected to the faulty action.
         """
         self.logger.debug("Solving the test set problems using the learned REPAIRED domain.")
         _, _, safe_test_stats = self._solve_and_validate(
@@ -222,12 +223,13 @@ class ModelFaultDiagnosis:
             problems_type="test")
         safe_test_stats["action_name"] = faulty_action_name
         safe_test_stats["repair_method"] = repair_method.name
+        safe_test_stats["defect_type"] = defect_type.name
         all_diagnosis_stats.append(safe_test_stats)
         self._clear_plans(test_set_dir_path)
 
     def run_faulty_model_on_test(self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str,
                                  faulty_domain_path: Path, test_set_dir_path: Path,
-                                 repair_method: RepairAlgorithmType) -> NoReturn:
+                                 repair_method: RepairAlgorithmType, defect_type: DefectType) -> NoReturn:
         """Tries to solve the test set problems using the faulty domain.
 
         :param all_diagnosis_stats: the collected diagnosis statistics.
@@ -235,6 +237,7 @@ class ModelFaultDiagnosis:
         :param faulty_domain_path: the path to the faulty domain file.
         :param test_set_dir_path: the path to the test set directory.
         :param repair_method: the repair method used to repair the faulty action.
+        :param defect_type: the type of defect that was injected to the faulty action.
         """
         self.logger.debug("solving the test set problems using the FAULTY domain.")
         _, _, faulty_test_set_stats = self._solve_and_validate(
@@ -242,12 +245,13 @@ class ModelFaultDiagnosis:
             problems_type="test")
         faulty_test_set_stats["action_name"] = faulty_action_name
         faulty_test_set_stats["repair_method"] = repair_method.name
+        faulty_test_set_stats["defect_type"] = defect_type.name
         all_diagnosis_stats.append(faulty_test_set_stats)
         self._clear_plans(test_set_dir_path)
 
     def run_repair_model_on_train(
             self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str, repaired_domain_file_path: Path,
-            train_set_dir_path: Path, repair_method: RepairAlgorithmType) -> NoReturn:
+            train_set_dir_path: Path, repair_method: RepairAlgorithmType, defect_type: DefectType) -> NoReturn:
         """Tries to solve the train set problems using the repaired domain.
 
         :param all_diagnosis_stats: the collected diagnosis statistics.
@@ -255,6 +259,7 @@ class ModelFaultDiagnosis:
         :param repaired_domain_file_path: the path to the repaired domain file.
         :param train_set_dir_path: the path to the train set directory.
         :param repair_method: the repair method used to repair the faulty action.
+        :param defect_type: the type of defect that was injected to the faulty action.
         """
         self.logger.debug("solving the train set problems (again for validation) using the REPAIRED learned domain.")
         _, _, safe_train_stats = self._solve_and_validate(
@@ -262,6 +267,7 @@ class ModelFaultDiagnosis:
             problems_type="train")
         safe_train_stats["action_name"] = faulty_action_name
         safe_train_stats["repair_method"] = repair_method.name
+        safe_train_stats["defect_type"] = defect_type.name
         all_diagnosis_stats.append(safe_train_stats)
         self._clear_plans(train_set_dir_path)
 
@@ -299,6 +305,7 @@ class ModelFaultDiagnosis:
 
         faulty_train_stats["action_name"] = faulty_action
         faulty_train_stats["repair_method"] = repair_algorithm_type.name
+        faulty_train_stats["defect_type"] = defect_type.name
         all_diagnosis_stats.append(faulty_train_stats)
         self._clear_plans(train_set_dir_path)
 
@@ -312,11 +319,11 @@ class ModelFaultDiagnosis:
             test_set_dir_path, valid_observations, faulty_observations, repair_algorithm_type)
 
         self._run_repaired_model_on_test(all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
-                                         test_set_dir_path, repair_algorithm_type)
+                                         test_set_dir_path, repair_algorithm_type, defect_type)
         self.run_faulty_model_on_test(all_diagnosis_stats, faulty_action, faulty_domain_path, test_set_dir_path,
-                                      repair_algorithm_type)
+                                      repair_algorithm_type, defect_type)
         self.run_repair_model_on_train(all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
-                                       train_set_dir_path, repair_algorithm_type)
+                                       train_set_dir_path, repair_algorithm_type, defect_type)
 
     def evaluate_fault_diagnosis(self, train_set_dir_path: Path, test_set_dir_path: Path) -> NoReturn:
         """Conducts the experiments to evaluate the efficiency of the 'repair' property.

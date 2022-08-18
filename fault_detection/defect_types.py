@@ -13,7 +13,7 @@ class DefectType(Enum):
 
 
 class RepairAlgorithmType(Enum):
-
     numeric_sam = 1
-    oblique_tree = 2
-    extended_svc = 3
+    raw_numeric_sam = 2
+    oblique_tree = 3
+    extended_svc = 4
