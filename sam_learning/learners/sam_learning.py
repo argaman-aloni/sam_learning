@@ -13,14 +13,12 @@ class SAMLearner:
     """Class that represents the safe action model learner algorithm."""
 
     logger: logging.Logger
-    observations: List[Observation]
     partial_domain: LearnerDomain
     matcher: PredicatesMatcher
     observed_actions: List[str]
 
     def __init__(self, partial_domain: Domain):
         self.logger = logging.getLogger(__name__)
-        self.observations = []
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
         self.observed_actions = []
