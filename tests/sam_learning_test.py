@@ -1,7 +1,7 @@
 """module tests for the SAM learning algorithm"""
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import GroundedPredicate, Domain, ActionCall, Predicate, Problem, Observation, \
+from pddl_plus_parser.models import Domain, ActionCall, Problem, Observation, \
     ObservedComponent
 from pytest import fixture
 

@@ -31,6 +31,10 @@ SAILING_LEARNED_DOMAIN_PATH = EXAMPLES_DIR_PATH / "sailing_domain.pddl"
 SAILING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "prob_sailing.pddl"
 SAILING_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "sailing_observation.trajectory"
 
+WOODWORKING_COMBINED_DOMAIN_PATH = EXAMPLES_DIR_PATH / "woodworking_combined_domain.pddl"
+WOODWORKING_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_combined_problem.pddl"
+WOODWORKING_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "ma_woodworking_trajectory.trajectory"
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)
