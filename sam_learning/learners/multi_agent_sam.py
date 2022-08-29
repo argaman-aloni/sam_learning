@@ -11,7 +11,7 @@ from sam_learning.learners import SAMLearner
 
 
 class MultiAgentSAM(SAMLearner):
-    ""
+    """Class designated to learning action models from multi-agent trajectories with joint actions."""
     logger: logging.Logger
     must_be_add_effects: Dict[str, Set[Predicate]]
     must_be_delete_effects: Dict[str, Set[Predicate]]
