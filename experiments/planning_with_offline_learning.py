@@ -12,7 +12,7 @@ from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning
+from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, MultiAgentSAM
 from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
@@ -27,6 +27,7 @@ LEARNING_ALGORITHMS = {
     # difference is that the learner is not given any fluents to assist in learning
     LearningAlgorithmType.raw_numeric_sam: NumericSAMLearner,
     LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
+    LearningAlgorithmType.ma_sam: MultiAgentSAM
 }
 
 
@@ -41,10 +42,11 @@ class POL:
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
     numeric_performance_calc: NumericPerformanceCalculator
+    executing_agents: List[str]
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
-                 use_metric_ff: bool = False):
+                 use_metric_ff: bool = False, executing_agents: List[str] = None):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
@@ -67,6 +69,7 @@ class POL:
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
             use_metric_ff=use_metric_ff)
+        self.executing_agents = executing_agents
 
     def _init_numeric_performance_calculator(self) -> NoReturn:
         """Initializes the algorithm of the numeric precision / recall calculator."""
@@ -117,20 +120,32 @@ class POL:
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             observed_objects.update(problem.objects)
-            new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
+            if self._learning_algorithm == LearningAlgorithmType.ma_sam:
+                new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+                    trajectory_file_path, self.executing_agents)
+            else:
+                new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
+
             allowed_observations.append(new_observation)
-            if index % 2 != 0:
+            if index % 5 != 0:
                 self.logger.info(f"Skipping the iteration {index} to save the total amount of time!")
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map)
-            learned_model, learning_report = learner.learn_action_model(allowed_observations)
+            if self._learning_algorithm != LearningAlgorithmType.ma_sam:
+                learned_model, learning_report = learner.learn_action_model(allowed_observations)
+            else:
+                learned_model, learning_report = learner.learn_combined_action_model(allowed_observations,
+                                                                                     agent_names=self.executing_agents)
+
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
 
-        self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+        if self._learning_algorithm in NUMERIC_ALGORITHMS:
+            self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
@@ -172,7 +187,7 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the POL algorithm on the input domain.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
-    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6],
+    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6, 7],
                         help="The type of learning algorithm. "
                              "\n 1: sam_learning\n2: esam_learning\n3: numeric_sam\n4: raw_numeric_sam\n"
                              "6: polynomial_sam")
@@ -181,6 +196,9 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--use_metric_ff_solver", required=False,
                         help="Whether or not to solve the problems using metric-FF", default=False,
                         action=argparse.BooleanOptionalAction)
+    parser.add_argument("--executing_agents", required=False, default=None,
+                        help="In case of a multi-agent action model learning, the names of the agents that "
+                             "are executing the actions")
 
     args = parser.parse_args()
     return args
@@ -188,11 +206,15 @@ def parse_arguments() -> argparse.Namespace:
 
 def main():
     args = parse_arguments()
+    executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
+        if args.executing_agents is not None else None
+
     offline_learner = POL(working_directory_path=Path(args.working_directory_path),
                           domain_file_name=args.domain_file_name,
                           learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
                           fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-                          use_metric_ff=True)
+                          use_metric_ff=args.use_metric_ff_solver,
+                          executing_agents=executing_agents)
     offline_learner.run_cross_validation()
 
 

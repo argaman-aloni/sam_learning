@@ -13,12 +13,30 @@ from pddl_plus_parser.multi_agent import MultiAgentDomainsConverter, MultiAgentP
 from utilities import SolverType
 
 
-class ExperimentTrajectoriesCreator:
+class MAExperimentTrajectoriesCreator:
     """Class responsible for creating the trajectories that will be used in the experiments."""
     logger: logging.Logger
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+
+    def _copy_domain_files(self, problem_folder: Path, output_folder: Path) -> NoReturn:
+        """Copies the domain files to the output folder.
+
+        :param problem_folder: the folder containing the problems and the domains.
+        :param output_folder: the folder to copy the files to once the trajectories are created.
+        """
+        self.logger.info("Copying domain related files...")
+        combined_domain_file_name = "combined_domain.pddl"
+        combined_problem_file_name = "combined_problem.pddl"
+        problem_folder_name = problem_folder.stem
+        domain_file_path = problem_folder / combined_domain_file_name
+        combined_plan_path = problem_folder / f"{problem_folder_name}.solution"
+        shutil.copy(domain_file_path, output_folder)
+        shutil.copy(problem_folder / combined_problem_file_name, output_folder / f"pfile_{problem_folder_name}.pddl")
+        shutil.copy(combined_plan_path, output_folder / f"pfile_{problem_folder_name}.solution")
+        shutil.copy(problem_folder / f"{problem_folder_name}.trajectory",
+                    output_folder / f"pfile_{problem_folder_name}.trajectory")
 
     def create_domain_trajectories(self, problems_directory: Path, plans_directory: Path, output_folder: Path,
                                    agent_names: List[str], planner_prefix: str) -> NoReturn:
@@ -39,7 +57,8 @@ class ExperimentTrajectoriesCreator:
                                              domain=combined_domain).parse_problem()
             plan_converter = PlanConverter(ma_domain=combined_domain)
             plan_folder_path = plans_directory / f"{planner_prefix}_{problem_folder_name}"
-            plan_sequence = plan_converter.convert_plan(plan_file_path=plan_folder_path / "Plan.txt",
+            plan_sequence = plan_converter.convert_plan(problem=combined_problem,
+                                                        plan_file_path=plan_folder_path / "Plan.txt",
                                                         agent_names=agent_names)
             combined_plan_path = problem_folder / f"{problem_folder_name}.solution"
             plan_converter.export_plan(plan_file_path=combined_plan_path, plan_actions=plan_sequence)
@@ -48,20 +67,11 @@ class ExperimentTrajectoriesCreator:
             trajectory_exporter.export_to_file(triplets, problem_folder / f"{problem_folder_name}.trajectory")
             self._copy_domain_files(problem_folder, output_folder)
 
-    def _copy_domain_files(self, problem_folder: Path, output_folder: Path) -> NoReturn:
-        """
 
-        :param problem_folder:
-        :param output_folder:
-        :return:
-        """
-        self.logger.info("Copying domain related files...")
-        combined_domain_file_name = "combined_domain.pddl"
-        combined_problem_file_name = "combined_problem.pddl"
-        problem_folder_name = problem_folder.stem
-        domain_file_path = problem_folder / combined_domain_file_name
-        combined_plan_path = problem_folder / f"{problem_folder_name}.solution"
-        shutil.copy(domain_file_path, output_folder)
-        shutil.copy(problem_folder / combined_problem_file_name, output_folder / f"{problem_folder_name}.pddl")
-        shutil.copy(combined_plan_path, output_folder)
-        shutil.copy(problem_folder / f"{problem_folder_name}.trajectory", output_folder)
+if __name__ == '__main__':
+    trajectory_creator = MAExperimentTrajectoriesCreator()
+    trajectory_creator.create_domain_trajectories(problems_directory=Path(sys.argv[1]),
+                                                  plans_directory=Path(sys.argv[2]),
+                                                  output_folder=Path(sys.argv[3]),
+                                                  agent_names=["a1", "a2", "a3", "a4"],
+                                                  planner_prefix=sys.argv[4])

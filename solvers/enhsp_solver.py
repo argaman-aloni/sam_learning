@@ -1,10 +1,11 @@
 """Module responsible for running the Expressive Numeric Heuristic Planner (ENHSP)."""
 import logging
 import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, NoReturn
 
 from jdk4py import JAVA
 
@@ -26,7 +27,51 @@ class ENHSPSolver:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    # def _execute_timed_run
+    def _run_enhsp_process(self, run_command: str, problem_file_path: Path,
+                           solving_stats: Dict[str, str]) -> NoReturn:
+        """Runs the ENHSP process and monitors its execution time.
+
+        :param run_command: the command to run the ENHSP process.
+        :param problem_file_path: the path to the problem file.
+        :param solving_stats: the statistics of the solving process.
+        """
+        self.logger.info(f"Starting to run ENHSP process for the problem - {problem_file_path.stem}")
+        process = subprocess.Popen(run_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            process.wait(timeout=MAX_RUNNING_TIME)
+
+        except subprocess.TimeoutExpired:
+            self.logger.debug(
+                f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
+            solving_stats[problem_file_path.stem] = "timeout"
+            os.kill(process.pid, signal.SIGTERM)
+            os.system("pkill -f enhsp.jar")
+            return
+
+        if process.returncode is None:
+            solving_stats[problem_file_path.stem] = "timeout"
+            return
+
+        self.logger.info("ENHSP finished its execution!")
+        stdout = process.stdout.read()
+        stderr = process.stderr.read()
+
+        if PROBLEM_SOLVED in stdout:
+            self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
+            solving_stats[problem_file_path.stem] = "ok"
+
+        elif NO_SOLUTION_FOR_PROBLEM in stdout or OTHER_NO_SOLUTION_TYPE in stdout:
+            self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
+            solving_stats[problem_file_path.stem] = "no_solution"
+
+        elif GOAL_NOT_REACHABLE in stderr:
+            self.logger.warning("Solver declared goal unreachable!")
+            solving_stats[problem_file_path.stem] = "no_solution"
+
+        else:
+            self.logger.critical(f"While solving problem encountered unknown error! STDOUT - {stdout}")
+            self.logger.critical(f"While solving problem encountered unknown error! STDERR - {stderr}")
+            solving_stats[problem_file_path.stem] = "no_solution"
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
@@ -43,32 +88,8 @@ class ENHSPSolver:
                                "-f", str(problem_file_path.absolute()),
                                "-planner", "sat-hmrphj",
                                "-sp", str(solution_path.absolute())]
-            try:
-                process = subprocess.run([str(JAVA), "-jar", ENHSP_FILE_PATH, *running_options], capture_output=True,
-                                         timeout=MAX_RUNNING_TIME + 1)
-                self.logger.info("ENHSP finished its execution!")
-                if PROBLEM_SOLVED in process.stdout:
-                    self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
-                    solving_stats[problem_file_path.stem] = "ok"
-
-                elif NO_SOLUTION_FOR_PROBLEM in process.stdout or OTHER_NO_SOLUTION_TYPE in process.stdout:
-                    self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
-                    solving_stats[problem_file_path.stem] = "no_solution"
-
-                elif GOAL_NOT_REACHABLE in process.stderr:
-                    self.logger.warning("Solver declared goal unreachable!")
-                    solving_stats[problem_file_path.stem] = "no_solution"
-
-                else:
-                    self.logger.critical(f"While solving problem encountered unknown error! STDOUT - {process.stdout}")
-                    self.logger.critical(f"While solving problem encountered unknown error! STDERR - {process.stderr}")
-                    solving_stats[problem_file_path.stem] = "no_solution"
-
-            except subprocess.TimeoutExpired:
-                self.logger.debug(f"Learning algorithm did not finish in time so was killed "
-                                  f"while trying to solve - {problem_file_path.stem}")
-                solving_stats[problem_file_path.stem] = "timeout"
-                continue
+            run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
+            self._run_enhsp_process(run_command, problem_file_path, solving_stats)
 
         return solving_stats
 

@@ -2,10 +2,10 @@
 import csv
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, NoReturn, List, Optional
+from typing import Any, Dict, NoReturn, List, Optional, Union
 
 from pddl_plus_parser.lisp_parsers import DomainParser
-from pddl_plus_parser.models import Domain, Observation
+from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, MultiAgentComponent
 
 from experiments.discrete_precision_recall_calculator import PrecisionRecallCalculator
 from utilities import LearningAlgorithmType
@@ -83,7 +83,7 @@ class LearningStatisticsManager:
         self.results_dir_path = self.working_directory_path / "results_directory"
 
     @staticmethod
-    def _update_action_appearances(used_observations: List[Observation]) -> Counter:
+    def _update_action_appearances(used_observations: List[Union[Observation, MultiAgentObservation]]) -> Counter:
         """Updates the number of times each action appeared in the input trajectories.
 
         :param used_observations: the observations used to learn the actions.
@@ -92,7 +92,11 @@ class LearningStatisticsManager:
         action_appearance_counter = Counter()
         for observation in used_observations:
             for component in observation.components:
-                action_appearance_counter[component.grounded_action_call.name] += 1
+                if isinstance(component, MultiAgentComponent):
+                    for action in component.grounded_joint_action.actions:
+                        action_appearance_counter[action.name] += 1
+                else:
+                    action_appearance_counter[component.grounded_action_call.name] += 1
         return action_appearance_counter
 
     def _extract_all_preconditions(self, action_name, learned_domain):
@@ -112,8 +116,9 @@ class LearningStatisticsManager:
         """Creates the results' directory that contains the learning results."""
         self.results_dir_path.mkdir(exist_ok=True)
 
-    def add_to_action_stats(self, used_observations: List[Observation], learned_domain: LearnerDomain,
-                            learning_report: Optional[Dict[str, str]] = None) -> NoReturn:
+    def add_to_action_stats(
+            self, used_observations: List[Union[Observation, MultiAgentObservation]],
+            learned_domain: LearnerDomain, learning_report: Optional[Dict[str, str]] = None) -> NoReturn:
         """Add the action data to the statistics.
 
         :param used_observations: the observations that were used to learn the action.
@@ -195,14 +200,13 @@ class LearningStatisticsManager:
         self.action_learning_stats.clear()
 
     def _collect_numeric_learning_statistics(
-            self, used_observations: List[Observation], learning_report: Dict[str, str],
+            self, used_observations: List[Union[Observation, MultiAgentObservation]], learning_report: Dict[str, str],
             precision_recall_calc: PrecisionRecallCalculator) -> NoReturn:
-        """
+        """Collects the numeric learning statistics from the learning report.
 
-        :param used_observations:
-        :param learning_report:
-        :param precision_recall_calc:
-        :return:
+        :param used_observations: the observations that were used to learn the action model.
+        :param learning_report: the report that the learning algorithm submitted.
+        :param precision_recall_calc: the object that calculates the precision and recall of the learned action model.
         """
         num_triplets = sum([len(observation.components) for observation in used_observations])
         actions_stats_counter = Counter(learning_report.values())

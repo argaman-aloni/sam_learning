@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import NoReturn, Dict, List, Any, Optional, Union
 
-from pddl_plus_parser.models import Observation
+from pddl_plus_parser.models import Observation, MultiAgentObservation
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
@@ -91,14 +91,15 @@ class DomainValidator:
                 iteration_statistics["goal_not_achieved"] += 1
 
     @staticmethod
-    def _extract_num_triplets(used_observations: Union[List[Observation], List[Path]] = None) -> int:
+    def _extract_num_triplets(used_observations: Union[List[Observation],
+                                                       List[MultiAgentObservation], List[Path]] = None) -> int:
         """Extracts the number of trajectory triplets from the observations.
 
         :param used_observations: the observations used to generate the plans.
         :return: the number of trajectory triplets in the used observations.
         """
         for observation in used_observations:
-            if type(observation) is not Observation:
+            if not isinstance(observation, Observation) and not isinstance(observation, MultiAgentObservation):
                 with open(observation, "r") as observation_file:
                     num_operators = 0
                     for line in observation_file.readlines():

@@ -1,7 +1,7 @@
 """Module to learn action models from multi-agent trajectories with joint actions."""
 import logging
 from collections import defaultdict
-from typing import Dict, List, NoReturn, Tuple, Set
+from typing import Dict, List, NoReturn, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, PDDLObject, NOP_ACTION, \
     MultiAgentObservation, ActionCall, State
@@ -17,8 +17,11 @@ class MultiAgentSAM(SAMLearner):
     must_be_delete_effects: Dict[str, Set[Predicate]]
     might_be_add_effects: Dict[str, Set[Predicate]]
     might_be_delete_effects: Dict[str, Set[Predicate]]
+    preconditions_fluent_map: Dict[str, List[str]]
+    concurrency_constraint: int
 
-    def __init__(self, partial_domain: Domain):
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 concurrency_constraint: int = 2):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
         self.observed_actions = []
@@ -26,6 +29,8 @@ class MultiAgentSAM(SAMLearner):
         self.must_be_delete_effects = defaultdict(set)
         self.might_be_add_effects = defaultdict(set)
         self.might_be_delete_effects = defaultdict(set)
+        self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
+        self.concurrency_constraint = concurrency_constraint
 
     @staticmethod
     def _update_might_be_effects(action_might_be_effects: Set[Predicate], new_effects: List[Predicate]):
@@ -178,7 +183,8 @@ class MultiAgentSAM(SAMLearner):
                 self.handle_multi_agent_trajectory_component(component, observation.grounded_objects, agent_names)
 
         self._update_actions_must_be_effects()
-        self._update_actions_might_be_effects()
+        if self.concurrency_constraint == 1:
+            self._update_actions_might_be_effects()
 
         learning_report = {action_name: "OK" for action_name in self.partial_domain.actions}
         return self.partial_domain, learning_report
