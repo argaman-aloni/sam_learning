@@ -108,7 +108,7 @@ def test_repair_model_fix_numeric_effect_when_given_valid_observation(
         defect_type=DefectType.numeric_effect, action_to_alter="lift")
 
     fault_repair._filter_redundant_observations("lift", valid_observations, faulty_observations)
-    repaired_model = fault_repair.repair_model(
+    repaired_model, _ = fault_repair.repair_model(
         faulty_domain=faulty_learner_domain, valid_observations=valid_observations, faulty_action_name="lift")
 
     assert repaired_model.actions["lift"].numeric_effects[0] == "(increase (fuel-cost ) 1.0)"

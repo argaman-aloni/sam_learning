@@ -176,13 +176,14 @@ class FaultRepair:
             faulty_observation.components = relevant_faulty_components
 
     def execute_plans_on_agent(
-            self, plans_dir_path: Path, faulty_domain_path: Path,
+            self, plans_dir_path: Path, faulty_domain_path: Path, solving_report: Dict[str, str],
             is_repaired_model: bool = False) -> Tuple[List[Observation], List[Observation], Dict[str, str]]:
         """Executes the plans on the agent and returns the learned information about the possible faults and the
         execution status.
 
         :param faulty_domain_path: the path to the domain file that might be either faulty or the fixed file.
         :param plans_dir_path: the path to the directory containing the plans.
+        :param solving_report: the report received by the solving algorithm regarding the solved problems.
         :param is_repaired_model: whether the model has been repaired or not.
         :return: the statistics about the execution of the plans and the observations.
         """
@@ -192,6 +193,9 @@ class FaultRepair:
         faulty_action_name = None
         faulty_domain = DomainParser(domain_path=faulty_domain_path).parse_domain()
         for solution_file_path in plans_dir_path.glob("*.solution"):
+            if solution_file_path.stem not in solving_report:
+                continue
+
             problem_file_path = plans_dir_path / f"{solution_file_path.stem}.pddl"
             valid_observation, faulty_observation, faulty_action = self._observe_single_plan(
                 faulty_domain, problem_file_path, solution_file_path)
@@ -225,7 +229,7 @@ class FaultRepair:
     def repair_model(
             self, faulty_domain: LearnerDomain, valid_observations: List[Observation],
             faulty_observations: List[Observation] = None, faulty_action_name: str = None,
-            repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam) -> LearnerDomain:
+            repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Repairs an action model that contains a defect by learning valid observations.
 
         :param faulty_domain: the domain that contains a defected action.
@@ -239,25 +243,25 @@ class FaultRepair:
         repaired_action = None
         if repair_algorithm_type == RepairAlgorithmType.numeric_sam:
             learner = NumericSAMLearner(partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map)
-            learned_model, _ = learner.learn_action_model(valid_observations)
+            learned_model, report = learner.learn_action_model(valid_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 
         elif repair_algorithm_type == RepairAlgorithmType.raw_numeric_sam:
             learner = NumericSAMLearner(partial_domain=partial_domain)
-            learned_model, _ = learner.learn_action_model(valid_observations)
+            learned_model, report = learner.learn_action_model(valid_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 
         elif repair_algorithm_type == RepairAlgorithmType.oblique_tree:
             learner = ObliqueTreeModelLearner(partial_domain=partial_domain, polynomial_degree=0,
                                               faulty_action_name=faulty_action_name)
-            learned_model, _ = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
+            learned_model, report = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 
         elif repair_algorithm_type == RepairAlgorithmType.extended_svc:
             learner = SVCModelLearner(partial_domain=partial_domain, polynomial_degree=0,
                                       faulty_action_name=faulty_action_name)
-            learned_model, _ = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
+            learned_model, report = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 
         faulty_domain.actions[faulty_action_name] = repaired_action
-        return faulty_domain
+        return faulty_domain, report

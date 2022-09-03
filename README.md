@@ -20,6 +20,12 @@ In addition to the above, the code contains additional functionality designated 
 The following explains how to install the SAM-Learning framework.
 Notice, the code works on linux machines due to its dependencies on planners and validators that only work on linux machines.
 
+### Needed external tools:
+1. **ENHSP solver** - can be downloaded from [here](https://sites.google.com/view/enhsp/).
+2. **Metric-FF planner** - can be downloaded from [here](https://fai.cs.uni-saarland.de/hoffmann/metric-ff.html). In this algorithm, we use version 2.1 of Metric-FF which is the latest version.
+3. **VAL validation algorithm** - can be downloaded from [here](https://github.com/KCL-Planning/VAL). Use the instructions given in the repository to install VAL.
+4. PlanMiner (non mandatory, required if you wnat to compare SAM to the other current works using our framework) - can be downloaded from [here](https://github.com/Leontes/PlanMiner),
+
 ### Environment variables
 
 * 'METRIC_FF_DIRECTORY': Directory of the compiled metric-FF planner.
