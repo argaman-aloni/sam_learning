@@ -66,10 +66,11 @@ class FaultRepair:
                 return False
 
         for fluent_name, fluent in valid_next_state.state_fluents.items():
-            if fluent.state_representation != faulty_next_state.state_fluents[fluent_name].state_representation:
+            if abs(fluent.value - faulty_next_state.state_fluents[fluent_name].value) >= 1:
                 self.logger.debug(
-                    f"The action {faulty_action_name} resulted in different state in the executing agent!"
-                    f"\nExpected - {fluent.state_representation} and received - "
+                    f"The action {faulty_action_name} resulted in a numeric value that's difference "
+                    f"is larger than the threshold!"
+                    f"\nExpected - {fluent.state_representation} +- x < 1 and received - "
                     f"{faulty_next_state.state_fluents[fluent_name].state_representation}")
                 return False
 

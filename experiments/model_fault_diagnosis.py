@@ -11,8 +11,9 @@ from typing import NoReturn, List, Dict, Any, Optional, Tuple, Iterator
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Observation, Domain
 
-from experiments import LearningStatisticsManager
+from experiments import LearningStatisticsManager, NumericPerformanceCalculator
 from experiments.k_fold_split import KFoldSplit
+from experiments.utils import init_numeric_performance_calculator
 from fault_detection import FaultGenerator, FaultRepair, DefectType, RepairAlgorithmType
 from sam_learning.core import LearnerDomain
 from solvers import ENHSPSolver
@@ -43,6 +44,7 @@ class ModelFaultDiagnosis:
     results_dir_path: Path
     model_domain_file_path: Path
     model_domain: Domain
+    numeric_performance_calc: NumericPerformanceCalculator
 
     def __init__(self, work_dir_path: Path, original_domain_file_name: str, fluents_map_path: Path):
         self.logger = logging.getLogger(__name__)
@@ -57,7 +59,7 @@ class ModelFaultDiagnosis:
         self.results_dir_path = work_dir_path / "results_directory"
         self.model_domain_file_path = self.working_directory_path / self.model_domain_file_name
         self.model_domain = DomainParser(domain_path=self.model_domain_file_path).parse_domain()
-        self._action_index = 0
+        self.numeric_performance_calc = None
         self.learning_statistics_manager = LearningStatisticsManager(
             working_directory_path=work_dir_path,
             domain_path=self.model_domain_file_path,
@@ -211,13 +213,15 @@ class ModelFaultDiagnosis:
         """
         self.logger.debug(f"Found a defected action! action - {faulty_action_name}")
         repaired_domain, report = self.fault_repair.repair_model(faulty_domain, valid_observations, faulty_observations,
-                                                         faulty_action_name, repair_algorithm_type)
+                                                                 faulty_action_name, repair_algorithm_type)
         used_observations = [*valid_observations, *faulty_observations]
+        self.numeric_performance_calc.learning_algorithm = REPAIR_TO_LEARNING_ALGORITHM[repair_algorithm_type]
         self.learning_statistics_manager.add_to_action_stats(used_observations, repaired_domain, report)
         self._export_domain(domain=repaired_domain, domain_directory_path=test_set_dir_path,
                             domain_file_name=None, is_faulty=False, defect_type=defect_type,
                             action_name=faulty_action_name, repair_type=repair_algorithm_type.name)
         learned_domain_file_path = test_set_dir_path / self.model_domain_file_name
+        self.numeric_performance_calc.calculate_performance(learned_domain_file_path, len(used_observations))
         return learned_domain_file_path
 
     def _run_repaired_model_on_test(self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str,
@@ -299,8 +303,6 @@ class ModelFaultDiagnosis:
             writer.writeheader()
             writer.writerows(action_diagnosis_stats)
 
-        self.learning_statistics_manager.export_action_learning_statistics(fold_number=self._action_index)
-
     def _run_single_fault_detection(
             self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action: str, faulty_domain: LearnerDomain,
             test_set_dir_path: Path, train_set_dir_path: Path, defect_type: DefectType,
@@ -366,7 +368,7 @@ class ModelFaultDiagnosis:
 
             self.logger.info("Finished running fault diagnosis on all the available approaches.")
             self._clear_domains(train_set_dir_path, test_set_dir_path)
-            self._action_index += 1
+            self.numeric_performance_calc.export_numeric_learning_performance()
             self.learning_statistics_manager.clear_statistics()
 
         self.logger.debug("Finished the fault diagnosis simulation!")
@@ -376,6 +378,9 @@ class ModelFaultDiagnosis:
     def run_fault_diagnosis(self) -> NoReturn:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
+        self.numeric_performance_calc = init_numeric_performance_calculator(self.working_directory_path,
+                                                                            self.model_domain_file_name,
+                                                                            LearningAlgorithmType.numeric_sam)
         for train_dir_path, test_dir_path in self.k_fold.create_k_fold():
             self.evaluate_fault_diagnosis(train_dir_path, test_dir_path)
 

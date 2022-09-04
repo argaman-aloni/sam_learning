@@ -11,6 +11,7 @@ from pddl_plus_parser.models import Observation
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
+from experiments.utils import init_numeric_performance_calculator
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, MultiAgentSAM
 from utilities import LearningAlgorithmType
@@ -75,20 +76,9 @@ class POL:
         """Initializes the algorithm of the numeric precision / recall calculator."""
         if self._learning_algorithm not in NUMERIC_ALGORITHMS:
             return
-
-        domain_path = self.working_directory_path / self.domain_file_name
-        model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
-        observations = []
-        for trajectory_file_path in self.working_directory_path.glob("*.trajectory"):
-            problem_path = self.working_directory_path / f"{trajectory_file_path.stem}.pddl"
-            problem = ProblemParser(problem_path, partial_domain).parse_problem()
-            new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
-            observations.append(new_observation)
-
-        self.numeric_performance_calc = NumericPerformanceCalculator(model_domain=model_domain,
-                                                                     observations=observations,
-                                                                     working_directory_path=self.working_directory_path,
-                                                                     learning_algorithm=self._learning_algorithm)
+        self.numeric_performance_calc = init_numeric_performance_calculator(self.working_directory_path,
+                                                                            self.domain_file_name,
+                                                                            self._learning_algorithm)
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.

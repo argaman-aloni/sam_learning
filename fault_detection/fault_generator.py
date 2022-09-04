@@ -52,7 +52,7 @@ class FaultGenerator:
         :param should_decrease: whether the expression should be decreased or increased.
         """
         node = expression.root
-        alter_by = random.randint(1, 20)
+        alter_by = random.randint(2, 20)
         while not node.is_leaf:
             node = node.children[1]
 

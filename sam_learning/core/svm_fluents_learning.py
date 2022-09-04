@@ -31,11 +31,7 @@ class SVMFluentsLearning(UnsafeFluentsLearning):
         :return: whether the row has been incorrectly classified. (and thus should remain for the next iteration)
         """
         feature_values = row_values[:-1]
-        class_column = row_values[-1]
-        if class_column == 1:
-            return sum(feature_values * coefficients) + intercept < 0  # positive class
-        else:
-            return sum(feature_values * coefficients) + intercept >= 0
+        return sum(feature_values * coefficients) + intercept < 1  # positive class
 
     def _remove_rows_with_accurate_classification(
             self, input_df: pd.DataFrame, coefficients: List[float], intercept: float) -> pd.DataFrame:
