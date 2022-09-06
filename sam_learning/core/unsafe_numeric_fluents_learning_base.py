@@ -137,7 +137,7 @@ class UnsafeFluentsLearning(ABC):
         return f"(+ {multiplication_parts[0]} {inner_layer})"
 
     def _create_inequality_constraint_strings(self, features_names: List[str], coefficients_path: List[List[float]],
-                                              intercepts_path: List[float]) -> List[str]:
+                                              intercepts_path: List[float], should_be_also_equal: bool = True) -> List[str]:
         """Creates the string representing f(x) + b >= 0 for each of the linear equations.
 
         Notice:
@@ -155,7 +155,8 @@ class UnsafeFluentsLearning(ABC):
                 continue
 
             coefficients_string = self._construct_linear_equation_string(multiplication_functions)
-            inequalities.add(f"(>= (+ {coefficients_string} {intercept_value}) 0.0)")
+            equality_sign = ">=" if should_be_also_equal else ">"
+            inequalities.add(f"({equality_sign} (+ {coefficients_string} {intercept_value}) 0.0)")
 
         if len(inequalities) == 0:
             return []

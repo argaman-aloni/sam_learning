@@ -17,8 +17,6 @@ class SAMLearner:
     partial_domain: LearnerDomain
     matcher: PredicatesMatcher
     observed_actions: List[str]
-    must_not_be_add_effect: Dict[str, Set[Predicate]]
-    must_not_be_delete_effect: Dict[str, Set[Predicate]]
 
     def __init__(self, partial_domain: Domain):
         self.logger = logging.getLogger(__name__)
@@ -26,8 +24,6 @@ class SAMLearner:
         self.matcher = PredicatesMatcher(partial_domain)
         self.observed_actions = []
         self.vocabulary_creator = VocabularyCreator()
-        self.must_not_be_add_effect = defaultdict(set)
-        self.must_not_be_delete_effect = defaultdict(set)
 
     def _reduce_constants_from_effects(self, grounded_action: ActionCall, lifted_add_effects: List[Predicate],
                                        lifted_delete_effects: List[Predicate]):
@@ -160,8 +156,6 @@ class SAMLearner:
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
-        self._update_must_not_be_effects(grounded_action, next_state, observed_objects)
-
         observed_action.add_effects.update(lifted_add_effects)
         observed_action.delete_effects.update(lifted_delete_effects)
 
@@ -204,16 +198,8 @@ class SAMLearner:
             grounded_action, previous_state, next_state)
 
         observed_action.add_effects.update(lifted_add_effects)
-        observed_action.add_effects.difference_update(self.must_not_be_add_effect[action_name])
         observed_action.delete_effects.update(lifted_delete_effects)
-        observed_action.delete_effects.difference_update(self.must_not_be_delete_effect[action_name])
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
-
-    def _update_must_not_be_effects(self, grounded_action, next_state, observed_objects):
-        self.must_not_be_add_effect[grounded_action.name].update(self._add_negative_predicates(
-            grounded_action, next_state, observed_objects))
-        self.must_not_be_delete_effect[grounded_action.name].update(self._add_positive_predicates(
-            grounded_action, next_state))
 
     def _verify_parameter_duplication(self, grounded_action: ActionCall) -> bool:
         """Verifies if the action was called with duplicated objects in a trajectory component.
@@ -254,7 +240,6 @@ class SAMLearner:
             self.add_new_action(grounded_action, previous_state, next_state, observed_objects)
 
         else:
-            self._update_must_not_be_effects(grounded_action, next_state, observed_objects)
             self.update_action(grounded_action, previous_state, next_state)
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
