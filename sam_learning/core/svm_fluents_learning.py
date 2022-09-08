@@ -31,8 +31,7 @@ class SVMFluentsLearning(UnsafeFluentsLearning):
         :return: whether the row has been incorrectly classified. (and thus should remain for the next iteration)
         """
         feature_values = row_values[:-1]
-        return sum(
-            feature_values * coefficients) + intercept < 0  # all the values in that the line equation does not fit
+        return sum(feature_values * coefficients) + intercept >= 0  # all the values in that the line equation holds
 
     def _remove_rows_with_accurate_classification(
             self, input_df: pd.DataFrame, coefficients: List[float], intercept: float) -> pd.DataFrame:
@@ -54,7 +53,7 @@ class SVMFluentsLearning(UnsafeFluentsLearning):
         :return: the coefficients and the intercept of the SVC model.
         """
         self.logger.info("Running linear SVC model to learn the fluents coefficients and inequalities intercept...")
-        svm_fluents_learning = LinearSVC(random_state=0, tol=1e-5)
+        svm_fluents_learning = LinearSVC(random_state=0, tol=1e-5, class_weight={1: 1, -1: 0.001})
         svm_fluents_learning.fit(dataframe.loc[:, dataframe.columns != CLASS_COLUMN], dataframe[CLASS_COLUMN])
         self.logger.debug("Model trained. Returning the coefficients and the intercept...")
         return svm_fluents_learning.coef_[0], svm_fluents_learning.intercept_[0]

@@ -2,7 +2,6 @@
 import argparse
 import csv
 import logging
-import os
 import random
 from collections import Counter
 from pathlib import Path
@@ -299,11 +298,6 @@ class ModelFaultDiagnosis:
         valid_observations, faulty_observations, faulty_train_stats = self._solve_and_validate(
             problems_dir_path=train_set_dir_path, domain_file_path=faulty_domain_path, domain_type="faulty",
             problems_type="train")
-
-        faulty_train_stats["action_name"] = faulty_action
-        faulty_train_stats["repair_method"] = repair_algorithm_type.name
-        faulty_train_stats["defect_type"] = defect_type.name
-        all_diagnosis_stats.append(faulty_train_stats)
         self._clear_plans(train_set_dir_path)
 
         if len(valid_observations) == 0:

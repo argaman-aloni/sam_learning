@@ -49,7 +49,7 @@ def test_calculate_expression_class_identifies_that_row_that_classified_correctl
 
     should_row_remain = svc_fluents_learning_zero_degree_polynom._calculate_expression_class(
         row_values, coefficients, intercept)
-    assert not should_row_remain
+    assert should_row_remain
 
 
 def test_remove_rows_with_accurate_classification_should_remove_one_line_the_only_one_with_correct_classification(
