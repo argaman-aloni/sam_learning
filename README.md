@@ -80,7 +80,8 @@ For example - _sattelite_fluents.json_.
   * `--domain_file_name` - The name of the domain file including extension.
   * `--learning_algorithm` - The learning algorithm to use.
   * `--fluents_map_path` - The path to the mapping file.
-  * `--use_metric_ff_solver` - Whether to use the metric-FF solver or the ENHSP solver.
+  * `--solver_type` - The type of planner to use - metric-FF, ENHSP or Fast Downward.
+  * `--executing_agents` - The name of the agents that are partaking in the execution (in case this is a MA problem).
 
 For more information, run the script with the `-h` flag.
 
