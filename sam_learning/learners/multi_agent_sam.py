@@ -113,7 +113,6 @@ class MultiAgentSAM(SAMLearner):
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         observed_action = self.partial_domain.actions[grounded_action.name]
         super()._add_new_action_preconditions(grounded_action, observed_action, observed_objects, previous_state)
-        super()._update_must_not_be_effects(grounded_action, next_state, observed_objects)
 
         self._handle_single_agent_action_effects(grounded_action, previous_state, next_state, num_operational_actions)
         self.observed_actions.append(observed_action.name)
@@ -133,7 +132,6 @@ class MultiAgentSAM(SAMLearner):
         self.logger.info(f"Updating the action {grounded_action.name}.")
         self._update_action_preconditions(grounded_action, previous_state)
 
-        super()._update_must_not_be_effects(grounded_action, next_state, observed_objects)
         self._handle_single_agent_action_effects(grounded_action, previous_state, next_state, num_operational_actions)
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 

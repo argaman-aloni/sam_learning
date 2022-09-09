@@ -14,7 +14,7 @@ from experiments.numeric_performance_calculator import NumericPerformanceCalcula
 from experiments.utils import init_numeric_performance_calculator
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, MultiAgentSAM
-from utilities import LearningAlgorithmType
+from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
@@ -47,7 +47,7 @@ class POL:
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
-                 use_metric_ff: bool = False, executing_agents: List[str] = None):
+                 solver_type: SolverType, executing_agents: List[str] = None):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
@@ -69,13 +69,14 @@ class POL:
         self.numeric_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
-            use_metric_ff=use_metric_ff)
+            solver_type=solver_type)
         self.executing_agents = executing_agents
 
     def _init_numeric_performance_calculator(self) -> NoReturn:
         """Initializes the algorithm of the numeric precision / recall calculator."""
         if self._learning_algorithm not in NUMERIC_ALGORITHMS:
             return
+
         self.numeric_performance_calc = init_numeric_performance_calculator(self.working_directory_path,
                                                                             self.domain_file_name,
                                                                             self._learning_algorithm)
@@ -183,9 +184,8 @@ def parse_arguments() -> argparse.Namespace:
                              "6: polynomial_sam")
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
                                                                    "fluents", default=None)
-    parser.add_argument("--use_metric_ff_solver", required=False,
-                        help="Whether or not to solve the problems using metric-FF", default=False,
-                        action=argparse.BooleanOptionalAction)
+    parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
+                        help="The solver that should be used for the sake of validation", default=3)
     parser.add_argument("--executing_agents", required=False, default=None,
                         help="In case of a multi-agent action model learning, the names of the agents that "
                              "are executing the actions")
@@ -203,7 +203,7 @@ def main():
                           domain_file_name=args.domain_file_name,
                           learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
                           fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-                          use_metric_ff=args.use_metric_ff_solver,
+                          solver_type=SolverType(args.solver_type),
                           executing_agents=executing_agents)
     offline_learner.run_cross_validation()
 

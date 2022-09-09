@@ -42,7 +42,7 @@ class DomainValidator:
     """
 
     logger: logging.Logger
-    solver: ENHSPSolver
+    solver: Union[ENHSPSolver, MetricFFSolver, FastDownwardSolver]
     solving_stats: List[Dict[str, Any]]
     aggregated_solving_stats: List[Dict[str, Any]]
     learning_algorithm: LearningAlgorithmType
@@ -50,9 +50,9 @@ class DomainValidator:
     results_dir_path: Path
 
     def __init__(self, working_directory_path: Path,
-                 learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, use_metric_ff: bool = False):
+                 learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, solver_type: SolverType):
         self.logger = logging.getLogger(__name__)
-        self.solver = MetricFFSolver() if use_metric_ff else ENHSPSolver()
+        self.solver = SOLVER_TYPES[solver_type]()
         self.solving_stats = []
         self.aggregated_solving_stats = []
         self.learning_algorithm = learning_algorithm
