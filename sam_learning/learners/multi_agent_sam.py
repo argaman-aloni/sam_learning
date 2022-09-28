@@ -60,8 +60,6 @@ class MultiAgentSAM(SAMLearner):
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         lifted_add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
         lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_del_effects))
-        if len(self.partial_domain.constants) > 0:
-            super()._reduce_constants_from_effects(grounded_action, lifted_add_effects, lifted_delete_effects)
 
         if number_operational_actions == 1:
             self.logger.debug(f"The action {grounded_action.name} is the only operational action in the trajectory.")

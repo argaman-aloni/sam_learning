@@ -8,7 +8,7 @@ from sam_learning.core import PredicatesMatcher
 from tests.consts import LOCATION_TYPE, AGENT_TYPE, WOODWORKING_DOMAIN_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
     TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, ELEVATORS_DOMAIN_PATH, \
     ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH, NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, \
-    DEPOT_NUMERIC_TRAJECTORY_PATH
+    DEPOT_NUMERIC_TRAJECTORY_PATH, COLOR_TYPE
 
 TRUCK_AT_LOCATION_GROUNDED_PREDICATE = GroundedPredicate(
     name="at",
@@ -149,6 +149,29 @@ def test_match_predicate_to_action_with_no_duplicated_parameters_with_consts_ret
 
     assert len(actual_predicates) == 1
     assert expected_predicate.untyped_representation == actual_predicates[0].untyped_representation
+
+
+def test_match_predicate_to_action_with_two_possible_options_for_match_one_with_constant_and_one_without_returns_two_options(
+        predicate_matcher_with_consts: PredicatesMatcher):
+    test_action_call = ActionCall(name="do-immersion-varnish",
+                                  grounded_parameters=["m1", "obj1", "natural", "rough"])
+    test_conflicting_predicate = GroundedPredicate(
+        name="colour",
+        signature={"?obj": PART_TYPE,
+                   "?color": COLOR_TYPE},
+        object_mapping={"?obj": "obj1", "?color": "natural"})
+    actual_predicates = predicate_matcher_with_consts.match_predicate_to_action_literals(
+        grounded_predicate=test_conflicting_predicate, action_call=test_action_call)
+    print([p.untyped_representation for p in actual_predicates])
+
+    expected_predicates = [
+        Predicate(name="colour", signature={"?x": PART_TYPE, "?newcolour": COLOR_TYPE}),
+        Predicate(name="colour", signature={"?x": PART_TYPE, "natural": COLOR_TYPE})
+    ]
+
+    assert len(actual_predicates) == 2
+    assert set([p.untyped_representation for p in actual_predicates]) == set(
+        [p.untyped_representation for p in expected_predicates])
 
 
 def test_match_predicate_to_action_with_no_duplicated_parameters_where_predicate_contains_only_consts_returns_correct_match(

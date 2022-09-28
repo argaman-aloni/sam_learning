@@ -9,6 +9,7 @@ EXAMPLES_DIR_PATH = Path(CWD, "examples")
 DOMAIN_NO_CONSTS_PATH = EXAMPLES_DIR_PATH / "domain-logistics.pddl"
 WOODWORKING_DOMAIN_PATH = EXAMPLES_DIR_PATH / "woodworking-domain.pddl"
 WOODWORKING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_problem.pddl"
+WOODWORKING_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "woodworking_trajectory.trajectory"
 NUMERIC_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_numeric.pddl"
 NUMERIC_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile2.pddl"
 ELEVATORS_DOMAIN_PATH = EXAMPLES_DIR_PATH / "elevators_domain.pddl"
@@ -41,6 +42,7 @@ CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)
 WOODOBJ_TYPE = PDDLType(name="woodobj", parent=OBJECT_TYPE)
 SURFACE_TYPE = PDDLType(name="surface", parent=OBJECT_TYPE)
 TREATMENT_STATUS_TYPE = PDDLType(name="treatmentstatus", parent=OBJECT_TYPE)
+COLOR_TYPE = PDDLType(name="acolour", parent=OBJECT_TYPE)
 PART_TYPE = PDDLType(name="part", parent=WOODOBJ_TYPE)
 TAXI_TYPE = PDDLType(name="taxi", parent=AGENT_TYPE)
 TRUCK_TYPE = PDDLType(name="truck", parent=AGENT_TYPE)

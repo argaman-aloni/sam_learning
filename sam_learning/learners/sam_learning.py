@@ -11,7 +11,10 @@ from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain,
 
 
 class SAMLearner:
-    """Class that represents the safe action model learner algorithm."""
+    """Class that represents the safe action model learner algorithm.
+
+    Notice: This class does not support domains with constants or with the same object mapped to multiple parameters.
+    """
 
     logger: logging.Logger
     partial_domain: LearnerDomain
@@ -24,33 +27,6 @@ class SAMLearner:
         self.matcher = PredicatesMatcher(partial_domain)
         self.observed_actions = []
         self.vocabulary_creator = VocabularyCreator()
-
-    def _reduce_constants_from_effects(self, grounded_action: ActionCall, lifted_add_effects: List[Predicate],
-                                       lifted_delete_effects: List[Predicate]):
-        """Removed predicates that contain constants from the effects of the action to not err and add extra effects.
-
-        :param grounded_action: the grounded action.
-        :param lifted_add_effects: the lifted add effects of the action.
-        :param lifted_delete_effects: the lifted delete effects of the action.
-        """
-        constants = list(self.partial_domain.constants.keys())
-        add_effects_to_remove = set()
-        for effect in lifted_add_effects:
-            for constant in constants:
-                if constant in effect.signature and constant in grounded_action.parameters:
-                    add_effects_to_remove.add(effect)
-
-        delete_effects_to_remove = set()
-        for effect in lifted_delete_effects:
-            for constant in constants:
-                if constant in effect.signature and constant in grounded_action.parameters:
-                    delete_effects_to_remove.add(effect)
-
-        for effect in add_effects_to_remove:
-            lifted_add_effects.remove(effect)
-
-        for effect in delete_effects_to_remove:
-            lifted_delete_effects.remove(effect)
 
     def _handle_action_effects(
             self, grounded_action: ActionCall, previous_state: State,
@@ -67,9 +43,6 @@ class SAMLearner:
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         lifted_add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
         lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_del_effects))
-        if len(self.partial_domain.constants) > 0:
-            self._reduce_constants_from_effects(grounded_action, lifted_add_effects, lifted_delete_effects)
-
         return lifted_add_effects, lifted_delete_effects
 
     def _update_action_preconditions(
@@ -124,20 +97,6 @@ class SAMLearner:
                 possible_negative_predicates.update(lifted_matches)
 
         return possible_negative_predicates
-
-    def _add_positive_predicates(self, grounded_action: ActionCall, state: State) -> Set[Predicate]:
-        """Adds positive predicates for the not possible delete effects vocabulary.
-
-        :param grounded_action: the action that was encountered.
-        :param state: the state in which the vocabulary is based on.
-        :return: the possible negative predicates that were added to the action.
-        """
-        possible_positive_predicates = set()
-        for predicate_set in state.state_predicates.values():
-            lifted_matches = self.matcher.get_possible_literal_matches(grounded_action, list(predicate_set))
-            possible_positive_predicates.update(lifted_matches)
-
-        return possible_positive_predicates
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State,
                        next_state: State, observed_objects: Dict[str, PDDLObject]) -> NoReturn:
