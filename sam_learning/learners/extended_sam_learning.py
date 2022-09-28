@@ -24,7 +24,7 @@ class ExtendedSAM(SAMLearner):
 
     def _extract_maybe_delete_effects(self, grounded_action: ActionCall, grounded_del_effects: Set[GroundedPredicate],
                                       must_be_delete_effects: List[Predicate]) -> NoReturn:
-        """Extracts the delete effects based on non injective matches.
+        """Extracts delete effects based on non injective matches.
 
         :param grounded_action: the action that is being handled.
         :param grounded_del_effects: the grounded predicates that were present in the pre-state and removed from the
@@ -41,7 +41,7 @@ class ExtendedSAM(SAMLearner):
 
             else:
                 self.logger.debug("Encountered a non injective match! adding to maybe delete effects.")
-                self.possible_delete_effects[grounded_action.name].add(effect)
+                self.possible_delete_effects[grounded_action.name].update(lifted_literal_matches)
 
     def _extract_maybe_add_effects(self, grounded_action: ActionCall, grounded_add_effects: Set[GroundedPredicate],
                                    must_be_add_effects: List[Predicate]) -> NoReturn:
@@ -60,7 +60,7 @@ class ExtendedSAM(SAMLearner):
 
             else:
                 self.logger.debug("Encountered a non injective match! adding to maybe add effects.")
-                self.possible_add_effects[grounded_action.name].add(effect)
+                self.possible_add_effects[grounded_action.name].update(lifted_literal_matches)
 
     def _extract_non_injective_matches(
             self, grounded_action: ActionCall,
@@ -75,6 +75,7 @@ class ExtendedSAM(SAMLearner):
             states.
         :return: the effects that are definitely add and delete effects (based on injective matching process).
         """
+        self.logger.debug(f"Extracting non injective matches of action {grounded_action.name}.")
         must_be_add_effects = []
         must_be_delete_effects = []
         self._extract_maybe_add_effects(grounded_action, grounded_add_effects, must_be_add_effects)
@@ -90,6 +91,7 @@ class ExtendedSAM(SAMLearner):
         :param grounded_action: the action that is being handled.
         :param state_predicates: the grounded predicates observed in the post state.
         """
+        self.logger.info(f"Removing impossible effects of action {grounded_action.name} based on rule 2 of SAM.")
         observed_predicates = set()
         for lifted_predicate, grounded_predicates in state_predicates.items():
             observed_predicates.update(grounded_predicates)
@@ -179,7 +181,13 @@ class ExtendedSAM(SAMLearner):
 
     def create_proxy_actions(self) -> NoReturn:
         """Create proxy actions to handle the non injective effects."""
-        pass
+        self.logger.info("Starting to create proxy actions.")
+        for action in self.partial_domain.actions.values():
+            self.possible_add_effects[action.name].difference_update(action.add_effects)
+            self.possible_delete_effects[action.name].difference_update(action.delete_effects)
+            if len(self.possible_add_effects[action.name]) > 0 or len(self.possible_delete_effects[action.name]) > 0:
+                self.logger.debug(f"Not all ambiguities were solved! Creating proxy actions for {action.name}.")
+                # TODO: complete this part.
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.

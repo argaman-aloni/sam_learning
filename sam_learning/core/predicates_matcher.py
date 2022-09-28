@@ -71,6 +71,10 @@ class PredicatesMatcher:
         """
         self.logger.info(f"Trying to match the grounded predicate - {grounded_predicate.untyped_representation} "
                          f"to the action call {str(action_call)}")
+        if len(grounded_predicate.signature) == 0:
+            self.logger.debug("The predicate has no parameters, by default matches the action!")
+            return [Predicate(name=grounded_predicate.name, signature={})]
+
         lifted_action_data = self.matcher_domain.actions[action_call.name]
         constants = self.matcher_domain.constants
         grounded_predicate_call = grounded_predicate.grounded_objects
