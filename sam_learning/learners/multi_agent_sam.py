@@ -4,20 +4,19 @@ from collections import defaultdict
 from typing import Dict, List, NoReturn, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, PDDLObject, NOP_ACTION, \
-    MultiAgentObservation, ActionCall, State
+    MultiAgentObservation, ActionCall, State, GroundedPredicate
 
-from sam_learning.core import LearnerDomain, extract_effects
+from sam_learning.core import LearnerDomain, extract_effects, MultiActionPredicateMatching
 from sam_learning.learners import SAMLearner
 
 
 class MultiAgentSAM(SAMLearner):
     """Class designated to learning action models from multi-agent trajectories with joint actions."""
     logger: logging.Logger
-    must_be_add_effects: Dict[str, Set[Predicate]]
-    must_be_delete_effects: Dict[str, Set[Predicate]]
     might_be_add_effects: Dict[str, Set[Predicate]]
     might_be_delete_effects: Dict[str, Set[Predicate]]
     preconditions_fluent_map: Dict[str, List[str]]
+    joint_actions: Dict[str, MultiActionPredicateMatching]
     concurrency_constraint: int
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
@@ -25,11 +24,10 @@ class MultiAgentSAM(SAMLearner):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
         self.observed_actions = []
-        self.must_be_add_effects = defaultdict(set)
-        self.must_be_delete_effects = defaultdict(set)
         self.might_be_add_effects = defaultdict(set)
         self.might_be_delete_effects = defaultdict(set)
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
+        self.joint_actions = {}
         self.concurrency_constraint = concurrency_constraint
 
     @staticmethod
@@ -45,6 +43,41 @@ class MultiAgentSAM(SAMLearner):
             return intersection_add_effects.union(new_observed_effects)
 
         return set(new_effects)
+
+    def _create_negative_grounded_predicates(
+            self, state: State, observed_objects: Dict[str, PDDLObject]) -> Set[GroundedPredicate]:
+        """
+
+        :param state:
+        :param observed_objects:
+        :return:
+        """
+        possible_negative_predicates = set()
+        vocabulary = self.vocabulary_creator.create_vocabulary(self.partial_domain, observed_objects)
+        for lifted_predicate_name, grounded_missing_predicates in vocabulary.items():
+            if lifted_predicate_name not in state.state_predicates:
+                possible_negative_predicates.update(grounded_missing_predicates)
+                continue
+
+            possible_negative_predicates.update([predicate for predicate in grounded_missing_predicates if predicate
+                                                 not in state.state_predicates[lifted_predicate_name]])
+
+        return possible_negative_predicates
+
+    def _add_positive_predicates(self, grounded_action: ActionCall, state: State) -> Set[Predicate]:
+        """Adds positice predicates that are observed in the state.
+
+        :param grounded_action: the action that was encountered.
+        :param state: the state belonging to the currently observed triplet.
+        :return: the lifted predicates that were observed in the state.
+        """
+        possible_positive_predicates = set()
+        for predicates in state.state_predicates.values():
+            lifted_matches = self.matcher.get_possible_literal_matches(
+                grounded_action, list(predicates))
+            possible_positive_predicates.update(lifted_matches)
+
+        return possible_positive_predicates
 
     def _handle_single_agent_action_effects(self, grounded_action: ActionCall, previous_state: State,
                                             next_state: State, number_operational_actions: int) -> NoReturn:
@@ -133,6 +166,98 @@ class MultiAgentSAM(SAMLearner):
         self._handle_single_agent_action_effects(grounded_action, previous_state, next_state, num_operational_actions)
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
+    def update_one_executed_action(self, executed_action: ActionCall, previous_state: State, next_state: State,
+                                   observed_objects: Dict[str, PDDLObject]) -> NoReturn:
+        """
+
+        :param executed_action:
+        :param previous_state:
+        :param next_state:
+        :param observed_objects:
+        :return:
+        """
+        negative_pre_state_predicates = super()._add_negative_predicates(executed_action, previous_state,
+                                                                         observed_objects)
+        pre_state_predicates = set()
+        for positive_predicates in previous_state.state_predicates.values():
+            pre_state_predicates.update(positive_predicates)
+
+        pre_state_predicates.update(negative_pre_state_predicates)
+        observed_action = self.partial_domain.actions[executed_action.name]
+        if executed_action.name not in self.observed_actions:
+            super().add_new_action(executed_action, previous_state, next_state, observed_objects)
+            return
+
+        super()._update_action_preconditions(executed_action, previous_state)
+        # now we observe the action again, we need to clear the action's ambiguities
+        negative_state_predicates = self._add_negative_predicates(executed_action, next_state, observed_objects)
+        lifted_add_effects, lifted_delete_effects = super()._handle_action_effects(
+            executed_action, previous_state, next_state)
+        observed_action.add_effects.update(lifted_add_effects)
+        observed_action.delete_effects.update(lifted_delete_effects)
+
+        add_effects_to_remove = set(lifted_add_effects).union(negative_state_predicates)
+        delete_effects_to_remove = set(lifted_delete_effects).union(
+            self._add_positive_predicates(executed_action, next_state))
+        for effect_to_remove in add_effects_to_remove:
+            self.might_be_add_effects[observed_action.name].discard(effect_to_remove)
+
+        for delete_effect in delete_effects_to_remove:
+            self.might_be_delete_effects[observed_action.name].discard(delete_effect)
+
+    def update_multiple_executed_actions(
+            self, joint_actions: List[ActionCall], previous_state: State, next_state: State,
+            objects: Dict[str, PDDLObject], agents: List[str]) -> NoReturn:
+        """
+
+        :param joint_actions:
+        :param previous_state:
+        :param next_state:
+        :param objects:
+        :param agents:
+        :return:
+        """
+        for agent_name, single_agent_action in zip(agents, joint_actions):
+            if single_agent_action.name == NOP_ACTION:
+                self.logger.debug(f"The agent {agent_name} did not perform an action in this joint action triplet.")
+                continue
+
+            self._update_action_preconditions(single_agent_action, previous_state)
+
+        positive_next_state_predicates = set()
+        for positive_predicates in next_state.state_predicates.values():
+            positive_next_state_predicates.update(positive_predicates)
+
+        negative_state_predicates = self._create_negative_grounded_predicates(next_state, objects)
+        # calculate action(l) for each literal in the post state - first for the positive literals and then the negative
+        for literal in positive_next_state_predicates:
+            if not self.is_add_effect(previous_state, literal):
+                continue
+
+            interacting_actions = self._get_interacting_actions(literal, joint_actions)
+            if len(interacting_actions) == 0:
+                self.logger.debug(f"No action interacts with the literal {literal.untyped_representation}.")
+                continue
+
+            if len(interacting_actions) == 1:
+                interacting_action = self.partial_domain.actions[interacting_actions[0].name]
+                interacting_action.add_effects.add(literal)
+                continue
+
+            self.logger.debug(f"More than one action is interacting with - {literal.untyped_representation}!")
+            joint_action_name = ",".join([action.name for action in interacting_actions])
+            domain_predicate = self.partial_domain.predicates[literal.name]
+            literal_constraints = {domain_predicate: [self.matcher.match_predicate_to_action_literals(literal, action)
+                                   for action in interacting_actions]}
+            if joint_action_name not in self.joint_actions:
+                multi_action_predicate_matching = MultiActionPredicateMatching()
+                multi_action_predicate_matching.positive_predicates.append(literal_constraints)
+                self.joint_actions[joint_action_name] = multi_action_predicate_matching
+
+            else:
+                self.joint_actions[joint_action_name].positive_predicates.append(literal_constraints)
+
+
     def handle_multi_agent_trajectory_component(
             self, component: MultiAgentComponent, objects: Dict[str, PDDLObject], agents: List[str]) -> NoReturn:
         """Handles a single multi agent triplet in the observed trajectory.
@@ -146,24 +271,19 @@ class MultiAgentSAM(SAMLearner):
         next_state = component.next_state
 
         action_count = joint_action.action_count
-        for agent_name, single_agent_action in zip(agents, joint_action.actions):
-            if single_agent_action.name == NOP_ACTION:
-                self.logger.debug(f"The agent {agent_name} did not perform an action in this joint action triplet.")
-                continue
+        if action_count == 1:
+            executing_action = None
+            self.logger.debug(f"The trajectory component contains a single action!")
+            for agent_name, single_agent_action in zip(agents, joint_action.actions):
+                if single_agent_action.name != NOP_ACTION:
+                    executing_action = single_agent_action
+                    break
 
-            if self._verify_parameter_duplication(single_agent_action):
-                self.logger.warning(f"{str(single_agent_action)} contains duplicated parameters!")
-                continue
+            self.update_one_executed_action(executing_action, previous_state, next_state, objects)
+            return
 
-            if single_agent_action.name not in self.observed_actions:
-                self.logger.debug(f"Agent - {agent_name} performed the action - {single_agent_action.name} "
-                                  f"which was not observed yet.")
-                self.add_new_single_agent_action(single_agent_action, previous_state, next_state, objects, action_count)
-
-            else:
-                self.logger.debug(f"Agent - {agent_name} performed the action - {single_agent_action.name}. "
-                                  f"Updating the action's data.")
-                self.update_single_agent_action(single_agent_action, previous_state, next_state, action_count, objects)
+        self.logger.debug("More than one action is being executed in the current triplet.")
+        self.update_multiple_executed_actions(joint_action.actions, previous_state, next_state, objects, agents)
 
     def learn_combined_action_model(self, observations: List[MultiAgentObservation],
                                     agent_names: List[str]) -> Tuple[LearnerDomain, Dict[str, str]]:

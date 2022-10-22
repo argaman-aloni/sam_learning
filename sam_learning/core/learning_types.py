@@ -3,7 +3,7 @@ from enum import Enum
 
 
 class ConditionType(Enum):
-    injunctive = 1
+    conjunctive = 1
     disjunctive = 2
 
 

@@ -5,6 +5,7 @@ import math
 import os
 from collections import defaultdict
 from pathlib import Path
+import pandas as pd
 from typing import Dict, List, NoReturn, Tuple, Optional
 
 import matplotlib.pyplot as plt
@@ -156,7 +157,7 @@ class NumericFluentStateStorage:
                 functions_equality_strings.append(f"(= {function_variable} {value})")
 
             concatenated_str = " ".join(functions_equality_strings)
-            return [concatenated_str], ConditionType.injunctive
+            return [concatenated_str], ConditionType.conjunctive
 
         injunctive_conditions = []
         for state_values in previous_state_matrix:
@@ -240,7 +241,7 @@ class NumericFluentStateStorage:
         max_value = max(self.previous_state_storage.get(relevant_fluent, [0]))
         conditions = [f"(>= {relevant_fluent} {min_value})", f"(<= {relevant_fluent} {max_value})"]
         conditions.extend(equality_strs)
-        return conditions, ConditionType.injunctive
+        return conditions, ConditionType.conjunctive
 
     def _filter_constant_features(self, previous_state_matrix: np.ndarray, relevant_fluents: List[str]) -> Tuple[
         np.ndarray, List[str], List[str]]:
@@ -352,6 +353,20 @@ class NumericFluentStateStorage:
 
         return non_convexed_conditions, filtered_previous_state_matrix, remained_fluents
 
+    def search_for_constant_values_in_pre_states(self) -> List[str]:
+        """Search for columns that might contain constant values and sets them as an additional condition.
+
+        :return: the additional conditions that were found.
+        """
+        df = pd.DataFrame(data=self.previous_state_storage)
+        constant_column_names = df.columns[df.nunique() <= 1]
+        constant_values_constraints = []
+        for column_name in constant_column_names:
+            self.logger.debug(f"The column {column_name} contains a single value.")
+            constant_values_constraints.append(f"(= {column_name} {df[column_name].iloc[0]})")
+
+        return constant_values_constraints
+
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.
 
@@ -413,7 +428,7 @@ class NumericFluentStateStorage:
         inequalities_strs = self._construct_pddl_inequality_scheme(A, b, remained_fluents)
         inequalities_strs.extend(equality_strs)
 
-        return inequalities_strs, ConditionType.injunctive
+        return inequalities_strs, ConditionType.conjunctive
 
     def construct_assignment_equations(self) -> List[str]:
         """Constructs the assignment statements for the action according to the changed value functions.

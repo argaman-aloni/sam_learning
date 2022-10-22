@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, NoReturn
 
 FAST_DOWNWARD_DIR_PATH = os.environ["FAST_DOWNWARD_DIR_PATH"]
 
@@ -16,6 +16,18 @@ class FastDownwardSolver:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+
+    @staticmethod
+    def _remove_cost_from_file(solution_path: Path) -> NoReturn:
+        """Removes the line that contains the plan cost from the plan file because the framework does not support it.
+
+        :param solution_path: the path to the solution file.
+        """
+        with open(solution_path, "r") as solution_file:
+            solution_lines = solution_file.readlines()
+
+        with open(solution_path, "w") as solution_file:
+            solution_file.writelines(solution_lines[:-1])
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
         """Runs the Fast Downward solver on all the problems in the given directory.
@@ -41,6 +53,7 @@ class FastDownwardSolver:
                 subprocess.check_output(run_command, shell=True)
                 self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
                 solving_stats[problem_file_path.stem] = "ok"
+                self._remove_cost_from_file(solution_path)
 
             except subprocess.CalledProcessError as e:
                 if e.returncode == 23:

@@ -57,7 +57,7 @@ class PlanMinerExperimentRunner:
             else:
                 learner_domain.actions[action_name].numeric_preconditions = (
                     [precondition.to_pddl() for precondition in action_data.numeric_preconditions],
-                    ConditionType.injunctive)
+                    ConditionType.conjunctive)
             learner_domain.actions[action_name].add_effects = action_data.add_effects
             learner_domain.actions[action_name].delete_effects = action_data.delete_effects
             learner_domain.actions[action_name].numeric_effects = [effect.to_pddl() for effect in

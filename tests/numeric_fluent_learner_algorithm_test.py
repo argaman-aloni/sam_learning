@@ -348,6 +348,29 @@ def test_construct_assignment_equations_only_one_observation_raises_not_safe_err
         load_action_state_fluent_storage.construct_assignment_equations()
 
 
+def test_construct_assignment_equations_with_reviewer_possible_observation_should_work_combined_with_constraints(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    # Note the function that we are trying to calculate is y[i+1] = y[i] + 10 * x[i]
+    # In this setting we create an observation where x[i] = 2 constantly but y[i] = 1, 2, 3, 4
+    LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(2)
+    for i in range(1, 5):
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(i)
+        simple_prev_state_fluents = {
+            "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_previous_state_storage(simple_prev_state_fluents)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(i + 10 * 2)
+        simple_next_state_fluents = {
+            "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+            "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
+        }
+        load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
+
+    print(load_action_state_fluent_storage.construct_assignment_equations())
+    print(load_action_state_fluent_storage.search_for_constant_values_in_pre_states())
+
+
 def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_degraded_conditions(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
@@ -361,7 +384,7 @@ def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_de
     load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
     output_conditions, condition_type = load_action_state_fluent_storage.construct_safe_linear_inequalities(
         ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"])
-    assert condition_type == ConditionType.injunctive
+    assert condition_type == ConditionType.conjunctive
     assert output_conditions == ["(= (fuel-cost ) 34.0) (= (load_limit ?z) 411.0) (= (current_load ?z) 121.0)"]
 
 
@@ -456,7 +479,7 @@ def test_construct_safe_linear_inequalities_with_one_dimension_variable_select_m
     assert set(output_conditions) == set(expected_conditions)
 
 
-def test_construct_safe_linear_when_not_given_relevant_fluents_uses_all_variables_in_previous_state(
+def test_construct_safe_linear_inequalities_when_not_given_relevant_fluents_uses_all_variables_in_previous_state(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     pre_state_input_values = [(-19.0, 32.0), (14.0, 52.0), (28.0, 12.0), (-7.0, 13.0)]
     for fuel_cost_val, current_limit_val in pre_state_input_values:

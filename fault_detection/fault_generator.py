@@ -182,7 +182,7 @@ class FaultGenerator:
             faulty_domain_action.positive_preconditions = original_action.positive_preconditions
             faulty_domain_action.inequality_preconditions = original_action.inequality_preconditions
             numeric_preconditions = [precond.to_pddl() for precond in original_action.numeric_preconditions]
-            faulty_domain_action.numeric_preconditions = (numeric_preconditions, ConditionType.injunctive)
+            faulty_domain_action.numeric_preconditions = (numeric_preconditions, ConditionType.conjunctive)
             faulty_domain_action.add_effects = original_action.add_effects
             faulty_domain_action.delete_effects = original_action.delete_effects
             numeric_effects = [effect.to_pddl() for effect in original_action.numeric_effects]

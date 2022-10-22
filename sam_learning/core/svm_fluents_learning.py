@@ -85,4 +85,4 @@ class SVMFluentsLearning(UnsafeFluentsLearning):
 
         return self._create_inequality_constraint_strings(
             feature_names, coefficients_route,
-            intercept_route, should_be_also_equal=False), ConditionType.injunctive
+            intercept_route, should_be_also_equal=False), ConditionType.conjunctive
