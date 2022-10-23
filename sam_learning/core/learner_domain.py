@@ -30,7 +30,6 @@ class LearnerAction:
         self.negative_preconditions = set()
         self.inequality_preconditions = set()
         self.numeric_preconditions = tuple()
-        self.numeric_constant_constraints = []
         self.add_effects = set()
         self.delete_effects = set()
         self.numeric_effects = []
@@ -71,15 +70,6 @@ class LearnerAction:
             inequality_precondition_str += "\n"
         return inequality_precondition_str
 
-    def _extract_constants_constraints(self) -> str:
-        """Extracts the constants constraints from the action.
-
-        :return: the string containing the constants constraints.
-        """
-        if len(self.numeric_constant_constraints) > 0:
-            return "\t\t\n".join(self.numeric_constant_constraints)
-        return ""
-
     def _extract_numeric_preconditions(self, positive_preconditions, negative_preconditions, precondition_str) -> str:
         """Extract the numeric preconditions from the action.
 
@@ -97,7 +87,6 @@ class LearnerAction:
         return f"(and {' '.join(positive_preconditions)}\n" \
                f"\t\t{' '.join(negative_preconditions)}\n" \
                f"\t\t{precondition_str}" \
-               f"{self._extract_constants_constraints()}" \
                f"\t\t{numeric_preconditions_str})"
 
     def _preconditions_to_pddl(self) -> str:

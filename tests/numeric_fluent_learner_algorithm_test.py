@@ -348,12 +348,12 @@ def test_construct_assignment_equations_only_one_observation_raises_not_safe_err
         load_action_state_fluent_storage.construct_assignment_equations()
 
 
-def test_construct_assignment_equations_with_reviewer_possible_observation_should_work_combined_with_constraints(
+def test_construct_assignment_equations_with_reviewer_possible_observation_should_not_work(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     # Note the function that we are trying to calculate is y[i+1] = y[i] + 10 * x[i]
     # In this setting we create an observation where x[i] = 2 constantly but y[i] = 1, 2, 3, 4
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(2)
-    for i in range(1, 5):
+    for i in range(1, 10):
         CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(i)
         simple_prev_state_fluents = {
             "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
@@ -367,8 +367,8 @@ def test_construct_assignment_equations_with_reviewer_possible_observation_shoul
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    print(load_action_state_fluent_storage.construct_assignment_equations())
-    print(load_action_state_fluent_storage.search_for_constant_values_in_pre_states())
+    with raises(NotSafeActionError):
+        load_action_state_fluent_storage.construct_assignment_equations()
 
 
 def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_degraded_conditions(

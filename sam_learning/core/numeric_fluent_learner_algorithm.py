@@ -48,9 +48,11 @@ class NumericFluentStateStorage:
 
         :param values_matrix: the matrix constructed based on the observations.
         """
-        num_dimensions = values_matrix.shape[1]
-        _, indices = sympy.Matrix(values_matrix).T.rref()
-        independent_rows_matrix = np.array([values_matrix[index] for index in indices])
+        num_dimensions = values_matrix.shape[1] + 1
+        num_rows = values_matrix.shape[0]
+        values_matrix_with_bias = np.c_[values_matrix, np.ones(num_rows)]
+        _, indices = sympy.Matrix(values_matrix_with_bias).T.rref()
+        independent_rows_matrix = np.array([values_matrix_with_bias[index] for index in indices])
         if independent_rows_matrix.shape[0] >= num_dimensions:
             return
 
@@ -352,20 +354,6 @@ class NumericFluentStateStorage:
             non_convexed_conditions.extend(equality_strs)
 
         return non_convexed_conditions, filtered_previous_state_matrix, remained_fluents
-
-    def search_for_constant_values_in_pre_states(self) -> List[str]:
-        """Search for columns that might contain constant values and sets them as an additional condition.
-
-        :return: the additional conditions that were found.
-        """
-        df = pd.DataFrame(data=self.previous_state_storage)
-        constant_column_names = df.columns[df.nunique() <= 1]
-        constant_values_constraints = []
-        for column_name in constant_column_names:
-            self.logger.debug(f"The column {column_name} contains a single value.")
-            constant_values_constraints.append(f"(= {column_name} {df[column_name].iloc[0]})")
-
-        return constant_values_constraints
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
         """Adds the matched lifted state fluents to the previous state storage.

@@ -93,8 +93,6 @@ class NumericSAMLearner(SAMLearner):
                         self.preconditions_fluent_map[action_name])
 
                 action.numeric_effects = self.storage[action_name].construct_assignment_equations()
-                constant_values_constraints = self.storage[action_name].search_for_constant_values_in_pre_states()
-                action.numeric_constant_constraints = constant_values_constraints
                 allowed_actions[action_name] = action
                 learning_metadata[action_name] = "OK"
 

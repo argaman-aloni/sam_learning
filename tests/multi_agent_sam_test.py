@@ -77,7 +77,7 @@ def test_add_new_single_agent_action_adds_new_predicates_and_learns_the_add_effe
     ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
                                        num_actions)
     assert "do-plane" in ma_sam.partial_domain.actions
-    add_effects = [p.untyped_representation for p in ma_sam.might_be_add_effects["do-plane"]]
+    add_effects = [p.untyped_representation for p in ma_sam.positive_literals_cnf["do-plane"]]
     assert {"(surface-condition ?x smooth)", "(colour ?x natural)", "(treatment ?x untreated)"}.issuperset(add_effects)
 
 
@@ -93,7 +93,7 @@ def test_add_new_single_agent_action_adds_new_predicates_and_learns_the_delete_e
     ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
                                        num_actions)
     assert "do-plane" in ma_sam.partial_domain.actions
-    delete_effects = [p.untyped_representation for p in ma_sam.might_be_delete_effects["do-plane"]]
+    delete_effects = [p.untyped_representation for p in ma_sam.negative_literals_cnf["do-plane"]]
     assert {"(treatment ?x ?oldtreatment)", "(surface-condition ?x ?oldsurface)", "(colour ?x ?oldcolour)"}.issuperset(
         delete_effects)
 
@@ -136,7 +136,7 @@ def test_update_single_agent_action_updates_action_with_correct_add_effects(
     next_state = component.next_state
     ma_sam.update_single_agent_action(do_plane_second_action_call, previous_state, next_state, num_actions,
                                       observed_objects)
-    add_effects = [p.untyped_representation for p in ma_sam.might_be_add_effects["do-plane"]]
+    add_effects = [p.untyped_representation for p in ma_sam.positive_literals_cnf["do-plane"]]
     assert {"(surface-condition ?x smooth)", "(colour ?x natural)", "(treatment ?x untreated)"}.issuperset(add_effects)
 
 
@@ -156,7 +156,7 @@ def test_update_single_agent_action_updates_action_with_correct_delete_effects(
     next_state = component.next_state
     ma_sam.update_single_agent_action(do_plane_second_action_call, previous_state, next_state, num_actions,
                                       observed_objects)
-    delete_effects = [p.untyped_representation for p in ma_sam.might_be_delete_effects["do-plane"]]
+    delete_effects = [p.untyped_representation for p in ma_sam.negative_literals_cnf["do-plane"]]
     assert {"(treatment ?x ?oldtreatment)", "(surface-condition ?x ?oldsurface)", "(colour ?x ?oldcolour)"}.issuperset(
         delete_effects)
 

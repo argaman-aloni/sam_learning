@@ -8,7 +8,7 @@ from .numeric_utils import construct_multiplication_strings, prettify_coefficien
     construct_linear_equation_string, construct_non_circular_assignment
 from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
-from .multi_agent_action_predicate_matcher import MultiActionPredicateMatching
+from .literals_cnf import LiteralCNF
 from .predicates_matcher import PredicatesMatcher
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
