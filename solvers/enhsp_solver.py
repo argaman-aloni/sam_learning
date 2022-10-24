@@ -5,7 +5,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, NoReturn
+from typing import Dict
 
 from jdk4py import JAVA
 
@@ -28,7 +28,7 @@ class ENHSPSolver:
         self.logger = logging.getLogger(__name__)
 
     def _run_enhsp_process(self, run_command: str, problem_file_path: Path,
-                           solving_stats: Dict[str, str]) -> NoReturn:
+                           solving_stats: Dict[str, str]) -> None:
         """Runs the ENHSP process and monitors its execution time.
 
         :param run_command: the command to run the ENHSP process.

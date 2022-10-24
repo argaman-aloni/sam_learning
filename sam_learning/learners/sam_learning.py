@@ -2,7 +2,7 @@
 import logging
 from collections import defaultdict
 from itertools import combinations
-from typing import List, Tuple, NoReturn, Dict, Set
+from typing import List, Tuple, Dict, Set
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
 
@@ -46,7 +46,7 @@ class SAMLearner:
         return lifted_add_effects, lifted_delete_effects
 
     def _update_action_preconditions(
-            self, grounded_action: ActionCall, previous_state: State) -> NoReturn:
+            self, grounded_action: ActionCall, previous_state: State) -> None:
         """Updates the preconditions of an action after it was observed at least once.
 
         :param grounded_action: the grounded action that is being executed in the trajectory component.
@@ -99,7 +99,7 @@ class SAMLearner:
         return possible_negative_predicates
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State,
-                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> NoReturn:
+                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> None:
         """Create a new action in the domain.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
@@ -122,7 +122,7 @@ class SAMLearner:
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
 
     def _add_new_action_preconditions(self, grounded_action: ActionCall, observed_action: LearnerAction,
-                                      observed_objects: Dict[str, PDDLObject], previous_state: State) -> NoReturn:
+                                      observed_objects: Dict[str, PDDLObject], previous_state: State) -> None:
         """General method to add new action's discrete preconditions.
 
         :param grounded_action: the action that is currently being executed.
@@ -142,7 +142,7 @@ class SAMLearner:
         observed_action.negative_preconditions.update(negative_predicates)
 
     def update_action(
-            self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
+            self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
@@ -180,7 +180,7 @@ class SAMLearner:
         return has_duplicates
 
     def handle_single_trajectory_component(self, component: ObservedComponent,
-                                           observed_objects: Dict[str, PDDLObject]) -> NoReturn:
+                                           observed_objects: Dict[str, PDDLObject]) -> None:
         """Handles a single trajectory component as a part of the learning process.
 
         :param component: the trajectory component that is being handled at the moment.
@@ -216,7 +216,7 @@ class SAMLearner:
         learning_report = {action_name: "OK" for action_name in self.partial_domain.actions}
         return self.partial_domain, learning_report
 
-    def deduce_initial_inequality_preconditions(self) -> NoReturn:
+    def deduce_initial_inequality_preconditions(self) -> None:
         """Tries to deduce which objects in the actions' signature cannot be equal."""
         self.logger.debug("Starting to deduce inequality preconditions")
         for action_name, action_data in self.partial_domain.actions.items():

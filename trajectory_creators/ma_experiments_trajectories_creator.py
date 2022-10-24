@@ -3,14 +3,11 @@ import logging
 import shutil
 import sys
 from pathlib import Path
-from typing import NoReturn, List
+from typing import List
 
-from pddl_plus_parser.exporters import MetricFFParser, TrajectoryExporter, ENHSPParser
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.multi_agent import MultiAgentDomainsConverter, MultiAgentProblemsConverter, PlanConverter, \
     MultiAgentTrajectoryExporter
-
-from utilities import SolverType
 
 
 class MAExperimentTrajectoriesCreator:
@@ -20,7 +17,7 @@ class MAExperimentTrajectoriesCreator:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def _copy_domain_files(self, problem_folder: Path, output_folder: Path) -> NoReturn:
+    def _copy_domain_files(self, problem_folder: Path, output_folder: Path) -> None:
         """Copies the domain files to the output folder.
 
         :param problem_folder: the folder containing the problems and the domains.
@@ -39,7 +36,7 @@ class MAExperimentTrajectoriesCreator:
                     output_folder / f"pfile_{problem_folder_name}.trajectory")
 
     def create_domain_trajectories(self, problems_directory: Path, plans_directory: Path, output_folder: Path,
-                                   agent_names: List[str], planner_prefix: str) -> NoReturn:
+                                   agent_names: List[str], planner_prefix: str) -> None:
         """Creates the domain trajectory files."""
         for problem_folder in problems_directory.glob("*"):
             self.logger.info(f"Creating trajectories for {problem_folder.stem}")

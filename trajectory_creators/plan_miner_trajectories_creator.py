@@ -2,7 +2,6 @@
 import logging
 import sys
 from pathlib import Path
-from typing import NoReturn
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import Operator
@@ -23,7 +22,7 @@ class PlanMinerTrajectoriesCreator:
         self.working_directory_path = working_directory_path
         self.logger = logging.getLogger(__name__)
 
-    def create_plan_miner_trajectories(self) -> NoReturn:
+    def create_plan_miner_trajectories(self) -> None:
         """Creates the trajectories in the format file that PlanMiner requires.."""
         domain_file_path = self.working_directory_path / self.domain_file_name
         domain = DomainParser(domain_file_path).parse_domain()

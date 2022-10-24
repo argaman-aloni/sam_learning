@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, NoReturn
+from typing import Dict
 
 FAST_DOWNWARD_DIR_PATH = os.environ["FAST_DOWNWARD_DIR_PATH"]
 
@@ -18,7 +18,7 @@ class FastDownwardSolver:
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
-    def _remove_cost_from_file(solution_path: Path) -> NoReturn:
+    def _remove_cost_from_file(solution_path: Path) -> None:
         """Removes the line that contains the plan cost from the plan file because the framework does not support it.
 
         :param solution_path: the path to the solution file.

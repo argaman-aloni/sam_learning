@@ -1,6 +1,6 @@
 """Module that learns polynomial preconditions and effects from a domain."""
 import itertools
-from typing import Dict, NoReturn, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy
 from pddl_plus_parser.models import PDDLFunction
@@ -45,7 +45,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
         return self._create_polynomial_string_recursive(fluents)
 
     def _add_polynom_to_storage(self, state_fluents: Dict[str, PDDLFunction],
-                                storage: Dict[str, List[float]]) -> NoReturn:
+                                storage: Dict[str, List[float]]) -> None:
         """Adds the polynomial representation of the state fluents to the storage.
 
         :param state_fluents: the numeric fluents present in the input state.
@@ -65,7 +65,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
                 values = [state_fluents[fluent].value for fluent in fluent_combination]
                 self.previous_state_storage[polynomial_fluent].append(numpy.prod(values))
 
-    def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+    def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the previous state storage.
 
         :param state_fluents: the lifted state fluents that were matched for the action.
@@ -76,7 +76,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
 
         self._add_polynom_to_storage(state_fluents, self.previous_state_storage)
 
-    def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+    def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the next state storage.
 
         :param state_fluents: the lifted state fluents that were matched for the action.

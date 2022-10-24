@@ -1,6 +1,6 @@
 """Extension to SAM Learning that can learn numeric state variables."""
 
-from typing import List, NoReturn, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional
 
 from pddl_plus_parser.models import Observation, ActionCall, State, Domain, PDDLObject
 
@@ -23,7 +23,7 @@ class NumericSAMLearner(SAMLearner):
         self.preconditions_fluent_map = preconditions_fluent_map
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State,
-                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> NoReturn:
+                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> None:
         """Adds a new action to the learned domain.
 
         :param grounded_action: the grounded action that was executed according to the observation.
@@ -44,7 +44,7 @@ class NumericSAMLearner(SAMLearner):
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
 
     def update_action(
-            self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
+            self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Updates the action's data according to the new input observed triplet.
 
         :param grounded_action: the grounded action that was observed.
@@ -115,7 +115,7 @@ class PolynomialSAMLearning(NumericSAMLearner):
         self.polynom_degree = polynomial_degree
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State,
-                       observed_objects: Dict[str, PDDLObject]) -> NoReturn:
+                       observed_objects: Dict[str, PDDLObject]) -> None:
         """Adds a new action to the learned domain.
 
         :param grounded_action: the grounded action that was executed according to the observation.

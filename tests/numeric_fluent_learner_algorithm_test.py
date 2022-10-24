@@ -1,4 +1,6 @@
 """Module test for the numeric state storage."""
+import random
+
 import numpy as np
 from pddl_plus_parser.lisp_parsers import PDDLTokenizer
 from pddl_plus_parser.models import construct_expression_tree, NumericalExpressionTree
@@ -15,6 +17,7 @@ TEST_DOMAIN_FUNCTIONS = {
     "fuel-cost": FUEL_COST_FUNCTION
 }
 
+random.seed(0)
 
 @fixture()
 def load_action_state_fluent_storage() -> NumericFluentStateStorage:
@@ -214,9 +217,11 @@ def test_construct_pddl_inequality_scheme_with_simple_3d_four_equations_returns_
 
 def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_in_variables_returns_empty_list(
         load_action_state_fluent_storage: NumericFluentStateStorage):
-    for i in range(3):
-        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(i + 1)
-        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(i)
+    for i in range(4):
+        random_prev_load_limit = random.randint(0, 100)
+        random_prev_current_load = random.randint(0, 100)
+        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(random_prev_load_limit)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(random_prev_current_load)
         simple_prev_state_fluents = {
             "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
             "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION
@@ -230,10 +235,12 @@ def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_
 
 def test_construct_assignment_equations_when_change_is_caused_by_constant_returns_correct_value(
         load_action_state_fluent_storage: NumericFluentStateStorage):
-    # This tests is meant to validate that cases such as (assign (battery-level ?r) 10) can be handled.
+    # This test is meant to validate that cases such as (assign (battery-level ?r) 10) can be handled.
     for i in range(3):
-        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(i + 1)
-        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(i)
+        random_prev_load_limit = random.randint(0, 100)
+        random_prev_current_load = random.randint(0, 100)
+        LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(random_prev_load_limit)
+        CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(random_prev_current_load)
         simple_prev_state_fluents = {
             "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
             "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION

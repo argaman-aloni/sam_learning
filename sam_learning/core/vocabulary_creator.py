@@ -43,7 +43,7 @@ class VocabularyCreator:
 
     def create_vocabulary(self, domain: Union[LearnerDomain, Domain],
                           observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
-        """Create a vocabulary of random combinations of the actions' parameters.
+        """Create a vocabulary of random combinations of the predicates parameters and objects.
 
         :param domain: the domain containing the predicates and the action signatures.
         :param observed_objects: the objects that were observed in the trajectory.

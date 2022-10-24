@@ -4,7 +4,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, NoReturn
+from typing import Dict
 
 from pddl_plus_parser.exporters import MetricFFParser
 
@@ -23,7 +23,7 @@ class MetricFFSolver:
         self.parser = MetricFFParser()
 
     def _run_metric_ff_process(self, run_command: str, solution_path: Path,
-                               problem_file_path: Path, solving_stats: Dict[str, str]) -> NoReturn:
+                               problem_file_path: Path, solving_stats: Dict[str, str]) -> None:
         """Runs the metric-ff process."""
         self.logger.info(f"Metric-FF solver is working on - {problem_file_path.stem}")
         process = subprocess.Popen(run_command, shell=True)

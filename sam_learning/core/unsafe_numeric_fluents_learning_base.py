@@ -3,7 +3,7 @@ import itertools
 import logging
 from abc import ABC
 from collections import defaultdict
-from typing import Dict, List, NoReturn, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy
 import pandas as pd
@@ -45,7 +45,7 @@ class UnsafeFluentsLearning(ABC):
 
         return f"(* {fluents[0]} {self._create_monomial_string(fluents[1:])})"
 
-    def _add_polynomial(self, lifted_fluents: Dict[str, PDDLFunction], dataset: Dict[str, List[float]]) -> NoReturn:
+    def _add_polynomial(self, lifted_fluents: Dict[str, PDDLFunction], dataset: Dict[str, List[float]]) -> None:
         """Adds a polynomial to the dataset.
 
         :param lifted_fluents: the lifted fluents that are to be added to the polynomial dataset.
@@ -66,7 +66,7 @@ class UnsafeFluentsLearning(ABC):
                 dataset[polynomial_fluent].append(numpy.prod(values))
 
     def _add_lifted_post_state_fluent_to_dataset(
-            self, component: ObservedComponent, dataset: Dict[str, List[float]]) -> NoReturn:
+            self, component: ObservedComponent, dataset: Dict[str, List[float]]) -> None:
         """Adds the post state fluents to the dataset.
 
         :param component: the component that is currently being processed.
@@ -78,7 +78,7 @@ class UnsafeFluentsLearning(ABC):
             dataset[fluent_name].append(func.value)
 
     def _add_lifted_functions_to_dataset(self, component: ObservedComponent,
-                                         dataset: Dict[str, List[float]]) -> NoReturn:
+                                         dataset: Dict[str, List[float]]) -> None:
         """Adds lifted functions to the dataset.
 
         :param component: the current observed component, i.e. the current trajectory triplet.
@@ -137,7 +137,8 @@ class UnsafeFluentsLearning(ABC):
         return f"(+ {multiplication_parts[0]} {inner_layer})"
 
     def _create_inequality_constraint_strings(self, features_names: List[str], coefficients_path: List[List[float]],
-                                              intercepts_path: List[float], should_be_also_equal: bool = True) -> List[str]:
+                                              intercepts_path: List[float], should_be_also_equal: bool = True) -> List[
+        str]:
         """Creates the string representing f(x) + b >= 0 for each of the linear equations.
 
         Notice:

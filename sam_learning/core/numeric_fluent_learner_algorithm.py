@@ -5,8 +5,7 @@ import math
 import os
 from collections import defaultdict
 from pathlib import Path
-import pandas as pd
-from typing import Dict, List, NoReturn, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -43,7 +42,7 @@ class NumericFluentStateStorage:
         # TODO: remove this once the action is fully tested.
         self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
 
-    def _validate_legal_equations(self, values_matrix: np.ndarray) -> NoReturn:
+    def _validate_legal_equations(self, values_matrix: np.ndarray) -> None:
         """Validates that there are enough independent equations which enable for a single solution for the equation.
 
         :param values_matrix: the matrix constructed based on the observations.
@@ -61,7 +60,7 @@ class NumericFluentStateStorage:
         self.logger.warning(failure_reason)
         raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 
-    def _validate_safe_equation_solving(self, lifted_function: str) -> NoReturn:
+    def _validate_safe_equation_solving(self, lifted_function: str) -> None:
         """Conducts a first validation on whether it is safe to solve the linear equations.
 
         :param lifted_function: the number of the function to be validated.
@@ -200,7 +199,7 @@ class NumericFluentStateStorage:
             self.logger.warning(failure_reason)
             raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.convex_hull_not_found)
 
-    def _display_convex_hull(self, display_mode: bool, hull: ConvexHull, num_dimensions: int) -> NoReturn:
+    def _display_convex_hull(self, display_mode: bool, hull: ConvexHull, num_dimensions: int) -> None:
         """Displays the convex hull in as a plot.
 
         :param display_mode: whether to display the plot.
@@ -355,7 +354,7 @@ class NumericFluentStateStorage:
 
         return non_convexed_conditions, filtered_previous_state_matrix, remained_fluents
 
-    def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+    def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the previous state storage.
 
         :param state_fluents: the lifted state fluents that were matched for the action.
@@ -363,7 +362,7 @@ class NumericFluentStateStorage:
         for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
             self.previous_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
 
-    def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> NoReturn:
+    def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the next state storage.
 
         :param state_fluents: the lifted state fluents that were matched for the action.
@@ -375,7 +374,7 @@ class NumericFluentStateStorage:
                 self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
                 self.previous_state_storage[state_fluent_lifted_str].append(0)
 
-    def filter_out_inconsistent_state_variables(self) -> NoReturn:
+    def filter_out_inconsistent_state_variables(self) -> None:
         """Filters out fluents that appear only in part of the states since they are not safe.
 
         :return: only the safe state variables that appear in *all* states.

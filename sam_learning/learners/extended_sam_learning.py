@@ -1,6 +1,6 @@
 """An extension to the SAM learning algorithm that can learn when the matching process is not injective."""
 from collections import defaultdict
-from typing import List, Tuple, NoReturn, Dict, Set
+from typing import List, Tuple, Dict, Set
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
     GroundedPredicate
@@ -23,7 +23,7 @@ class ExtendedSAM(SAMLearner):
         self.should_create_proxy_actions = should_create_proxy_actions
 
     def _extract_maybe_delete_effects(self, grounded_action: ActionCall, grounded_del_effects: Set[GroundedPredicate],
-                                      must_be_delete_effects: List[Predicate]) -> NoReturn:
+                                      must_be_delete_effects: List[Predicate]) -> None:
         """Extracts delete effects based on non injective matches.
 
         :param grounded_action: the action that is being handled.
@@ -44,7 +44,7 @@ class ExtendedSAM(SAMLearner):
                 self.possible_delete_effects[grounded_action.name].update(lifted_literal_matches)
 
     def _extract_maybe_add_effects(self, grounded_action: ActionCall, grounded_add_effects: Set[GroundedPredicate],
-                                   must_be_add_effects: List[Predicate]) -> NoReturn:
+                                   must_be_add_effects: List[Predicate]) -> None:
         """Extracts the add effects based on non injective matches.
 
         :param grounded_action: the action that is being handled.
@@ -84,7 +84,7 @@ class ExtendedSAM(SAMLearner):
         return must_be_add_effects, must_be_delete_effects
 
     def _remove_impossible_effects(self, grounded_action: ActionCall,
-                                   state_predicates: Dict[str, Set[GroundedPredicate]]) -> NoReturn:
+                                   state_predicates: Dict[str, Set[GroundedPredicate]]) -> None:
         """Removes effects based on the second SAM rule - if an literal has not been observed in the post state
         it cannot be an effect.
 
@@ -120,7 +120,7 @@ class ExtendedSAM(SAMLearner):
         return must_be_add_effects, must_be_delete_effects
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State,
-                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> NoReturn:
+                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> None:
         """Create a new action in the domain.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
@@ -143,7 +143,7 @@ class ExtendedSAM(SAMLearner):
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
 
     def update_action(
-            self, grounded_action: ActionCall, previous_state: State, next_state: State) -> NoReturn:
+            self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
@@ -162,7 +162,7 @@ class ExtendedSAM(SAMLearner):
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
     def handle_single_trajectory_component(self, component: ObservedComponent,
-                                           observed_objects: Dict[str, PDDLObject]) -> NoReturn:
+                                           observed_objects: Dict[str, PDDLObject]) -> None:
         """Handles a single trajectory component as a part of the learning process.
 
         :param component: the trajectory component that is being handled at the moment.
@@ -179,7 +179,7 @@ class ExtendedSAM(SAMLearner):
         else:
             self.update_action(grounded_action, previous_state, next_state)
 
-    def create_proxy_actions(self) -> NoReturn:
+    def create_proxy_actions(self) -> None:
         """Create proxy actions to handle the non injective effects."""
         self.logger.info("Starting to create proxy actions.")
         for action in self.partial_domain.actions.values():

@@ -1,8 +1,10 @@
 """Module test for the multi agent action model learning."""
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, Problem, MultiAgentObservation, ActionCall, MultiAgentComponent
+from pddl_plus_parser.models import Domain, Problem, MultiAgentObservation, ActionCall, MultiAgentComponent, \
+    JointActionCall, NOP_ACTION, GroundedPredicate, Predicate
 from pytest import fixture
 
+from sam_learning.core import LiteralCNF
 from sam_learning.learners import MultiAgentSAM
 from tests.consts import WOODWORKING_COMBINED_DOMAIN_PATH, WOODWORKING_COMBINED_PROBLEM_PATH, \
     WOODWORKING_COMBINED_TRAJECTORY_PATH
@@ -44,126 +46,117 @@ def do_plane_first_action_call() -> ActionCall:
 
 @fixture()
 def do_plane_second_action_call() -> ActionCall:
-    return ActionCall("do-plane", ["planer0", "p1", "rough", "natural", "untreated"])
+    return ActionCall("do-plane", ["planer1", "p2", "verysmooth", "natural", "untreated"])
 
 
-def test_add_new_single_agent_action_adds_new_predicates_and_learns_the_preconditions_correctly(
+@fixture()
+def ma_literals_cnf(combined_domain: Domain) -> LiteralCNF:
+    action_names = [action for action in combined_domain.actions.keys()]
+    return LiteralCNF(action_names)
+
+
+def test_initialize_cnfs_sets_correct_predicates_in_the_cnf_dictionary(ma_sam: MultiAgentSAM, combined_domain: Domain):
+    ma_sam._initialize_cnfs()
+    assert len(ma_sam.positive_literals_cnf) == len(combined_domain.predicates)
+    assert len(ma_sam.negative_literals_cnf) == len(combined_domain.predicates)
+
+
+def test_locate_executing_action_when_only_one_action_is_in_the_joint_action_returns_single_action(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall):
+    assert ma_sam._locate_executing_action(JointActionCall(
+        [do_plane_first_action_call, ActionCall(NOP_ACTION, [])])) == [do_plane_first_action_call]
+
+
+def test_locate_executing_action_when_two_actions_are_in_the_joint_action_returns_two_actions(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, do_plane_second_action_call: ActionCall):
+    assert ma_sam._locate_executing_action(JointActionCall(
+        [do_plane_first_action_call, do_plane_second_action_call, ActionCall(NOP_ACTION, [])])) == \
+           [do_plane_first_action_call, do_plane_second_action_call]
+
+
+def test_create_fully_observable_predicates_adds_all_missing_state_predicates_correctly(
         ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation, do_plane_first_action_call: ActionCall):
     component = multi_agent_observation.components[1]
+    next_state = component.next_state
+    observed_objects = multi_agent_observation.grounded_objects
+    positive_predicates, negative_predicates = ma_sam.create_fully_observable_predicates(next_state, observed_objects)
+    state_predicates = []
+    for predicates in next_state.state_predicates.values():
+        state_predicates.extend(predicates)
+
+    assert len(positive_predicates) == len(state_predicates)
+    assert len(negative_predicates) > 0
+    negative_predicates_str = [p.untyped_representation for p in negative_predicates]
+    positive_predicates_str = [p.untyped_representation for p in positive_predicates]
+    assert all([p not in positive_predicates_str for p in negative_predicates_str])
+
+
+def test_compute_interacting_actions_returns_empty_list_if_no_action_interacts_with_the_predicate(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain):
+    lifted_predicate = combined_domain.predicates["boardsize-successor"]
+    grounded_predicate = GroundedPredicate(name="boardsize-successor", signature=lifted_predicate.signature,
+                                           object_mapping={"?size1": "s0", "?size2": "s1"})
+    assert ma_sam.compute_interacting_actions(grounded_predicate, executing_actions=[do_plane_first_action_call]) == []
+
+
+def test_compute_interacting_actions_returns_one_action_call_if_only_one_interacts_with_the_predicate(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain):
     # (do-plane planer0 p2 verysmooth natural varnished)
-    previous_state = component.previous_state
-    next_state = component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    num_actions = 2
-
-    ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
-                                       num_actions)
-    assert "do-plane" in ma_sam.partial_domain.actions
-    learned_action = ma_sam.partial_domain.actions["do-plane"]
-    positive_preconditions = [p.untyped_representation for p in learned_action.positive_preconditions]
-    assert {"(treatment ?x ?oldtreatment)", "(surface-condition ?x ?oldsurface)", "(available ?x)",
-            "(colour ?x ?oldcolour)"}.issubset(positive_preconditions)
+    lifted_predicate = combined_domain.predicates["surface-condition"]
+    grounded_predicate = GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
+                                           object_mapping={"?obj": "p2", "?surface": "verysmooth"})
+    assert ma_sam.compute_interacting_actions(grounded_predicate, executing_actions=[do_plane_first_action_call]) == \
+           [do_plane_first_action_call]
 
 
-def test_add_new_single_agent_action_adds_new_predicates_and_learns_the_add_effects_correctly(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation, do_plane_first_action_call: ActionCall):
-    component = multi_agent_observation.components[1]
-    # (do-plane planer0 p2 verysmooth natural varnished)
-    previous_state = component.previous_state
-    next_state = component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    num_actions = 2
+def test_compute_interacting_actions_returns_two_actions_when_two_actions_interact_with_the_same_predicate(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, do_plane_second_action_call: ActionCall,
+        combined_domain: Domain):
+    lifted_predicate = combined_domain.predicates["surface-condition"]
+    grounded_predicate = GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
+                                           object_mapping={"?obj": "p2", "?surface": "verysmooth"})
 
-    ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
-                                       num_actions)
-    assert "do-plane" in ma_sam.partial_domain.actions
-    add_effects = [p.untyped_representation for p in ma_sam.positive_literals_cnf["do-plane"]]
-    assert {"(surface-condition ?x smooth)", "(colour ?x natural)", "(treatment ?x untreated)"}.issuperset(add_effects)
+    assert ma_sam.compute_interacting_actions(
+        grounded_predicate, executing_actions=[do_plane_first_action_call, do_plane_second_action_call]) == \
+           [do_plane_first_action_call, do_plane_second_action_call]
 
 
-def test_add_new_single_agent_action_adds_new_predicates_and_learns_the_delete_effects_correctly(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation,
-        do_plane_first_action_call: ActionCall):
-    component = multi_agent_observation.components[1]
-    previous_state = component.previous_state
-    next_state = component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    num_actions = 2
+def test_compute_interacting_actions_returns_two_actions_when_two_when_third_action_does_not_interact_with_the_predicate(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, do_plane_second_action_call: ActionCall,
+        combined_domain: Domain):
+    lifted_predicate = combined_domain.predicates["surface-condition"]
+    grounded_predicate = GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
+                                           object_mapping={"?obj": "p2", "?surface": "verysmooth"})
 
-    ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
-                                       num_actions)
-    assert "do-plane" in ma_sam.partial_domain.actions
-    delete_effects = [p.untyped_representation for p in ma_sam.negative_literals_cnf["do-plane"]]
-    assert {"(treatment ?x ?oldtreatment)", "(surface-condition ?x ?oldsurface)", "(colour ?x ?oldcolour)"}.issuperset(
-        delete_effects)
+    non_interacting_action = ActionCall("do-plane", ["planer1", "p1", "verysmooth", "natural", "untreated"])
+    assert ma_sam.compute_interacting_actions(
+        grounded_predicate,
+        executing_actions=[do_plane_first_action_call, do_plane_second_action_call, non_interacting_action]) == \
+           [do_plane_first_action_call, do_plane_second_action_call]
 
 
-def test_update_single_agent_action_updates_action_with_correct_preconditions(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation,
-        do_plane_first_action_call: ActionCall, do_plane_observation_component: MultiAgentComponent,
-        do_plane_second_action_call: ActionCall):
-    previous_state = do_plane_observation_component.previous_state
-    next_state = do_plane_observation_component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    num_actions = 2
-    ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
-                                       num_actions)
-
-    component = multi_agent_observation.components[2]
-    previous_state = component.previous_state
-    next_state = component.next_state
-    ma_sam.update_single_agent_action(do_plane_second_action_call, previous_state, next_state, num_actions,
-                                      observed_objects)
-    learned_action = ma_sam.partial_domain.actions["do-plane"]
-    positive_preconditions = [p.untyped_representation for p in learned_action.positive_preconditions]
-    assert {"(treatment ?x ?oldtreatment)", "(surface-condition ?x ?oldsurface)", "(available ?x)",
-            "(colour ?x ?oldcolour)"}.issubset(positive_preconditions)
-
-
-def test_update_single_agent_action_updates_action_with_correct_add_effects(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation,
-        do_plane_first_action_call: ActionCall, do_plane_observation_component: MultiAgentComponent,
-        do_plane_second_action_call: ActionCall):
-    previous_state = do_plane_observation_component.previous_state
-    next_state = do_plane_observation_component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    num_actions = 2
-    ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
-                                       num_actions)
-
-    component = multi_agent_observation.components[2]
-    previous_state = component.previous_state
-    next_state = component.next_state
-    ma_sam.update_single_agent_action(do_plane_second_action_call, previous_state, next_state, num_actions,
-                                      observed_objects)
-    add_effects = [p.untyped_representation for p in ma_sam.positive_literals_cnf["do-plane"]]
-    assert {"(surface-condition ?x smooth)", "(colour ?x natural)", "(treatment ?x untreated)"}.issuperset(add_effects)
-
-
-def test_update_single_agent_action_updates_action_with_correct_delete_effects(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation,
-        do_plane_first_action_call: ActionCall, do_plane_observation_component: MultiAgentComponent,
-        do_plane_second_action_call: ActionCall):
-    previous_state = do_plane_observation_component.previous_state
-    next_state = do_plane_observation_component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    num_actions = 2
-    ma_sam.add_new_single_agent_action(do_plane_first_action_call, previous_state, next_state, observed_objects,
-                                       num_actions)
-
-    component = multi_agent_observation.components[2]
-    previous_state = component.previous_state
-    next_state = component.next_state
-    ma_sam.update_single_agent_action(do_plane_second_action_call, previous_state, next_state, num_actions,
-                                      observed_objects)
-    delete_effects = [p.untyped_representation for p in ma_sam.negative_literals_cnf["do-plane"]]
-    assert {"(treatment ?x ?oldtreatment)", "(surface-condition ?x ?oldsurface)", "(colour ?x ?oldcolour)"}.issuperset(
-        delete_effects)
+def test_construct_safe_actions_returns_empty_list_if_no_action_is_safe(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain,
+        ma_literals_cnf: LiteralCNF):
+    ma_sam.positive_literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
+    possible_effects = [("do-immersion-varnish", "(surface-condition ?agent ?newcolour)"),
+                        ("do-grind", "(surface-condition ?agent ?oldcolour)"),
+                        ("do-plane", "(surface-condition ?agent ?colour)")]
+    ma_literals_cnf.add_possible_effect(possible_effects)
+    predicate_params = ["?agent", "?colour"]
+    predicate_types = combined_domain.predicates["surface-condition"].signature.values()
+    ma_sam.lifted_bounded_predicates["do-plane"] = {
+        combined_domain.predicates["surface-condition"].untyped_representation:
+            {("(surface-condition ?agent ?colour)",
+              Predicate("surface-condition", signature={
+                  bounded_param: obj_type for bounded_param, obj_type in zip(predicate_params, predicate_types)}))}}
+    ma_sam.observed_actions.append("do-plane")
+    ma_sam.construct_safe_actions()
+    assert "do-plane" not in ma_sam.safe_actions
 
 
 def test_learn_action_model_returns_learned_model(
         ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
-    learned_model, learning_report = ma_sam.learn_combined_action_model([multi_agent_observation],
-                                                                        agent_names=WOODWORKING_AGENT_NAMES)
+    learned_model, learning_report = ma_sam.learn_combined_action_model([multi_agent_observation])
     print(learning_report)
     print(learned_model.to_pddl())
