@@ -3,7 +3,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import NoReturn, List, Optional, Dict
+from typing import List, Optional, Dict
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import Observation
@@ -72,7 +72,7 @@ class POL:
             solver_type=solver_type)
         self.executing_agents = executing_agents
 
-    def _init_numeric_performance_calculator(self) -> NoReturn:
+    def _init_numeric_performance_calculator(self) -> None:
         """Initializes the algorithm of the numeric precision / recall calculator."""
         if self._learning_algorithm not in NUMERIC_ALGORITHMS:
             return
@@ -93,7 +93,7 @@ class POL:
 
         return domain_path
 
-    def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> NoReturn:
+    def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
@@ -128,8 +128,7 @@ class POL:
             if self._learning_algorithm != LearningAlgorithmType.ma_sam:
                 learned_model, learning_report = learner.learn_action_model(allowed_observations)
             else:
-                learned_model, learning_report = learner.learn_combined_action_model(allowed_observations,
-                                                                                     agent_names=self.executing_agents)
+                learned_model, learning_report = learner.learn_combined_action_model(allowed_observations)
 
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
@@ -157,7 +156,7 @@ class POL:
 
         return domain_file_path
 
-    def run_cross_validation(self) -> NoReturn:
+    def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
         self._init_numeric_performance_calculator()

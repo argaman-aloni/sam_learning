@@ -155,6 +155,47 @@ def test_construct_safe_actions_returns_empty_list_if_no_action_is_safe(
     assert "do-plane" not in ma_sam.safe_actions
 
 
+def test_construct_safe_actions_returns_safe_action_when_it_has_only_one_effect_with_no_ambiguities(
+        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain,
+        ma_literals_cnf: LiteralCNF):
+    ma_sam.positive_literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
+    possible_effects = [("do-grind", "(surface-condition ?agent ?oldcolour)"),
+                        ("do-plane", "(surface-condition ?agent ?colour)")]
+    ma_literals_cnf.add_possible_effect(possible_effects)
+    ma_literals_cnf.add_possible_effect([("do-immersion-varnish", "(surface-condition ?agent ?newcolour)")])
+    predicate_types = combined_domain.predicates["surface-condition"].signature.values()
+
+    ma_sam.lifted_bounded_predicates["do-plane"] = {
+        combined_domain.predicates["surface-condition"].untyped_representation:
+            {("(surface-condition ?agent ?colour)",
+              Predicate("surface-condition", signature={
+                  bounded_param: obj_type for bounded_param, obj_type in
+                  zip(["?agent", "?colour"], predicate_types)}))}}
+
+    ma_sam.lifted_bounded_predicates["do-immersion-varnish"] = {
+        combined_domain.predicates["surface-condition"].untyped_representation:
+            {("(surface-condition ?agent ?newcolour)",
+              Predicate("surface-condition", signature={
+                  bounded_param: obj_type for bounded_param, obj_type in
+                  zip(["?agent", "?newcolour"], predicate_types)}))}}
+
+    ma_sam.lifted_bounded_predicates["do-grind"] = {
+        combined_domain.predicates["surface-condition"].untyped_representation:
+            {("(surface-condition ?agent ?oldcolour)",
+              Predicate("surface-condition", signature={
+                  bounded_param: obj_type for bounded_param, obj_type in
+                  zip(["?agent", "?oldcolour"], predicate_types)}))}}
+
+    ma_sam.observed_actions.append("do-plane")
+    ma_sam.observed_actions.append("do-immersion-varnish")
+    ma_sam.observed_actions.append("do-grind")
+
+    ma_sam.construct_safe_actions()
+    assert "do-plane" not in ma_sam.safe_actions
+    assert "do-grind" not in ma_sam.safe_actions
+    assert "do-immersion-varnish" in ma_sam.safe_actions
+
+
 def test_learn_action_model_returns_learned_model(
         ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
     learned_model, learning_report = ma_sam.learn_combined_action_model([multi_agent_observation])
