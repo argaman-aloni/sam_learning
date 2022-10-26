@@ -74,7 +74,21 @@ class MultiAgentSAM(SAMLearner):
 
         return lifted_predicate[0]
 
-    def _is_action_safe(self, action: LearnerAction, literals_cnf: Dict[str, LiteralCNF]) -> bool:
+    def _extract_relevant_not_effects(
+            self, grounded_predicates: List[GroundedPredicate],
+            executing_actions: List[ActionCall], relevant_action: ActionCall) -> List[GroundedPredicate]:
+        """Extracts the relevant not effects of the action.
+
+        :param grounded_predicates: the grounded predicates that are affected by the action.
+        :param executing_actions: the actions that are being executed in the joint action.
+        :param relevant_action: the action that is being learned.
+        :return: the relevant not effects of the action.
+        """
+        return [grounded_predicate for grounded_predicate in grounded_predicates if relevant_action in
+                self.compute_interacting_actions(grounded_predicate, executing_actions)]
+
+    def _is_action_safe(self, action: LearnerAction, literals_cnf: Dict[str, LiteralCNF],
+                        preconditions_to_filter: Set[Predicate]) -> bool:
         """Checks if the given action is safe to execute.
 
         :param action: the lifted action that is to be learned.
@@ -89,6 +103,10 @@ class MultiAgentSAM(SAMLearner):
 
             bounded_action_predicates = self.lifted_bounded_predicates[action.name][positive_domain_literal]
             bounded_predicates_str = {predicate_str for predicate_str, _ in bounded_action_predicates}
+            bounded_predicates_str.difference_update([p.untyped_representation for p in preconditions_to_filter])
+            if len(bounded_predicates_str) == 0:
+                continue
+
             if not cnf.is_action_safe(action_name=action.name, bounded_lifted_predicates=bounded_predicates_str):
                 self.logger.debug("Action %s is not safe to execute!", action.name)
                 return False
@@ -225,8 +243,9 @@ class MultiAgentSAM(SAMLearner):
 
         literals_cnf[grounded_effect.lifted_untyped_representation].add_possible_effect(concurrent_execution)
 
-    def update_single_agent_executed_action(self, executed_action: ActionCall, previous_state: State, next_state: State,
-                                            observed_objects: Dict[str, PDDLObject]) -> None:
+    def update_single_agent_executed_action(
+            self, executed_action: ActionCall, previous_state: State, next_state: State,
+            observed_objects: Dict[str, PDDLObject]) -> None:
         """Handles the situations where only one agent executed an action in a joint action.
 
         :param executed_action: the single operational action in the joint action.
@@ -245,11 +264,16 @@ class MultiAgentSAM(SAMLearner):
         else:
             super()._update_action_preconditions(executed_action, previous_state)
 
-        self.add_not_effect_to_cnf(executed_action, negative_next_state_predicates, self.positive_literals_cnf)
-        self.add_not_effect_to_cnf(executed_action, positive_next_state_predicates, self.negative_literals_cnf)
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         self.add_must_be_effect_to_cnf(executed_action, grounded_add_effects, self.positive_literals_cnf)
         self.add_must_be_effect_to_cnf(executed_action, grounded_del_effects, self.negative_literals_cnf)
+
+        relevant_not_add_effects = self._extract_relevant_not_effects(
+            negative_next_state_predicates, [executed_action], executed_action)
+        relevant_not_del_effects = self._extract_relevant_not_effects(
+            positive_next_state_predicates, [executed_action], executed_action)
+        self.add_not_effect_to_cnf(executed_action, relevant_not_add_effects, self.positive_literals_cnf)
+        self.add_not_effect_to_cnf(executed_action, relevant_not_del_effects, self.negative_literals_cnf)
 
     def update_multiple_executed_actions(
             self, joint_action: JointActionCall, previous_state: State, next_state: State,
@@ -277,8 +301,13 @@ class MultiAgentSAM(SAMLearner):
             self.create_fully_observable_predicates(next_state, observed_objects)
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         for executed_action in executing_actions:
-            self.add_not_effect_to_cnf(executed_action, negative_next_state_predicates, self.positive_literals_cnf)
-            self.add_not_effect_to_cnf(executed_action, positive_next_state_predicates, self.negative_literals_cnf)
+            relevant_not_add_effects = self._extract_relevant_not_effects(
+                negative_next_state_predicates, executing_actions, executed_action)
+            relevant_not_del_effects = self._extract_relevant_not_effects(
+                positive_next_state_predicates, executing_actions, executed_action)
+
+            self.add_not_effect_to_cnf(executed_action, relevant_not_add_effects, self.positive_literals_cnf)
+            self.add_not_effect_to_cnf(executed_action, relevant_not_del_effects, self.negative_literals_cnf)
 
         for grounded_add_effect in grounded_add_effects:
             self.handle_concurrent_execution(grounded_add_effect, executing_actions, self.positive_literals_cnf)
@@ -313,8 +342,8 @@ class MultiAgentSAM(SAMLearner):
                 continue
 
             self.logger.debug("Constructing safe action for %s", action.name)
-            if not self._is_action_safe(action, self.positive_literals_cnf) or not \
-                    self._is_action_safe(action, self.negative_literals_cnf):
+            if not self._is_action_safe(action, self.positive_literals_cnf, action.positive_preconditions) or not \
+                    self._is_action_safe(action, self.negative_literals_cnf, action.negative_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
                 action.positive_preconditions = set()
                 action.negative_preconditions = set()

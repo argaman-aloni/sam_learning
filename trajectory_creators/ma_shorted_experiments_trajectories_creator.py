@@ -21,17 +21,23 @@ class MATrajectoriesCreator:
                                    agent_names: List[str]) -> None:
         """Creates the domain trajectory files."""
         for solution_path in problems_directory.glob("*.solution"):
+            if (problems_directory / f"{solution_path.stem}.trajectory").exists():
+                continue
+
             self.logger.info(f"Creating trajectory for {solution_path.stem}")
             problem_path = problems_directory / f"{solution_path.stem}.pddl"
             single_agent_plan_path = problems_directory / f"{solution_path.stem}.plan"
-            shutil.move(solution_path, single_agent_plan_path)
             combined_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
             combined_problem = ProblemParser(problem_path=problem_path, domain=combined_domain).parse_problem()
+            if not single_agent_plan_path.exists():
+                shutil.move(solution_path, single_agent_plan_path)
+
             plan_converter = PlanConverter(ma_domain=combined_domain)
             plan_sequence = plan_converter.convert_plan(problem=combined_problem,
                                                         plan_file_path=single_agent_plan_path,
                                                         agent_names=agent_names)
             plan_converter.export_plan(plan_file_path=solution_path, plan_actions=plan_sequence)
+
             trajectory_exporter = MultiAgentTrajectoryExporter(combined_domain)
             triplets = trajectory_exporter.parse_plan(problem=combined_problem, plan_path=solution_path)
             trajectory_exporter.export_to_file(triplets, problems_directory / f"{solution_path.stem}.trajectory")

@@ -38,13 +38,16 @@ class LiteralCNF:
 
             filtered_joint_effect.append((action_name, lifted_predicate))
 
+        if filtered_joint_effect in self.possible_lifted_effects:
+            return
+
         self.possible_lifted_effects.append(filtered_joint_effect)
 
     def is_action_safe(self, action_name: str, bounded_lifted_predicates: Set[str]) -> bool:
         """Checks if an action is safe to execute based on this CNF clause.
 
         :param action_name: the name of the action.
-        :param bounded_lifted_predicates:
+        :param bounded_lifted_predicates: the lifted predicates bounded by the action's parameters.
         :return: True if the action is safe to execute, False otherwise.
         """
         possible_lifted_bounded_predicates = []
