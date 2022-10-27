@@ -131,8 +131,10 @@ class MultiAgentSAM(SAMLearner):
                 negative_predicates.extend(possible_state_predicates)
                 continue
 
-            filtered_grounded_state_predicates = [predicate for predicate in possible_state_predicates if predicate
-                                                  not in state.state_predicates[lifted_predicate_name]]
+            state_predicate_strs = [predicate.untyped_representation for predicate in
+                                    state.state_predicates[lifted_predicate_name]]
+            filtered_grounded_state_predicates = [predicate for predicate in possible_state_predicates if
+                                                  predicate.untyped_representation not in state_predicate_strs]
             negative_predicates.extend(filtered_grounded_state_predicates)
 
         for lifted_predicate_name, grounded_state_predicates in state.state_predicates.items():
@@ -201,21 +203,27 @@ class MultiAgentSAM(SAMLearner):
                           f"interact with the predicate {grounded_predicate.untyped_representation}")
         return interacting_actions
 
-    def extract_effects_from_cnf(self, action: LearnerAction, literals_cnf: Dict[str, LiteralCNF]) -> Set[Predicate]:
+    def extract_effects_from_cnf(self, action: LearnerAction, literals_cnf: Dict[str, LiteralCNF],
+                                 relevant_preconditions: Set[Predicate]) -> Set[Predicate]:
         """Extracts the action's relevant effects from the CNF object.
 
         :param action: the action that is currently being handled.
         :param literals_cnf: the CNF dictionary containing information about the effects.
+        :param relevant_preconditions: the preconditions of the action to filter the possible effects from.
         :return: the lifted bounded predicates.
         """
         effects = set()
+        relevant_preconditions_str = {predicate.untyped_representation for predicate in relevant_preconditions}
         for domain_predicate, cnf in literals_cnf.items():
             cnf_effects = cnf.extract_action_effects(action.name)
             for effect in cnf_effects:
-                bounded_predicate = [predicate_obj for lifted_representation, predicate_obj in
+                bounded_predicates = [predicate_obj for lifted_representation, predicate_obj in
                                      self.lifted_bounded_predicates[action.name][domain_predicate]
                                      if lifted_representation == effect]
-                effects.add(bounded_predicate[0])
+                if bounded_predicates[0].untyped_representation in relevant_preconditions_str:
+                    continue
+
+                effects.add(bounded_predicates[0])
 
         return effects
 
@@ -350,8 +358,10 @@ class MultiAgentSAM(SAMLearner):
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)
-            action.add_effects = self.extract_effects_from_cnf(action, self.positive_literals_cnf)
-            action.delete_effects = self.extract_effects_from_cnf(action, self.negative_literals_cnf)
+            action.add_effects = self.extract_effects_from_cnf(action, self.positive_literals_cnf,
+                                                               action.positive_preconditions)
+            action.delete_effects = self.extract_effects_from_cnf(action, self.negative_literals_cnf,
+                                                                  action.negative_preconditions)
             self.safe_actions.append(action.name)
 
     def learn_combined_action_model(

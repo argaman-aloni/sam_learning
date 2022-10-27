@@ -44,6 +44,7 @@ class FastDownwardSolver:
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
             running_options = ["--overall-time-limit", "60s",
                                "--plan-file", str(solution_path.absolute()),
+                               "--sas-file", f"{domain_file_path.stem}_output.sas",
                                str(domain_file_path.absolute()),
                                str(problem_file_path.absolute()),
                                "--evaluator", "'hcea=cea()'",

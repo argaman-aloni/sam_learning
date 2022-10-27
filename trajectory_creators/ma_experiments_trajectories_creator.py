@@ -37,7 +37,15 @@ class MAExperimentTrajectoriesCreator:
 
     def create_domain_trajectories(self, problems_directory: Path, plans_directory: Path, output_folder: Path,
                                    agent_names: List[str], planner_prefix: str) -> None:
-        """Creates the domain trajectory files."""
+        """Creates the domain trajectory files.
+
+        :param problems_directory:
+        :param plans_directory:
+        :param output_folder:
+        :param agent_names:
+        :param planner_prefix:
+        :return:
+        """
         for problem_folder in problems_directory.glob("*"):
             self.logger.info(f"Creating trajectories for {problem_folder.stem}")
             domain_converter = MultiAgentDomainsConverter(working_directory_path=problem_folder)
@@ -56,7 +64,8 @@ class MAExperimentTrajectoriesCreator:
             plan_folder_path = plans_directory / f"{planner_prefix}_{problem_folder_name}"
             plan_sequence = plan_converter.convert_plan(problem=combined_problem,
                                                         plan_file_path=plan_folder_path / "Plan.txt",
-                                                        agent_names=agent_names)
+                                                        agent_names=agent_names,
+                                                        should_validate_concurrency_constraint=False)
             combined_plan_path = problem_folder / f"{problem_folder_name}.solution"
             plan_converter.export_plan(plan_file_path=combined_plan_path, plan_actions=plan_sequence)
             trajectory_exporter = MultiAgentTrajectoryExporter(combined_domain)
@@ -67,8 +76,9 @@ class MAExperimentTrajectoriesCreator:
 
 if __name__ == '__main__':
     trajectory_creator = MAExperimentTrajectoriesCreator()
+    agent_names = sys.argv[4].replace("[", "").replace("]", "").split(",")
     trajectory_creator.create_domain_trajectories(problems_directory=Path(sys.argv[1]),
                                                   plans_directory=Path(sys.argv[2]),
                                                   output_folder=Path(sys.argv[3]),
-                                                  agent_names=["a1", "a2", "a3", "a4"],
-                                                  planner_prefix=sys.argv[4])
+                                                  agent_names=agent_names,
+                                                  planner_prefix=sys.argv[5])
