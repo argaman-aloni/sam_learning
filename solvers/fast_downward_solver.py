@@ -58,10 +58,10 @@ class FastDownwardSolver:
 
             except subprocess.CalledProcessError as e:
                 if e.returncode == 23:
-                    self.logger.warning("Fast Downward returned status code 23 - timeout.")
+                    self.logger.warning(f"Fast Downward returned status code 23 - timeout on problem {problem_file_path.stem}.")
                     solving_stats[problem_file_path.stem] = "timeout"
                 elif e.returncode == 11 or e.returncode == 12:
-                    self.logger.warning(f"Fast Downward returned status code {e.returncode} - plan unsolvable.")
+                    self.logger.warning(f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}.")
                     solving_stats[problem_file_path.stem] = "no_solution"
                 else:
                     self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")

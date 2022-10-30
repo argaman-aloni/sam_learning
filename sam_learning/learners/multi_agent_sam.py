@@ -218,8 +218,8 @@ class MultiAgentSAM(SAMLearner):
             cnf_effects = cnf.extract_action_effects(action.name)
             for effect in cnf_effects:
                 bounded_predicates = [predicate_obj for lifted_representation, predicate_obj in
-                                     self.lifted_bounded_predicates[action.name][domain_predicate]
-                                     if lifted_representation == effect]
+                                      self.lifted_bounded_predicates[action.name][domain_predicate]
+                                      if lifted_representation == effect]
                 if bounded_predicates[0].untyped_representation in relevant_preconditions_str:
                     continue
 

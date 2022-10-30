@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
-from pddl_plus_parser.models import Observation
+from pddl_plus_parser.models import Observation, MultiAgentObservation, Domain, Problem
 
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
@@ -19,33 +19,18 @@ from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
 
-NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
-                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]
 
-LEARNING_ALGORITHMS = {
-    LearningAlgorithmType.sam_learning: SAMLearner,
-    LearningAlgorithmType.numeric_sam: NumericSAMLearner,
-    # difference is that the learner is not given any fluents to assist in learning
-    LearningAlgorithmType.raw_numeric_sam: NumericSAMLearner,
-    LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
-}
-
-
-class POL:
+class MAPlanningWithOfflineLearning:
     """Class that represents the POL framework."""
     logger: logging.Logger
     working_directory_path: Path
     k_fold: KFoldSplit
     domain_file_name: str
     learning_statistics_manager: LearningStatisticsManager
-    _learning_algorithm: LearningAlgorithmType
     domain_validator: DomainValidator
-    fluents_map: Dict[str, List[str]]
-    numeric_performance_calc: NumericPerformanceCalculator
+    executing_agents: List[str]
 
-    def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
-                 solver_type: SolverType):
+    def __init__(self, working_directory_path: Path, domain_file_name: str, executing_agents: List[str] = None):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
@@ -55,28 +40,29 @@ class POL:
         self.learning_statistics_manager = LearningStatisticsManager(
             working_directory_path=working_directory_path,
             domain_path=self.working_directory_path / domain_file_name,
-            learning_algorithm=learning_algorithm)
-        self._learning_algorithm = learning_algorithm
-        if fluents_map_path is not None:
-            with open(fluents_map_path, "rt") as json_file:
-                self.fluents_map = json.load(json_file)
-
-        else:
-            self.fluents_map = None
-
-        self.numeric_performance_calc = None
+            learning_algorithm=LearningAlgorithmType.ma_sam)
         self.domain_validator = DomainValidator(
-            self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
-            solver_type=solver_type)
+            self.working_directory_path, LearningAlgorithmType.ma_sam, self.working_directory_path / domain_file_name,
+            solver_type=SolverType.fast_downward)
+        self.executing_agents = executing_agents
 
-    def _init_numeric_performance_calculator(self) -> None:
-        """Initializes the algorithm of the numeric precision / recall calculator."""
-        if self._learning_algorithm not in NUMERIC_ALGORITHMS:
-            return
+    def _filter_baseline_multi_agent_trajectory(
+            self, complete_observation: MultiAgentObservation) -> MultiAgentObservation:
+        """
 
-        self.numeric_performance_calc = init_numeric_performance_calculator(self.working_directory_path,
-                                                                            self.domain_file_name,
-                                                                            self._learning_algorithm)
+        :param complete_observation:
+        :return:
+        """
+        filtered_observation = MultiAgentObservation(executing_agents=self.executing_agents)
+        filtered_observation.add_problem_objects(complete_observation.grounded_objects)
+        for component in complete_observation.components:
+            if component.grounded_joint_action.action_count > 1:
+                continue
+
+            filtered_observation.add_component(component.previous_state,
+                                               component.grounded_joint_action.actions,
+                                               component.next_state)
+        return filtered_observation
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
@@ -90,7 +76,7 @@ class POL:
 
         return domain_path
 
-    def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
+    def learn_ma_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
@@ -101,33 +87,50 @@ class POL:
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        allowed_observations = []
+        allowed_complete_observations = []
+        allowed_filtered_observations = []
         observed_objects = {}
-        learned_domain_path = None
         for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             observed_objects.update(problem.objects)
-            new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
-            allowed_observations.append(new_observation)
+            complete_observation: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+                trajectory_file_path, self.executing_agents)
+            filtered_observation = self._filter_baseline_multi_agent_trajectory(complete_observation)
+            allowed_complete_observations.append(complete_observation)
+            allowed_filtered_observations.append(filtered_observation)
             if index % 5 != 0:
                 self.logger.info(f"Skipping the iteration {index} to save the total amount of time!")
                 continue
 
-            self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
-                                                                    preconditions_fluent_map=self.fluents_map)
-            learned_model, learning_report = learner.learn_action_model(allowed_observations)
-            self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
-
-        if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+            self.logger.info(f"Learning the action model using {len(allowed_complete_observations)} trajectories!")
+            self.learn_non_modified_trajectories(allowed_complete_observations, partial_domain, test_set_dir_path)
+            self.learn_baseline_action_model(allowed_filtered_observations, partial_domain, test_set_dir_path)
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
-    def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
+    def learn_baseline_action_model(self, allowed_filtered_observations, partial_domain, test_set_dir_path):
+        learner = MultiAgentSAM(partial_domain=partial_domain)
+        self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam.ma_sam_baseline
+        self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_baseline
+        learned_model, learning_report = learner.learn_combined_action_model(allowed_filtered_observations)
+        self.learning_statistics_manager.add_to_action_stats(allowed_filtered_observations, learned_model,
+                                                             learning_report)
+        self.validate_learned_domain(allowed_filtered_observations, learned_model, test_set_dir_path)
+
+    def learn_non_modified_trajectories(self, allowed_complete_observations, partial_domain, test_set_dir_path):
+        learner = MultiAgentSAM(partial_domain=partial_domain)
+        self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam
+        self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam
+        learned_model, learning_report = learner.learn_combined_action_model(allowed_complete_observations)
+        self.learning_statistics_manager.add_to_action_stats(allowed_complete_observations, learned_model,
+                                                             learning_report)
+        self.validate_learned_domain(allowed_complete_observations, learned_model, test_set_dir_path)
+
+
+    def validate_learned_domain(self, allowed_observations: List[MultiAgentObservation],
+                                learned_model: LearnerDomain,
                                 test_set_dir_path: Path) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
@@ -147,32 +150,23 @@ class POL:
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
-        self._init_numeric_performance_calculator()
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
-            self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
+            self.learn_ma_model_offline(fold_num, train_dir_path, test_dir_path)
             self.domain_validator.clear_statistics()
             self.learning_statistics_manager.clear_statistics()
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
         self.domain_validator.write_complete_joint_statistics()
-        if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self.numeric_performance_calc.export_numeric_learning_performance()
-            self.learning_statistics_manager.write_complete_joint_statistics()
 
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the POL algorithm on the input domain.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
-    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6, 7, 8],
-                        help="The type of learning algorithm. "
-                             "\n 1: sam_learning\n2: esam_learning\n3: numeric_sam\n4: raw_numeric_sam\n"
-                             "6: polynomial_sam\n 7: ma_sam\n 8: ma_sam_baseline")
-    parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
-                                                                   "fluents", default=None)
-    parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
-                        help="The solver that should be used for the sake of validation", default=3)
+    parser.add_argument("--executing_agents", required=False, default=None,
+                        help="In case of a multi-agent action model learning, the names of the agents that "
+                             "are executing the actions")
 
     args = parser.parse_args()
     return args
@@ -183,12 +177,9 @@ def main():
     executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
         if args.executing_agents is not None else None
 
-    offline_learner = POL(working_directory_path=Path(args.working_directory_path),
-                          domain_file_name=args.domain_file_name,
-                          learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
-                          fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-                          solver_type=SolverType(args.solver_type),
-                          executing_agents=executing_agents)
+    offline_learner = MAPlanningWithOfflineLearning(working_directory_path=Path(args.working_directory_path),
+                                                    domain_file_name=args.domain_file_name,
+                                                    executing_agents=executing_agents)
     offline_learner.run_cross_validation()
 
 

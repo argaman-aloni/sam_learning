@@ -111,8 +111,9 @@ class DomainValidator:
         num_triplets = sum([len(observation.components) for observation in used_observations])
         return num_triplets
 
-    def validate_domain(self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
-                        used_observations: Union[List[Observation], List[Path]] = None) -> NoReturn:
+    def validate_domain(
+            self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
+            used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None) -> NoReturn:
         """Validates that using the input domain problems can be solved.
 
         :param tested_domain_file_path: the path of the domain that was learned using POL.

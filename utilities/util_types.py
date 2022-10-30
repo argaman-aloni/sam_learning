@@ -9,9 +9,10 @@ class LearningAlgorithmType(Enum):
     plan_miner = 5
     polynomial_sam = 6
     ma_sam = 7
+    ma_sam_baseline = 8
     # learning algorithms relating to fault repair not to be used for POL
-    oblique_tree = 8
-    extended_svc = 9
+    oblique_tree = 9
+    extended_svc = 10
 
 
 class SolverType(Enum):
