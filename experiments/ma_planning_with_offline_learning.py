@@ -128,7 +128,6 @@ class MAPlanningWithOfflineLearning:
                                                              learning_report)
         self.validate_learned_domain(allowed_complete_observations, learned_model, test_set_dir_path)
 
-
     def validate_learned_domain(self, allowed_observations: List[MultiAgentObservation],
                                 learned_model: LearnerDomain,
                                 test_set_dir_path: Path) -> Path:
