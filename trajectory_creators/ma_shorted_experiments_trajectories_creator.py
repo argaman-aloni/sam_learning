@@ -49,8 +49,7 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.DEBUG)
     trajectory_creator = MATrajectoriesCreator()
+    executing_agents = sys.argv[3].replace("[", "").replace("]", "").split(",")
     trajectory_creator.create_domain_trajectories(domain_path=Path(sys.argv[1]),
                                                   problems_directory=Path(sys.argv[2]),
-                                                  agent_names=["depot0", "distributor0", "distributor1", "distributor2",
-                                                               "distributor3", "truck0",
-                                                               "truck1", "truck2", "truck3"])
+                                                  agent_names=executing_agents)

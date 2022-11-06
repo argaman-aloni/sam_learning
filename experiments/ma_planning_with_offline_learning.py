@@ -99,9 +99,6 @@ class MAPlanningWithOfflineLearning:
             filtered_observation = self._filter_baseline_multi_agent_trajectory(complete_observation)
             allowed_complete_observations.append(complete_observation)
             allowed_filtered_observations.append(filtered_observation)
-            if index % 5 != 0:
-                self.logger.info(f"Skipping the iteration {index} to save the total amount of time!")
-                continue
 
             self.logger.info(f"Learning the action model using {len(allowed_complete_observations)} trajectories!")
             self.learn_non_modified_trajectories(allowed_complete_observations, partial_domain, test_set_dir_path)
