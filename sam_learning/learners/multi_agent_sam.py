@@ -373,6 +373,7 @@ class MultiAgentSAM(SAMLearner):
         """
         self.logger.info("Starting to learn the action model!")
         self._initialize_cnfs()
+        super().deduce_initial_inequality_preconditions()
         for observation in observations:
             for component in observation.components:
                 self.handle_multi_agent_trajectory_component(component, observation.grounded_objects)
@@ -383,6 +384,8 @@ class MultiAgentSAM(SAMLearner):
         unobserved_actions = set(self.partial_domain.actions.keys()).difference(self.observed_actions)
 
         learning_report = {action_name: "OK" for action_name in self.safe_actions}
+        self.partial_domain.actions = {
+            action_name: self.partial_domain.actions[action_name] for action_name in self.safe_actions}
         learning_report.update({action_name: "NOT SAFE" for action_name in self.partial_domain.actions
                                 if action_name in observed_unsafe_actions})
         learning_report.update({action_name: "UNOBSERVED" for action_name in unobserved_actions})

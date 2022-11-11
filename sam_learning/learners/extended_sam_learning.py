@@ -5,15 +5,15 @@ from typing import List, Tuple, Dict, Set
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
     GroundedPredicate
 
-from sam_learning.core import extract_effects, LearnerDomain
+from sam_learning.core import extract_effects, LearnerDomain, LiteralCNF
 from sam_learning.learners import SAMLearner
 
 
 class ExtendedSAM(SAMLearner):
     """An extension to SAM That can learn in cases of non injective matching results."""
 
-    possible_add_effects: Dict[str, Set[Predicate]]  # mapping between the action's name to the possible add effects.
-    possible_delete_effects: Dict[str, Set[Predicate]]  # mapping between the action's name to the possible del effects.
+    positive_literals_cnf: Dict[str, LiteralCNF]
+    negative_literals_cnf: Dict[str, LiteralCNF]
     should_create_proxy_actions: bool  # whether to create proxy actions for the maybe effects.
 
     def __init__(self, partial_domain: Domain, should_create_proxy_actions: bool = False):

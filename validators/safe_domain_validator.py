@@ -27,6 +27,19 @@ SOLVING_STATISTICS = [
     "timeout",
     "not_applicable",
     "goal_not_achieved",
+    "problems_ok",
+    "problems_no_solution",
+    "problems_timeout",
+    "problems_not_applicable",
+    "problems_goal_not_achieved"
+]
+
+DEBUG_STATISTICS = [
+    "problems_ok",
+    "problems_no_solution",
+    "problems_timeout",
+    "problems_not_applicable",
+    "problems_goal_not_achieved"
 ]
 
 MAX_RUNNING_TIME = 60
@@ -69,7 +82,7 @@ class DomainValidator:
             solver_output_path.unlink(missing_ok=True)
 
     def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
-                                   iteration_statistics: Dict[str, int]) -> NoReturn:
+                                   iteration_statistics: Dict[str, Union[int, List[str]]]) -> NoReturn:
         """Validates that the solution file contains a valid plan.
 
         :param solution_file_path: the path to the solution file.
@@ -83,12 +96,17 @@ class DomainValidator:
             if VALID_PLAN in validation_file_content:
                 self.logger.info("The plan is valid.")
                 iteration_statistics["ok"] += 1
+                iteration_statistics["problems_ok"].append(problem_file_path.name)
+
             elif INAPPLICABLE_PLAN in validation_file_content:
                 self.logger.info("The plan is not applicable.")
                 iteration_statistics["not_applicable"] += 1
+                iteration_statistics["problems_not_applicable"].append(problem_file_path.name)
+
             elif GOAL_NOT_REACHED in validation_file_content:
                 self.logger.info("The plan did not reach the required goal.")
                 iteration_statistics["goal_not_achieved"] += 1
+                iteration_statistics["problems_goal_not_achieved"].append(problem_file_path.name)
 
     @staticmethod
     def _extract_num_triplets(used_observations: Union[List[Observation],
@@ -127,6 +145,9 @@ class DomainValidator:
             domain_file_path=tested_domain_file_path
         )
         solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
+        for debug_statistic in DEBUG_STATISTICS:
+            solving_stats[debug_statistic] = []
+
         for problem_file_name, entry in solving_report.items():
             if entry == SolutionOutputTypes.ok.name:
                 solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
@@ -137,6 +158,7 @@ class DomainValidator:
                 continue
 
             solving_stats[entry] += 1
+            solving_stats[f"problems_{entry}"].append(problem_file_name)
 
         self.solving_stats.append({
             "learning_algorithm": self.learning_algorithm.name,

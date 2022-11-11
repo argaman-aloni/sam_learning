@@ -232,7 +232,7 @@ class LearnerDomain:
         return f"(define (domain {self.name})\n" \
                f"(:requirements {' '.join(self.requirements)})\n" \
                f"(:types {self._types_to_pddl()}\n)\n\n" \
-               f"(:predicates {predicates}\n)\n\n" \
                f"{constants}" \
+               f"(:predicates {predicates}\n)\n\n" \
                f"{functions}" \
                f"{actions}\n)"

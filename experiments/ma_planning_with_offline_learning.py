@@ -1,19 +1,16 @@
 """The POL main framework - Compile, Learn and Plan."""
 import argparse
-import json
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
-from pddl_plus_parser.models import Observation, MultiAgentObservation, Domain, Problem
+from pddl_plus_parser.models import MultiAgentObservation
 
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
-from experiments.numeric_performance_calculator import NumericPerformanceCalculator
-from experiments.utils import init_numeric_performance_calculator
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, MultiAgentSAM
+from sam_learning.learners import MultiAgentSAM
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
