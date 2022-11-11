@@ -58,9 +58,9 @@ class LiteralCNF:
             if predicate not in possible_lifted_bounded_predicates and predicate not in self.not_effects[action_name]:
                 continue
 
-            if not [(action_name, predicate)] in self.possible_lifted_effects and \
-                    predicate not in self.not_effects[action_name]:
-                return False
+            for lifted_options in self.possible_lifted_effects:
+                if (action_name, predicate) in lifted_options and len(lifted_options) > 1:
+                    return False
 
         return True
 

@@ -77,9 +77,10 @@ def test_locate_executing_action_when_two_actions_are_in_the_joint_action_return
 def test_create_fully_observable_predicates_adds_all_missing_state_predicates_correctly(
         ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation, do_plane_first_action_call: ActionCall):
     component = multi_agent_observation.components[1]
+    initial_state = multi_agent_observation.components[0].previous_state
     next_state = component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    positive_predicates, negative_predicates = ma_sam.create_fully_observable_predicates(next_state, observed_objects)
+    positive_predicates, negative_predicates = ma_sam.create_fully_observable_predicates(next_state,
+                                                                                         initial_state=initial_state)
     state_predicates = []
     for predicates in next_state.state_predicates.values():
         state_predicates.extend(predicates)

@@ -1,6 +1,7 @@
 """The POL main framework - Compile, Learn and Plan."""
 import argparse
 import logging
+import time
 from pathlib import Path
 from typing import List
 
@@ -99,16 +100,21 @@ class MAPlanningWithOfflineLearning:
 
             self.logger.info(f"Learning the action model using {len(allowed_complete_observations)} trajectories!")
             self.learn_non_modified_trajectories(allowed_complete_observations, partial_domain, test_set_dir_path)
-            self.learn_baseline_action_model(allowed_filtered_observations, partial_domain, test_set_dir_path)
+            time.sleep(1)
+            self.learn_baseline_action_model(allowed_filtered_observations, allowed_complete_observations,
+                                             partial_domain, test_set_dir_path)
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
-    def learn_baseline_action_model(self, allowed_filtered_observations, partial_domain, test_set_dir_path):
+    def learn_baseline_action_model(self, allowed_filtered_observations, allowed_complete_observations,
+                                    partial_domain, test_set_dir_path):
+        initial_states = [observation.components[0].previous_state for observation in allowed_complete_observations]
         learner = MultiAgentSAM(partial_domain=partial_domain)
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam.ma_sam_baseline
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_baseline
-        learned_model, learning_report = learner.learn_combined_action_model(allowed_filtered_observations)
+        learned_model, learning_report = learner.learn_combined_action_model(allowed_filtered_observations,
+                                                                             initial_states)
         self.learning_statistics_manager.add_to_action_stats(allowed_filtered_observations, learned_model,
                                                              learning_report)
         self.validate_learned_domain(allowed_filtered_observations, learned_model, test_set_dir_path)
