@@ -30,17 +30,81 @@ def sam_learning(elevators_domain: Domain) -> SAMLearner:
     return SAMLearner(elevators_domain)
 
 
-def test_add_new_action_with_single_trajectory_component_adds_action_data_to_learned_domain(
-        sam_learning: SAMLearner, elevators_observation: Observation, elevators_problem: Problem):
+def test_create_complete_world_state_creates_the_representation_of_the_world_with_negative_predicates_that_are_not_empty(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    initial_state = observation_component.previous_state
+    observed_objects = elevators_observation.grounded_objects
+    _, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=initial_state)
+    assert len(negative_predicates) > 0
+
+
+def test_create_complete_world_state_creates_the_representation_of_the_world_with_negative_and_positive_predicates(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    initial_state = observation_component.previous_state
+    observed_objects = elevators_observation.grounded_objects
+    positive_predicates, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=initial_state)
+    positive_predicates_str = set([p.untyped_representation for p in positive_predicates])
+    negative_predicates_str = set([p.untyped_representation for p in negative_predicates])
+    assert positive_predicates_str.intersection(negative_predicates_str) == set()
+
+
+def test_create_complete_world_state_creates_the_representation_of_the_world_with_positive_predicates_covering_all_state_predicates(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    initial_state = observation_component.previous_state
+    observed_objects = elevators_observation.grounded_objects
+    positive_predicates, _ = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=initial_state)
+    state_predicates = set()
+    for predicates in initial_state.state_predicates.values():
+        state_predicates.update(predicates)
+
+    positive_predicates_str = set([p.untyped_representation for p in positive_predicates])
+    state_predicates_str = set([p.untyped_representation for p in state_predicates])
+    assert len(positive_predicates_str.intersection(state_predicates_str)) == len(state_predicates_str)
+    assert len(positive_predicates_str.intersection(state_predicates_str)) == len(positive_predicates_str)
+
+
+def test_add_new_action_with_single_trajectory_component_updates_the_negative_predicates_to_be_the_correct_ones_after_the_actions_execution(
+        sam_learning: SAMLearner, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]
     previous_state = observation_component.previous_state
     next_state = observation_component.next_state
     test_action_call = observation_component.grounded_action_call
-
+    observed_objects = elevators_observation.grounded_objects
+    _, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=previous_state)
+    negative_predicates_str = set([p.untyped_representation for p in negative_predicates])
     sam_learning.add_new_action(grounded_action=test_action_call,
                                 previous_state=previous_state,
                                 next_state=next_state,
-                                initial_state=previous_state)
+                                negative_state_predicates=negative_predicates)
+    new_negative_predicates_str = set([p.untyped_representation for p in negative_predicates])
+    assert len(negative_predicates_str.intersection(new_negative_predicates_str)) != len(negative_predicates_str)
+
+
+def test_add_new_action_with_single_trajectory_component_adds_action_data_to_learned_domain(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+    observed_objects = elevators_observation.grounded_objects
+    _, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=previous_state)
+    sam_learning.add_new_action(grounded_action=test_action_call,
+                                previous_state=previous_state,
+                                next_state=next_state,
+                                negative_state_predicates=negative_predicates)
 
     added_action_name = "move-down-slow"
     assert added_action_name in sam_learning.partial_domain.actions
@@ -74,21 +138,24 @@ def test_update_action_with_two_trajectory_component_updates_action_data_correct
         sam_learning: SAMLearner, elevators_observation: Observation):
     first_observation_component = elevators_observation.components[0]
     second_observation_component = elevators_observation.components[4]
+
+    observed_objects = elevators_observation.grounded_objects
+    _, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=first_observation_component.previous_state)
     first_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow2-0", "n17", "n16"])
     second_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow1-0", "n9", "n8"])
-
-    initial_state = first_observation_component.previous_state
-
     sam_learning.add_new_action(grounded_action=first_action_call,
                                 previous_state=first_observation_component.previous_state,
                                 next_state=first_observation_component.next_state,
-                                initial_state=initial_state)
+                                negative_state_predicates=negative_predicates)
 
     print(second_observation_component.previous_state.serialize())
 
     sam_learning.update_action(grounded_action=second_action_call,
                                previous_state=second_observation_component.previous_state,
-                               next_state=second_observation_component.next_state)
+                               next_state=second_observation_component.next_state,
+                               negative_state_predicates=negative_predicates)
     added_action_name = "move-down-slow"
 
     assert added_action_name in sam_learning.partial_domain.actions
@@ -99,14 +166,49 @@ def test_update_action_with_two_trajectory_component_updates_action_data_correct
     assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(lift-at ?lift ?f1)"]
 
 
+def test_add_update_action_with_single_trajectory_component_updates_the_negative_predicates_to_be_the_correct_ones_after_the_actions_execution(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    first_observation_component = elevators_observation.components[0]
+    second_observation_component = elevators_observation.components[4]
+
+    observed_objects = elevators_observation.grounded_objects
+    _, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=first_observation_component.previous_state)
+
+    negative_predicates_str = set([p.untyped_representation for p in negative_predicates])
+    first_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow2-0", "n17", "n16"])
+    second_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow1-0", "n9", "n8"])
+    sam_learning.add_new_action(grounded_action=first_action_call,
+                                previous_state=first_observation_component.previous_state,
+                                next_state=first_observation_component.next_state,
+                                negative_state_predicates=negative_predicates)
+
+    add_action_negative_predicates_str = set([p.untyped_representation for p in negative_predicates])
+
+    sam_learning.update_action(grounded_action=second_action_call,
+                               previous_state=second_observation_component.previous_state,
+                               next_state=second_observation_component.next_state,
+                               negative_state_predicates=negative_predicates)
+
+    update_action_negative_predicates_str = set([p.untyped_representation for p in negative_predicates])
+    assert len(negative_predicates_str.intersection(add_action_negative_predicates_str)) != len(negative_predicates_str)
+    assert len(add_action_negative_predicates_str.intersection(update_action_negative_predicates_str)) != len(
+        add_action_negative_predicates_str)
+
+
 def test_handle_single_trajectory_component_not_allowing_actions_with_duplicated_parameters(
         sam_learning: SAMLearner, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]
     initial_state = observation_component.previous_state
+    observed_objects = elevators_observation.grounded_objects
+    _, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=initial_state)
     test_action_call = ActionCall(name="move-down-slow", grounded_parameters=["slow2-0", "n17", "n17"])
     component = ObservedComponent(observation_component.previous_state, test_action_call,
                                   observation_component.next_state)
-    sam_learning.handle_single_trajectory_component(component, initial_state=initial_state)
+    sam_learning.handle_single_trajectory_component(component, negative_state_predicates=negative_predicates)
 
     added_action_name = "move-down-slow"
     learned_action_data = sam_learning.partial_domain.actions[added_action_name]
@@ -119,8 +221,12 @@ def test_handle_single_trajectory_component_learns_preconditions_and_effects_whe
         sam_learning: SAMLearner, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]
     initial_state = observation_component.previous_state
+    observed_objects = elevators_observation.grounded_objects
+    _, negative_predicates = sam_learning._create_complete_world_state(
+        observed_trajectory_objects=observed_objects,
+        state=initial_state)
     sam_learning.handle_single_trajectory_component(observation_component,
-                                                    initial_state=initial_state)
+                                                    negative_state_predicates=negative_predicates)
 
     added_action_name = "move-down-slow"
     learned_action_data = sam_learning.partial_domain.actions[added_action_name]

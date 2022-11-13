@@ -7,10 +7,12 @@ from pytest import fixture
 from sam_learning.core import LiteralCNF
 from sam_learning.learners import MultiAgentSAM
 from tests.consts import WOODWORKING_COMBINED_DOMAIN_PATH, WOODWORKING_COMBINED_PROBLEM_PATH, \
-    WOODWORKING_COMBINED_TRAJECTORY_PATH
+    WOODWORKING_COMBINED_TRAJECTORY_PATH, ROVERS_COMBINED_DOMAIN_PATH, ROVERS_COMBINED_PROBLEM_PATH, \
+    ROVERS_COMBINED_TRAJECTORY_PATH
 
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0",
                            "spray-varnisher0"]
+ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
 
 
 @fixture()
@@ -55,6 +57,32 @@ def ma_literals_cnf(combined_domain: Domain) -> LiteralCNF:
     return LiteralCNF(action_names)
 
 
+@fixture()
+def rovers_domain() -> Domain:
+    return DomainParser(ROVERS_COMBINED_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def rovers_problem(rovers_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=ROVERS_COMBINED_PROBLEM_PATH, domain=rovers_domain).parse_problem()
+
+
+@fixture()
+def rovers_ma_observation(rovers_domain: Domain, rovers_problem: Problem) -> MultiAgentObservation:
+    return TrajectoryParser(rovers_domain, rovers_problem).parse_trajectory(
+        ROVERS_COMBINED_TRAJECTORY_PATH, executing_agents=ROVERS_AGENT_NAMES)
+
+
+@fixture()
+def rovers_ma_sam(rovers_domain: Domain) -> MultiAgentSAM:
+    return MultiAgentSAM(rovers_domain)
+
+
+@fixture()
+def ma_sam(combined_domain: Domain) -> MultiAgentSAM:
+    return MultiAgentSAM(combined_domain)
+
+
 def test_initialize_cnfs_sets_correct_predicates_in_the_cnf_dictionary(ma_sam: MultiAgentSAM, combined_domain: Domain):
     ma_sam._initialize_cnfs()
     assert len(ma_sam.positive_literals_cnf) == len(combined_domain.predicates)
@@ -79,8 +107,11 @@ def test_create_fully_observable_predicates_adds_all_missing_state_predicates_co
     component = multi_agent_observation.components[1]
     initial_state = multi_agent_observation.components[0].previous_state
     next_state = component.next_state
-    positive_predicates, negative_predicates = ma_sam.create_fully_observable_predicates(next_state,
-                                                                                         initial_state=initial_state)
+    observed_objects = multi_agent_observation.grounded_objects
+    _, negative_predicates = ma_sam._create_complete_world_state(observed_trajectory_objects=observed_objects,
+                                                                 state=initial_state)
+    positive_predicates, negative_predicates = ma_sam.create_fully_observable_predicates(
+        next_state, negative_state_predicates=negative_predicates)
     state_predicates = []
     for predicates in next_state.state_predicates.values():
         state_predicates.extend(predicates)
@@ -195,6 +226,13 @@ def test_construct_safe_actions_returns_safe_action_when_it_has_only_one_effect_
     assert "do-plane" not in ma_sam.safe_actions
     assert "do-grind" not in ma_sam.safe_actions
     assert "do-immersion-varnish" in ma_sam.safe_actions
+
+
+def test_learn_action_model_with_colliding_actions_returns_that_actions_are_unsafe(
+        rovers_ma_sam: MultiAgentSAM, rovers_ma_observation: MultiAgentObservation):
+    _, learning_report = rovers_ma_sam.learn_combined_action_model([rovers_ma_observation])
+    assert learning_report["navigate"] == "NOT SAFE"
+    assert learning_report["communicate_rock_data"] == "NOT SAFE"
 
 
 def test_learn_action_model_returns_learned_model(

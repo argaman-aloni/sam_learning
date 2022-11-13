@@ -7,6 +7,9 @@ from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLCons
 from .learning_types import ConditionType
 
 DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
+NEGATIVE_PRECONDITIONS_REQ = ":negative-preconditions"
+EQUALITY_REQ = ":equality"
+ADDED_LEARNING_REQUIREMENTS = [DISJUNCTIVE_PRECONDITIONS_REQ, NEGATIVE_PRECONDITIONS_REQ, EQUALITY_REQ]
 
 
 class LearnerAction:
@@ -152,9 +155,6 @@ class LearnerDomain:
     def __init__(self, domain: Domain):
         self.name = domain.name
         self.requirements = domain.requirements
-        if DISJUNCTIVE_PRECONDITIONS_REQ not in self.requirements:
-            self.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
-
         self.types = domain.types
         self.constants = domain.constants
         self.predicates = domain.predicates
@@ -176,6 +176,12 @@ class LearnerDomain:
                     [str(c) for c in self.constants],
                 )
         )
+
+    def _complete_missing_requirements(self) -> None:
+        """Completes the requirements of the domain from the needed requirements of the learning algorithm."""
+        for requirement in ADDED_LEARNING_REQUIREMENTS:
+            if requirement not in self.requirements:
+                self.requirements.append(requirement)
 
     def _types_to_pddl(self) -> str:
         """Converts the types to a PDDL string.
@@ -225,6 +231,7 @@ class LearnerDomain:
 
         :return: the PDDL string representing the domain.
         """
+        self._complete_missing_requirements()
         predicates = "\n\t".join([str(p) for p in self.predicates.values()])
         actions = "\n".join(action.to_pddl() for action in self.actions.values())
         constants = f"(:constants {self._constants_to_pddl()}\n)\n\n" if len(self.constants) > 0 else ""

@@ -3,7 +3,7 @@ import argparse
 import logging
 import time
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import MultiAgentObservation
@@ -62,13 +62,15 @@ class MAPlanningWithOfflineLearning:
                                                component.next_state)
         return filtered_observation
 
-    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path) -> Path:
+    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path,
+                              file_name: Optional[str] = None) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
         :param test_set_path: the path to the test set directory where the domain would be exported to.
         """
-        domain_path = test_set_path / self.domain_file_name
+        domain_file_name = file_name or self.domain_file_name
+        domain_path = test_set_path / domain_file_name
         with open(domain_path, "wt") as domain_file:
             domain_file.write(learned_domain.to_pddl())
 
@@ -97,12 +99,12 @@ class MAPlanningWithOfflineLearning:
             filtered_observation = self._filter_baseline_multi_agent_trajectory(complete_observation)
             allowed_complete_observations.append(complete_observation)
             allowed_filtered_observations.append(filtered_observation)
-
             self.logger.info(f"Learning the action model using {len(allowed_complete_observations)} trajectories!")
             self.learn_non_modified_trajectories(allowed_complete_observations, partial_domain, test_set_dir_path)
             time.sleep(1)
             self.learn_baseline_action_model(allowed_filtered_observations, allowed_complete_observations,
                                              partial_domain, test_set_dir_path)
+            time.sleep(1)
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
@@ -113,10 +115,11 @@ class MAPlanningWithOfflineLearning:
         learner = MultiAgentSAM(partial_domain=partial_domain)
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam.ma_sam_baseline
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_baseline
-        learned_model, learning_report = learner.learn_combined_action_model(allowed_filtered_observations,
-                                                                             initial_states)
+        learned_model, learning_report = learner.learn_combined_action_model(allowed_filtered_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_filtered_observations, learned_model,
                                                              learning_report)
+        self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
+                                   f"ma_baseline_domain_{len(allowed_filtered_observations)}_trajectories.pddl")
         self.validate_learned_domain(allowed_filtered_observations, learned_model, test_set_dir_path)
 
     def learn_non_modified_trajectories(self, allowed_complete_observations, partial_domain, test_set_dir_path):
@@ -126,6 +129,8 @@ class MAPlanningWithOfflineLearning:
         learned_model, learning_report = learner.learn_combined_action_model(allowed_complete_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_complete_observations, learned_model,
                                                              learning_report)
+        self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
+                                   f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories.pddl")
         self.validate_learned_domain(allowed_complete_observations, learned_model, test_set_dir_path)
 
     def validate_learned_domain(self, allowed_observations: List[MultiAgentObservation],
