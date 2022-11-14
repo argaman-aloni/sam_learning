@@ -6,7 +6,8 @@ from typing import Dict, List, Tuple, Set, Optional
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, NOP_ACTION, \
     MultiAgentObservation, ActionCall, State, GroundedPredicate, JointActionCall, PDDLObject
 
-from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction
+from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, \
+    create_fully_observable_predicates
 from sam_learning.learners import SAMLearner
 
 
@@ -24,7 +25,6 @@ class MultiAgentSAM(SAMLearner):
                  concurrency_constraint: int = 2):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
-        self.observed_actions = []
         self.positive_literals_cnf = {}
         self.negative_literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
@@ -112,35 +112,6 @@ class MultiAgentSAM(SAMLearner):
                 return False
 
         return True
-
-    def create_fully_observable_predicates(
-            self, state: State, negative_state_predicates: Set[GroundedPredicate]) -> Tuple[List[GroundedPredicate], List[GroundedPredicate]]:
-        """Creates a list of fully observable predicates that represent the input state.
-
-        :param state: the state that contains only the positive predicates.
-        :param negative_state_predicates: the negative predicates that are not in the state.
-        :return: tuple containing the positive and negative predicates.
-        """
-        self.logger.info("Creating fully observable state with positive and negative literals.")
-        positive_predicates = []
-        negative_predicates = []
-
-        for negative_state_predicate in negative_state_predicates:
-            lifted_predicate_name = negative_state_predicate.lifted_untyped_representation
-            if negative_state_predicate.lifted_untyped_representation not in state.state_predicates:
-                negative_predicates.append(negative_state_predicate)
-                continue
-
-            state_predicate_strs = [predicate.untyped_representation for predicate in
-                                    state.state_predicates[lifted_predicate_name]]
-            if negative_state_predicate.untyped_representation not in state_predicate_strs:
-                negative_predicates.append(negative_state_predicate)
-                continue
-
-        for lifted_predicate_name, grounded_state_predicates in state.state_predicates.items():
-            positive_predicates.extend(grounded_state_predicates)
-
-        return positive_predicates, negative_predicates
 
     def add_not_effect_to_cnf(
             self, executed_action: ActionCall, next_state_predicates: List[GroundedPredicate],
@@ -263,7 +234,7 @@ class MultiAgentSAM(SAMLearner):
         """
         self.logger.info(f"Handling the execution of {str(executed_action)}.")
         positive_next_state_predicates, negative_next_state_predicates = \
-            self.create_fully_observable_predicates(next_state, negative_state_predicates)
+            create_fully_observable_predicates(next_state, negative_state_predicates)
         observed_action = self.partial_domain.actions[executed_action.name]
         if executed_action.name not in self.observed_actions:
             super()._add_new_action_preconditions(executed_action, observed_action,
@@ -312,7 +283,7 @@ class MultiAgentSAM(SAMLearner):
                 super()._update_action_preconditions(executed_action, previous_state)
 
         positive_next_state_predicates, negative_next_state_predicates = \
-            self.create_fully_observable_predicates(next_state, negative_state_predicates)
+            create_fully_observable_predicates(next_state, negative_state_predicates)
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         self.logger.debug("Updating the negative state predicates based on the action's execution.")
         for executed_action in executing_actions:

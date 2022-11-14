@@ -5,6 +5,36 @@ from typing import List, Tuple, Set
 from pddl_plus_parser.models import State, GroundedPredicate
 
 
+def create_fully_observable_predicates(
+        state: State, negative_state_predicates: Set[GroundedPredicate]) -> Tuple[
+    List[GroundedPredicate], List[GroundedPredicate]]:
+    """Creates a list of fully observable predicates that represent the input state.
+
+    :param state: the state that contains only the positive predicates.
+    :param negative_state_predicates: the negative predicates that are not in the state.
+    :return: tuple containing the positive and negative predicates.
+    """
+    positive_predicates = []
+    negative_predicates = []
+
+    for negative_state_predicate in negative_state_predicates:
+        lifted_predicate_name = negative_state_predicate.lifted_untyped_representation
+        if negative_state_predicate.lifted_untyped_representation not in state.state_predicates:
+            negative_predicates.append(negative_state_predicate)
+            continue
+
+        state_predicate_strs = [predicate.untyped_representation for predicate in
+                                state.state_predicates[lifted_predicate_name]]
+        if negative_state_predicate.untyped_representation not in state_predicate_strs:
+            negative_predicates.append(negative_state_predicate)
+            continue
+
+    for lifted_predicate_name, grounded_state_predicates in state.state_predicates.items():
+        positive_predicates.extend(grounded_state_predicates)
+
+    return positive_predicates, negative_predicates
+
+
 def create_signature_permutations(call_parameters: List[str], lifted_signature: List[str],
                                   subset_size: int) -> List[Tuple[Tuple[str]]]:
     """Choose r items our of a list size n.
