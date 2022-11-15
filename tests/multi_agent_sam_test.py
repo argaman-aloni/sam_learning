@@ -108,7 +108,7 @@ def test_create_fully_observable_predicates_adds_all_missing_state_predicates_co
     initial_state = multi_agent_observation.components[0].previous_state
     next_state = component.next_state
     observed_objects = multi_agent_observation.grounded_objects
-    _, negative_predicates = ma_sam._create_complete_world_state(observed_trajectory_objects=observed_objects,
+    _, negative_predicates = ma_sam._create_complete_world_state(relevant_objects=observed_objects,
                                                                  state=initial_state)
     positive_predicates, negative_predicates = ma_sam.create_fully_observable_predicates(
         next_state, negative_state_predicates=negative_predicates)

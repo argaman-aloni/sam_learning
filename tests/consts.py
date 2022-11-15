@@ -42,6 +42,10 @@ ROVERS_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "rovers_conflicing_actions_pr
 ROVERS_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "rovers_conflicting_actions_trajectory.trajectory"
 
 
+SPIDER_DOMAIN_PATH = EXAMPLES_DIR_PATH / "spider_domain.pddl"
+SPIDER_PROBLEM_PATH = EXAMPLES_DIR_PATH / "spider_problem.pddl"
+SPIDER_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "spider_trajectory.trajectory"
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)

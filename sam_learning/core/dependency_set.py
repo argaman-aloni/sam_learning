@@ -59,4 +59,4 @@ class DependencySet:
         :return: True if the dependency set is safe, False otherwise.
         """
         self.remove_dependencies(literal, preconditions_literals)
-        return len(self.dependencies[literal]) == 1
+        return len(self.dependencies[literal]) == 1 and self.dependencies[literal][0] != {literal}
