@@ -37,39 +37,111 @@ def positive_initial_state_predicates(spider_observation: Observation) -> Set[Gr
     return initial_state_predicates
 
 
-def test_create_possible_predicates_creates_correct_set_with_combined_positive_and_negative_predicates(
+def test_merge_positive_and_negative_predicates_creates_correct_set_with_combined_positive_and_negative_predicates(
         conditional_sam: ConditionalSAM, positive_initial_state_predicates: Set[GroundedPredicate]):
-    output_predicates = conditional_sam._create_possible_predicates(positive_initial_state_predicates, set())
+    output_predicates = conditional_sam._merge_positive_and_negative_predicates(positive_initial_state_predicates,
+                                                                                set())
     assert len(output_predicates) == len(positive_initial_state_predicates)
 
 
-def test_initialize_action_effects_sets_correct_effects(conditional_sam: ConditionalSAM,
-                                                        spider_observation: Observation):
-    previous_state = spider_observation.components[0].previous_state
+def test_initialize_actions_dependencies_sets_correct_effects(conditional_sam: ConditionalSAM,
+                                                              spider_observation: Observation):
     grounded_action = spider_observation.components[0].grounded_action_call
-    observed_objects = spider_observation.grounded_objects
-    positive_state_predicates, negative_state_predicates = conditional_sam._create_complete_world_state(
-        observed_objects, previous_state)
-    conditional_sam._initialize_action_effects(grounded_action, positive_state_predicates, negative_state_predicates)
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=spider_observation.components[0].previous_state,
+        next_state=spider_observation.components[0].next_state)
+
+    conditional_sam._initialize_actions_dependencies(grounded_action)
     assert len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects) > 0
     assert len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects) > 0
     print(len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects))
     print(len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects))
 
 
-def test_update_action_effects_sets_correct_effects(conditional_sam: ConditionalSAM, spider_observation: Observation):
-    previous_state = spider_observation.components[0].previous_state
-    next_state = spider_observation.components[0].next_state
+def test_initialize_actions_dependencies_adds_correct_dependencies(conditional_sam: ConditionalSAM,
+                                                                   spider_observation: Observation):
     grounded_action = spider_observation.components[0].grounded_action_call
-    observed_objects = spider_observation.grounded_objects
-    positive_previous_state_predicates, negative_previous_state_predicates = \
-        conditional_sam._create_complete_world_state(observed_objects, previous_state)
-    positive_next_state_predicates, negative_next_state_predicates = conditional_sam._create_complete_world_state(
-        observed_objects, next_state)
-    conditional_sam._initialize_action_effects(grounded_action, positive_previous_state_predicates,
-                                               negative_previous_state_predicates)
-    conditional_sam._update_action_effects(grounded_action,
-                                           list(positive_next_state_predicates),
-                                           list(negative_next_state_predicates))
-    assert len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects) > 0
-    assert len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects) == 0
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=spider_observation.components[0].previous_state,
+        next_state=spider_observation.components[0].next_state)
+
+    conditional_sam._initialize_actions_dependencies(grounded_action)
+    assert conditional_sam.dependency_set[grounded_action.name] is not None
+
+
+def test_update_action_effects_sets_correct_effects(conditional_sam: ConditionalSAM, spider_observation: Observation):
+    grounded_action = spider_observation.components[0].grounded_action_call
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=spider_observation.components[0].previous_state,
+        next_state=spider_observation.components[0].next_state)
+
+    conditional_sam._initialize_actions_dependencies(grounded_action)
+    initialized_add_effects = conditional_sam.partial_domain.actions[grounded_action.name].add_effects
+    initialized_delete_effects = conditional_sam.partial_domain.actions[grounded_action.name].delete_effects
+    conditional_sam._update_action_effects(grounded_action)
+    assert len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects) <= len(initialized_add_effects)
+    assert len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects) <= len(
+        initialized_delete_effects)
+
+
+def test_find_literals_not_in_state_correctly_sets_the_literals_that_do_not_appear_in_the_state(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    grounded_action = spider_observation.components[0].grounded_action_call
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=spider_observation.components[0].previous_state,
+        next_state=spider_observation.components[0].next_state)
+
+    predicates_not_in_state = conditional_sam._find_literals_not_in_state(
+        grounded_action=grounded_action,
+        positive_predicates=conditional_sam.previous_state_positive_predicates,
+        negative_predicates=conditional_sam.previous_state_negative_predicates)
+
+    negative_preconditions = {"(currently-updating-movable )", "(currently-updating-unmovable )",
+                              "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
+                              "(currently-dealing )"}
+
+    assert negative_preconditions.issubset(predicates_not_in_state)
+
+
+def test_find_literals_existing_in_state_correctly_sets_the_literals_that_do_appear_in_the_state(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    grounded_action = spider_observation.components[0].grounded_action_call
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=spider_observation.components[0].previous_state,
+        next_state=spider_observation.components[0].next_state)
+
+    predicates_not_in_state = conditional_sam._find_literals_not_in_state(
+        grounded_action=grounded_action,
+        positive_predicates=conditional_sam.previous_state_positive_predicates,
+        negative_predicates=conditional_sam.previous_state_negative_predicates)
+
+    negative_preconditions = {"(currently-updating-movable )", "(currently-updating-unmovable )",
+                              "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
+                              "(currently-dealing )"}
+
+    assert not negative_preconditions.issubset(predicates_not_in_state)
+
+
+def test_remove_non_existing_previous_state_dependencies_removes_correct_predicates_from_literals_that_are_effects_only(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    previous_state = spider_observation.components[0].previous_state
+    grounded_action = spider_observation.components[0].grounded_action_call
+    next_state = spider_observation.components[0].next_state
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state)
+
+    conditional_sam._initialize_actions_dependencies(grounded_action)
+    conditional_sam._update_action_effects(grounded_action)
+    conditional_sam._remove_non_existing_previous_state_dependencies(grounded_action, previous_state, next_state)
+    not_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
+                        "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
+                        "(currently-dealing )"}
+
+    for not_dependency in not_dependencies:
+        assert {not_dependency} not in conditional_sam.dependency_set[grounded_action.name].dependencies[
+            "(currently-dealing )"]

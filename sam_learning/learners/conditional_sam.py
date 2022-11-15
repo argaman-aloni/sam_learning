@@ -24,25 +24,41 @@ class ConditionalSAM(SAMLearner):
         self.max_antecedents_size = max_antecedents_size
         self.dependency_set = {}
 
-    def _create_possible_predicates(
+    def _merge_positive_and_negative_predicates(
             self, positive_state_predicates: Set[GroundedPredicate],
             negative_state_predicates: Set[GroundedPredicate]) -> Set[GroundedPredicate]:
-        """
+        """Merges the positive and negative predicates into a single set.
 
-        :param positive_state_predicates:
-        :param negative_state_predicates:
-        :return:
+        :param positive_state_predicates: the set containing the positive predicates.
+        :param negative_state_predicates: the set containing the negative predicates.
+        :return: the merged set.
         """
         self.logger.debug("Creating a set of both negative and positive predicates.")
         positive_predicates = positive_state_predicates.copy()
         negative_predicates = negative_state_predicates.copy()
         return positive_predicates.union(negative_predicates)
 
+    def _initialize_actions_dependencies(self, grounded_action: ActionCall) -> None:
+        """Initialize the dependency set for a single action.
+
+        :param grounded_action: the action that is currently being observed.
+        """
+        self.logger.debug("Initializing the dependency set and the effects for the action %s.", grounded_action.name)
+        grounded_predicates = self._merge_positive_and_negative_predicates(self.previous_state_positive_predicates,
+                                                                           self.previous_state_negative_predicates)
+        lifted_predicates = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_predicates))
+        dependency_set = DependencySet(self.max_antecedents_size)
+        dependency_set.initialize_dependencies(set(lifted_predicates))
+        self.dependency_set[grounded_action.name] = dependency_set
+        self.partial_domain.actions[grounded_action.name].add_effects.update(lifted_predicates)
+        self.partial_domain.actions[grounded_action.name].delete_effects.update(lifted_predicates)
+
     def _update_action_effects(self, grounded_action: ActionCall) -> None:
         """Set the correct data for the action's effects.
 
         :param grounded_action: the action that is currently being executed.
         """
+        self.logger.debug(f"updating the effects for the action {grounded_action.name}.")
         observed_action = self.partial_domain.actions[grounded_action.name]
         positive_next_state_matches = self.matcher.get_possible_literal_matches(
             grounded_action, list(self.next_state_positive_predicates))
@@ -50,16 +66,17 @@ class ConditionalSAM(SAMLearner):
             grounded_action, list(self.next_state_negative_predicates))
         observed_action.add_effects.difference_update(negative_next_state_matches)
         observed_action.delete_effects.difference_update(positive_next_state_matches)
+        self.logger.debug(f"Done filtering out predicates that cannot be effects.")
 
     def _find_literals_not_in_state(
             self, grounded_action: ActionCall, positive_predicates: Set[GroundedPredicate],
             negative_predicates: Set[GroundedPredicate]) -> Set[str]:
-        """
+        """Finds literals that are not present in the current state.
 
-        :param grounded_action:
-        :param positive_predicates:
-        :param negative_predicates:
-        :return:
+        :param grounded_action: the action that is being executed.
+        :param positive_predicates: the positive state predicates.
+        :param negative_predicates: the negative state predicates.
+        :return: the set of strings representing the literals that are not in the state.
         """
         state_positive_literals = self.matcher.get_possible_literal_matches(
             grounded_action, list(positive_predicates))
@@ -73,60 +90,28 @@ class ConditionalSAM(SAMLearner):
 
     def _find_literals_existing_in_state(
             self, grounded_action: ActionCall, positive_predicates, negative_predicates) -> Set[str]:
-        """
+        """Finds the literals that do exist in the state.
 
-        :param grounded_action:
-        :param positive_predicates:
-        :param negative_predicates:
-        :return:
+        :param grounded_action: the action that is being executed.
+        :param positive_predicates: the positive state predicates.
+        :param negative_predicates: the negative state predicates.
+        :return: the set of strings representing the literals that are in the state.
         """
         state_positive_literals = self.matcher.get_possible_literal_matches(
             grounded_action, list(positive_predicates))
         state_negative_literals = self.matcher.get_possible_literal_matches(
             grounded_action, list(negative_predicates))
-        # since we want to capture the literals NOT in s' we will transpose the literals values.
+        # since we want to capture the literals ARE in s' we will transpose the literals values.
         existing_state_literals_str = [literal.untyped_representation for literal in state_positive_literals]
         existing_state_literals_str.extend([f"(not {literal.untyped_representation})" for literal in
                                             state_negative_literals])
         return set(existing_state_literals_str)
 
-    def _is_action_safe(self, action, param, positive_preconditions):
-        pass
+    def _remove_existing_previous_state_dependencies(self, grounded_action: ActionCall) -> None:
+        """Removes the literals that exist in the previous state from the dependency set of a literal that is
+            not in the next state.
 
-    def _extract_effects_dependency_set(self, action, param):
-        pass
-
-    def _initialize_actions_dependencies(self, grounded_action: ActionCall) -> None:
-        """Initialize the dependency set for a single action.
-
-        :param grounded_action: the action that is currently being observed.
-        """
-        grounded_predicates = self._create_possible_predicates(self.previous_state_positive_predicates,
-                                                               self.previous_state_negative_predicates)
-        lifted_predicates = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_predicates))
-        dependency_set = DependencySet(self.max_antecedents_size)
-        dependency_set.initialize_dependencies(set(lifted_predicates))
-        self.dependency_set[grounded_action.name] = dependency_set
-        self.partial_domain.actions[grounded_action.name].add_effects.update(lifted_predicates)
-        self.partial_domain.actions[grounded_action.name].delete_effects.update(lifted_predicates)
-
-    def _update_effects_data(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
-        """
-
-        :param grounded_action:
-        :param next_state:
-        :param previous_state:
-        :return:
-        """
-        self._update_action_effects(grounded_action)
-        self.remove_not_possible_dependencies(grounded_action, previous_state, next_state)
-        self.remove_impossible_effects(grounded_action)
-
-    def remove_existing_previous_state_dependencies(self, grounded_action: ActionCall) -> None:
-        """
-
-        :param grounded_action:
-        :return:
+        :param grounded_action: the action that is being executed.
         """
         missing_next_state_literals_str = self._find_literals_not_in_state(
             grounded_action, self.next_state_positive_predicates, self.next_state_negative_predicates)
@@ -136,13 +121,14 @@ class ConditionalSAM(SAMLearner):
             self.dependency_set[grounded_action.name].remove_dependencies(
                 literal=literal, literals_to_remove=existing_previous_state_literals_str)
 
-    def remove_non_existing_previous_state_dependencies(
+    def _remove_non_existing_previous_state_dependencies(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
-        """
+        """Removed literals that don't appear in the previous state from the dependency set of a literal that is
+            guaranteed as an effect.
 
-        :param grounded_action:
-        :param previous_state:
-        :param next_state:
+        :param grounded_action: the action that is being executed.
+        :param previous_state: the state prior to the action execution.
+        :param next_state: the state after the action execution.
         :return:
         """
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
@@ -158,7 +144,7 @@ class ConditionalSAM(SAMLearner):
             self.dependency_set[grounded_action.name].remove_dependencies(
                 literal=literal, literals_to_remove=missing_pre_state_literals_str)
 
-    def remove_not_possible_dependencies(
+    def _remove_not_possible_dependencies(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """
 
@@ -167,22 +153,25 @@ class ConditionalSAM(SAMLearner):
         :param next_state:
         :return:
         """
-        self.remove_existing_previous_state_dependencies(grounded_action)
-        self.remove_non_existing_previous_state_dependencies(
+        self._remove_existing_previous_state_dependencies(grounded_action)
+        self._remove_non_existing_previous_state_dependencies(
             grounded_action, previous_state, next_state)
 
-    def remove_impossible_effects(self, grounded_action: ActionCall) -> None:
-        """
+    def _update_effects_data(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
+        """Updates the literals that cannot be effects as well as updates the dependency set.
 
-        :param grounded_action:
-        :return:
+        :param grounded_action: the action that is currently being executed.
+        :param next_state: the state following the action's execution.
+        :param previous_state: the state prior to the action's execution.
         """
-        positive_literals = self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.next_state_positive_predicates))
-        negative_literals = self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.next_state_negative_predicates))
-        self.partial_domain.actions[grounded_action.name].add_effects.difference_update(negative_literals)
-        self.partial_domain.actions[grounded_action.name].delete_effects.difference_update(positive_literals)
+        self._update_action_effects(grounded_action)
+        self._remove_not_possible_dependencies(grounded_action, previous_state, next_state)
+
+    def _is_action_safe(self, action, param, positive_preconditions):
+        pass
+
+    def _extract_effects_dependency_set(self, action, param):
+        pass
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
