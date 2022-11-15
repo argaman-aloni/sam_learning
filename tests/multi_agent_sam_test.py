@@ -102,27 +102,6 @@ def test_locate_executing_action_when_two_actions_are_in_the_joint_action_return
            [do_plane_first_action_call, do_plane_second_action_call]
 
 
-def test_create_fully_observable_predicates_adds_all_missing_state_predicates_correctly(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation, do_plane_first_action_call: ActionCall):
-    component = multi_agent_observation.components[1]
-    initial_state = multi_agent_observation.components[0].previous_state
-    next_state = component.next_state
-    observed_objects = multi_agent_observation.grounded_objects
-    _, negative_predicates = ma_sam._create_complete_world_state(relevant_objects=observed_objects,
-                                                                 state=initial_state)
-    positive_predicates, negative_predicates = ma_sam.create_fully_observable_predicates(
-        next_state, negative_state_predicates=negative_predicates)
-    state_predicates = []
-    for predicates in next_state.state_predicates.values():
-        state_predicates.extend(predicates)
-
-    assert len(positive_predicates) == len(state_predicates)
-    assert len(negative_predicates) > 0
-    negative_predicates_str = [p.untyped_representation for p in negative_predicates]
-    positive_predicates_str = [p.untyped_representation for p in positive_predicates]
-    assert all([p not in positive_predicates_str for p in negative_predicates_str])
-
-
 def test_compute_interacting_actions_returns_empty_list_if_no_action_interacts_with_the_predicate(
         ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain):
     lifted_predicate = combined_domain.predicates["boardsize-successor"]

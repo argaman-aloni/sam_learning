@@ -26,6 +26,7 @@ class SAMLearner:
     previous_state_negative_predicates: Set[GroundedPredicate]
     next_state_negative_predicates: Set[GroundedPredicate]
     next_state_positive_predicates: Set[GroundedPredicate]
+    current_trajectory_objects: Dict[str, PDDLObject]
 
     def __init__(self, partial_domain: Domain):
         self.logger = logging.getLogger(__name__)
@@ -140,12 +141,12 @@ class SAMLearner:
         possible_negative_predicates.update(lifted_matches)
         return possible_negative_predicates
 
-    def _add_new_action_preconditions(self, grounded_action: ActionCall, observed_action: LearnerAction) -> None:
+    def _add_new_action_preconditions(self, grounded_action: ActionCall) -> None:
         """General method to add new action's discrete preconditions.
 
         :param grounded_action: the action that is currently being executed.
-        :param observed_action: the action that is being added to the domain.
         """
+        observed_action = self.partial_domain.actions[grounded_action.name]
         possible_preconditions = set()
         negative_predicates = self._add_negative_predicates(grounded_action)
         lifted_matches = self.matcher.get_possible_literal_matches(
@@ -179,7 +180,7 @@ class SAMLearner:
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
-        self._add_new_action_preconditions(grounded_action, observed_action)
+        self._add_new_action_preconditions(grounded_action)
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 

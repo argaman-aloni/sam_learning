@@ -223,22 +223,17 @@ class MultiAgentSAM(SAMLearner):
         literals_cnf[grounded_effect.lifted_untyped_representation].add_possible_effect(concurrent_execution)
 
     def update_single_agent_executed_action(
-            self, executed_action: ActionCall, previous_state: State, next_state: State,
-            negative_state_predicates: Set[GroundedPredicate]) -> None:
+            self, executed_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Handles the situations where only one agent executed an action in a joint action.
 
         :param executed_action: the single operational action in the joint action.
         :param previous_state: the state prior to the action's execution.
         :param next_state: the state following the action's execution.
-        :param negative_state_predicates: the negative state predicates.
         """
         self.logger.info(f"Handling the execution of {str(executed_action)}.")
-        positive_next_state_predicates, negative_next_state_predicates = \
-            create_fully_observable_predicates(next_state, negative_state_predicates)
         observed_action = self.partial_domain.actions[executed_action.name]
         if executed_action.name not in self.observed_actions:
-            super()._add_new_action_preconditions(executed_action, observed_action,
-                                                  negative_state_predicates, previous_state)
+            super()._add_new_action_preconditions(executed_action)
             self.observed_actions.append(observed_action.name)
 
         else:
@@ -250,9 +245,9 @@ class MultiAgentSAM(SAMLearner):
         self.add_must_be_effect_to_cnf(executed_action, grounded_del_effects, self.negative_literals_cnf)
 
         relevant_not_add_effects = self._extract_relevant_not_effects(
-            negative_next_state_predicates, [executed_action], executed_action)
+            list(self.next_state_negative_predicates), [executed_action], executed_action)
         relevant_not_del_effects = self._extract_relevant_not_effects(
-            positive_next_state_predicates, [executed_action], executed_action)
+            list(self.next_state_positive_predicates), [executed_action], executed_action)
 
         if len(relevant_not_add_effects) > 0:
             self.add_not_effect_to_cnf(executed_action, relevant_not_add_effects, self.positive_literals_cnf)
@@ -261,36 +256,32 @@ class MultiAgentSAM(SAMLearner):
             self.add_not_effect_to_cnf(executed_action, relevant_not_del_effects, self.negative_literals_cnf)
 
     def update_multiple_executed_actions(
-            self, joint_action: JointActionCall, previous_state: State, next_state: State,
-            negative_state_predicates: Set[GroundedPredicate]) -> None:
+            self, joint_action: JointActionCall, previous_state: State, next_state: State) -> None:
         """Handles the case where more than one action is executed in a single trajectory triplet.
 
         :param joint_action: the joint action that was executed.
         :param previous_state: the state prior to the joint action's execution.
         :param next_state: the state following the joint action's execution.
-        :param negative_state_predicates: the negative state predicates.
         """
         self.logger.info("Learning when multiple actions are executed concurrently.")
         executing_actions = self._locate_executing_action(joint_action)
         for executed_action in executing_actions:
             observed_action = self.partial_domain.actions[executed_action.name]
+            self._create_fully_observable_triplet_predicates(executed_action, previous_state, next_state)
             if executed_action.name not in self.observed_actions:
-                super()._add_new_action_preconditions(executed_action, observed_action, negative_state_predicates,
-                                                      previous_state)
+                super()._add_new_action_preconditions(executed_action)
                 self.observed_actions.append(observed_action.name)
 
             else:
                 super()._update_action_preconditions(executed_action, previous_state)
 
-        positive_next_state_predicates, negative_next_state_predicates = \
-            create_fully_observable_predicates(next_state, negative_state_predicates)
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         self.logger.debug("Updating the negative state predicates based on the action's execution.")
         for executed_action in executing_actions:
             relevant_not_add_effects = self._extract_relevant_not_effects(
-                negative_next_state_predicates, executing_actions, executed_action)
+                list(self.next_state_negative_predicates), executing_actions, executed_action)
             relevant_not_del_effects = self._extract_relevant_not_effects(
-                positive_next_state_predicates, executing_actions, executed_action)
+                list(self.next_state_positive_predicates), executing_actions, executed_action)
 
             if len(relevant_not_add_effects) > 0:
                 self.add_not_effect_to_cnf(executed_action, relevant_not_add_effects, self.positive_literals_cnf)
@@ -303,28 +294,24 @@ class MultiAgentSAM(SAMLearner):
         for grounded_del_effect in grounded_del_effects:
             self.handle_concurrent_execution(grounded_del_effect, executing_actions, self.negative_literals_cnf)
 
-    def handle_multi_agent_trajectory_component(
-            self, component: MultiAgentComponent, trajectory_objects: Dict[str, PDDLObject]) -> None:
+    def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:
         """Handles a single multi-agent triplet in the observed trajectory.
 
         :param component: the triplet to handle.
-        :param trajectory_objects: the objects observed in the current trakectory.
         """
         previous_state = component.previous_state
         joint_action = component.grounded_joint_action
         next_state = component.next_state
-        _, negative_state_predicates = super()._create_complete_world_state(trajectory_objects, previous_state)
 
         action_count = joint_action.action_count
         if action_count == 1:
             executing_action = self._locate_executing_action(joint_action)[0]
-            self.update_single_agent_executed_action(executing_action, previous_state, next_state,
-                                                     negative_state_predicates)
+            self._create_fully_observable_triplet_predicates(executing_action, previous_state, next_state)
+            self.update_single_agent_executed_action(executing_action, previous_state, next_state)
             return
 
         self.logger.debug("More than one action is being executed in the current triplet.")
-        self.update_multiple_executed_actions(joint_action, previous_state, next_state,
-                                              negative_state_predicates)
+        self.update_multiple_executed_actions(joint_action, previous_state, next_state)
 
     def construct_safe_actions(self) -> None:
         """Constructs the single-agent actions that are safe to execute."""
@@ -358,10 +345,9 @@ class MultiAgentSAM(SAMLearner):
         self._initialize_cnfs()
         super().deduce_initial_inequality_preconditions()
         for index, observation in enumerate(observations):
-            trajectory_objects = observation.grounded_objects
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
-                self.handle_multi_agent_trajectory_component(component, trajectory_objects)
+                self.handle_multi_agent_trajectory_component(component)
 
         self.construct_safe_actions()
         self.logger.info("Finished learning the action model!")

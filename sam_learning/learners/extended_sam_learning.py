@@ -2,7 +2,7 @@
 from collections import defaultdict
 from typing import List, Tuple, Dict, Set
 
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, \
     GroundedPredicate
 
 from sam_learning.core import extract_effects, LearnerDomain, LiteralCNF
@@ -119,20 +119,17 @@ class ExtendedSAM(SAMLearner):
         self._remove_impossible_effects(grounded_action, next_state.state_predicates)
         return must_be_add_effects, must_be_delete_effects
 
-    def add_new_action(self, grounded_action: ActionCall, previous_state: State,
-                       next_state: State, observed_objects: Dict[str, PDDLObject]) -> None:
+    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
         :param previous_state: the state that the action was executed on.
         :param next_state: the state that was created after executing the action on the previous
-        :param observed_objects: the objects that were observed in the current trajectory.
-            state.
         """
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
-        super()._add_new_action_preconditions(grounded_action, observed_action, observed_objects, previous_state)
+        super()._add_new_action_preconditions(grounded_action)
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
@@ -161,20 +158,19 @@ class ExtendedSAM(SAMLearner):
         observed_action.delete_effects.update(lifted_delete_effects)
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
-    def handle_single_trajectory_component(self, component: ObservedComponent,
-                                           observed_objects: Dict[str, PDDLObject]) -> None:
+    def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
         """Handles a single trajectory component as a part of the learning process.
 
         :param component: the trajectory component that is being handled at the moment.
-        :param observed_objects: the objects that were observed in the current trajectory.
         """
         previous_state = component.previous_state
         grounded_action = component.grounded_action_call
         next_state = component.next_state
         action_name = grounded_action.name
 
+        super()._create_fully_observable_triplet_predicates(grounded_action, previous_state, next_state)
         if action_name not in self.observed_actions:
-            self.add_new_action(grounded_action, previous_state, next_state, observed_objects)
+            self.add_new_action(grounded_action, previous_state, next_state)
 
         else:
             self.update_action(grounded_action, previous_state, next_state)
@@ -198,8 +194,9 @@ class ExtendedSAM(SAMLearner):
         self.logger.info("Starting to learn the action model!")
         super().deduce_initial_inequality_preconditions()
         for observation in observations:
+            self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
-                self.handle_single_trajectory_component(component, observation.grounded_objects)
+                self.handle_single_trajectory_component(component)
 
         if self.should_create_proxy_actions:
             self.logger.info("Starting to create proxy actions for the effects that were not determined.")
