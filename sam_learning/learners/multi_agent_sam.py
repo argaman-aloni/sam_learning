@@ -4,10 +4,9 @@ from collections import defaultdict
 from typing import Dict, List, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, NOP_ACTION, \
-    MultiAgentObservation, ActionCall, State, GroundedPredicate, JointActionCall, PDDLObject
+    MultiAgentObservation, ActionCall, State, GroundedPredicate, JointActionCall
 
-from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, \
-    create_fully_observable_predicates
+from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction
 from sam_learning.learners import SAMLearner
 
 
@@ -343,6 +342,7 @@ class MultiAgentSAM(SAMLearner):
         """
         self.logger.info("Starting to learn the action model!")
         self._initialize_cnfs()
+
         super().deduce_initial_inequality_preconditions()
         for index, observation in enumerate(observations):
             self.current_trajectory_objects = observation.grounded_objects

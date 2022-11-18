@@ -8,8 +8,10 @@ from typing import List, Optional
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import MultiAgentObservation
 
+from experiments import NumericPerformanceCalculator
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
+from experiments.utils import init_numeric_performance_calculator
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import MultiAgentSAM
 from utilities import LearningAlgorithmType, SolverType
@@ -27,6 +29,8 @@ class MAPlanningWithOfflineLearning:
     learning_statistics_manager: LearningStatisticsManager
     domain_validator: DomainValidator
     executing_agents: List[str]
+    performance_calculator: NumericPerformanceCalculator
+    ma_domain_path: Path
 
     def __init__(self, working_directory_path: Path, domain_file_name: str, executing_agents: List[str] = None):
         self.logger = logging.getLogger(__name__)
@@ -43,6 +47,8 @@ class MAPlanningWithOfflineLearning:
             self.working_directory_path, LearningAlgorithmType.ma_sam, self.working_directory_path / domain_file_name,
             solver_type=SolverType.fast_downward)
         self.executing_agents = executing_agents
+        self.performance_calculator = None
+        self.ma_domain_path = None
 
     def _filter_baseline_multi_agent_trajectory(
             self, complete_observation: MultiAgentObservation) -> MultiAgentObservation:
@@ -106,6 +112,7 @@ class MAPlanningWithOfflineLearning:
                                              partial_domain, test_set_dir_path)
             time.sleep(1)
 
+        self.performance_calculator.calculate_semantic_performance(self.ma_domain_path, len(allowed_complete_observations))
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
@@ -129,8 +136,9 @@ class MAPlanningWithOfflineLearning:
         learned_model, learning_report = learner.learn_combined_action_model(allowed_complete_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_complete_observations, learned_model,
                                                              learning_report)
-        self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories.pddl")
+        self.ma_domain_path = self.working_directory_path / "results_directory" / \
+                              f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories.pddl"
+        self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
         self.validate_learned_domain(allowed_complete_observations, learned_model, test_set_dir_path)
 
     def validate_learned_domain(self, allowed_observations: List[MultiAgentObservation],
@@ -154,6 +162,9 @@ class MAPlanningWithOfflineLearning:
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
+        self.performance_calculator = init_numeric_performance_calculator(
+            self.working_directory_path, self.domain_file_name, LearningAlgorithmType.ma_sam,
+            executing_agents=self.executing_agents)
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_ma_model_offline(fold_num, train_dir_path, test_dir_path)
@@ -162,6 +173,7 @@ class MAPlanningWithOfflineLearning:
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
         self.domain_validator.write_complete_joint_statistics()
+        self.performance_calculator.export_combined_semantic_performance()
 
 
 def parse_arguments() -> argparse.Namespace:
