@@ -73,3 +73,54 @@ def test_remove_dependencies_removed_correct_set_of_literals_and_all_subsets(woo
     predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
     dependency_set.remove_dependencies(tested_predicate, predicates_to_remove)
     assert len(dependency_set.dependencies[tested_predicate]) == 378 + 28 - 3
+
+
+def test_is_safe_literal_returns_literal_unsafe_if_contains_more_that_one_item(woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=2)
+    dependency_set.initialize_dependencies(set(woodworking_predicates))
+    tested_predicate = "(available ?obj)"
+    predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
+    assert not dependency_set.is_safe_literal(tested_predicate, predicates_to_remove)
+
+
+def test_is_safe_literal_returns_literal_safe_if_contains_zero_items(woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=2)
+    tested_predicate = "(available ?obj)"
+    dependency_set.dependencies[tested_predicate] = []
+    predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
+    assert dependency_set.is_safe_literal(tested_predicate, predicates_to_remove)
+
+
+def test_is_safe_literal_returns_literal_safe_if_contains_one_item(woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=2)
+    tested_predicate = "(available ?obj)"
+    dependency_set.dependencies[tested_predicate] = [{"(available ?obj)"}]
+    predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
+    assert dependency_set.is_safe_literal(tested_predicate, predicates_to_remove)
+
+
+def test_is_safe_returns_false_on_initialized_literals_set(woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=2)
+    dependency_set.initialize_dependencies(set(woodworking_predicates))
+
+    predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
+    assert not dependency_set.is_safe(predicates_to_remove)
+
+
+def test_extract_restrictive_conditions_converts_all_positive_predicates_to_negatives_and_negatives_to_positive(
+        woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=2)
+    dependency_set.initialize_dependencies(set(woodworking_predicates))
+
+    literals_str = {literal.untyped_representation for literal in woodworking_predicates}
+    literals_str.update({f"(not {literal.untyped_representation})" for literal in woodworking_predicates})
+
+    positive_predicates, negative_predicates = dependency_set.extract_restrictive_conditions()
+    assert len(positive_predicates) + len(negative_predicates) == len(literals_str)
+    assert len(positive_predicates) == len(negative_predicates)
+    assert positive_predicates == negative_predicates

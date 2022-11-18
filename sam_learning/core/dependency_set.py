@@ -1,6 +1,6 @@
 """Module representing the dependency set of an action."""
 import itertools
-from typing import Set, Dict, List
+from typing import Set, Dict, List, Tuple, Optional
 
 from pddl_plus_parser.models import Predicate
 
@@ -51,12 +51,55 @@ class DependencySet:
             if dependency in self.dependencies[literal]:
                 self.dependencies[literal].remove(dependency)
 
-    def is_conditional_effect(self, literal: str, preconditions_literals: Set[str]) -> bool:
+    def is_safe_conditional_effect(self, literal: str) -> bool:
         """Determines whether the literal is a conditional effect with safe number of antecedents.
+
+        :param literal: the literal to check.
+        :return: True if the dependency set is safe, False otherwise.
+        """
+        return len(self.dependencies[literal]) == 1 and self.dependencies[literal][0] != {literal}
+
+    def is_safe_literal(self, literal: str, preconditions_literals: Optional[Set[str]] = None) -> bool:
+        """Determines whether the literal is safe in terms of number of antecedents.
 
         :param literal: the literal to check.
         :param preconditions_literals: the preconditions of the action.
         :return: True if the dependency set is safe, False otherwise.
         """
-        self.remove_dependencies(literal, preconditions_literals)
-        return len(self.dependencies[literal]) == 1 and self.dependencies[literal][0] != {literal}
+        if preconditions_literals is not None:
+            self.remove_dependencies(literal, preconditions_literals)
+
+        return len(self.dependencies[literal]) <= 1
+
+    def is_safe(self, preconditions_literals: Set[str]) -> bool:
+        """Determines whether the dependency set of an action is safe for all possible lifted literals.
+
+        :param preconditions_literals: the preconditions of the action.
+        :return: True if the entire dependency set is safe, False otherwise.
+        """
+        for literal in self.dependencies:
+            if not self.is_safe_literal(literal, preconditions_literals):
+                return False
+
+        return True
+
+    def extract_restrictive_conditions(self) -> Tuple[Set[str], Set[str]]:
+        """Extracts the safe conditional effects from the dependency set.
+
+        :return: the negative and positive conditions that need to be added.
+        """
+        safe_conditions = set()
+        for literal in self.dependencies:
+            # assuming that at this point the precondition is already removed from the dependency set
+            if not self.is_safe_literal(literal):
+                safe_conditions.update(*self.dependencies[literal])
+
+        positive_predicates = set()
+        negative_predicates = set()
+        for condition in safe_conditions:
+            if condition.startswith("(not "):
+                positive_predicates.add(f"{condition[5:-1]}")
+            else:
+                negative_predicates.add(condition)
+
+        return positive_predicates, negative_predicates

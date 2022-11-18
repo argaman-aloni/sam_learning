@@ -112,7 +112,9 @@ class MAPlanningWithOfflineLearning:
                                              partial_domain, test_set_dir_path)
             time.sleep(1)
 
-        self.performance_calculator.calculate_semantic_performance(self.ma_domain_path, len(allowed_complete_observations))
+        self.performance_calculator.calculate_semantic_performance(self.ma_domain_path,
+                                                                   len(allowed_complete_observations))
+        self.performance_calculator.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 

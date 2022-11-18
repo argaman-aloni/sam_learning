@@ -3,10 +3,23 @@ import logging
 from typing import Dict, List, Optional, Set, Tuple
 
 from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall, Observation, \
-    ObservedComponent
+    ObservedComponent, Predicate, ConditionalEffect
 
-from sam_learning.core import DependencySet, LearnerDomain, extract_effects
+from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction
 from sam_learning.learners import SAMLearner
+
+
+def _extract_predicate_data(action: LearnerAction, predicate_str: str) -> Predicate:
+    """Extracts the lifted bounded predicate from the string.
+
+    :param action: the action that contains the predicate.
+    :param predicate_str: the string representation of the predicate.
+    :return: the predicate object matching the string.
+    """
+    predicate_data = predicate_str.replace("(", "").replace(")", "").split(" ")
+    predicate_name = predicate_data[0]
+    predicate_signature = {parameter: action.signature[parameter] for parameter in predicate_data[1:]}
+    return Predicate(predicate_name, predicate_signature)
 
 
 class ConditionalSAM(SAMLearner):
@@ -83,14 +96,14 @@ class ConditionalSAM(SAMLearner):
         state_negative_literals = self.matcher.get_possible_literal_matches(
             grounded_action, list(negative_predicates))
         # since we want to capture the literals NOT in s' we will transpose the literals values.
-        missing_next_state_literals_str = [f"(not {literal.untyped_representation})" for literal in
-                                           state_positive_literals]
-        missing_next_state_literals_str.extend([literal.untyped_representation for literal in state_negative_literals])
-        return set(missing_next_state_literals_str)
+        missing_state_literals_str = [f"(not {literal.untyped_representation})" for literal in
+                                      state_positive_literals]
+        missing_state_literals_str.extend([literal.untyped_representation for literal in state_negative_literals])
+        return set(missing_state_literals_str)
 
     def _find_literals_existing_in_state(
             self, grounded_action: ActionCall, positive_predicates, negative_predicates) -> Set[str]:
-        """Finds the literals that do exist in the state.
+        """Finds the literals present in the current state.
 
         :param grounded_action: the action that is being executed.
         :param positive_predicates: the positive state predicates.
@@ -146,12 +159,11 @@ class ConditionalSAM(SAMLearner):
 
     def _remove_not_possible_dependencies(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
-        """
+        """Removes the literals that are not possible as antecedent candidates from the dependency set.
 
-        :param grounded_action:
-        :param previous_state:
-        :param next_state:
-        :return:
+        :param grounded_action: the action that is currently being executed.
+        :param previous_state: the state prior to the action's execution.
+        :param next_state: the state following the action's execution.
         """
         self._remove_existing_previous_state_dependencies(grounded_action)
         self._remove_non_existing_previous_state_dependencies(
@@ -167,11 +179,61 @@ class ConditionalSAM(SAMLearner):
         self._update_action_effects(grounded_action)
         self._remove_not_possible_dependencies(grounded_action, previous_state, next_state)
 
-    def _is_action_safe(self, action, param, positive_preconditions):
-        pass
+    def _is_action_safe(self, action: LearnerAction, action_dependency_set: DependencySet) -> bool:
+        """Checks if the action complies with the safety conditions.
 
-    def _extract_effects_dependency_set(self, action, param):
-        pass
+        :param action: the action being tested.
+        :param action_dependency_set: the action's dependency set.
+        :return: True if the action is safe, False otherwise.
+        """
+        self.logger.debug(f"Checking if action {action.name} is safe.")
+        preconditions_str = {precondition.untyped_representation for precondition in
+                             action.positive_preconditions}
+        preconditions_str.update([f"(not {precondition})" for precondition in action.negative_preconditions])
+
+        return action_dependency_set.is_safe(preconditions_str)
+
+    def _construct_restrictive_preconditions(
+            self, action: LearnerAction, action_dependency_set: DependencySet) -> None:
+        """Constructs the additional preconditions that are required for the action to be safe.
+
+        :param action: the action that contains unsafe literals in the effects.
+        :param action_dependency_set: the action's dependency set.
+        """
+        self.logger.info(f"Constructing restrictive preconditions for the unsafe action {action.name}.")
+        positive_conditions, negative_conditions = action_dependency_set.extract_restrictive_conditions()
+        for predicate_str in positive_conditions:
+            action.positive_preconditions.add(_extract_predicate_data(action, predicate_str))
+
+        for predicate_str in negative_conditions:
+            action.negative_preconditions.add(_extract_predicate_data(action, predicate_str))
+
+    def _construct_conditional_effects_from_dependency_set(
+            self, action: LearnerAction, action_dependency_set: DependencySet) -> None:
+        """Constructs the conditional effects of the action from the data available in the dependency set.
+
+        :param action: the action that is being constructed.
+        :param action_dependency_set: the action's dependency set.
+        """
+        for literal, dependencies in action_dependency_set.dependencies.items():
+            if not action_dependency_set.is_safe_conditional_effect(literal):
+                self.logger.debug(f"The literal {literal} is not a conditional effect.")
+                continue
+
+            self.logger.debug(f"Extracting the conditional effect - {literal} from the dependency set.")
+            conditional_effect = ConditionalEffect()
+            if literal.startswith("(not"):
+                conditional_effect.add_effects.add(_extract_predicate_data(action, f"{literal[5:-1]}"))
+
+            else:
+                conditional_effect.delete_effects.add(_extract_predicate_data(action, literal))
+
+            positive_conditions, negative_conditions = action_dependency_set.extract_restrictive_conditions()
+            for predicate_str in positive_conditions:
+                conditional_effect.positive_conditions.add(_extract_predicate_data(action, predicate_str))
+
+            for predicate_str in negative_conditions:
+                conditional_effect.negative_conditions.add(_extract_predicate_data(action, predicate_str))
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
@@ -201,10 +263,9 @@ class ConditionalSAM(SAMLearner):
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
     def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
-        """
+        """Handles a single trajectory component as a part of the learning process.
 
-        :param component:
-        :return:
+        :param component: the trajectory component that is being handled at the moment.
         """
         previous_state = component.previous_state
         grounded_action = component.grounded_action_call
@@ -224,15 +285,17 @@ class ConditionalSAM(SAMLearner):
             if action.name not in self.observed_actions:
                 continue
 
-            self.logger.debug("Constructing safe action for %s", action.name)
-            if not self._is_action_safe(action, self.dependency_set[action.name], action.positive_preconditions):
+            self.logger.debug("Removing preconditions predicates from the action's effects.")
+            action.add_effects.difference_update(action.positive_preconditions)
+            action.delete_effects.difference_update(action.negative_preconditions)
+
+            if not self._is_action_safe(action, self.dependency_set[action.name]):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                action.positive_preconditions = set()
-                action.negative_preconditions = set()
+                self._construct_restrictive_preconditions(action, self.dependency_set[action.name])
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)
-            self._extract_effects_dependency_set(action, self.dependency_set[action.name])
+            self._construct_conditional_effects_from_dependency_set(action, self.dependency_set[action.name])
             self.safe_actions.append(action.name)
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
