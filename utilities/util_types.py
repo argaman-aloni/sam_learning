@@ -10,9 +10,10 @@ class LearningAlgorithmType(Enum):
     polynomial_sam = 6
     ma_sam = 7
     ma_sam_baseline = 8
+    conditional_sam = 9
     # learning algorithms relating to fault repair not to be used for POL
-    oblique_tree = 9
-    extended_svc = 10
+    oblique_tree = 10
+    extended_svc = 11
 
 
 class SolverType(Enum):

@@ -2,7 +2,7 @@
 import logging
 from collections import defaultdict
 from itertools import combinations
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict, Set, Optional
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
     GroundedPredicate
@@ -106,13 +106,14 @@ class SAMLearner:
         return lifted_add_effects, lifted_delete_effects
 
     def _update_action_preconditions(
-            self, grounded_action: ActionCall, previous_state: State) -> None:
+            self, grounded_action: ActionCall, previous_state: State,
+            action_to_update: Optional[LearnerAction] = None) -> None:
         """Updates the preconditions of an action after it was observed at least once.
 
         :param grounded_action: the grounded action that is being executed in the trajectory component.
         :param previous_state: the state that was seen prior to the action's execution.
         """
-        current_action = self.partial_domain.actions[grounded_action.name]
+        current_action = action_to_update or self.partial_domain.actions[grounded_action.name]
         possible_preconditions = set()
         for lifted_predicate_name, grounded_state_predicates in previous_state.state_predicates.items():
             self.logger.debug(f"trying to match the predicate - {lifted_predicate_name} "
@@ -141,12 +142,15 @@ class SAMLearner:
         possible_negative_predicates.update(lifted_matches)
         return possible_negative_predicates
 
-    def _add_new_action_preconditions(self, grounded_action: ActionCall) -> None:
+    def _add_new_action_preconditions(self, grounded_action: ActionCall,
+                                      action_to_update: Optional[LearnerAction] = None) -> None:
         """General method to add new action's discrete preconditions.
 
         :param grounded_action: the action that is currently being executed.
+        :param action_to_update: the action that is being updated, if None the action is
+            created based on the partial domain.
         """
-        observed_action = self.partial_domain.actions[grounded_action.name]
+        observed_action = action_to_update or self.partial_domain.actions[grounded_action.name]
         possible_preconditions = set()
         negative_predicates = self._add_negative_predicates(grounded_action)
         lifted_matches = self.matcher.get_possible_literal_matches(

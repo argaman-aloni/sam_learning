@@ -107,10 +107,7 @@ class MAPlanningWithOfflineLearning:
             allowed_filtered_observations.append(filtered_observation)
             self.logger.info(f"Learning the action model using {len(allowed_complete_observations)} trajectories!")
             self.learn_non_modified_trajectories(allowed_complete_observations, partial_domain, test_set_dir_path)
-            time.sleep(1)
-            self.learn_baseline_action_model(allowed_filtered_observations, allowed_complete_observations,
-                                             partial_domain, test_set_dir_path)
-            time.sleep(1)
+            self.learn_baseline_action_model(allowed_filtered_observations, partial_domain, test_set_dir_path)
 
         self.performance_calculator.calculate_semantic_performance(self.ma_domain_path,
                                                                    len(allowed_complete_observations))
@@ -118,9 +115,7 @@ class MAPlanningWithOfflineLearning:
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
-    def learn_baseline_action_model(self, allowed_filtered_observations, allowed_complete_observations,
-                                    partial_domain, test_set_dir_path):
-        initial_states = [observation.components[0].previous_state for observation in allowed_complete_observations]
+    def learn_baseline_action_model(self, allowed_filtered_observations, partial_domain, test_set_dir_path):
         learner = MultiAgentSAM(partial_domain=partial_domain)
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam.ma_sam_baseline
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_baseline
@@ -176,6 +171,7 @@ class MAPlanningWithOfflineLearning:
 
         self.domain_validator.write_complete_joint_statistics()
         self.performance_calculator.export_combined_semantic_performance()
+        self.learning_statistics_manager.export_all_folds_action_stats()
 
 
 def parse_arguments() -> argparse.Namespace:

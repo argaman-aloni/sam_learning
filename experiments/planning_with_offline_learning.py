@@ -13,14 +13,15 @@ from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
 from experiments.utils import init_numeric_performance_calculator
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, MultiAgentSAM
+from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
-                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]
+                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam,
+                      LearningAlgorithmType.conditional_sam]
 
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
@@ -28,6 +29,7 @@ LEARNING_ALGORITHMS = {
     # difference is that the learner is not given any fluents to assist in learning
     LearningAlgorithmType.raw_numeric_sam: NumericSAMLearner,
     LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
+    LearningAlgorithmType.conditional_sam: ConditionalSAM,
 }
 
 
@@ -110,10 +112,6 @@ class POL:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if index % 5 != 0:
-                self.logger.info(f"Skipping the iteration {index} to save the total amount of time!")
-                continue
-
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map)
@@ -165,10 +163,10 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the POL algorithm on the input domain.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
-    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6, 7, 8],
+    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6, 9],
                         help="The type of learning algorithm. "
                              "\n 1: sam_learning\n2: esam_learning\n3: numeric_sam\n4: raw_numeric_sam\n"
-                             "6: polynomial_sam\n 7: ma_sam\n 8: ma_sam_baseline")
+                             "6: polynomial_sam\n 9: conditional_sam")
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
                                                                    "fluents", default=None)
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
@@ -180,15 +178,11 @@ def parse_arguments() -> argparse.Namespace:
 
 def main():
     args = parse_arguments()
-    executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
-        if args.executing_agents is not None else None
-
     offline_learner = POL(working_directory_path=Path(args.working_directory_path),
                           domain_file_name=args.domain_file_name,
                           learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
                           fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-                          solver_type=SolverType(args.solver_type),
-                          executing_agents=executing_agents)
+                          solver_type=SolverType(args.solver_type))
     offline_learner.run_cross_validation()
 
 

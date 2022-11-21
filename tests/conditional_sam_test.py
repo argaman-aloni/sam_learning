@@ -5,7 +5,9 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, Trajector
 from pddl_plus_parser.models import Domain, Problem, Observation, GroundedPredicate
 from pytest import fixture
 
+from sam_learning.core import DependencySet
 from sam_learning.learners import ConditionalSAM
+from sam_learning.learners.conditional_sam import _extract_predicate_data
 from tests.consts import SPIDER_DOMAIN_PATH, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH
 
 
@@ -305,3 +307,82 @@ def test_is_action_safe_with_a_new_action_returns_that_action_is_not_safe(condit
 
     assert not conditional_sam._is_action_safe(conditional_sam.partial_domain.actions[grounded_action.name],
                                                conditional_sam.dependency_set[grounded_action.name])
+
+
+def test_extract_predicate_data_returns_correct_predicate_when_predicate_contains_no_parameters(
+        conditional_sam: ConditionalSAM, spider_domain: Domain):
+    test_predicate = "(currently-updating-movable )"
+    learner_action = conditional_sam.partial_domain.actions["start-dealing"]
+    result_predicate = _extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
+    assert result_predicate.name == "currently-updating-movable"
+    assert len(result_predicate.signature) == 0
+
+
+def test_extract_predicate_data_returns_correct_predicate_predicate_contains_parameters(
+        conditional_sam: ConditionalSAM, spider_domain: Domain):
+    test_predicate = "(to-deal ?c ?totableau ?fromdeal ?from)"
+    learner_action = conditional_sam.partial_domain.actions["deal-card"]
+    result_predicate = _extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
+    assert result_predicate.name == "to-deal"
+    assert len(result_predicate.signature) == 4
+    assert result_predicate.signature["?c"].name == "card"
+    assert result_predicate.signature["?totableau"].name == "tableau"
+    assert result_predicate.signature["?fromdeal"].name == "deal"
+    assert result_predicate.signature["?from"].name == "cardposition"
+
+
+def test_extract_predicate_data_returns_correct_predicate_predicate_contains_constants(
+        conditional_sam: ConditionalSAM, spider_domain: Domain):
+    test_predicate = "(on ?c discard)"
+    learner_action = conditional_sam.partial_domain.actions["collect-card"]
+    result_predicate = _extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
+    assert result_predicate.name == "on"
+    assert len(result_predicate.signature) == 2
+    assert result_predicate.signature["?c"].name == "card"
+    assert result_predicate.signature["discard"].name == "cardposition"
+
+
+def test_construct_conditional_effects_from_dependency_set_constructs_correct_conditional_effect(
+        conditional_sam: ConditionalSAM):
+    dependecy_set = DependencySet(max_size_antecedents=1)
+    dependecy_set.dependencies = {
+        "(currently-updating-unmovable )": [{"(not (can-continue-group ?c ?to))"}],
+        "(make-unmovable ?to)": [{"(not (can-continue-group ?c ?to))"}]
+    }
+    test_action = conditional_sam.partial_domain.actions["deal-card"]
+
+    conditional_sam._construct_conditional_effects_from_dependency_set(test_action, dependecy_set)
+    conditional_effects = conditional_sam.partial_domain.actions[test_action.name].conditional_effects
+    assert len(conditional_effects) == 2
+
+    effect = conditional_effects.pop()
+    assert len(effect.negative_conditions) == 1
+    assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
+    assert effect.add_effects.pop().untyped_representation == "(currently-updating-unmovable )"
+
+    effect = conditional_effects.pop()
+    assert len(effect.negative_conditions) == 1
+    assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
+    assert effect.add_effects.pop().untyped_representation == "(make-unmovable ?to)"
+
+
+def test_handle_single_trajectory_component_learns_correct_information(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
+    conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
+    conditional_sam._remove_preconditions_from_effects(
+        conditional_sam.partial_domain.actions["start-dealing"])
+    print()
+    print(conditional_sam.partial_domain.actions["start-dealing"].to_pddl())
+
+
+def test_is_action_safe_returns_true_after_one_trajectory_component(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
+    conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
+    test_action = conditional_sam.partial_domain.actions["start-dealing"]
+    conditional_sam._is_action_safe(test_action, conditional_sam.dependency_set[test_action.name])
+    for dep, dep_data in conditional_sam.dependency_set[test_action.name].dependencies.items():
+        print(dep)
+        print()
+        print(dep_data)

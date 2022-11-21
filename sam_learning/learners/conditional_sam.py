@@ -3,22 +3,27 @@ import logging
 from typing import Dict, List, Optional, Set, Tuple
 
 from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall, Observation, \
-    ObservedComponent, Predicate, ConditionalEffect
+    ObservedComponent, Predicate, ConditionalEffect, PDDLConstant
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction
 from sam_learning.learners import SAMLearner
 
 
-def _extract_predicate_data(action: LearnerAction, predicate_str: str) -> Predicate:
+def _extract_predicate_data(action: LearnerAction, predicate_str: str,
+                            domain_constants: Dict[str, PDDLConstant]) -> Predicate:
     """Extracts the lifted bounded predicate from the string.
 
     :param action: the action that contains the predicate.
     :param predicate_str: the string representation of the predicate.
+    :param domain_constants: the constants of the domain if exist.
     :return: the predicate object matching the string.
     """
     predicate_data = predicate_str.replace("(", "").replace(")", "").split(" ")
+    predicate_data = [data for data in predicate_data if data != ""]
     predicate_name = predicate_data[0]
-    predicate_signature = {parameter: action.signature[parameter] for parameter in predicate_data[1:]}
+    combined_signature = {**action.signature}
+    combined_signature.update({constant.name: constant.type for constant in domain_constants.values()})
+    predicate_signature = {parameter: combined_signature[parameter] for parameter in predicate_data[1:]}
     return Predicate(predicate_name, predicate_signature)
 
 
@@ -28,7 +33,7 @@ class ConditionalSAM(SAMLearner):
     logger: logging.Logger
     max_antecedents_size: int
 
-    def __init__(self, partial_domain: Domain, max_antecedents_size: int,
+    def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
                  preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
@@ -203,10 +208,12 @@ class ConditionalSAM(SAMLearner):
         self.logger.info(f"Constructing restrictive preconditions for the unsafe action {action.name}.")
         positive_conditions, negative_conditions = action_dependency_set.extract_restrictive_conditions()
         for predicate_str in positive_conditions:
-            action.positive_preconditions.add(_extract_predicate_data(action, predicate_str))
+            action.positive_preconditions.add(_extract_predicate_data(
+                action, predicate_str, self.partial_domain.constants))
 
         for predicate_str in negative_conditions:
-            action.negative_preconditions.add(_extract_predicate_data(action, predicate_str))
+            action.negative_preconditions.add(_extract_predicate_data(
+                action, predicate_str, self.partial_domain.constants))
 
     def _construct_conditional_effects_from_dependency_set(
             self, action: LearnerAction, action_dependency_set: DependencySet) -> None:
@@ -223,17 +230,23 @@ class ConditionalSAM(SAMLearner):
             self.logger.debug(f"Extracting the conditional effect - {literal} from the dependency set.")
             conditional_effect = ConditionalEffect()
             if literal.startswith("(not"):
-                conditional_effect.add_effects.add(_extract_predicate_data(action, f"{literal[5:-1]}"))
+                conditional_effect.add_effects.add(_extract_predicate_data(
+                    action, f"{literal[5:-1]}", self.partial_domain.constants))
 
             else:
-                conditional_effect.delete_effects.add(_extract_predicate_data(action, literal))
+                conditional_effect.delete_effects.add(_extract_predicate_data(
+                    action, literal, self.partial_domain.constants))
 
-            positive_conditions, negative_conditions = action_dependency_set.extract_restrictive_conditions()
+            positive_conditions, negative_conditions = action_dependency_set.extract_safe_conditionals(literal)
             for predicate_str in positive_conditions:
-                conditional_effect.positive_conditions.add(_extract_predicate_data(action, predicate_str))
+                conditional_effect.positive_conditions.add(_extract_predicate_data(
+                    action, predicate_str, self.partial_domain.constants))
 
             for predicate_str in negative_conditions:
-                conditional_effect.negative_conditions.add(_extract_predicate_data(action, predicate_str))
+                conditional_effect.negative_conditions.add(_extract_predicate_data(
+                    action, predicate_str, self.partial_domain.constants))
+
+            action.conditional_effects.add(conditional_effect)
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
@@ -286,8 +299,7 @@ class ConditionalSAM(SAMLearner):
                 continue
 
             self.logger.debug("Removing preconditions predicates from the action's effects.")
-            action.add_effects.difference_update(action.positive_preconditions)
-            action.delete_effects.difference_update(action.negative_preconditions)
+            self._remove_preconditions_from_effects(action)
 
             if not self._is_action_safe(action, self.dependency_set[action.name]):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
@@ -297,6 +309,14 @@ class ConditionalSAM(SAMLearner):
             self.logger.debug("Action %s is safe to execute.", action.name)
             self._construct_conditional_effects_from_dependency_set(action, self.dependency_set[action.name])
             self.safe_actions.append(action.name)
+
+    def _remove_preconditions_from_effects(self, action: LearnerAction) -> None:
+        """Removes the preconditions predicates from the action's effects.
+
+        :param action: the learned action.
+        """
+        action.add_effects.difference_update(action.positive_preconditions)
+        action.delete_effects.difference_update(action.negative_preconditions)
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.

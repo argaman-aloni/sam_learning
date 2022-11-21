@@ -2,7 +2,8 @@
 from collections import defaultdict
 from typing import Set, List, Dict, Tuple
 
-from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain
+from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain, \
+    ConditionalEffect
 
 from .learning_types import ConditionType
 
@@ -25,6 +26,7 @@ class LearnerAction:
     add_effects: Set[Predicate]
     delete_effects: Set[Predicate]
     numeric_effects: List[str]  # set of the strings representing the equations creating the numeric effect.
+    conditional_effects: Set[ConditionalEffect]
 
     def __init__(self, name: str, signature: SignatureType):
         self.name = name
@@ -36,6 +38,7 @@ class LearnerAction:
         self.add_effects = set()
         self.delete_effects = set()
         self.numeric_effects = []
+        self.conditional_effects = set()
 
     def __str__(self):
         signature_str_items = []
@@ -97,17 +100,17 @@ class LearnerAction:
 
         :return: the preconditions in PDDL format.
         """
-        if len(self.positive_preconditions) == 0 and len(self.numeric_preconditions) == 0:
-            return "()"
-
         positive_preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
         negative_preconditions = [f"(not {precond.untyped_representation})" for precond in self.negative_preconditions]
 
-        precondition_str = self._extract_inequality_preconditions()
+        positive_preconditions_str = "\t\t\n".join(positive_preconditions)
+        negative_preconditions_str = "\t\t\n".join(negative_preconditions)
+        equality_conditions_str = self._extract_inequality_preconditions()
         if len(self.numeric_preconditions) > 0:
-            return self._extract_numeric_preconditions(positive_preconditions, negative_preconditions, precondition_str)
+            return self._extract_numeric_preconditions(positive_preconditions, negative_preconditions,
+                                                       equality_conditions_str)
 
-        return f"(and {' '.join(positive_preconditions)} \n\t\t{' '.join(negative_preconditions)} {precondition_str})"
+        return f"(and {positive_preconditions_str}\n\t\t{negative_preconditions_str}\n\t\t{equality_conditions_str})"
 
     def _effects_to_pddl(self) -> str:
         """Converts the effects to the needed PDDL format.
@@ -116,16 +119,20 @@ class LearnerAction:
         """
         add_effects = [effect.untyped_representation for effect in self.add_effects]
         delete_effects = [effect.untyped_representation for effect in self.delete_effects]
-        delete_effects_str = ""
-        if len(delete_effects) > 0:
-            delete_effects_str = " ".join([f"(not {effect})" for effect in delete_effects])
+        add_effects_str = "\n\t\t".join(add_effects)
+        delete_effects_str = "\n\t\t".join([f"(not {effect})" for effect in delete_effects])
+
+        conditional_effects = "\n\t\t"
+        conditional_effects += "\t\t\n".join([str(conditional_effect) for conditional_effect
+                                              in self.conditional_effects])
 
         if len(self.numeric_effects) > 0:
             numeric_effects = "\t\t\n".join([effect for effect in self.numeric_effects])
-            return f"(and {' '.join(add_effects)} {delete_effects_str}\n" \
-                   f"\t\t{numeric_effects}\n)"
+            return f"(and {add_effects_str} {delete_effects_str}\n" \
+                   f"\t\t{conditional_effects}\n" \
+                   f"{numeric_effects})"
 
-        return f"(and {' '.join(add_effects)} {delete_effects_str})"
+        return f"(and {add_effects_str} {delete_effects_str}{conditional_effects})"
 
     def to_pddl(self) -> str:
         """Returns the PDDL string representation of the action.

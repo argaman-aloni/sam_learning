@@ -83,6 +83,24 @@ class DependencySet:
 
         return True
 
+    def extract_safe_conditionals(self, literal: str) -> Tuple[Set[str], Set[str]]:
+        """Extracts the safe conditional effects from the dependency set.
+
+        :return: the safe conditional effects.
+        """
+        safe_conditionals = self.dependencies[literal].copy()
+        safe_conditions = safe_conditionals.pop()
+        positive_predicates = set()
+        negative_predicates = set()
+        for condition in safe_conditions:
+            if condition.startswith("(not "):
+                negative_predicates.add(f"{condition[5:-1]}")
+
+            else:
+                positive_predicates.add(condition)
+
+        return positive_predicates, negative_predicates
+
     def extract_restrictive_conditions(self) -> Tuple[Set[str], Set[str]]:
         """Extracts the safe conditional effects from the dependency set.
 

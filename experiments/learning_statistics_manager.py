@@ -2,14 +2,14 @@
 import csv
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, NoReturn, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, MultiAgentComponent
 
 from experiments.discrete_precision_recall_calculator import PrecisionRecallCalculator
-from utilities import LearningAlgorithmType
 from sam_learning.core import LearnerDomain
+from utilities import LearningAlgorithmType
 
 LEARNED_ACTIONS_STATS_COLUMNS = [
     "learning_algorithm",
@@ -17,11 +17,16 @@ LEARNED_ACTIONS_STATS_COLUMNS = [
     "num_trajectories",
     "num_trajectory_triplets",
     "total_number_of_actions",
+    "num_safe_actions",
+    "num_unsafe_actions",
     "learned_action_name",
     "num_triplets_action_appeared",
     "learned_discrete_preconditions",
+    "num_discrete_preconditions",
     "learned_discrete_add_effects",
+    "num_discrete_add_effects",
     "learned_discrete_delete_effects",
+    "num_discrete_delete_effects",
     "ground_truth_preconditions",
     "ground_truth_add_effects",
     "ground_truth_delete_effects",
@@ -42,7 +47,6 @@ NUMERIC_LEARNING_STAT_COLUMNS = [
     "num_trajectories",
     "num_trajectory_triplets",
     "total_number_of_actions",
-    "#numeric_actions_learned_ok",
     "#numeric_actions_no_solution",
     "#numeric_actions_no_convex_hull",
     "#numeric_actions_infinite_number_solutions",
@@ -112,13 +116,13 @@ class LearningStatisticsManager:
              self.model_domain.actions[action_name].negative_preconditions])
         return ground_truth_preconditions, learned_preconditions
 
-    def create_results_directory(self) -> NoReturn:
+    def create_results_directory(self) -> None:
         """Creates the results' directory that contains the learning results."""
         self.results_dir_path.mkdir(exist_ok=True)
 
     def add_to_action_stats(
             self, used_observations: List[Union[Observation, MultiAgentObservation]],
-            learned_domain: LearnerDomain, learning_report: Optional[Dict[str, str]] = None) -> NoReturn:
+            learned_domain: LearnerDomain, learning_report: Optional[Dict[str, str]] = None) -> None:
         """Add the action data to the statistics.
 
         :param used_observations: the observations that were used to learn the action.
@@ -134,19 +138,28 @@ class LearningStatisticsManager:
             ground_truth_preconditions, learned_preconditions = self._extract_all_preconditions(action_name,
                                                                                                 learned_domain)
 
+            learned_add_effects = [p.untyped_representation for p in learned_domain.actions[action_name].add_effects]
+            learned_del_effects = [p.untyped_representation for p in learned_domain.actions[action_name].delete_effects]
+            num_safe_actions = len([learning_report[action_name] for action_name in learning_report if
+                                    learning_report[action_name] == "OK"])
+            num_unsafe_actions = len([learning_report[action_name] for action_name in learning_report
+                                      if learning_report[action_name] == "NOT SAFE"])
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,
                 "domain_name": self.model_domain.name,
                 "num_trajectories": len(used_observations),
                 "num_trajectory_triplets": num_triplets,
                 "total_number_of_actions": len(self.model_domain.actions),
+                "num_safe_actions": num_safe_actions,
+                "num_unsafe_actions": num_unsafe_actions,
                 "learned_action_name": action_name,
                 "num_triplets_action_appeared": action_appearance_counter[action_name],
                 "learned_discrete_preconditions": learned_preconditions,
-                "learned_discrete_add_effects": [p.untyped_representation for p in
-                                                 learned_domain.actions[action_name].add_effects],
-                "learned_discrete_delete_effects": [p.untyped_representation for p in
-                                                    learned_domain.actions[action_name].delete_effects],
+                "num_discrete_preconditions": len(learned_preconditions),
+                "learned_discrete_add_effects": learned_add_effects,
+                "num_discrete_add_effects": len(learned_add_effects),
+                "learned_discrete_delete_effects": learned_del_effects,
+                "num_discrete_delete_effects": len(learned_del_effects),
                 "ground_truth_preconditions": ground_truth_preconditions,
                 "ground_truth_add_effects": [p.untyped_representation for p in
                                              self.model_domain.actions[action_name].add_effects],
@@ -161,7 +174,7 @@ class LearningStatisticsManager:
                 used_observations, learning_report, precision_recall_calculator)
 
     def _export_statistics_data(self, fold_number: int, columns: List[str],
-                                action_data_to_export: List[Dict[str, Any]], stats_data_file_name: str) -> NoReturn:
+                                action_data_to_export: List[Dict[str, Any]], stats_data_file_name: str) -> None:
         """Exports statistics to a report CSV file.
 
         :param fold_number: the number of the currently running fold.
@@ -177,7 +190,7 @@ class LearningStatisticsManager:
             for data_line in action_data_to_export:
                 stats_writer.writerow(data_line)
 
-    def export_action_learning_statistics(self, fold_number: int) -> NoReturn:
+    def export_action_learning_statistics(self, fold_number: int) -> None:
         """Export the statistics collected about the actions.
 
         :param fold_number: the number of the currently running fold.
@@ -185,7 +198,15 @@ class LearningStatisticsManager:
         self._export_statistics_data(fold_number, LEARNED_ACTIONS_STATS_COLUMNS, self.action_learning_stats,
                                      "action_stats_fold")
 
-    def export_numeric_learning_statistics(self, fold_number: int) -> NoReturn:
+    def export_all_folds_action_stats(self) -> None:
+        """Export the statistics collected about the actions."""
+        output_path = self.results_dir_path / f"all_folds_action_learning_stats.csv"
+        with open(output_path, 'wt', newline='') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=LEARNED_ACTIONS_STATS_COLUMNS)
+            writer.writeheader()
+            writer.writerows(self.action_learning_stats)
+
+    def export_numeric_learning_statistics(self, fold_number: int) -> None:
         """Export the numeric learning statistics that were collected from the learning report.
 
         :param fold_number: the number of the currently running fold.
@@ -193,7 +214,7 @@ class LearningStatisticsManager:
         self._export_statistics_data(fold_number, NUMERIC_LEARNING_STAT_COLUMNS, self.numeric_learning_stats,
                                      "numeric_learning_fold")
 
-    def clear_statistics(self) -> NoReturn:
+    def clear_statistics(self) -> None:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
         self.merged_numeric_stats.extend(self.numeric_learning_stats)
         self.numeric_learning_stats.clear()
@@ -201,7 +222,7 @@ class LearningStatisticsManager:
 
     def _collect_numeric_learning_statistics(
             self, used_observations: List[Union[Observation, MultiAgentObservation]], learning_report: Dict[str, str],
-            precision_recall_calc: PrecisionRecallCalculator) -> NoReturn:
+            precision_recall_calc: PrecisionRecallCalculator) -> None:
         """Collects the numeric learning statistics from the learning report.
 
         :param used_observations: the observations that were used to learn the action model.
@@ -221,7 +242,6 @@ class LearningStatisticsManager:
             "num_trajectories": len(used_observations),
             "num_trajectory_triplets": num_triplets,
             "total_number_of_actions": len(self.model_domain.actions),
-            "#numeric_actions_learned_ok": actions_stats_counter["OK"],
             "#numeric_actions_no_solution": actions_stats_counter["no_solution_found"],
             "#numeric_actions_no_convex_hull": actions_stats_counter["convex_hull_not_found"],
             "#numeric_actions_infinite_number_solutions": actions_stats_counter["not_enough_data"],
@@ -231,7 +251,7 @@ class LearningStatisticsManager:
         }
         self.numeric_learning_stats.append(model_stats)
 
-    def write_complete_joint_statistics(self) -> NoReturn:
+    def write_complete_joint_statistics(self) -> None:
         """Writes a statistics file containing all the folds combined data."""
         output_path = self.results_dir_path / f"{self.learning_algorithm.name}_all_folds_numeric_learning_stats.csv"
         with open(output_path, 'wt', newline='') as csv_file:

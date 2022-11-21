@@ -2,7 +2,7 @@
 import logging
 from typing import List, Tuple, Optional
 
-from pddl_plus_parser.models import Domain, Predicate, GroundedPredicate, ActionCall
+from pddl_plus_parser.models import Domain, Predicate, GroundedPredicate, ActionCall, PDDLObject
 
 from sam_learning.core.matching_utils import contains_duplicates, create_signature_permutations
 
@@ -62,7 +62,8 @@ class PredicatesMatcher:
         return filtered_matches
 
     def match_predicate_to_action_literals(
-            self, grounded_predicate: GroundedPredicate, action_call: ActionCall) -> Optional[List[Predicate]]:
+            self, grounded_predicate: GroundedPredicate, action_call: ActionCall,
+            extra_grounded_object: PDDLObject = None, extra_lifted_object: PDDLObject = None) -> Optional[List[Predicate]]:
         """Matches the action objects to the predicate objects.
 
         :param grounded_predicate: the grounded predicate that was observed.

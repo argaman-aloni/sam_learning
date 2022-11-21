@@ -8,7 +8,7 @@ from sam_learning.core import PredicatesMatcher
 from tests.consts import LOCATION_TYPE, AGENT_TYPE, WOODWORKING_DOMAIN_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
     TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, ELEVATORS_DOMAIN_PATH, \
     ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH, NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, \
-    DEPOT_NUMERIC_TRAJECTORY_PATH, COLOR_TYPE
+    DEPOT_NUMERIC_TRAJECTORY_PATH, COLOR_TYPE, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, SPIDER_DOMAIN_PATH
 
 TRUCK_AT_LOCATION_GROUNDED_PREDICATE = GroundedPredicate(
     name="at",
@@ -103,6 +103,26 @@ def depot_observation(depot_domain: Domain, depot_problem: Problem) -> Observati
 @fixture()
 def depot_predicate_matcher(depot_domain: Domain) -> PredicatesMatcher:
     return PredicatesMatcher(domain=depot_domain)
+
+
+@fixture()
+def spider_domain() -> Domain:
+    return DomainParser(SPIDER_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def spider_problem(spider_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=SPIDER_PROBLEM_PATH, domain=spider_domain).parse_problem()
+
+
+@fixture()
+def spider_observation(spider_domain: Domain, spider_problem: Problem) -> Observation:
+    return TrajectoryParser(spider_domain, spider_problem).parse_trajectory(SPIDER_TRAJECTORY_PATH)
+
+
+@fixture()
+def spider_predicate_matcher(spider_domain: Domain) -> PredicatesMatcher:
+    return PredicatesMatcher(domain=spider_domain)
 
 
 def test_match_predicate_to_action_with_no_match_returns_empty_list(
@@ -314,3 +334,13 @@ def test_get_possible_literal_from_actual_state_captures_all_needed_predicates_i
                                possible_matches]
     print(possible_lifted_matches)
     assert actual_preconditions.issubset(possible_lifted_matches)
+
+
+def test_match_predicate_to_action_literals_when_action_and_predicates_have_no_parameters_match_them_to_each_other(
+        spider_predicate_matcher: PredicatesMatcher, spider_domain: Domain):
+    test_action_call = ActionCall(name="start-dealing", grounded_parameters=[])
+    test_predicate = spider_domain.predicates["currently-dealing"]
+    test_state_predicates = [GroundedPredicate(name=test_predicate.name, signature={}, object_mapping={})]
+    possible_matches = spider_predicate_matcher.get_possible_literal_matches(test_action_call,
+                                                                             test_state_predicates)
+    assert len(possible_matches) == 1

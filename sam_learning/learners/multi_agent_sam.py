@@ -16,21 +16,22 @@ class MultiAgentSAM(SAMLearner):
     positive_literals_cnf: Dict[str, LiteralCNF]
     negative_literals_cnf: Dict[str, LiteralCNF]
     preconditions_fluent_map: Dict[str, List[str]]
-    concurrency_constraint: int
     lifted_bounded_predicates: Dict[str, Dict[str, Set[Tuple[str, Predicate]]]]
     safe_actions: List[str]
+    restrictive_domain: LearnerDomain
+    observed_single_agent_actions: List[str]
 
-    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-                 concurrency_constraint: int = 2):
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
         self.positive_literals_cnf = {}
         self.negative_literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
-        self.concurrency_constraint = concurrency_constraint
         self.lifted_bounded_predicates = {action_name: defaultdict(set) for action_name in
                                           self.partial_domain.actions.keys()}
         self.safe_actions = []
+        self.restrictive_domain = LearnerDomain(domain=partial_domain)
+        self.observed_single_agent_actions = []
 
     def _initialize_cnfs(self) -> None:
         """Initialize the CNFs for the action model."""
@@ -111,6 +112,37 @@ class MultiAgentSAM(SAMLearner):
                 return False
 
         return True
+
+    def _add_restrictive_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
+        """Adds a new restrictive version of the action.
+
+        :param grounded_action: the action currently being executed.
+        :param previous_state: the state prior to the action's execution.
+        :param next_state: the state after the action's execution.
+        """
+        restrictive_action = self.restrictive_domain.actions[grounded_action.name]
+        super()._add_new_action_preconditions(grounded_action, action_to_update=restrictive_action)
+        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
+            grounded_action, previous_state, next_state)
+
+        restrictive_action.add_effects.update(lifted_add_effects)
+        restrictive_action.delete_effects.update(lifted_delete_effects)
+        self.observed_single_agent_actions.append(grounded_action.name)
+
+    def _update_restrictive_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
+        """Updates the restrictive version of the action.
+
+        :param grounded_action: the action currently being executed.
+        :param previous_state: the state prior to the action's execution.
+        :param next_state: the state after the action's execution.
+        """
+        restrictive_action = self.restrictive_domain.actions[grounded_action.name]
+        super()._update_action_preconditions(grounded_action, previous_state, action_to_update=restrictive_action)
+        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
+            grounded_action, previous_state, next_state)
+
+        restrictive_action.add_effects.update(lifted_add_effects)
+        restrictive_action.delete_effects.update(lifted_delete_effects)
 
     def add_not_effect_to_cnf(
             self, executed_action: ActionCall, next_state_predicates: List[GroundedPredicate],
@@ -234,9 +266,11 @@ class MultiAgentSAM(SAMLearner):
         if executed_action.name not in self.observed_actions:
             super()._add_new_action_preconditions(executed_action)
             self.observed_actions.append(observed_action.name)
+            self._add_restrictive_action(executed_action, previous_state, next_state)
 
         else:
             super()._update_action_preconditions(executed_action, previous_state)
+            self._update_restrictive_action(executed_action, previous_state, next_state)
 
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         self.logger.debug("Updating the negative state predicates based on the action's execution.")
@@ -322,16 +356,18 @@ class MultiAgentSAM(SAMLearner):
             if not self._is_action_safe(action, self.positive_literals_cnf, action.positive_preconditions) or not \
                     self._is_action_safe(action, self.negative_literals_cnf, action.negative_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                action.positive_preconditions = set()
-                action.negative_preconditions = set()
+                if action.name not in self.observed_single_agent_actions:
+                    continue
+
+                self.partial_domain.actions[action.name] = self.restrictive_domain.actions[action.name]
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)
+            self.safe_actions.append(action.name)
             action.add_effects = self.extract_effects_from_cnf(action, self.positive_literals_cnf,
                                                                action.positive_preconditions)
             action.delete_effects = self.extract_effects_from_cnf(action, self.negative_literals_cnf,
                                                                   action.negative_preconditions)
-            self.safe_actions.append(action.name)
 
     def learn_combined_action_model(
             self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
