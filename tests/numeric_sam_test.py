@@ -94,7 +94,7 @@ def test_learn_action_model_for_satellite_domain_returns_learned_model(satellite
     print(learned_model.to_pddl())
 
 
-def test_learn_action_model_for_satellite__with_problematic_trajectory_domain_returns_learned_model(
+def test_learn_action_model_for_satellite_with_problematic_trajectory_domain_returns_learned_model(
         satellite_sam_learning: NumericSAMLearner, satellite_observation_problematic: Observation):
     learned_model, learning_metadata = satellite_sam_learning.learn_action_model([satellite_observation_problematic])
     print()
