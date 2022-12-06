@@ -8,6 +8,8 @@ from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction
 from sam_learning.learners import SAMLearner
 
+NOT_PREFIX = "(not"
+
 
 def _extract_predicate_data(action: LearnerAction, predicate_str: str,
                             domain_constants: Dict[str, PDDLConstant]) -> Predicate:
@@ -101,7 +103,7 @@ class ConditionalSAM(SAMLearner):
         state_negative_literals = self.matcher.get_possible_literal_matches(
             grounded_action, list(negative_predicates))
         # since we want to capture the literals NOT in s' we will transpose the literals values.
-        missing_state_literals_str = [f"(not {literal.untyped_representation})" for literal in
+        missing_state_literals_str = [f"{NOT_PREFIX} {literal.untyped_representation})" for literal in
                                       state_positive_literals]
         missing_state_literals_str.extend([literal.untyped_representation for literal in state_negative_literals])
         return set(missing_state_literals_str)
@@ -121,7 +123,7 @@ class ConditionalSAM(SAMLearner):
             grounded_action, list(negative_predicates))
         # since we want to capture the literals ARE in s' we will transpose the literals values.
         existing_state_literals_str = [literal.untyped_representation for literal in state_positive_literals]
-        existing_state_literals_str.extend([f"(not {literal.untyped_representation})" for literal in
+        existing_state_literals_str.extend([f"{NOT_PREFIX} {literal.untyped_representation})" for literal in
                                             state_negative_literals])
         return set(existing_state_literals_str)
 
@@ -155,7 +157,7 @@ class ConditionalSAM(SAMLearner):
         lifted_delete_effects = self.matcher.get_possible_literal_matches(
             grounded_action, list(grounded_del_effects))
         effects_str = [literal.untyped_representation for literal in lifted_add_effects]
-        effects_str.extend([f"(not {literal.untyped_representation})" for literal in lifted_delete_effects])
+        effects_str.extend([f"{NOT_PREFIX} {literal.untyped_representation})" for literal in lifted_delete_effects])
         missing_pre_state_literals_str = self._find_literals_not_in_state(
             grounded_action, self.previous_state_positive_predicates, self.previous_state_negative_predicates)
         for literal in effects_str:
@@ -194,7 +196,7 @@ class ConditionalSAM(SAMLearner):
         self.logger.debug(f"Checking if action {action.name} is safe.")
         preconditions_str = {precondition.untyped_representation for precondition in
                              action.positive_preconditions}
-        preconditions_str.update([f"(not {precondition})" for precondition in action.negative_preconditions])
+        preconditions_str.update([f"{NOT_PREFIX} {precondition.untyped_representation})" for precondition in action.negative_preconditions])
 
         return action_dependency_set.is_safe(preconditions_str)
 
@@ -229,12 +231,12 @@ class ConditionalSAM(SAMLearner):
 
             self.logger.debug(f"Extracting the conditional effect - {literal} from the dependency set.")
             conditional_effect = ConditionalEffect()
-            if literal.startswith("(not"):
-                conditional_effect.add_effects.add(_extract_predicate_data(
+            if literal.startswith(NOT_PREFIX):
+                conditional_effect.delete_effects.add(_extract_predicate_data(
                     action, f"{literal[5:-1]}", self.partial_domain.constants))
 
             else:
-                conditional_effect.delete_effects.add(_extract_predicate_data(
+                conditional_effect.add_effects.add(_extract_predicate_data(
                     action, literal, self.partial_domain.constants))
 
             positive_conditions, negative_conditions = action_dependency_set.extract_safe_conditionals(literal)
@@ -247,6 +249,14 @@ class ConditionalSAM(SAMLearner):
                     action, predicate_str, self.partial_domain.constants))
 
             action.conditional_effects.add(conditional_effect)
+
+    def _remove_preconditions_from_effects(self, action: LearnerAction) -> None:
+        """Removes the preconditions predicates from the action's effects.
+
+        :param action: the learned action.
+        """
+        action.add_effects.difference_update(action.positive_preconditions)
+        action.delete_effects.difference_update(action.negative_preconditions)
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
@@ -309,14 +319,6 @@ class ConditionalSAM(SAMLearner):
             self.logger.debug("Action %s is safe to execute.", action.name)
             self._construct_conditional_effects_from_dependency_set(action, self.dependency_set[action.name])
             self.safe_actions.append(action.name)
-
-    def _remove_preconditions_from_effects(self, action: LearnerAction) -> None:
-        """Removes the preconditions predicates from the action's effects.
-
-        :param action: the learned action.
-        """
-        action.add_effects.difference_update(action.positive_preconditions)
-        action.delete_effects.difference_update(action.negative_preconditions)
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.

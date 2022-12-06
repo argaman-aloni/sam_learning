@@ -28,7 +28,7 @@ def spider_observation(spider_domain: Domain, spider_problem: Problem) -> Observ
 
 @fixture()
 def conditional_sam(spider_domain: Domain) -> ConditionalSAM:
-    return ConditionalSAM(spider_domain, max_antecedents_size=2)
+    return ConditionalSAM(spider_domain, max_antecedents_size=1)
 
 
 @fixture()
@@ -355,15 +355,21 @@ def test_construct_conditional_effects_from_dependency_set_constructs_correct_co
     conditional_effects = conditional_sam.partial_domain.actions[test_action.name].conditional_effects
     assert len(conditional_effects) == 2
 
-    effect = conditional_effects.pop()
-    assert len(effect.negative_conditions) == 1
-    assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
-    assert effect.add_effects.pop().untyped_representation == "(currently-updating-unmovable )"
+    possible_add_effects = ["(currently-updating-unmovable )", "(make-unmovable ?to)"]
 
     effect = conditional_effects.pop()
     assert len(effect.negative_conditions) == 1
     assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
-    assert effect.add_effects.pop().untyped_representation == "(make-unmovable ?to)"
+    assert len(effect.positive_conditions) == 0
+    add_effect = effect.add_effects.pop().untyped_representation
+    assert add_effect in possible_add_effects
+
+    possible_add_effects.remove(add_effect)
+
+    effect = conditional_effects.pop()
+    assert len(effect.negative_conditions) == 1
+    assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
+    assert effect.add_effects.pop().untyped_representation in possible_add_effects
 
 
 def test_handle_single_trajectory_component_learns_correct_information(
@@ -372,17 +378,34 @@ def test_handle_single_trajectory_component_learns_correct_information(
     conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
     conditional_sam._remove_preconditions_from_effects(
         conditional_sam.partial_domain.actions["start-dealing"])
-    print()
-    print(conditional_sam.partial_domain.actions["start-dealing"].to_pddl())
+    pddl_action = conditional_sam.partial_domain.actions["start-dealing"].to_pddl()
+    assert "(not (currently-updating-unmovable ))" in pddl_action
+    assert "(not (currently-updating-movable ))" in pddl_action
+    assert "(not (currently-collecting-deck ))" in pddl_action
+    assert "(not (currently-updating-part-of-tableau ))" in pddl_action
+    assert "(not (currently-dealing ))" in pddl_action
 
 
-def test_is_action_safe_returns_true_after_one_trajectory_component(
+def test_is_action_safe_returns_true_when_dependency_set_contains_only_unconditional_effect_of_action(
         conditional_sam: ConditionalSAM, spider_observation: Observation):
     conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
     test_action = conditional_sam.partial_domain.actions["start-dealing"]
-    conditional_sam._is_action_safe(test_action, conditional_sam.dependency_set[test_action.name])
-    for dep, dep_data in conditional_sam.dependency_set[test_action.name].dependencies.items():
-        print(dep)
-        print()
-        print(dep_data)
+    conditional_sam.dependency_set[test_action.name].dependencies = {
+        "(currently-dealing )": conditional_sam.dependency_set[test_action.name].dependencies["(currently-dealing )"]
+    }
+    assert conditional_sam._is_action_safe(test_action, conditional_sam.dependency_set[test_action.name])
+
+
+def test_is_action_safe_returns_false_after_one_trajectory_component(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
+    conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
+    test_action = conditional_sam.partial_domain.actions["start-dealing"]
+    assert not conditional_sam._is_action_safe(test_action, conditional_sam.dependency_set[test_action.name])
+
+
+def test_learn_action_model_learns_restrictive_action_mode(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    learned_model, _ = conditional_sam.learn_action_model([spider_observation])
+    print(learned_model.to_pddl())

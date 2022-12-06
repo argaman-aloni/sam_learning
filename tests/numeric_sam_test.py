@@ -78,6 +78,27 @@ def satellite_sam_learning(satellite_domain: Domain, satellite_fluents_map: Dict
     return NumericSAMLearner(satellite_domain, satellite_fluents_map)
 
 
+def test_add_new_action_adds_action_to_fluents_storage(
+        numeric_sam_learning: NumericSAMLearner, numeric_observation: Observation):
+    initial_state = numeric_observation.components[0].previous_state
+    action_call = numeric_observation.components[0].grounded_action_call
+    next_state = numeric_observation.components[0].next_state
+    numeric_sam_learning.add_new_action(
+        grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    assert action_call.name in numeric_sam_learning.storage
+
+
+def test_update_action_updates_action_in_the_storage(
+        numeric_sam_learning: NumericSAMLearner, numeric_observation: Observation):
+    initial_state = numeric_observation.components[0].previous_state
+    action_call = numeric_observation.components[0].grounded_action_call
+    next_state = numeric_observation.components[0].next_state
+    numeric_sam_learning.add_new_action(
+        grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    numeric_sam_learning.update_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    assert action_call.name in numeric_sam_learning.storage
+
+
 def test_learn_action_model_returns_learned_model(numeric_sam_learning: NumericSAMLearner,
                                                   numeric_observation: Observation):
     learned_model, learning_metadata = numeric_sam_learning.learn_action_model([numeric_observation])

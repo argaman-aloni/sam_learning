@@ -111,6 +111,14 @@ def test_is_safe_returns_false_on_initialized_literals_set(woodworking_predicate
     assert not dependency_set.is_safe(predicates_to_remove)
 
 
+def test_is_safe_conditional_effect_returns_false_on_initialized_literals_set(woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=2)
+    dependency_set.initialize_dependencies(set(woodworking_predicates))
+
+    assert not dependency_set.is_safe_conditional_effect("(is-smooth ?surface)")
+
+
 def test_extract_restrictive_conditions_converts_all_positive_predicates_to_negatives_and_negatives_to_positive(
         woodworking_predicates: List[Predicate]):
     """Test the removal of a dependency from the dependency set."""
