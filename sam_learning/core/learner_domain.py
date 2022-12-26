@@ -114,7 +114,10 @@ class LearnerAction:
             return self._extract_numeric_preconditions(positive_preconditions, negative_preconditions,
                                                        equality_conditions_str)
 
-        return f"(and {positive_preconditions_str}\n\t\t{negative_preconditions_str}\n\t\t{equality_conditions_str})"
+        manual_preconditions_str = "\t\t\n".join(self.manual_preconditions)
+
+        return f"(and {positive_preconditions_str}\n\t\t{negative_preconditions_str}\n\t\t{equality_conditions_str}" \
+               f"\n\t\t{manual_preconditions_str})"
 
     def _effects_to_pddl(self) -> str:
         """Converts the effects to the needed PDDL format.
@@ -130,13 +133,18 @@ class LearnerAction:
         conditional_effects += "\t\t\n".join([str(conditional_effect) for conditional_effect
                                               in self.conditional_effects])
 
+        universal_effects = "\n\t\t"
+        universal_effects += "\t\t\n".join([str(universal_effect) for universal_effect
+                                            in self.universal_effects])
+
         if len(self.numeric_effects) > 0:
             numeric_effects = "\t\t\n".join([effect for effect in self.numeric_effects])
             return f"(and {add_effects_str} {delete_effects_str}\n" \
                    f"\t\t{conditional_effects}\n" \
+                   f"\t\t{universal_effects}\n" \
                    f"{numeric_effects})"
 
-        return f"(and {add_effects_str} {delete_effects_str}{conditional_effects})"
+        return f"(and {add_effects_str} {delete_effects_str}{universal_effects})"
 
     def to_pddl(self) -> str:
         """Returns the PDDL string representation of the action.

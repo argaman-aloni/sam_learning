@@ -330,7 +330,6 @@ def test_remove_non_existing_previous_state_dependencies_removes_correct_predica
             "(currently-dealing )"]
 
 
-
 def test_remove_non_existing_previous_state_quantified_dependencies_does_not_raise_error(
         nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
     previous_state = nurikabe_observation.components[0].previous_state
@@ -540,6 +539,19 @@ def test_extract_predicate_data_returns_correct_predicate_predicate_contains_con
     assert result_predicate.signature["discard"].name == "cardposition"
 
 
+def test_extract_predicate_data_returns_correct_predicate_with_additional_type(
+        conditional_sam: ConditionalSAM, spider_domain: Domain):
+    test_predicate = "(can-be-placed-on ?c ?c1)"
+    learner_action = conditional_sam.partial_domain.actions["collect-card"]
+    result_predicate = _extract_predicate_data(
+        learner_action, test_predicate, spider_domain.constants,
+        additional_parameter="?c1", additional_parameter_type=spider_domain.types["card"])
+    assert result_predicate.name == "can-be-placed-on"
+    assert len(result_predicate.signature) == 2
+    assert result_predicate.signature["?c"].name == "card"
+    assert result_predicate.signature["?c1"].name == "card"
+
+
 def test_construct_conditional_effects_from_dependency_set_constructs_correct_conditional_effect(
         conditional_sam: ConditionalSAM):
     dependecy_set = DependencySet(max_size_antecedents=1)
@@ -565,9 +577,37 @@ def test_construct_conditional_effects_from_dependency_set_constructs_correct_co
     possible_add_effects.remove(add_effect)
 
     effect = conditional_effects.pop()
+    print(effect)
     assert len(effect.negative_conditions) == 1
     assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
     assert effect.add_effects.pop().untyped_representation in possible_add_effects
+
+
+def test_construct_universal_effects_from_dependency_set_constructs_correct_conditional_effect(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+
+    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set.dependencies = {
+        "(blocked ?c)": [{"(connected ?to ?c)"}],
+        "(not (available ?c))": [{"(available ?c)"}]
+    }
+    test_action = nurikabe_conditional_sam.partial_domain.actions["move"]
+    ground_action = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
+    nurikabe_conditional_sam._initialize_universal_dependencies(ground_action)
+    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(test_action, dependency_set, "cell")
+    universal_effect = \
+        [effect for effect in nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects
+         if effect.quantified_type.name == "cell"][0]
+    print(universal_effect)
+
+    effect = universal_effect.conditional_effects.pop()
+    assert len(effect.positive_conditions) == 1
 
 
 def test_handle_single_trajectory_component_learns_correct_information(
@@ -604,6 +644,6 @@ def test_is_action_safe_returns_false_after_one_trajectory_component(
 
 
 def test_learn_action_model_learns_restrictive_action_mode(
-        conditional_sam: ConditionalSAM, spider_observation: Observation):
-    learned_model, _ = conditional_sam.learn_action_model([spider_observation])
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    learned_model, _ = nurikabe_conditional_sam.learn_action_model([nurikabe_observation])
     print(learned_model.to_pddl())

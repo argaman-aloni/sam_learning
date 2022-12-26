@@ -1,5 +1,6 @@
 """Module representing the dependency set of an action."""
 import itertools
+from collections import defaultdict
 from typing import Set, Dict, List, Tuple, Optional
 
 from pddl_plus_parser.models import Predicate
@@ -101,23 +102,30 @@ class DependencySet:
 
         return positive_predicates, negative_predicates
 
-    def extract_restrictive_conditions(self) -> Tuple[Set[str], Set[str]]:
+    def extract_restrictive_conditions(self) -> List[str]:
         """Extracts the safe conditional effects from the dependency set.
 
         :return: the negative and positive conditions that need to be added.
         """
-        safe_conditions = set()
+        safe_conditions = defaultdict(set)
+        complete_conditions = []
         for literal in self.dependencies:
             # assuming that at this point the precondition is already removed from the dependency set
             if not self.is_safe_literal(literal):
-                safe_conditions.update(*self.dependencies[literal])
+                unsafe_antecedents = set()
+                for antecedents in self.dependencies[literal]:
+                    unsafe_antecedents.update(antecedents)
 
-        positive_predicates = set()
-        negative_predicates = set()
-        for condition in safe_conditions:
-            if condition.startswith("(not "):
-                positive_predicates.add(f"{condition[5:-1]}")
-            else:
-                negative_predicates.add(condition)
+                safe_conditions[literal] = unsafe_antecedents
 
-        return positive_predicates, negative_predicates
+        for effect, antecedents in safe_conditions.items():
+            negated_antecedents = []
+            for antecedent in antecedents:
+                if antecedent.startswith("(not "):
+                    negated_antecedents.append(f"{antecedent[5:-1]}")
+                else:
+                    negated_antecedents.append(antecedent)
+
+            complete_conditions.append(f"(or {effect} (and {' '.join(negated_antecedents)}))")
+
+        return complete_conditions

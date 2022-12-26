@@ -128,7 +128,6 @@ def test_extract_restrictive_conditions_converts_all_positive_predicates_to_nega
     literals_str = {literal.untyped_representation for literal in woodworking_predicates}
     literals_str.update({f"(not {literal.untyped_representation})" for literal in woodworking_predicates})
 
-    positive_predicates, negative_predicates = dependency_set.extract_restrictive_conditions()
-    assert len(positive_predicates) + len(negative_predicates) == len(literals_str)
-    assert len(positive_predicates) == len(negative_predicates)
-    assert positive_predicates == negative_predicates
+    conditions = dependency_set.extract_restrictive_conditions()
+    assert conditions is not None
+
