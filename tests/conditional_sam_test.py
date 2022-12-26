@@ -1,14 +1,17 @@
 """Module test for Conditional SAM."""
 from typing import Set
 
+import pytest
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, Problem, Observation, GroundedPredicate
+from pddl_plus_parser.models import Domain, Problem, Observation, GroundedPredicate, ActionCall, PDDLObject
 from pytest import fixture
 
 from sam_learning.core import DependencySet
 from sam_learning.learners import ConditionalSAM
-from sam_learning.learners.conditional_sam import _extract_predicate_data
-from tests.consts import SPIDER_DOMAIN_PATH, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH
+from sam_learning.learners.conditional_sam import _extract_predicate_data, create_additional_parameter_name, \
+    find_unique_objects_by_type
+from tests.consts import SPIDER_DOMAIN_PATH, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH, \
+    NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH
 
 
 @fixture()
@@ -27,8 +30,28 @@ def spider_observation(spider_domain: Domain, spider_problem: Problem) -> Observ
 
 
 @fixture()
+def nurikabe_domain() -> Domain:
+    return DomainParser(NURIKABE_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def nurikabe_problem(nurikabe_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=NURIKABE_PROBLEM_PATH, domain=nurikabe_domain).parse_problem()
+
+
+@fixture()
+def nurikabe_observation(nurikabe_domain: Domain, nurikabe_problem: Problem) -> Observation:
+    return TrajectoryParser(nurikabe_domain, nurikabe_problem).parse_trajectory(NURIKABE_TRAJECTORY_PATH)
+
+
+@fixture()
 def conditional_sam(spider_domain: Domain) -> ConditionalSAM:
     return ConditionalSAM(spider_domain, max_antecedents_size=1)
+
+
+@fixture()
+def nurikabe_conditional_sam(nurikabe_domain: Domain) -> ConditionalSAM:
+    return ConditionalSAM(nurikabe_domain, max_antecedents_size=1)
 
 
 @fixture()
@@ -38,6 +61,30 @@ def positive_initial_state_predicates(spider_observation: Observation) -> Set[Gr
     for predicate in initial_state.state_predicates.values():
         initial_state_predicates.update(predicate)
     return initial_state_predicates
+
+
+def test_create_additional_parameter_name_creates_a_parameter_name_based_on_the_type_and_action_name(
+        nurikabe_conditional_sam: ConditionalSAM):
+    learner_domain = nurikabe_conditional_sam.partial_domain
+    action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
+    additional_object = PDDLObject(name="c4", type=learner_domain.types["cell"])
+    parameter_name = create_additional_parameter_name(learner_domain, action_call, additional_object)
+    assert parameter_name == '?c'
+
+
+def test_create_additional_parameter_name_creates_a_parameter_name_based_on_the_type_and_action_name_with_index(
+        nurikabe_conditional_sam: ConditionalSAM):
+    learner_domain = nurikabe_conditional_sam.partial_domain
+    action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
+    additional_object = PDDLObject(name="n1", type=learner_domain.types["group"])
+    parameter_name = create_additional_parameter_name(learner_domain, action_call, additional_object)
+    assert parameter_name == '?g1'
+
+
+def test_find_unique_objects_by_type_returns_correct_objects(spider_observation: Observation):
+    observation_objects = spider_observation.grounded_objects
+    unique_objects = find_unique_objects_by_type(observation_objects)
+    assert sum(len(objects) for objects in unique_objects.values()) == len(observation_objects)
 
 
 def test_merge_positive_and_negative_predicates_creates_correct_set_with_combined_positive_and_negative_predicates(
@@ -72,6 +119,64 @@ def test_initialize_actions_dependencies_adds_correct_dependencies(conditional_s
 
     conditional_sam._initialize_actions_dependencies(grounded_action)
     assert conditional_sam.dependency_set[grounded_action.name] is not None
+
+
+def test_initialize_universal_dependencies_creates_one_universal_effect_for_each_type(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain, nurikabe_observation: Observation):
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=nurikabe_observation.components[0].previous_state,
+        next_state=nurikabe_observation.components[0].next_state)
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+
+    unique_objects = find_unique_objects_by_type(nurikabe_conditional_sam.current_trajectory_objects)
+    assert len(nurikabe_conditional_sam.partial_domain.actions["move"].universal_effects) == len(unique_objects)
+
+
+def test_initialize_universal_dependencies_adds_possible_dependencies_for_action_in_dependency_set(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain, nurikabe_observation: Observation):
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=nurikabe_observation.components[0].previous_state,
+        next_state=nurikabe_observation.components[0].next_state)
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+
+    assert len(nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]["cell"].dependencies) > 0
+
+
+def test_initialize_universal_dependencies_creates_dependency_set_for_each_type_of_quantified_object(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain, nurikabe_observation: Observation):
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=nurikabe_observation.components[0].previous_state,
+        next_state=nurikabe_observation.components[0].next_state)
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+
+    assert len(nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]) == 3
+
+
+def test_initialize_universal_dependencies_initialize_dependencies_objects_with_new_data(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain, nurikabe_observation: Observation):
+    grounded_action = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+
+    assert len(nurikabe_conditional_sam.quantified_dependency_set) > 0
+
+
+def test_initialize_universal_dependencies_adds_the_new_additional_parameters_for_the_action(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain, nurikabe_observation: Observation):
+    grounded_action = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+
+    assert len(nurikabe_conditional_sam.additional_parameters[grounded_action.name]) > 0
 
 
 def test_update_action_effects_sets_correct_effects(conditional_sam: ConditionalSAM, spider_observation: Observation):
@@ -130,6 +235,81 @@ def test_find_literals_existing_in_state_correctly_sets_the_literals_that_do_app
     assert not negated_negative_preconditions.issubset(predicates_not_in_state)
 
 
+def test_find_literals_existing_in_state_correctly_selects_literals_with_the_additional_parameter(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=nurikabe_observation.components[0].previous_state,
+        next_state=nurikabe_observation.components[0].next_state)
+    extra_parameter_name = "?c"
+    predicates_in_state = nurikabe_conditional_sam._find_literals_existing_in_state(
+        grounded_action=grounded_action,
+        positive_predicates=nurikabe_conditional_sam.previous_state_positive_predicates,
+        negative_predicates=nurikabe_conditional_sam.previous_state_negative_predicates,
+        extra_grounded_object="pos-0-2",
+        extra_lifted_object=extra_parameter_name)
+
+    expected_set = {"(connected ?to ?c)", "(connected ?c ?to)"}
+    assert predicates_in_state.issuperset(expected_set) and predicates_in_state.issubset(expected_set)
+
+
+def test_find_literals_existing_in_state_does_not_choose_literals_that_might_match_the_action_parameter_without_the_added_variable(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=nurikabe_observation.components[0].previous_state,
+        next_state=nurikabe_observation.components[0].next_state)
+
+    extra_parameter_name = "?c"
+    predicates_in_state = nurikabe_conditional_sam._find_literals_existing_in_state(
+        grounded_action=grounded_action,
+        positive_predicates=nurikabe_conditional_sam.previous_state_positive_predicates,
+        negative_predicates=nurikabe_conditional_sam.previous_state_negative_predicates,
+        extra_grounded_object="pos-0-2",
+        extra_lifted_object=extra_parameter_name)
+
+    assert not predicates_in_state.issubset({"(not (painted ?to))", "(moving)", "(connected ?from ?to)"})
+
+
+def test_remove_existing_previous_state_quantified_dependencies_removes_correct_predicates_from_literals_that_are_effects_only(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
+    not_dependencies = {"(moving )", "(not (painted ?to))", "(robot-pos ?from)"}
+
+    for not_dependency in not_dependencies:
+        assert {not_dependency} not in \
+               nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]["cell"].dependencies[
+                   "(painted ?c)"]
+
+
+def test_remove_existing_previous_state_quantified_dependencies_shrinks_dependencies_from_previous_iteration(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    previous_dependencies_size = 16
+    nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
+    assert any(len(dependencies) < previous_dependencies_size for dependencies in
+               nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]["cell"].dependencies.values())
+
+
 def test_remove_non_existing_previous_state_dependencies_removes_correct_predicates_from_literals_that_are_effects_only(
         conditional_sam: ConditionalSAM, spider_observation: Observation):
     previous_state = spider_observation.components[0].previous_state
@@ -148,6 +328,24 @@ def test_remove_non_existing_previous_state_dependencies_removes_correct_predica
     for not_dependency in not_dependencies:
         assert {not_dependency} not in conditional_sam.dependency_set[grounded_action.name].dependencies[
             "(currently-dealing )"]
+
+
+
+def test_remove_non_existing_previous_state_quantified_dependencies_does_not_raise_error(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    try:
+        nurikabe_conditional_sam._remove_non_existing_previous_state_quantified_dependencies(
+            grounded_action, previous_state, next_state)
+
+    except Exception as e:
+        pytest.fail(f"Unexpected error: {e}")
 
 
 def test_remove_existing_previous_state_dependencies_removes_correct_predicates_from_literals_not_in_effects(

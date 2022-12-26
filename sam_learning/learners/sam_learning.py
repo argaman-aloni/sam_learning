@@ -73,16 +73,19 @@ class SAMLearner:
         return positive_state_predicates, negative_state_predicates
 
     def _create_fully_observable_triplet_predicates(
-            self, current_action: ActionCall, previous_state: State, next_state: State) -> None:
+            self, current_action: ActionCall, previous_state: State, next_state: State,
+            should_ignore_action: bool = False) -> None:
         """Sets the fully observable previous state and next state predicates for the current action.
 
         :param current_action: the action that is currently being executed.
         :param previous_state: the state prior to the action's execution.
         :param next_state: the state following the action's execution.
+        :param should_ignore_action: whether the action should be ignored and then use all trajectory objects or not.
         """
         relevant_objects = {object_name: object_data for object_name, object_data in
                             self.current_trajectory_objects.items()
-                            if object_name in current_action.parameters}
+                            if object_name in current_action.parameters} \
+            if not should_ignore_action else self.current_trajectory_objects
         self.previous_state_positive_predicates, self.previous_state_negative_predicates = \
             self._create_complete_world_state(relevant_objects=relevant_objects, state=previous_state)
         self.next_state_positive_predicates, self.next_state_negative_predicates = \

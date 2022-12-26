@@ -8,7 +8,8 @@ from sam_learning.core import PredicatesMatcher
 from tests.consts import LOCATION_TYPE, AGENT_TYPE, WOODWORKING_DOMAIN_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
     TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, ELEVATORS_DOMAIN_PATH, \
     ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH, NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, \
-    DEPOT_NUMERIC_TRAJECTORY_PATH, COLOR_TYPE, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, SPIDER_DOMAIN_PATH
+    DEPOT_NUMERIC_TRAJECTORY_PATH, COLOR_TYPE, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, SPIDER_DOMAIN_PATH, \
+    NURIKABE_DOMAIN_PATH
 
 TRUCK_AT_LOCATION_GROUNDED_PREDICATE = GroundedPredicate(
     name="at",
@@ -123,6 +124,16 @@ def spider_observation(spider_domain: Domain, spider_problem: Problem) -> Observ
 @fixture()
 def spider_predicate_matcher(spider_domain: Domain) -> PredicatesMatcher:
     return PredicatesMatcher(domain=spider_domain)
+
+
+@fixture()
+def nurikabe_domain() -> Domain:
+    return DomainParser(NURIKABE_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def nurikabe_predicate_matcher(nurikabe_domain: Domain) -> PredicatesMatcher:
+    return PredicatesMatcher(domain=nurikabe_domain)
 
 
 def test_match_predicate_to_action_with_no_match_returns_empty_list(
@@ -344,3 +355,72 @@ def test_match_predicate_to_action_literals_when_action_and_predicates_have_no_p
     possible_matches = spider_predicate_matcher.get_possible_literal_matches(test_action_call,
                                                                              test_state_predicates)
     assert len(possible_matches) == 1
+
+
+def test_match_predicate_to_action_literals_when_given_extra_object_to_match_creates_lifted_matches_correctly(
+        nurikabe_predicate_matcher: PredicatesMatcher, nurikabe_domain: Domain):
+    test_action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
+    test_predicate = nurikabe_domain.predicates["part-of"]
+    test_state_predicate = GroundedPredicate(name=test_predicate.name,
+                                             signature=test_predicate.signature,
+                                             object_mapping={"?x": "pos-5-1", "?y": "g0"})
+    possible_matches = nurikabe_predicate_matcher.match_predicate_to_action_literals(
+        grounded_predicate=test_state_predicate, action_call=test_action_call, extra_grounded_object="pos-5-1",
+        extra_lifted_object="?cadj")
+    assert len(possible_matches) == 1
+    assert possible_matches[0].untyped_representation == "(part-of ?cadj ?g)"
+
+
+def test_match_predicate_to_action_literals_when_given_extra_object_to_match_does_not_match_when_the_parameters_are_wrong(
+        nurikabe_predicate_matcher: PredicatesMatcher, nurikabe_domain: Domain):
+    test_action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
+    test_predicate = nurikabe_domain.predicates["part-of"]
+    test_state_predicate = GroundedPredicate(name=test_predicate.name,
+                                             signature=test_predicate.signature,
+                                             object_mapping={"?x": "pos-5-1", "?y": "g0"})
+    possible_matches = nurikabe_predicate_matcher.match_predicate_to_action_literals(
+        grounded_predicate=test_state_predicate, action_call=test_action_call, extra_grounded_object="pos-5-2",
+        extra_lifted_object="?cadj")
+    assert len(possible_matches) == 0
+
+
+def test_get_possible_literal_matches_with_extra_literal_extends_the_possible_set_of_matches(
+        nurikabe_predicate_matcher: PredicatesMatcher, nurikabe_domain: Domain):
+    test_action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
+    test_predicate = nurikabe_domain.predicates["part-of"]
+    test_state_predicates = [GroundedPredicate(name=test_predicate.name,
+                                               signature=test_predicate.signature,
+                                               object_mapping={"?x": "pos-5-0", "?y": "g0"}),
+                             GroundedPredicate(name=test_predicate.name,
+                                               signature=test_predicate.signature,
+                                               object_mapping={"?x": "pos-5-2", "?y": "g0"})
+                             ]
+    possible_matches = nurikabe_predicate_matcher.get_possible_literal_matches(
+        test_action_call,
+        test_state_predicates,
+        extra_grounded_object="pos-5-2",
+        extra_lifted_object="?cadj")
+    assert len(possible_matches) == 1
+
+
+def test_get_possible_literal_matches_with_extra_literal_extends_the_possible_set_of_matches_with_correct_data(
+        nurikabe_predicate_matcher: PredicatesMatcher, nurikabe_domain: Domain):
+    test_action_call = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
+    test_predicate = nurikabe_domain.predicates["connected"]
+    test_state_predicates = [GroundedPredicate(name=test_predicate.name,
+                                               signature=test_predicate.signature,
+                                               object_mapping={"?c": "pos-0-2", "?c2": "pos-0-1"}),
+                             GroundedPredicate(name=test_predicate.name,
+                                               signature=test_predicate.signature,
+                                               object_mapping={"?c": "pos-0-2", "?c2": "pos-0-3"}),
+                             GroundedPredicate(name=test_predicate.name,
+                                               signature=test_predicate.signature,
+                                               object_mapping={"?c": "pos-0-2", "?c2": "pos-2-1"}),
+                             ]
+    possible_matches = nurikabe_predicate_matcher.get_possible_literal_matches(
+        test_action_call,
+        test_state_predicates,
+        extra_grounded_object="pos-0-2",
+        extra_lifted_object="?cadj")
+    assert len(possible_matches) == 1
+    assert possible_matches[0].untyped_representation == "(connected ?cadj ?to)"

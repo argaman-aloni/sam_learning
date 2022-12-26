@@ -46,6 +46,11 @@ SPIDER_DOMAIN_PATH = EXAMPLES_DIR_PATH / "spider_domain.pddl"
 SPIDER_PROBLEM_PATH = EXAMPLES_DIR_PATH / "spider_problem.pddl"
 SPIDER_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "spider_trajectory.trajectory"
 
+NURIKABE_DOMAIN_PATH = EXAMPLES_DIR_PATH / "nurikabe_domain.pddl"
+NURIKABE_PROBLEM_PATH = EXAMPLES_DIR_PATH / "nurikabe_pfile_random-9x9-107.pddl"
+NURIKABE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "nurikabe_pfile_random-9x9-107.trajectory"
+
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)

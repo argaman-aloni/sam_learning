@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import Set, List, Dict, Tuple
 
 from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain, \
-    ConditionalEffect
+    ConditionalEffect, UniversalQuantifiedEffect
 
 from .learning_types import ConditionType
 
@@ -22,11 +22,13 @@ class LearnerAction:
     negative_preconditions: Set[Predicate]
     inequality_preconditions: Set[Tuple[str, str]]  # set of parameters names that should not be equal.
     numeric_preconditions: Tuple[List[str], ConditionType]  # tuple mapping the numeric preconditions to their type.
+    manual_preconditions: List[str] # in case the preconditions don't fit any of the above.
     numeric_constant_constraints: List[str]
     add_effects: Set[Predicate]
     delete_effects: Set[Predicate]
     numeric_effects: List[str]  # set of the strings representing the equations creating the numeric effect.
     conditional_effects: Set[ConditionalEffect]
+    universal_effects: Set[UniversalQuantifiedEffect]
 
     def __init__(self, name: str, signature: SignatureType):
         self.name = name
@@ -35,10 +37,12 @@ class LearnerAction:
         self.negative_preconditions = set()
         self.inequality_preconditions = set()
         self.numeric_preconditions = tuple()
+        self.manual_preconditions = []
         self.add_effects = set()
         self.delete_effects = set()
         self.numeric_effects = []
         self.conditional_effects = set()
+        self.universal_effects = set()
 
     def __str__(self):
         signature_str_items = []
