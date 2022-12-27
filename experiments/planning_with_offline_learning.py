@@ -48,6 +48,7 @@ class POL:
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
                  solver_type: SolverType):
+        self.index = 0
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
@@ -80,13 +81,16 @@ class POL:
                                                                             self.domain_file_name,
                                                                             self._learning_algorithm)
 
-    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path) -> Path:
+    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path,
+                              file_name: Optional[str] = None) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
         :param test_set_path: the path to the test set directory where the domain would be exported to.
+        :param file_name: the name of the file to export the domain to.
         """
-        domain_path = test_set_path / self.domain_file_name
+        domain_file_name = file_name or self.domain_file_name
+        domain_path = test_set_path / domain_file_name
         with open(domain_path, "wt") as domain_file:
             domain_file.write(learned_domain.to_pddl())
 
@@ -135,6 +139,9 @@ class POL:
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
+        self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
+                                   f"learned_domain_{self.index}_trajectories.pddl")
+        self.index += 1
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,

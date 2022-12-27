@@ -60,3 +60,11 @@ def test_create_vocabulary_creates_grounded_predicates_when_constants_and_object
     assert set(vocabulary_predicates.keys()) == {'(surface-condition ?obj ?surface)', '(available ?obj)',
                                                  '(is-smooth ?surface)', '(has-colour ?agent ?colour)',
                                                  '(grind-treatment-change ?agent ?old ?new)'}
+
+
+def test_create_lifted_vocabulary_creates_lifted_predicates_only_for_those_with_matching_types(
+        woodworking_domain: Domain, vocabulary_creator: VocabularyCreator):
+    vocabulary_predicates = vocabulary_creator.create_lifted_vocabulary(
+        domain=woodworking_domain,
+        possible_parameters=woodworking_domain.actions["do-grind"].signature)
+    assert vocabulary_predicates is not None

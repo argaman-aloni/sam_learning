@@ -21,7 +21,7 @@ DEFAULT_SPLIT = 5
 
 
 class MAPlanningWithOfflineLearning:
-    """Class that represents the POL framework."""
+    """Class that represents the POL framework for multi-agent problems."""
     logger: logging.Logger
     working_directory_path: Path
     k_fold: KFoldSplit
@@ -74,6 +74,7 @@ class MAPlanningWithOfflineLearning:
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
         :param test_set_path: the path to the test set directory where the domain would be exported to.
+        :param file_name: the name of the file to export the domain to.
         """
         domain_file_name = file_name or self.domain_file_name
         domain_path = test_set_path / domain_file_name

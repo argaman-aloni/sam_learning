@@ -87,13 +87,6 @@ def test_find_unique_objects_by_type_returns_correct_objects(spider_observation:
     assert sum(len(objects) for objects in unique_objects.values()) == len(observation_objects)
 
 
-def test_merge_positive_and_negative_predicates_creates_correct_set_with_combined_positive_and_negative_predicates(
-        conditional_sam: ConditionalSAM, positive_initial_state_predicates: Set[GroundedPredicate]):
-    output_predicates = conditional_sam._merge_positive_and_negative_predicates(positive_initial_state_predicates,
-                                                                                set())
-    assert len(output_predicates) == len(positive_initial_state_predicates)
-
-
 def test_initialize_actions_dependencies_sets_correct_effects(conditional_sam: ConditionalSAM,
                                                               spider_observation: Observation):
     grounded_action = spider_observation.components[0].grounded_action_call
@@ -177,6 +170,16 @@ def test_initialize_universal_dependencies_adds_the_new_additional_parameters_fo
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
     assert len(nurikabe_conditional_sam.additional_parameters[grounded_action.name]) > 0
+
+
+def test_initialize_universal_dependencies_not_add_dependencies_if_additional_param_does_not_appear(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain, nurikabe_observation: Observation):
+    grounded_action = ActionCall(name="start-painting", grounded_parameters=["pos-1-2", "g3", "n1", "n2"])
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+
+    assert "(not (next n0 ?n2))" not in nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name][
+        "num"].dependencies
 
 
 def test_update_action_effects_sets_correct_effects(conditional_sam: ConditionalSAM, spider_observation: Observation):
@@ -293,6 +296,38 @@ def test_remove_existing_previous_state_quantified_dependencies_removes_correct_
         assert {not_dependency} not in \
                nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]["cell"].dependencies[
                    "(painted ?c)"]
+
+
+def test_remove_existing_previous_state_quantified_dependencies_tries_to_remove_from_a_literal_that_does_not_contain_a_matching_parameter_not_will_fail(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation, nurikabe_domain: Domain):
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = ActionCall(name="start-painting", grounded_parameters=["pos-1-2", "g3", "n1", "n2"])
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
+    try:
+        nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
+    except KeyError:
+        pytest.fail("KeyError was raised")
+
+
+def test_remove_existing_previous_state_quantified_dependencies_does_not_get_key_error(
+        conditional_sam: ConditionalSAM, spider_observation: Observation, spider_domain: Domain):
+    previous_state = spider_observation.components[0].previous_state
+    grounded_action = ActionCall(name="finish-collecting-deck",
+                                 grounded_parameters=["card-d0-s3-v4", "card-d0-s0-v4", "pile-0"])
+    next_state = spider_observation.components[0].next_state
+    conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+    conditional_sam._initialize_universal_dependencies(grounded_action)
+    try:
+        conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
+    except KeyError:
+        pytest.fail("KeyError was raised")
 
 
 def test_remove_existing_previous_state_quantified_dependencies_shrinks_dependencies_from_previous_iteration(

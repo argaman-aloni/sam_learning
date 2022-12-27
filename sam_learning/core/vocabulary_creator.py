@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from itertools import permutations
-from typing import List, Tuple, Dict, Set, Union
+from typing import List, Tuple, Dict, Set, Union, Optional
 
 from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain
 
@@ -64,7 +64,39 @@ class VocabularyCreator:
                 grounded_predicate = GroundedPredicate(name=predicate_name, signature=predicate.signature,
                                                        object_mapping={parameter_name: object_name for
                                                                        object_name, parameter_name in
-                                    zip(grounded_signature, predicate.signature)})
+                                                                       zip(grounded_signature, predicate.signature)})
                 vocabulary[predicate.untyped_representation].add(grounded_predicate)
 
+        return vocabulary
+
+    def create_lifted_vocabulary(self, domain: Union[LearnerDomain, Domain],
+                                 possible_parameters: Dict[str, PDDLType],
+                                 must_be_parameter: Optional[str] = None) -> Set[Predicate]:
+        """Create a vocabulary of random combinations of parameters that match the predicates.
+
+        :param domain: the domain containing the predicates and the action signatures.
+        :param possible_parameters: the parameters to use to create the vocabulary from.
+        :return: list containing all the predicates with the different combinations of parameters.
+        """
+        self.logger.debug(f"Creating predicates vocabulary from {possible_parameters}")
+        vocabulary = set()
+        possible_parameters_names = list(possible_parameters.keys()) + list(domain.constants.keys())
+        parameter_types = list(possible_parameters.values()) + [const.type for const in domain.constants.values()]
+        for predicate in domain.predicates.values():
+            predicate_name = predicate.name
+            signature_permutations = choose_objects_subset(possible_parameters_names, len(predicate.signature))
+            for signature_permutation in signature_permutations:
+                bounded_lifted_signature = {param_name: parameter_types[possible_parameters_names.index(param_name)]
+                                            for param_name in signature_permutation}
+
+                if not self._validate_type_matching(bounded_lifted_signature, predicate):
+                    continue
+
+                if must_be_parameter is not None and must_be_parameter not in bounded_lifted_signature:
+                    continue
+
+                grounded_predicate = Predicate(name=predicate_name, signature=bounded_lifted_signature)
+                vocabulary.add(grounded_predicate)
+
+        self.logger.debug(f"Created vocabulary of size {len(vocabulary)}")
         return vocabulary

@@ -119,8 +119,7 @@ def test_is_safe_conditional_effect_returns_false_on_initialized_literals_set(wo
     assert not dependency_set.is_safe_conditional_effect("(is-smooth ?surface)")
 
 
-def test_extract_restrictive_conditions_converts_all_positive_predicates_to_negatives_and_negatives_to_positive(
-        woodworking_predicates: List[Predicate]):
+def test_extract_restrictive_conditions_creates_not_empty_list(woodworking_predicates: List[Predicate]):
     """Test the removal of a dependency from the dependency set."""
     dependency_set = DependencySet(max_size_antecedents=2)
     dependency_set.initialize_dependencies(set(woodworking_predicates))
@@ -130,4 +129,23 @@ def test_extract_restrictive_conditions_converts_all_positive_predicates_to_nega
 
     conditions = dependency_set.extract_restrictive_conditions()
     assert conditions is not None
+
+def test_extract_restrictive_conditions_converts_all_positive_predicates_to_negatives_and_negatives_to_positive(
+        woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set.initialize_dependencies(set(woodworking_predicates))
+    tested_predicate = "(available ?obj)"
+    literals_str = {literal.untyped_representation for literal in woodworking_predicates}
+    literals_str.update({f"(not {literal.untyped_representation})" for literal in woodworking_predicates})
+
+    conditions = dependency_set.extract_restrictive_conditions()
+    antecedents = dependency_set.dependencies[tested_predicate]
+    for antecedent in antecedents:
+        antecedent_str = antecedent.pop()
+        if antecedent_str.startswith("(not"):
+            assert antecedent_str[5:-1] in conditions[0]
+
+        else:
+            assert f"(not {antecedent_str})" in conditions[0]
 

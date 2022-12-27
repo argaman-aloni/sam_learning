@@ -79,7 +79,7 @@ class ConditionalSAM(SAMLearner):
     max_antecedents_size: int
     current_trajectory_objects: Dict[str, PDDLObject]
 
-    def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
+    def __init__(self, partial_domain: Domain, max_antecedents_size: int = 3,
                  preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
@@ -90,40 +90,23 @@ class ConditionalSAM(SAMLearner):
         self.quantified_dependency_set = {action_name: {} for action_name in self.partial_domain.actions}
         self.additional_parameters = defaultdict(dict)
 
-    def _merge_positive_and_negative_predicates(
-            self, positive_state_predicates: Set[GroundedPredicate],
-            negative_state_predicates: Set[GroundedPredicate]) -> Set[GroundedPredicate]:
-        """Merges the positive and negative predicates into a single set.
-
-        :param positive_state_predicates: the set containing the positive predicates.
-        :param negative_state_predicates: the set containing the negative predicates.
-        :return: the merged set.
-        """
-        self.logger.debug("Creating a set of both negative and positive predicates.")
-        positive_predicates = positive_state_predicates.copy()
-        negative_predicates = negative_state_predicates.copy()
-        return positive_predicates.union(negative_predicates)
-
     def _initialize_universal_dependencies(self, grounded_action: ActionCall) -> None:
         """Initialize the universal antecedents candidates for a universal effect.
 
         :param grounded_action: the action to initialize the universal dependencies for.
         """
         self.logger.debug("Initializing the universal antecedents candidates for action %s.", grounded_action.name)
-        grounded_predicates = self._merge_positive_and_negative_predicates(self.previous_state_positive_predicates,
-                                                                           self.previous_state_negative_predicates)
         objects_by_type = find_unique_objects_by_type(self.current_trajectory_objects, grounded_action.parameters)
+        lifted_action_signature = self.partial_domain.actions[grounded_action.name].signature
         for pddl_type_name, pddl_objects in objects_by_type.items():
-            lifted_matches = set()
+            additional_parameter_name = create_additional_parameter_name(self.partial_domain, grounded_action,
+                                                                         pddl_objects[0])
+            vocabulary = self.vocabulary_creator.create_lifted_vocabulary(
+                domain=self.partial_domain,
+                possible_parameters={**lifted_action_signature, additional_parameter_name: pddl_objects[0].type},
+                must_be_parameter=additional_parameter_name)
             dependency_set = DependencySet(self.max_antecedents_size)
-            additional_parameter_name = create_additional_parameter_name(
-                self.partial_domain, grounded_action, pddl_objects[0])
-            for matching_object in pddl_objects:
-                lifted_matches.update(self.matcher.get_possible_literal_matches(
-                    grounded_action_call=grounded_action, state_literals=list(grounded_predicates),
-                    extra_grounded_object=matching_object.name, extra_lifted_object=additional_parameter_name))
-
-            dependency_set.initialize_dependencies(set(lifted_matches))
+            dependency_set.initialize_dependencies(vocabulary)
             self.quantified_dependency_set[grounded_action.name][pddl_type_name] = dependency_set
             universal_effect = UniversalQuantifiedEffect(quantified_parameter=additional_parameter_name,
                                                          quantified_type=pddl_objects[0].type)
@@ -136,14 +119,14 @@ class ConditionalSAM(SAMLearner):
         :param grounded_action: the action that is currently being observed.
         """
         self.logger.debug("Initializing the dependency set and the effects for the action %s.", grounded_action.name)
-        grounded_predicates = self._merge_positive_and_negative_predicates(self.previous_state_positive_predicates,
-                                                                           self.previous_state_negative_predicates)
-        lifted_predicates = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_predicates))
+        lifted_action_signature = self.partial_domain.actions[grounded_action.name].signature
+        vocabulary = self.vocabulary_creator.create_lifted_vocabulary(
+            domain=self.partial_domain, possible_parameters=lifted_action_signature)
         dependency_set = DependencySet(self.max_antecedents_size)
-        dependency_set.initialize_dependencies(set(lifted_predicates))
+        dependency_set.initialize_dependencies(vocabulary)
         self.dependency_set[grounded_action.name] = dependency_set
-        self.partial_domain.actions[grounded_action.name].add_effects.update(lifted_predicates)
-        self.partial_domain.actions[grounded_action.name].delete_effects.update(lifted_predicates)
+        self.partial_domain.actions[grounded_action.name].add_effects.update(vocabulary)
+        self.partial_domain.actions[grounded_action.name].delete_effects.update(vocabulary)
 
     def _update_action_effects(self, grounded_action: ActionCall) -> None:
         """Set the correct data for the action's effects.
@@ -241,6 +224,9 @@ class ConditionalSAM(SAMLearner):
                     pddl_object.name, additional_parameter_name))
 
             for literal in missing_next_state_literals_str:
+                if additional_parameter_name not in literal:
+                    continue
+
                 self.quantified_dependency_set[grounded_action.name][pddl_type_name].remove_dependencies(
                     literal=literal, literals_to_remove=existing_previous_state_literals_str)
 

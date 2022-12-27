@@ -124,7 +124,7 @@ class DependencySet:
                 if antecedent.startswith("(not "):
                     negated_antecedents.append(f"{antecedent[5:-1]}")
                 else:
-                    negated_antecedents.append(antecedent)
+                    negated_antecedents.append(f"(not {antecedent})")
 
             complete_conditions.append(f"(or {effect} (and {' '.join(negated_antecedents)}))")
 
