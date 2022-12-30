@@ -11,7 +11,8 @@ from sam_learning.learners import ConditionalSAM
 from sam_learning.learners.conditional_sam import _extract_predicate_data, create_additional_parameter_name, \
     find_unique_objects_by_type
 from tests.consts import SPIDER_DOMAIN_PATH, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH, \
-    NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH
+    NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
+    ADL_SATELLITE_TRAJECTORY_PATH
 
 
 @fixture()
@@ -45,6 +46,21 @@ def nurikabe_observation(nurikabe_domain: Domain, nurikabe_problem: Problem) -> 
 
 
 @fixture()
+def satellite_domain() -> Domain:
+    return DomainParser(ADL_SATELLITE_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def satellite_problem(satellite_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=ADL_SATELLITE_PROBLEM_PATH, domain=satellite_domain).parse_problem()
+
+
+@fixture()
+def satellite_observation(satellite_domain: Domain, satellite_problem: Problem) -> Observation:
+    return TrajectoryParser(satellite_domain, satellite_problem).parse_trajectory(ADL_SATELLITE_TRAJECTORY_PATH)
+
+
+@fixture()
 def conditional_sam(spider_domain: Domain) -> ConditionalSAM:
     return ConditionalSAM(spider_domain, max_antecedents_size=1)
 
@@ -52,6 +68,11 @@ def conditional_sam(spider_domain: Domain) -> ConditionalSAM:
 @fixture()
 def nurikabe_conditional_sam(nurikabe_domain: Domain) -> ConditionalSAM:
     return ConditionalSAM(nurikabe_domain, max_antecedents_size=1)
+
+
+@fixture()
+def satellite_conditional_sam(satellite_domain: Domain) -> ConditionalSAM:
+    return ConditionalSAM(satellite_domain, max_antecedents_size=1)
 
 
 @fixture()
@@ -114,18 +135,39 @@ def test_initialize_actions_dependencies_adds_correct_dependencies(conditional_s
     assert conditional_sam.dependency_set[grounded_action.name] is not None
 
 
-def test_initialize_universal_dependencies_creates_one_universal_effect_for_each_type(
-        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain, nurikabe_observation: Observation):
-    grounded_action = nurikabe_observation.components[0].grounded_action_call
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+def test_initialize_universal_dependencies_adds_additional_parameter_for_each_newly_created_type(
+        satellite_conditional_sam: ConditionalSAM, satellite_domain: Domain, satellite_observation: Observation):
+    grounded_action = ActionCall(name="switch_off", grounded_parameters=["instrument7", "satellite2"])
+    satellite_conditional_sam.current_trajectory_objects = satellite_observation.grounded_objects
+    satellite_conditional_sam._create_fully_observable_triplet_predicates(
         current_action=grounded_action,
-        previous_state=nurikabe_observation.components[0].previous_state,
-        next_state=nurikabe_observation.components[0].next_state)
-    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+        previous_state=satellite_observation.components[0].previous_state,
+        next_state=satellite_observation.components[0].next_state)
+    satellite_conditional_sam._initialize_universal_dependencies(grounded_action)
 
-    unique_objects = find_unique_objects_by_type(nurikabe_conditional_sam.current_trajectory_objects)
-    assert len(nurikabe_conditional_sam.partial_domain.actions["move"].universal_effects) == len(unique_objects)
+    for pddl_type in satellite_domain.types:
+        if pddl_type == "object":
+            continue
+
+        assert pddl_type in satellite_conditional_sam.additional_parameters[grounded_action.name]
+
+
+def test_initialize_universal_dependencies_adds_additional_parameter_for_each_newly_created_type_for_every_action(
+        satellite_conditional_sam: ConditionalSAM, satellite_domain: Domain, satellite_observation: Observation):
+    for action_name in satellite_conditional_sam.partial_domain.actions:
+        grounded_action = ActionCall(name=action_name, grounded_parameters=[])
+        satellite_conditional_sam.current_trajectory_objects = satellite_observation.grounded_objects
+        satellite_conditional_sam._create_fully_observable_triplet_predicates(
+            current_action=grounded_action,
+            previous_state=satellite_observation.components[0].previous_state,
+            next_state=satellite_observation.components[0].next_state)
+        satellite_conditional_sam._initialize_universal_dependencies(grounded_action)
+        for pddl_type in satellite_domain.types:
+            if pddl_type == "object":
+                continue
+
+            assert pddl_type in satellite_conditional_sam.additional_parameters[grounded_action.name]
+        print(satellite_conditional_sam.additional_parameters[grounded_action.name])
 
 
 def test_initialize_universal_dependencies_adds_possible_dependencies_for_action_in_dependency_set(
@@ -393,14 +435,19 @@ def test_remove_existing_previous_state_dependencies_removes_correct_predicates_
     conditional_sam._initialize_actions_dependencies(grounded_action)
     conditional_sam._update_action_effects(grounded_action)
     conditional_sam._remove_existing_previous_state_dependencies(grounded_action)
-    not_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
-                        "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
-                        "(currently-dealing )"}
+    positive_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
+                             "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
+                             "(currently-dealing )"}
+
+    negative_dependencies = {f"(not {dep})" for dep in
+                             positive_dependencies.difference({"(currently-collecting-deck )"})}
 
     tested_literal = "(not (currently-collecting-deck ))"
-    for not_dependency in not_dependencies:
-        assert {not_dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
-        assert {f"(not {not_dependency})"} in conditional_sam.dependency_set[grounded_action.name].dependencies[
+    for dependency in positive_dependencies:
+        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
+
+    for dependency in negative_dependencies:
+        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[
             tested_literal]
 
 
@@ -416,20 +463,26 @@ def test_update_effects_data_updates_the_relevant_effects_and_removes_irrelevant
     initialized_add_effects = conditional_sam.partial_domain.actions[grounded_action.name].add_effects
     initialized_delete_effects = conditional_sam.partial_domain.actions[grounded_action.name].delete_effects
     conditional_sam._update_effects_data(grounded_action, previous_state, next_state)
-    not_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
-                        "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
-                        "(currently-dealing )"}
+    positive_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
+                             "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
+                             "(currently-dealing )"}
+
+    negative_dependencies = {f"(not {dep})" for dep in
+                             positive_dependencies.difference({"(currently-collecting-deck )"})}
 
     tested_literal = "(not (currently-collecting-deck ))"
     assert len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects) <= len(initialized_add_effects)
     assert len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects) <= len(
         initialized_delete_effects)
-    for not_dependency in not_dependencies:
-        assert {not_dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
-        assert {f"(not {not_dependency})"} in conditional_sam.dependency_set[grounded_action.name].dependencies[
-            tested_literal]
-        assert {not_dependency} not in conditional_sam.dependency_set[grounded_action.name].dependencies[
+
+    for dependency in positive_dependencies:
+        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
+        assert {dependency} not in conditional_sam.dependency_set[grounded_action.name].dependencies[
             "(currently-dealing )"]
+
+    for dependency in negative_dependencies:
+        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
+
 
 
 def test_add_new_action_updates_action_negative_preconditions(conditional_sam: ConditionalSAM,
@@ -643,6 +696,20 @@ def test_construct_universal_effects_from_dependency_set_constructs_correct_cond
 
     effect = universal_effect.conditional_effects.pop()
     assert len(effect.positive_conditions) == 1
+
+
+def test_remove_preconditions_from_effects_removes_action_preconditions_from_dependencies(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
+    conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
+    conditional_sam._remove_preconditions_from_effects(
+        conditional_sam.partial_domain.actions["start-dealing"])
+    assert "(not (currently-updating-movable ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
+    assert "(not (currently-updating-unmovable ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
+    assert "(not (currently-updating-part-of-tableau ))" not in conditional_sam.dependency_set[
+        "start-dealing"].dependencies
+    assert "(not (currently-collecting-deck ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
+    assert "(not (currently-dealing ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
 
 
 def test_handle_single_trajectory_component_learns_correct_information(

@@ -50,6 +50,10 @@ NURIKABE_DOMAIN_PATH = EXAMPLES_DIR_PATH / "nurikabe_domain.pddl"
 NURIKABE_PROBLEM_PATH = EXAMPLES_DIR_PATH / "nurikabe_pfile_random-9x9-107.pddl"
 NURIKABE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "nurikabe_pfile_random-9x9-107.trajectory"
 
+ADL_SATELLITE_DOMAIN_PATH = EXAMPLES_DIR_PATH / "adlSat.pddl"
+ADL_SATELLITE_PROBLEM_PATH = EXAMPLES_DIR_PATH / "adlSat_problem.pddl"
+ADL_SATELLITE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "adlSat_trajectory.trajectory"
+
 
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")

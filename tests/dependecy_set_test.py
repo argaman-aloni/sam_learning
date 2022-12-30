@@ -62,7 +62,7 @@ def test_initialize_dependencies_with_real_domain_predicates_creates_correct_set
     """Test the initialization of the dependency set with real domain predicates."""
     dependency_set = DependencySet(max_size_antecedents=2)
     dependency_set.initialize_dependencies(set(woodworking_predicates))
-    assert len(dependency_set.dependencies[woodworking_predicates[0].untyped_representation]) == 378 + 28
+    assert len(dependency_set.dependencies[woodworking_predicates[0].untyped_representation]) == 378
 
 
 def test_remove_dependencies_removed_correct_set_of_literals_and_all_subsets(woodworking_predicates: List[Predicate]):
@@ -72,7 +72,7 @@ def test_remove_dependencies_removed_correct_set_of_literals_and_all_subsets(woo
     tested_predicate = "(available ?obj)"
     predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
     dependency_set.remove_dependencies(tested_predicate, predicates_to_remove)
-    assert len(dependency_set.dependencies[tested_predicate]) == 378 + 28 - 3
+    assert len(dependency_set.dependencies[tested_predicate]) == 378 - 3
 
 
 def test_is_safe_literal_returns_literal_unsafe_if_contains_more_that_one_item(woodworking_predicates: List[Predicate]):

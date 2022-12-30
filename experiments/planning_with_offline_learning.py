@@ -44,12 +44,13 @@ class POL:
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
     numeric_performance_calc: NumericPerformanceCalculator
+    max_num_antecedents: int
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
-                 solver_type: SolverType):
-        self.index = 0
+                 solver_type: SolverType, max_num_antecedents: int):
         self.logger = logging.getLogger(__name__)
+        self.max_num_antecedents = max_num_antecedents
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
                                  domain_file_name=domain_file_name,
@@ -116,9 +117,13 @@ class POL:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
+            if (index + 1) % 10 != 0:
+                continue
+
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
-                                                                    preconditions_fluent_map=self.fluents_map)
+                                                                    preconditions_fluent_map=self.fluents_map,
+                                                                    max_antecedents_size=self.max_num_antecedents)
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
@@ -140,8 +145,7 @@ class POL:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"learned_domain_{self.index}_trajectories.pddl")
-        self.index += 1
+                                   f"{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
@@ -178,6 +182,7 @@ def parse_arguments() -> argparse.Namespace:
                                                                    "fluents", default=None)
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
                         help="The solver that should be used for the sake of validation", default=3)
+    parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size", default=1)
 
     args = parser.parse_args()
     return args
@@ -189,7 +194,8 @@ def main():
                           domain_file_name=args.domain_file_name,
                           learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
                           fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-                          solver_type=SolverType(args.solver_type))
+                          solver_type=SolverType(args.solver_type),
+                          max_num_antecedents=args.max_antecedent_size or 0)
     offline_learner.run_cross_validation()
 
 

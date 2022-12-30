@@ -5,8 +5,13 @@ from typing import Set, Dict, List, Tuple, Optional
 
 from pddl_plus_parser.models import Predicate
 
+NOT_PREFIX = "(not"
+AFTER_NOT_PREFIX_INDEX = 5
+RIGHT_BRACKET_INDEX = -1
 
-def create_antecedents_combination(antecedents: Set[str], max_antecedents_size) -> List[Set[str]]:
+
+def create_antecedents_combination(antecedents: Set[str], max_antecedents_size: int,
+                                   exclude_literals: Optional[Set[str]] = None) -> List[Set[str]]:
     """Creates all possible subset combinations of antecedents.
 
     :param antecedents: the list of antecedents that may be trigger for conditional effects.
@@ -14,8 +19,10 @@ def create_antecedents_combination(antecedents: Set[str], max_antecedents_size) 
     :return: all possible subsets of the antecedents up to the given size.
     """
     antecedents_combinations = []
+    antecedents_to_use = antecedents - exclude_literals if exclude_literals is not None else antecedents
     for subset_size in range(1, max_antecedents_size + 1):
-        possible_combinations = [set(combination) for combination in itertools.combinations(antecedents, subset_size)]
+        possible_combinations = [set(combination) for combination in itertools.combinations(
+            antecedents_to_use, subset_size)]
         for combination in possible_combinations:
             antecedents_combinations.append(combination)
 
@@ -38,8 +45,9 @@ class DependencySet:
         """
         literals_str = {literal.untyped_representation for literal in lifted_literals}
         literals_str.update({f"(not {literal.untyped_representation})" for literal in lifted_literals})
-        antecedents_combinations = create_antecedents_combination(literals_str, self.max_size_antecedents)
-        self.dependencies = {literal: antecedents_combinations.copy() for literal in literals_str}
+        for literal in literals_str:
+            self.dependencies[literal] = create_antecedents_combination(
+                literals_str, self.max_size_antecedents, exclude_literals={literal})
 
     def remove_dependencies(self, literal: str, literals_to_remove: Set[str]) -> None:
         """Remove a dependency from the dependency set.
@@ -51,6 +59,14 @@ class DependencySet:
         for dependency in dependencies_to_remove:
             if dependency in self.dependencies[literal]:
                 self.dependencies[literal].remove(dependency)
+
+    def remove_preconditions_literals(self, preconditions_literals: Set[str]) -> None:
+        """Removes the preconditions literals from the dependency set.
+
+        :param preconditions_literals: the preconditions of the action.
+        """
+        for literal in preconditions_literals:
+            self.dependencies.pop(literal, None)
 
     def is_safe_conditional_effect(self, literal: str) -> bool:
         """Determines whether the literal is a conditional effect with safe number of antecedents.
@@ -95,22 +111,21 @@ class DependencySet:
         negative_predicates = set()
         for condition in safe_conditions:
             if condition.startswith("(not "):
-                negative_predicates.add(f"{condition[5:-1]}")
+                negative_predicates.add(f"{condition[AFTER_NOT_PREFIX_INDEX:-RIGHT_BRACKET_INDEX]}")
 
             else:
                 positive_predicates.add(condition)
 
         return positive_predicates, negative_predicates
 
-    def extract_restrictive_conditions(self) -> List[str]:
-        """Extracts the safe conditional effects from the dependency set.
+    def _extract_unsafe_antecedents(self) -> Dict[str, Set[str]]:
+        """Extracts the safe antecedents from the dependency set.
 
-        :return: the negative and positive conditions that need to be added.
+        :return: the safe antecedents.
         """
         safe_conditions = defaultdict(set)
-        complete_conditions = []
+        # assuming that at this point the precondition is already removed from the dependency set
         for literal in self.dependencies:
-            # assuming that at this point the precondition is already removed from the dependency set
             if not self.is_safe_literal(literal):
                 unsafe_antecedents = set()
                 for antecedents in self.dependencies[literal]:
@@ -118,14 +133,34 @@ class DependencySet:
 
                 safe_conditions[literal] = unsafe_antecedents
 
-        for effect, antecedents in safe_conditions.items():
+        return safe_conditions
+
+    def _construct_restrictive_preconditions(self, unsafe_antecedents: Dict[str, Set[str]]) -> List[str]:
+        """Constructs the restrictive preconditions from the unsafe antecedents.
+
+        :param unsafe_antecedents: the unsafe antecedents.
+        :return: the restrictive preconditions.
+        """
+        restrictive_preconditions = []
+        for effect, antecedents in unsafe_antecedents.items():
             negated_antecedents = []
             for antecedent in antecedents:
-                if antecedent.startswith("(not "):
-                    negated_antecedents.append(f"{antecedent[5:-1]}")
-                else:
-                    negated_antecedents.append(f"(not {antecedent})")
+                antecedent_to_add = antecedent[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX] if antecedent.startswith(
+                    "(not ") else f"(not {antecedent})"
+                if antecedent_to_add == effect:
+                    continue
 
-            complete_conditions.append(f"(or {effect} (and {' '.join(negated_antecedents)}))")
+            if len(negated_antecedents) == 0:
+                continue
 
-        return complete_conditions
+            restrictive_preconditions.append(f"(or {effect} (and {' '.join(negated_antecedents)}))")
+
+        return restrictive_preconditions
+
+    def extract_restrictive_conditions(self) -> List[str]:
+        """Extracts the safe conditional effects from the dependency set.
+
+        :return: the negative and positive conditions that need to be added.
+        """
+        unsafe_conditions = self._extract_unsafe_antecedents()
+        return self._construct_restrictive_preconditions(unsafe_conditions)

@@ -36,18 +36,18 @@ def _extract_predicate_data(
 
 
 def create_additional_parameter_name(
-        domain: LearnerDomain, grounded_action: ActionCall, pddl_object: PDDLObject) -> str:
+        domain: LearnerDomain, grounded_action: ActionCall, pddl_type: PDDLType) -> str:
     """Creates a unique name for the additional parameter.
 
     :param domain: the domain containing the action definition.
     :param grounded_action: the grounded action that had been observed.
-    :param pddl_object: the object that is being added as a parameter.
+    :param pddl_type: the new type that is being added as a parameter.
     :return: the new parameter name.
     """
     index = 1
-    additional_parameter_name = f"?{pddl_object.type.name[0]}"
+    additional_parameter_name = f"?{pddl_type.name[0]}"
     while additional_parameter_name in domain.actions[grounded_action.name].signature:
-        additional_parameter_name = f"?{pddl_object.type.name[0]}{index}"
+        additional_parameter_name = f"?{pddl_type.name[0]}{index}"
         index += 1
 
     return additional_parameter_name
@@ -79,7 +79,7 @@ class ConditionalSAM(SAMLearner):
     max_antecedents_size: int
     current_trajectory_objects: Dict[str, PDDLObject]
 
-    def __init__(self, partial_domain: Domain, max_antecedents_size: int = 3,
+    def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
                  preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
@@ -90,28 +90,29 @@ class ConditionalSAM(SAMLearner):
         self.quantified_dependency_set = {action_name: {} for action_name in self.partial_domain.actions}
         self.additional_parameters = defaultdict(dict)
 
-    def _initialize_universal_dependencies(self, grounded_action: ActionCall) -> None:
+    def _initialize_universal_dependencies(self, ground_action: ActionCall) -> None:
         """Initialize the universal antecedents candidates for a universal effect.
 
-        :param grounded_action: the action to initialize the universal dependencies for.
+        :param ground_action: the action to initialize the universal dependencies for.
         """
-        self.logger.debug("Initializing the universal antecedents candidates for action %s.", grounded_action.name)
-        objects_by_type = find_unique_objects_by_type(self.current_trajectory_objects, grounded_action.parameters)
-        lifted_action_signature = self.partial_domain.actions[grounded_action.name].signature
-        for pddl_type_name, pddl_objects in objects_by_type.items():
-            additional_parameter_name = create_additional_parameter_name(self.partial_domain, grounded_action,
-                                                                         pddl_objects[0])
+        self.logger.debug("Initializing the universal antecedents candidates for action %s.", ground_action.name)
+        lifted_action_signature = self.partial_domain.actions[ground_action.name].signature
+        for pddl_type_name, pddl_type in self.partial_domain.types.items():
+            if pddl_type_name == "object":
+                continue
+
+            additional_parameter_name = create_additional_parameter_name(self.partial_domain, ground_action, pddl_type)
             vocabulary = self.vocabulary_creator.create_lifted_vocabulary(
                 domain=self.partial_domain,
-                possible_parameters={**lifted_action_signature, additional_parameter_name: pddl_objects[0].type},
+                possible_parameters={**lifted_action_signature, additional_parameter_name: pddl_type},
                 must_be_parameter=additional_parameter_name)
             dependency_set = DependencySet(self.max_antecedents_size)
             dependency_set.initialize_dependencies(vocabulary)
-            self.quantified_dependency_set[grounded_action.name][pddl_type_name] = dependency_set
+            self.quantified_dependency_set[ground_action.name][pddl_type_name] = dependency_set
             universal_effect = UniversalQuantifiedEffect(quantified_parameter=additional_parameter_name,
-                                                         quantified_type=pddl_objects[0].type)
-            self.additional_parameters[grounded_action.name][pddl_type_name] = additional_parameter_name
-            self.partial_domain.actions[grounded_action.name].universal_effects.add(universal_effect)
+                                                         quantified_type=pddl_type)
+            self.additional_parameters[ground_action.name][pddl_type_name] = additional_parameter_name
+            self.partial_domain.actions[ground_action.name].universal_effects.add(universal_effect)
 
     def _initialize_actions_dependencies(self, grounded_action: ActionCall) -> None:
         """Initialize the dependency set for a single action.
@@ -210,9 +211,14 @@ class ConditionalSAM(SAMLearner):
 
         :param grounded_action: the action that is being executed.
         """
+        self.logger.debug("Removing existing previous state quantified dependencies.")
         objects_by_type = find_unique_objects_by_type(self.current_trajectory_objects, grounded_action.parameters)
         for pddl_type_name, pddl_objects in objects_by_type.items():
-            additional_parameter_name = self.additional_parameters[grounded_action.name][pddl_type_name]
+            try:
+                additional_parameter_name = self.additional_parameters[grounded_action.name][pddl_type_name]
+            except KeyError:
+                raise ValueError(f"Could not find additional parameter for action {str(grounded_action)} and type {pddl_type_name}")
+
             missing_next_state_literals_str = set()
             existing_previous_state_literals_str = set()
             for pddl_object in pddl_objects:
@@ -347,7 +353,7 @@ class ConditionalSAM(SAMLearner):
         conservative_conditional_preconditions = action_dependency_set.extract_restrictive_conditions()
         for conservative_condition in conservative_conditional_preconditions:
             action.manual_preconditions.append(
-                f"({FORALL} ({self.additional_parameters[action.name][quantified_type]} {quantified_type}) "
+                f"({FORALL} ({self.additional_parameters[action.name][quantified_type]} - {quantified_type}) "
                 f"{conservative_condition})")
 
     def _construct_conditional_effect_data(
@@ -429,14 +435,19 @@ class ConditionalSAM(SAMLearner):
                 additional_parameter_type=self.partial_domain.types[quantified_type])
             universal_effect.conditional_effects.add(conditional_effect)
 
-    @staticmethod
-    def _remove_preconditions_from_effects(action: LearnerAction) -> None:
+    def _remove_preconditions_from_effects(self, action: LearnerAction) -> None:
         """Removes the preconditions predicates from the action's effects.
 
         :param action: the learned action.
         """
+        self.logger.debug("Removing the preconditions predicates from the action's effects.")
         action.add_effects.difference_update(action.positive_preconditions)
         action.delete_effects.difference_update(action.negative_preconditions)
+        self.logger.debug("Remving the preconditions from the possible conditional effects")
+        preconditions_literals = {predicate.untyped_representation for predicate in action.positive_preconditions}
+        preconditions_literals.update(
+            {f"(not {predicate.untyped_representation})" for predicate in action.negative_preconditions})
+        self.dependency_set[action.name].remove_preconditions_literals(preconditions_literals)
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
