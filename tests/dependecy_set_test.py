@@ -128,7 +128,8 @@ def test_extract_restrictive_conditions_creates_not_empty_list(woodworking_predi
     literals_str.update({f"(not {literal.untyped_representation})" for literal in woodworking_predicates})
 
     conditions = dependency_set.extract_restrictive_conditions()
-    assert conditions is not None
+    assert len(conditions) > 0
+    print(conditions)
 
 def test_extract_restrictive_conditions_converts_all_positive_predicates_to_negatives_and_negatives_to_positive(
         woodworking_predicates: List[Predicate]):

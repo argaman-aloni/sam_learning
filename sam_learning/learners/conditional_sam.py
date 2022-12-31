@@ -323,7 +323,7 @@ class ConditionalSAM(SAMLearner):
         :param action_dependency_set: the action's dependency set.
         :return: True if the action is safe, False otherwise.
         """
-        self.logger.debug(f"Checking if action {action.name} is safe.")
+        self.logger.debug(f"Checking if action {action.name} is safe for the universal effects.")
         preconditions_str = {precondition.untyped_representation for precondition in
                              action.positive_preconditions}
         preconditions_str.update(

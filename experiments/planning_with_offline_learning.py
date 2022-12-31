@@ -117,9 +117,6 @@ class POL:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if (index + 1) % 10 != 0:
-                continue
-
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map,

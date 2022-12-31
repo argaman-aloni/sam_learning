@@ -147,8 +147,8 @@ class DependencySet:
             for antecedent in antecedents:
                 antecedent_to_add = antecedent[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX] if antecedent.startswith(
                     "(not ") else f"(not {antecedent})"
-                if antecedent_to_add == effect:
-                    continue
+                if antecedent_to_add != effect:
+                    negated_antecedents.append(antecedent_to_add)
 
             if len(negated_antecedents) == 0:
                 continue

@@ -94,11 +94,10 @@ def test_create_additional_parameter_name_creates_a_parameter_name_based_on_the_
 
 
 def test_create_additional_parameter_name_creates_a_parameter_name_based_on_the_type_and_action_name_with_index(
-        nurikabe_conditional_sam: ConditionalSAM):
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_domain: Domain):
     learner_domain = nurikabe_conditional_sam.partial_domain
     action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
-    additional_object = PDDLObject(name="n1", type=learner_domain.types["group"])
-    parameter_name = create_additional_parameter_name(learner_domain, action_call, additional_object)
+    parameter_name = create_additional_parameter_name(learner_domain, action_call, nurikabe_domain.types["group"])
     assert parameter_name == '?g1'
 
 
@@ -735,6 +734,30 @@ def test_is_action_safe_returns_true_when_dependency_set_contains_only_unconditi
         "(currently-dealing )": conditional_sam.dependency_set[test_action.name].dependencies["(currently-dealing )"]
     }
     assert conditional_sam._is_action_safe(test_action, conditional_sam.dependency_set[test_action.name])
+
+
+
+def test_construct_universal_effects_from_dependency_set_constructs_correct_universal_effect(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    tested_type = "cell"
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+
+    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set.dependencies = {
+        "(blocked ?c)": [{"(connected ?to ?c)"}],
+        "(not (available ?c))": [{"(available ?c)"}]
+    }
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
+    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(test_action, dependency_set, tested_type)
+    assert any(len(effect.conditional_effects) > 0 for effect in test_action.universal_effects)
+    for effect in test_action.universal_effects:
+        print(str(effect))
 
 
 def test_is_action_safe_returns_false_after_one_trajectory_component(
