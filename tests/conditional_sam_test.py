@@ -8,7 +8,7 @@ from pytest import fixture
 
 from sam_learning.core import DependencySet
 from sam_learning.learners import ConditionalSAM
-from sam_learning.learners.conditional_sam import _extract_predicate_data, create_additional_parameter_name, \
+from sam_learning.learners.conditional_sam import extract_predicate_data, create_additional_parameter_name, \
     find_unique_objects_by_type
 from tests.consts import SPIDER_DOMAIN_PATH, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH, \
     NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
@@ -223,7 +223,8 @@ def test_initialize_universal_dependencies_not_add_dependencies_if_additional_pa
         "num"].dependencies
 
 
-def test_update_action_effects_sets_correct_effects(conditional_sam: ConditionalSAM, spider_observation: Observation):
+def test_update_observed_effects_adds_the_observed_effects_to_the_correct_set_for_conditional_effects(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
     grounded_action = spider_observation.components[0].grounded_action_call
     conditional_sam._create_fully_observable_triplet_predicates(
         current_action=grounded_action,
@@ -231,12 +232,23 @@ def test_update_action_effects_sets_correct_effects(conditional_sam: Conditional
         next_state=spider_observation.components[0].next_state)
 
     conditional_sam._initialize_actions_dependencies(grounded_action)
-    initialized_add_effects = conditional_sam.partial_domain.actions[grounded_action.name].add_effects
-    initialized_delete_effects = conditional_sam.partial_domain.actions[grounded_action.name].delete_effects
-    conditional_sam._update_action_effects(grounded_action)
-    assert len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects) <= len(initialized_add_effects)
-    assert len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects) <= len(
-        initialized_delete_effects)
+    conditional_sam._update_observed_effects(grounded_action, spider_observation.components[0].previous_state,
+                                             spider_observation.components[0].next_state)
+    assert len(conditional_sam.observed_effects[grounded_action.name]) > 0
+
+
+def test_update_observed_effects_does_not_add_universal_effect_if_not_observed_in_post_state(
+        conditional_sam: ConditionalSAM, spider_observation: Observation):
+    grounded_action = spider_observation.components[0].grounded_action_call
+    conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action,
+        previous_state=spider_observation.components[0].previous_state,
+        next_state=spider_observation.components[0].next_state)
+
+    conditional_sam._initialize_actions_dependencies(grounded_action)
+    conditional_sam._update_observed_effects(grounded_action, spider_observation.components[0].previous_state,
+                                             spider_observation.components[0].next_state)
+    assert len(conditional_sam.observed_universal_effects[grounded_action.name]) == 0
 
 
 def test_find_literals_not_in_state_correctly_sets_the_literals_that_do_not_appear_in_the_state(
@@ -395,7 +407,7 @@ def test_remove_non_existing_previous_state_dependencies_removes_correct_predica
         current_action=grounded_action, previous_state=previous_state, next_state=next_state)
 
     conditional_sam._initialize_actions_dependencies(grounded_action)
-    conditional_sam._update_action_effects(grounded_action)
+    conditional_sam._update_observed_effects(grounded_action, previous_state, next_state)
     conditional_sam._remove_non_existing_previous_state_dependencies(grounded_action, previous_state, next_state)
     not_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
                         "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
@@ -432,7 +444,7 @@ def test_remove_existing_previous_state_dependencies_removes_correct_predicates_
         current_action=grounded_action, previous_state=previous_state, next_state=next_state)
 
     conditional_sam._initialize_actions_dependencies(grounded_action)
-    conditional_sam._update_action_effects(grounded_action)
+    conditional_sam._update_observed_effects(grounded_action, previous_state, next_state)
     conditional_sam._remove_existing_previous_state_dependencies(grounded_action)
     positive_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
                              "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
@@ -481,7 +493,6 @@ def test_update_effects_data_updates_the_relevant_effects_and_removes_irrelevant
 
     for dependency in negative_dependencies:
         assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
-
 
 
 def test_add_new_action_updates_action_negative_preconditions(conditional_sam: ConditionalSAM,
@@ -576,28 +587,11 @@ def test_update_action_updates_preconditions(conditional_sam: ConditionalSAM,
                                               "(not (currently-dealing ))"})
 
 
-def test_is_action_safe_with_a_new_action_returns_that_action_is_not_safe(conditional_sam: ConditionalSAM,
-                                                                          spider_observation: Observation):
-    grounded_action = spider_observation.components[0].grounded_action_call
-    conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=spider_observation.components[0].previous_state,
-        next_state=spider_observation.components[0].next_state)
-
-    conditional_sam._initialize_actions_dependencies(grounded_action)
-    conditional_sam.add_new_action(grounded_action,
-                                   spider_observation.components[0].previous_state,
-                                   spider_observation.components[0].next_state)
-
-    assert not conditional_sam._is_action_safe(conditional_sam.partial_domain.actions[grounded_action.name],
-                                               conditional_sam.dependency_set[grounded_action.name])
-
-
 def test_extract_predicate_data_returns_correct_predicate_when_predicate_contains_no_parameters(
         conditional_sam: ConditionalSAM, spider_domain: Domain):
     test_predicate = "(currently-updating-movable )"
     learner_action = conditional_sam.partial_domain.actions["start-dealing"]
-    result_predicate = _extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
+    result_predicate = extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
     assert result_predicate.name == "currently-updating-movable"
     assert len(result_predicate.signature) == 0
 
@@ -606,7 +600,7 @@ def test_extract_predicate_data_returns_correct_predicate_predicate_contains_par
         conditional_sam: ConditionalSAM, spider_domain: Domain):
     test_predicate = "(to-deal ?c ?totableau ?fromdeal ?from)"
     learner_action = conditional_sam.partial_domain.actions["deal-card"]
-    result_predicate = _extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
+    result_predicate = extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
     assert result_predicate.name == "to-deal"
     assert len(result_predicate.signature) == 4
     assert result_predicate.signature["?c"].name == "card"
@@ -619,7 +613,7 @@ def test_extract_predicate_data_returns_correct_predicate_predicate_contains_con
         conditional_sam: ConditionalSAM, spider_domain: Domain):
     test_predicate = "(on ?c discard)"
     learner_action = conditional_sam.partial_domain.actions["collect-card"]
-    result_predicate = _extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
+    result_predicate = extract_predicate_data(learner_action, test_predicate, spider_domain.constants)
     assert result_predicate.name == "on"
     assert len(result_predicate.signature) == 2
     assert result_predicate.signature["?c"].name == "card"
@@ -630,7 +624,7 @@ def test_extract_predicate_data_returns_correct_predicate_with_additional_type(
         conditional_sam: ConditionalSAM, spider_domain: Domain):
     test_predicate = "(can-be-placed-on ?c ?c1)"
     learner_action = conditional_sam.partial_domain.actions["collect-card"]
-    result_predicate = _extract_predicate_data(
+    result_predicate = extract_predicate_data(
         learner_action, test_predicate, spider_domain.constants,
         additional_parameter="?c1", additional_parameter_type=spider_domain.types["card"])
     assert result_predicate.name == "can-be-placed-on"
@@ -648,26 +642,59 @@ def test_construct_conditional_effects_from_dependency_set_constructs_correct_co
     }
     test_action = conditional_sam.partial_domain.actions["deal-card"]
 
-    conditional_sam._construct_conditional_effects_from_dependency_set(test_action, dependecy_set)
-    conditional_effects = conditional_sam.partial_domain.actions[test_action.name].conditional_effects
-    assert len(conditional_effects) == 2
+    conditional_effect = conditional_sam._construct_conditional_effect_data(test_action, dependecy_set,
+                                                                            "(make-unmovable ?to)")
+    assert len(conditional_effect.negative_conditions) == 1
+    assert conditional_effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
+    assert len(conditional_effect.positive_conditions) == 0
+    add_effect = conditional_effect.add_effects.pop().untyped_representation
+    assert add_effect == "(make-unmovable ?to)"
 
-    possible_add_effects = ["(currently-updating-unmovable )", "(make-unmovable ?to)"]
 
-    effect = conditional_effects.pop()
-    assert len(effect.negative_conditions) == 1
-    assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
-    assert len(effect.positive_conditions) == 0
-    add_effect = effect.add_effects.pop().untyped_representation
-    assert add_effect in possible_add_effects
+def test_construct_restrictive_preconditions_constructs_correct_restrictive_precondition_string_as_required(
+        conditional_sam: ConditionalSAM):
+    dependecy_set = DependencySet(max_size_antecedents=1)
+    dependecy_set.dependencies = {
+        "(currently-updating-unmovable )": [{"(not (can-continue-group ?c ?to))"}],
+        "(make-unmovable ?to)": [{"(not (can-continue-group ?c ?to))"}]
+    }
+    test_action = conditional_sam.partial_domain.actions["deal-card"]
 
-    possible_add_effects.remove(add_effect)
+    conditional_sam._construct_restrictive_preconditions(test_action, dependecy_set, "(make-unmovable ?to)")
+    print(test_action.manual_preconditions)
+    assert test_action.manual_preconditions == ["(or (make-unmovable ?to) (and (or (can-continue-group ?c ?to))))"]
 
-    effect = conditional_effects.pop()
-    print(effect)
-    assert len(effect.negative_conditions) == 1
-    assert effect.negative_conditions.pop().untyped_representation == "(can-continue-group ?c ?to)"
-    assert effect.add_effects.pop().untyped_representation in possible_add_effects
+
+def test_construct_restrictive_preconditions_constructs_correct_restrictive_precondition_string_as_required_when_is_effect(
+        conditional_sam: ConditionalSAM):
+    dependecy_set = DependencySet(max_size_antecedents=1)
+    dependecy_set.dependencies = {
+        "(currently-updating-unmovable )": [{"(not (can-continue-group ?c ?to))"}],
+        "(make-unmovable ?to)": [{"(not (can-continue-group ?c ?to))"}]
+    }
+    test_action = conditional_sam.partial_domain.actions["deal-card"]
+
+    conditional_sam.observed_effects[test_action.name].add("(make-unmovable ?to)")
+    conditional_sam._construct_restrictive_preconditions(test_action, dependecy_set, "(make-unmovable ?to)")
+    print(test_action.manual_preconditions)
+    assert test_action.manual_preconditions == [
+        "(or (make-unmovable ?to) (and (or (can-continue-group ?c ?to))) (and (not (can-continue-group ?c ?to))))"]
+
+
+def test_construct_restrictive_conditional_effects_constructs_the_correct_conditional_effect_in_the_action(
+        conditional_sam: ConditionalSAM):
+    dependecy_set = DependencySet(max_size_antecedents=1)
+    dependecy_set.dependencies = {
+        "(currently-updating-unmovable )": [{"(not (can-continue-group ?c ?to))"}],
+        "(make-unmovable ?to)": [{"(not (can-continue-group ?c ?to))"}]
+    }
+    test_action = conditional_sam.partial_domain.actions["deal-card"]
+
+    conditional_sam.observed_effects[test_action.name].add("(make-unmovable ?to)")
+    conditional_sam._construct_restrictive_conditional_effects(test_action, dependecy_set, "(make-unmovable ?to)")
+    conditional_effect = test_action.conditional_effects.pop()
+    print(str(conditional_effect))
+    assert str(conditional_effect) == "(when (and (not (can-continue-group ?c ?to))) (and (make-unmovable ?to)))"
 
 
 def test_construct_universal_effects_from_dependency_set_constructs_correct_conditional_effect(
@@ -687,7 +714,8 @@ def test_construct_universal_effects_from_dependency_set_constructs_correct_cond
     test_action = nurikabe_conditional_sam.partial_domain.actions["move"]
     ground_action = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
     nurikabe_conditional_sam._initialize_universal_dependencies(ground_action)
-    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(test_action, dependency_set, "cell")
+    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(
+        test_action, dependency_set, "cell", "(blocked ?c)")
     universal_effect = \
         [effect for effect in nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects
          if effect.quantified_type.name == "cell"][0]
@@ -701,7 +729,7 @@ def test_remove_preconditions_from_effects_removes_action_preconditions_from_dep
         conditional_sam: ConditionalSAM, spider_observation: Observation):
     conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
-    conditional_sam._remove_preconditions_from_effects(
+    conditional_sam._remove_preconditions_from_dependency_set(
         conditional_sam.partial_domain.actions["start-dealing"])
     assert "(not (currently-updating-movable ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
     assert "(not (currently-updating-unmovable ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
@@ -715,7 +743,7 @@ def test_handle_single_trajectory_component_learns_correct_information(
         conditional_sam: ConditionalSAM, spider_observation: Observation):
     conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
-    conditional_sam._remove_preconditions_from_effects(
+    conditional_sam._remove_preconditions_from_dependency_set(
         conditional_sam.partial_domain.actions["start-dealing"])
     pddl_action = conditional_sam.partial_domain.actions["start-dealing"].to_pddl()
     assert "(not (currently-updating-unmovable ))" in pddl_action
@@ -723,18 +751,6 @@ def test_handle_single_trajectory_component_learns_correct_information(
     assert "(not (currently-collecting-deck ))" in pddl_action
     assert "(not (currently-updating-part-of-tableau ))" in pddl_action
     assert "(not (currently-dealing ))" in pddl_action
-
-
-def test_is_action_safe_returns_true_when_dependency_set_contains_only_unconditional_effect_of_action(
-        conditional_sam: ConditionalSAM, spider_observation: Observation):
-    conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
-    conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
-    test_action = conditional_sam.partial_domain.actions["start-dealing"]
-    conditional_sam.dependency_set[test_action.name].dependencies = {
-        "(currently-dealing )": conditional_sam.dependency_set[test_action.name].dependencies["(currently-dealing )"]
-    }
-    assert conditional_sam._is_action_safe(test_action, conditional_sam.dependency_set[test_action.name])
-
 
 
 def test_construct_universal_effects_from_dependency_set_constructs_correct_universal_effect(
@@ -754,18 +770,90 @@ def test_construct_universal_effects_from_dependency_set_constructs_correct_univ
     }
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
-    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(test_action, dependency_set, tested_type)
+    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(
+        test_action, dependency_set, tested_type, "(not (available ?c))")
     assert any(len(effect.conditional_effects) > 0 for effect in test_action.universal_effects)
     for effect in test_action.universal_effects:
         print(str(effect))
 
 
-def test_is_action_safe_returns_false_after_one_trajectory_component(
-        conditional_sam: ConditionalSAM, spider_observation: Observation):
-    conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
-    conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
-    test_action = conditional_sam.partial_domain.actions["start-dealing"]
-    assert not conditional_sam._is_action_safe(test_action, conditional_sam.dependency_set[test_action.name])
+def test_construct_restrictive_universal_preconditions_creates_correct_restrictive_preconditions_for_the_action(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    tested_type = "cell"
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+
+    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set.dependencies = {
+        "(blocked ?c)": [{"(connected ?to ?c)"}],
+        "(not (available ?c))": [{"(available ?c)"}]
+    }
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
+    nurikabe_conditional_sam._construct_restrictive_universal_preconditions(
+        test_action, dependency_set, tested_type, "(blocked ?c)")
+
+    print(test_action.manual_preconditions)
+    assert test_action.manual_preconditions == [
+        "(forall (?c - cell) (or (blocked ?c) (and (or (not (connected ?to ?c))))))"]
+
+
+def test_construct_restrictive_universal_preconditions_creates_correct_restrictive_preconditions_for_the_action_when_literal_is_effect(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    tested_type = "cell"
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+
+    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set.dependencies = {
+        "(blocked ?c)": [{"(connected ?to ?c)"}],
+        "(not (available ?c))": [{"(available ?c)"}]
+    }
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
+
+    nurikabe_conditional_sam.observed_universal_effects[test_action.name][tested_type].add("(blocked ?c)")
+    nurikabe_conditional_sam._construct_restrictive_universal_preconditions(
+        test_action, dependency_set, tested_type, "(blocked ?c)")
+
+    print(test_action.manual_preconditions)
+    assert test_action.manual_preconditions == [
+        "(forall (?c - cell) (or (blocked ?c) (and (or (not (connected ?to ?c)))) (and (connected ?to ?c))))"]
+
+
+def test_construct_restrictive_universal_effect_constructs_correct_restrictive_universal_effect(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    tested_type = "cell"
+    previous_state = nurikabe_observation.components[0].previous_state
+    grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
+    next_state = nurikabe_observation.components[0].next_state
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
+        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+
+    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set.dependencies = {
+        "(blocked ?c)": [{"(connected ?to ?c)"}],
+        "(not (available ?c))": [{"(available ?c)"}]
+    }
+    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
+    test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
+
+    nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name][tested_type] = dependency_set
+    nurikabe_conditional_sam.observed_universal_effects[test_action.name][tested_type].add("(blocked ?c)")
+    nurikabe_conditional_sam._construct_restrictive_universal_effect(
+        test_action, tested_type, "(blocked ?c)")
+
+    for universal_effect in test_action.universal_effects:
+        print(universal_effect)
 
 
 def test_learn_action_model_learns_restrictive_action_mode(
