@@ -144,7 +144,7 @@ class LearnerAction:
                    f"\t\t{universal_effects}\n" \
                    f"{numeric_effects})"
 
-        return f"(and {add_effects_str} {delete_effects_str}{universal_effects})"
+        return f"(and {add_effects_str} {delete_effects_str} {conditional_effects} {universal_effects})"
 
     def to_pddl(self) -> str:
         """Returns the PDDL string representation of the action.

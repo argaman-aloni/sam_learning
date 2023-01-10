@@ -134,7 +134,7 @@ def test_is_safe_conditional_effect_returns_false_on_initialized_literals_set(wo
     dependency_set = DependencySet(max_size_antecedents=2)
     dependency_set.initialize_dependencies(set(woodworking_predicates))
 
-    assert not dependency_set.is_safe_conditional_effect("(is-smooth ?surface)")
+    assert not dependency_set.is_conditional_effect("(is-smooth ?surface)")
 
 
 def test_extract_restrictive_conditions_creates_non_empty_list(woodworking_predicates: List[Predicate]):
@@ -189,6 +189,18 @@ def test_extract_restrictive_conditions_creates_conditions_with_negated_literals
     assert "(or (not b))" in conditions
     assert "(or (not a))" in conditions
     assert "(or (not c))" in conditions
+
+
+def test_remove_preconditions_literals_correctly_removed_preconditions_from_the_depencency_set(
+        woodworking_predicates: List[Predicate]):
+    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set.initialize_dependencies(set(woodworking_predicates))
+
+    preconditions = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
+    dependency_set.remove_preconditions_literals(preconditions)
+
+    for literal in preconditions:
+        assert literal not in dependency_set.dependencies
 
 
 def test_extract_restrictive_conditions_creates_conditions_with_negated_literals_and_positive_literals_when_is_effect():

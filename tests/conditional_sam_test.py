@@ -107,21 +107,6 @@ def test_find_unique_objects_by_type_returns_correct_objects(spider_observation:
     assert sum(len(objects) for objects in unique_objects.values()) == len(observation_objects)
 
 
-def test_initialize_actions_dependencies_sets_correct_effects(conditional_sam: ConditionalSAM,
-                                                              spider_observation: Observation):
-    grounded_action = spider_observation.components[0].grounded_action_call
-    conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=spider_observation.components[0].previous_state,
-        next_state=spider_observation.components[0].next_state)
-
-    conditional_sam._initialize_actions_dependencies(grounded_action)
-    assert len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects) > 0
-    assert len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects) > 0
-    print(len(conditional_sam.partial_domain.actions[grounded_action.name].add_effects))
-    print(len(conditional_sam.partial_domain.actions[grounded_action.name].delete_effects))
-
-
 def test_initialize_actions_dependencies_adds_correct_dependencies(conditional_sam: ConditionalSAM,
                                                                    spider_observation: Observation):
     grounded_action = spider_observation.components[0].grounded_action_call
@@ -235,6 +220,7 @@ def test_update_observed_effects_adds_the_observed_effects_to_the_correct_set_fo
     conditional_sam._update_observed_effects(grounded_action, spider_observation.components[0].previous_state,
                                              spider_observation.components[0].next_state)
     assert len(conditional_sam.observed_effects[grounded_action.name]) > 0
+    print(conditional_sam.observed_effects[grounded_action.name])
 
 
 def test_update_observed_effects_does_not_add_universal_effect_if_not_observed_in_post_state(
@@ -854,6 +840,54 @@ def test_construct_restrictive_universal_effect_constructs_correct_restrictive_u
 
     for universal_effect in test_action.universal_effects:
         print(universal_effect)
+
+
+def test_handle_single_trajectory_component_updates_correct_observed_effects_for_conditional_effects_and_universal_effects(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    first_component = nurikabe_observation.components[0]
+    nurikabe_conditional_sam.handle_single_trajectory_component(first_component)
+    expected_effects = {"(robot-pos ?to)", "(not (robot-pos ?from))"}
+    actual_effects = nurikabe_conditional_sam.observed_effects[first_component.grounded_action_call.name]
+    assert actual_effects == expected_effects
+    for observed_effects in nurikabe_conditional_sam.observed_universal_effects[
+        first_component.grounded_action_call.name].values():
+        assert len(observed_effects) == 0
+
+
+def test_verify_and_construct_safe_conditional_effects_does_not_change_observed_effects(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    first_component = nurikabe_observation.components[0]
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam.handle_single_trajectory_component(first_component)
+    test_action = nurikabe_conditional_sam.partial_domain.actions[first_component.grounded_action_call.name]
+    nurikabe_conditional_sam._verify_and_construct_safe_conditional_effects(test_action)
+
+    expected_effects = {"(robot-pos ?to)", "(not (robot-pos ?from))"}
+    actual_effects = nurikabe_conditional_sam.observed_effects[first_component.grounded_action_call.name]
+
+
+def test_verify_and_construct_safe_conditional_effects_constructs_correct_safe_conditional_effects_with_observed_effects_only(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    first_component = nurikabe_observation.components[0]
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam.handle_single_trajectory_component(first_component)
+    test_action = nurikabe_conditional_sam.partial_domain.actions[first_component.grounded_action_call.name]
+    nurikabe_conditional_sam._verify_and_construct_safe_conditional_effects(test_action)
+
+    assert [effect.untyped_representation for effect in test_action.add_effects] == ["(robot-pos ?to)"]
+    assert [effect.untyped_representation for effect in test_action.delete_effects] == ["(robot-pos ?from)"]
+    assert len(test_action.conditional_effects) == 0
+
+
+def test_verify_and_construct_safe_conditional_effects_creates_conditional_effect_when_action_is_unsafe(
+        nurikabe_conditional_sam: ConditionalSAM, nurikabe_observation: Observation):
+    fourth_component = nurikabe_observation.components[4]
+    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    nurikabe_conditional_sam.handle_single_trajectory_component(fourth_component)
+    test_action = nurikabe_conditional_sam.partial_domain.actions[fourth_component.grounded_action_call.name]
+    nurikabe_conditional_sam._verify_and_construct_safe_conditional_effects(test_action)
+
+    assert len(test_action.conditional_effects) > 0
 
 
 def test_learn_action_model_learns_restrictive_action_mode(

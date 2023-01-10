@@ -80,14 +80,17 @@ class DependencySet:
                 self.dependencies[literal].remove(dependency)
 
     def remove_preconditions_literals(self, preconditions_literals: Set[str]) -> None:
-        """Removes the preconditions literals from the dependency set.
+        """Removes the preconditions literals from the dependency set (from both the antecedents and the results).
 
         :param preconditions_literals: the preconditions of the action.
         """
         for literal in preconditions_literals:
             self.dependencies.pop(literal, None)
 
-    def is_safe_conditional_effect(self, literal: str) -> bool:
+        for literal in self.dependencies:
+            self.remove_dependencies(literal, preconditions_literals, include_supersets=True)
+
+    def is_conditional_effect(self, literal: str) -> bool:
         """Determines whether the literal is a conditional effect with safe number of antecedents.
 
         :param literal: the literal to check.

@@ -73,8 +73,6 @@ class ConditionalSAM(SAMLearner):
         dependency_set = DependencySet(self.max_antecedents_size)
         dependency_set.initialize_dependencies(vocabulary)
         self.dependency_set[grounded_action.name] = dependency_set
-        self.partial_domain.actions[grounded_action.name].add_effects.update(vocabulary)
-        self.partial_domain.actions[grounded_action.name].delete_effects.update(vocabulary)
 
     def _update_observed_effects(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Set the correct data for the action's effects.
@@ -85,20 +83,20 @@ class ConditionalSAM(SAMLearner):
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
         delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_del_effects))
-        self.observed_effects[grounded_action.name].update(
-            [positive_literal.untyped_representation for positive_literal in add_effects])
-        self.observed_effects[grounded_action.name].update(
-            [f"{NOT_PREFIX} {negative_literal.untyped_representation}" for negative_literal in delete_effects])
+        non_quantified_add_effects = {positive_literal.untyped_representation for positive_literal in add_effects}
+        non_quantified_del_effects = {f"{NOT_PREFIX} {negative_literal.untyped_representation})" for negative_literal in
+                                      delete_effects}
+        self.observed_effects[grounded_action.name].update(non_quantified_add_effects)
+        self.observed_effects[grounded_action.name].update(non_quantified_del_effects)
 
         self.logger.debug("adding observed universal effects.")
         for lifted_add_effects, lifted_delete_effects, pddl_type_name, _ in extract_quantified_effects(
                 grounded_action, grounded_add_effects, grounded_del_effects, self.current_trajectory_objects,
                 self.matcher, self.additional_parameters[grounded_action.name]):
             self.observed_universal_effects[grounded_action.name][pddl_type_name].update(
-                [positive_literal.untyped_representation for positive_literal in lifted_add_effects])
+                {positive_literal.untyped_representation for positive_literal in lifted_add_effects})
             self.observed_universal_effects[grounded_action.name][pddl_type_name].update(
-                [f"{NOT_PREFIX} {negative_literal.untyped_representation}"
-                 for negative_literal in delete_effects])
+                {f"{NOT_PREFIX} {negative_literal.untyped_representation})" for negative_literal in delete_effects})
 
     def _find_literals_not_in_state(
             self, grounded_action: ActionCall, positive_predicates: Set[GroundedPredicate],
@@ -419,9 +417,33 @@ class ConditionalSAM(SAMLearner):
         constants = self.partial_domain.constants
         if literal.startswith(NOT_PREFIX):
             action.delete_effects.add(extract_predicate_data(action, f"{literal[5:-1]}", constants))
+            return
 
-        else:
-            action.add_effects.add(extract_predicate_data(action, literal, constants))
+        action.add_effects.add(extract_predicate_data(action, literal, constants))
+
+    def verify_single_possible_conditional_effect(self, action: LearnerAction, action_dependency: DependencySet,
+                                                  literal: str) -> None:
+        """
+
+        :param action:
+        :param action_dependency:
+        :param literal:
+        :return:
+        """
+        if not self.dependency_set[action.name].is_safe_literal(literal):
+            self.logger.debug(f"The literal {literal} is not considered to be safe for {action.name}.")
+            self._construct_restrictive_preconditions(action, self.dependency_set[action.name], literal)
+            self._construct_restrictive_conditional_effects(action, self.dependency_set[action.name], literal)
+            return
+
+        self.logger.debug(f"The literal {literal} is safe to use in the action {action.name}.")
+        if literal in self.observed_effects[action.name]:
+            if not self.dependency_set[action.name].is_conditional_effect(literal):
+                self._construct_simple_effect(action, literal)
+
+            else:
+                conditional_effect = self._construct_conditional_effect_data(action, action_dependency, literal)
+                action.conditional_effects.add(conditional_effect)
 
     def _verify_and_construct_safe_conditional_effects(self, action: LearnerAction) -> None:
         """Verifies that the action is safe and constructs its effects and preconditions.
@@ -432,19 +454,7 @@ class ConditionalSAM(SAMLearner):
         self._remove_preconditions_from_dependency_set(action)
         action_dependency = self.dependency_set[action.name]
         for literal in action_dependency.dependencies:
-            if not self.dependency_set[action.name].is_safe_literal(literal):
-                self.logger.debug(f"The literal {literal} is not considered to be safe for {action.name}.")
-                self._construct_restrictive_preconditions(action, self.dependency_set[action.name], literal)
-                self._construct_restrictive_conditional_effects(action, self.dependency_set[action.name], literal)
-                continue
-
-            self.logger.debug(f"The literal {literal} is safe to use in the action {action.name}.")
-            if not self.dependency_set[action.name].is_safe_conditional_effect(literal):
-                self._construct_simple_effect(action, literal)
-                continue
-
-            conditional_effect = self._construct_conditional_effect_data(action, action_dependency, literal)
-            action.conditional_effects.add(conditional_effect)
+            self.verify_single_possible_conditional_effect(action, action_dependency, literal)
 
     def _verify_and_construct_safe_universal_effects(self, action: LearnerAction) -> None:
         """Constructs the single-agent actions that are safe to execute."""
