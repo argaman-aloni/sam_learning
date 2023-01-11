@@ -80,15 +80,15 @@ class LearnerAction:
             inequality_precondition_str += "\n"
         return inequality_precondition_str
 
-    def _extract_numeric_preconditions(self, positive_preconditions, negative_preconditions, precondition_str) -> str:
+    def _extract_numeric_preconditions(
+            self, positive_preconditions: List[str], negative_preconditions: List[str], precondition_str: str) -> str:
         """Extract the numeric preconditions from the action.
 
         :param positive_preconditions: the positive predicates to append to the string.
         :param precondition_str: the precondition string up to this point.
         :return: the string containing the numeric preconditions.
         """
-        numeric_preconditions = self.numeric_preconditions[0]
-        conditions_type = self.numeric_preconditions[1]
+        numeric_preconditions, conditions_type = self.numeric_preconditions
         numeric_preconditions_str = "\t\t\n".join(numeric_preconditions)
 
         if conditions_type == ConditionType.disjunctive:

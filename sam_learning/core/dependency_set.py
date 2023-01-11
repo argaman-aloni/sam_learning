@@ -160,15 +160,25 @@ class DependencySet:
                 negated_antecedents.append(antecedent_to_add)
                 positive_antecedents.add(antecedent)
 
-            negated_conditions_statement.append(f"(or {' '.join(negated_antecedents)})")
+            if len(negated_antecedents) > 1:
+                negated_conditions_statement.append(f"(or {' '.join(negated_antecedents)})")
+
+            else:
+                negated_conditions_statement.append(negated_antecedents[0])
+
+        if set(negated_conditions_statement) == preconditions:
+            return ""
 
         antecedent_statement = f"(and {' '.join(positive_antecedents)})"
+        negated_result = f"{NOT_PREFIX} {literal})"
         if is_effect:
             precondition_statement = \
-                f"(or {antecedent_statement} (and {' '.join(negated_conditions_statement)}))" if literal in preconditions \
+                f"(or {antecedent_statement} (and {' '.join(negated_conditions_statement)}))" \
+                    if negated_result in preconditions \
                     else f"(or {literal} (and {' '.join(negated_conditions_statement)}) {antecedent_statement})"
         else:
-            precondition_statement = f"(and {' '.join(negated_conditions_statement)})" if literal in preconditions \
+            precondition_statement = f"(and {' '.join(negated_conditions_statement)})" \
+                if negated_result in preconditions \
                 else f"(or {literal} (and {' '.join(negated_conditions_statement)}))"
 
         return precondition_statement

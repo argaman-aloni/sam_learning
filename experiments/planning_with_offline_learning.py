@@ -20,8 +20,7 @@ from validators import DomainValidator
 DEFAULT_SPLIT = 5
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
-                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam,
-                      LearningAlgorithmType.conditional_sam]
+                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]
 
 LEARNING_ALGORITHMS = {
     LearningAlgorithmType.sam_learning: SAMLearner,
@@ -43,12 +42,13 @@ class POL:
     _learning_algorithm: LearningAlgorithmType
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
+    action_to_universals_map: Dict[str, bool]
     numeric_performance_calc: NumericPerformanceCalculator
     max_num_antecedents: int
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
-                 solver_type: SolverType, max_num_antecedents: int):
+                 solver_type: SolverType, max_num_antecedents: int, universals_map_path: Optional[Path]):
         self.logger = logging.getLogger(__name__)
         self.max_num_antecedents = max_num_antecedents
         self.working_directory_path = working_directory_path
@@ -65,8 +65,16 @@ class POL:
             with open(fluents_map_path, "rt") as json_file:
                 self.fluents_map = json.load(json_file)
 
+
         else:
             self.fluents_map = None
+
+        if universals_map_path is not None:
+            with open(universals_map_path, "rt") as json_file:
+                self.action_to_universals_map = json.load(json_file)
+
+        else:
+            self.action_to_universals_map = None
 
         self.numeric_performance_calc = None
         self.domain_validator = DomainValidator(
@@ -117,18 +125,22 @@ class POL:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
+            if index % 10 != 0:
+                continue
+
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
                                                                     preconditions_fluent_map=self.fluents_map,
-                                                                    max_antecedents_size=self.max_num_antecedents)
+                                                                    max_antecedents_size=self.max_num_antecedents,
+                                                                    action_to_universal_effects_map=self.action_to_universals_map)
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
 
-        if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
-
-        self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
+        # if self._learning_algorithm in NUMERIC_ALGORITHMS:
+        #     self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+        #
+        # self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
@@ -177,6 +189,7 @@ def parse_arguments() -> argparse.Namespace:
                              "6: polynomial_sam\n 9: conditional_sam")
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
                                                                    "fluents", default=None)
+    parser.add_argument("--universals_map", required=False, help="The path to the file mapping indicating whether there are usinversals or not", default=None)
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
                         help="The solver that should be used for the sake of validation", default=3)
     parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size", default=1)
@@ -191,6 +204,7 @@ def main():
                           domain_file_name=args.domain_file_name,
                           learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
                           fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
+                          universals_map_path=Path(args.universals_map) if args.universals_map else None,
                           solver_type=SolverType(args.solver_type),
                           max_num_antecedents=args.max_antecedent_size or 0)
     offline_learner.run_cross_validation()

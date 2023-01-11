@@ -22,9 +22,11 @@ class ConditionalSAM(SAMLearner):
     current_trajectory_objects: Dict[str, PDDLObject]
     observed_effects: Dict[str, Set[str]]
     observed_universal_effects: Dict[str, Dict[str, Set[str]]]
+    action_to_universal_effects_map: Dict[str, bool]
 
     def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
-                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
+                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 action_to_universal_effects_map: Optional[Dict[str, bool]] = None):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
@@ -35,6 +37,8 @@ class ConditionalSAM(SAMLearner):
         self.additional_parameters = defaultdict(dict)
         self.observed_effects = {action_name: set() for action_name in self.partial_domain.actions}
         self.observed_universal_effects = {action_name: {} for action_name in self.partial_domain.actions}
+        self.action_to_universal_effects_map = action_to_universal_effects_map if \
+            action_to_universal_effects_map else {}
 
     def _initialize_universal_dependencies(self, ground_action: ActionCall) -> None:
         """Initialize the universal antecedents candidates for a universal effect.
@@ -529,7 +533,9 @@ class ConditionalSAM(SAMLearner):
 
         for action in self.partial_domain.actions.values():
             self._verify_and_construct_safe_conditional_effects(action)
-            self._verify_and_construct_safe_universal_effects(action)
+            if self.action_to_universal_effects_map[action.name]:
+                self._verify_and_construct_safe_universal_effects(action)
+
             self.logger.debug(f"Finished handling action {action.name}.")
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
