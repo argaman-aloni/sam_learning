@@ -22,7 +22,7 @@ class ConditionalSAM(SAMLearner):
     current_trajectory_objects: Dict[str, PDDLObject]
     observed_effects: Dict[str, Set[str]]
     observed_universal_effects: Dict[str, Dict[str, Set[str]]]
-    action_to_universal_effects_map: Dict[str, bool]
+    action_contains_literals_map: Dict[str, bool]
 
     def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
                  preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
@@ -37,8 +37,8 @@ class ConditionalSAM(SAMLearner):
         self.additional_parameters = defaultdict(dict)
         self.observed_effects = {action_name: set() for action_name in self.partial_domain.actions}
         self.observed_universal_effects = {action_name: {} for action_name in self.partial_domain.actions}
-        self.action_to_universal_effects_map = action_to_universal_effects_map if \
-            action_to_universal_effects_map else {}
+        self.action_contains_literals_map = action_to_universal_effects_map if \
+            action_to_universal_effects_map else {action_name: True for action_name in self.partial_domain.actions}
 
     def _initialize_universal_dependencies(self, ground_action: ActionCall) -> None:
         """Initialize the universal antecedents candidates for a universal effect.
@@ -94,13 +94,20 @@ class ConditionalSAM(SAMLearner):
         self.observed_effects[grounded_action.name].update(non_quantified_del_effects)
 
         self.logger.debug("adding observed universal effects.")
+        if not self.action_contains_literals_map[grounded_action.name]:
+            return
+
         for lifted_add_effects, lifted_delete_effects, pddl_type_name, _ in extract_quantified_effects(
                 grounded_action, grounded_add_effects, grounded_del_effects, self.current_trajectory_objects,
                 self.matcher, self.additional_parameters[grounded_action.name]):
+            positive_quantified_effects = {positive_literal.untyped_representation for positive_literal in
+                                           lifted_add_effects}
+            negative_quantified_effects = {f"{NOT_PREFIX} {negative_literal.untyped_representation})" for
+                                           negative_literal in lifted_delete_effects}
             self.observed_universal_effects[grounded_action.name][pddl_type_name].update(
-                {positive_literal.untyped_representation for positive_literal in lifted_add_effects})
+                positive_quantified_effects.difference(non_quantified_add_effects))
             self.observed_universal_effects[grounded_action.name][pddl_type_name].update(
-                {f"{NOT_PREFIX} {negative_literal.untyped_representation})" for negative_literal in delete_effects})
+                negative_quantified_effects.difference(non_quantified_del_effects))
 
     def _find_literals_not_in_state(
             self, grounded_action: ActionCall, positive_predicates: Set[GroundedPredicate],
@@ -251,8 +258,11 @@ class ConditionalSAM(SAMLearner):
         :param next_state: the state following the action's execution.
         """
         self._remove_existing_previous_state_dependencies(grounded_action)
-        self._remove_existing_previous_state_quantified_dependencies(grounded_action)
         self._remove_non_existing_previous_state_dependencies(grounded_action, previous_state, next_state)
+        if not self.action_contains_literals_map[grounded_action.name]:
+            return
+
+        self._remove_existing_previous_state_quantified_dependencies(grounded_action)
         self._remove_non_existing_previous_state_quantified_dependencies(grounded_action, previous_state, next_state)
 
     def _update_effects_data(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -294,7 +304,7 @@ class ConditionalSAM(SAMLearner):
         :param quantified_type: the quantified type of the literal.
         :param literal: the literal determined to be unsafe.
         """
-        self.logger.info(f"Constructing restrictive preconditions for the unsafe action {action.name}.")
+        self.logger.info(f"Constructing restrictive universal preconditions for the unsafe action {action.name}.")
         is_effect = literal in self.observed_universal_effects[action.name][quantified_type]
         conservative_conditional_preconditions = action_dependency_set.extract_restrictive_conditions(
             set(), literal, is_effect)
@@ -341,6 +351,7 @@ class ConditionalSAM(SAMLearner):
         :param quantified_type: the type of the quantified variable.
         :param quantified_literal: the literal that is quantified.
         """
+        self.logger.info(f"Constructing restrictive universal effect for the unsafe action {action.name}.")
         if quantified_literal not in self.observed_universal_effects[action.name][quantified_type]:
             return
 
@@ -476,7 +487,7 @@ class ConditionalSAM(SAMLearner):
                     self.logger.debug(f"The literal {quantified_literal} was not observed as a universal effect.")
                     continue
 
-                self.logger.debug(f"The quantified literal {quantified_literal} is safe for action {action.name}.")
+                self.logger.info(f"The quantified literal {quantified_literal} is safe for action {action.name}.")
                 self._construct_universal_effects_from_dependency_set(action, dependency_set, quantified_type,
                                                                       quantified_literal)
 
@@ -533,7 +544,7 @@ class ConditionalSAM(SAMLearner):
 
         for action in self.partial_domain.actions.values():
             self._verify_and_construct_safe_conditional_effects(action)
-            if self.action_to_universal_effects_map[action.name]:
+            if self.action_contains_literals_map[action.name]:
                 self._verify_and_construct_safe_universal_effects(action)
 
             self.logger.debug(f"Finished handling action {action.name}.")

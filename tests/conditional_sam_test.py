@@ -648,7 +648,7 @@ def test_construct_restrictive_preconditions_constructs_correct_restrictive_prec
 
     conditional_sam._construct_restrictive_preconditions(test_action, dependecy_set, "(make-unmovable ?to)")
     print(test_action.manual_preconditions)
-    assert test_action.manual_preconditions == ["(or (make-unmovable ?to) (and (or (can-continue-group ?c ?to))))"]
+    assert test_action.manual_preconditions == ["(or (make-unmovable ?to) (and (can-continue-group ?c ?to)))"]
 
 
 def test_construct_restrictive_preconditions_constructs_correct_restrictive_precondition_string_as_required_when_is_effect(
@@ -664,7 +664,7 @@ def test_construct_restrictive_preconditions_constructs_correct_restrictive_prec
     conditional_sam._construct_restrictive_preconditions(test_action, dependecy_set, "(make-unmovable ?to)")
     print(test_action.manual_preconditions)
     assert test_action.manual_preconditions == [
-        "(or (make-unmovable ?to) (and (or (can-continue-group ?c ?to))) (and (not (can-continue-group ?c ?to))))"]
+        "(or (make-unmovable ?to) (and (can-continue-group ?c ?to)) (and (not (can-continue-group ?c ?to))))"]
 
 
 def test_construct_restrictive_conditional_effects_constructs_the_correct_conditional_effect_in_the_action(
@@ -785,7 +785,7 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
 
     print(test_action.manual_preconditions)
     assert test_action.manual_preconditions == [
-        "(forall (?c - cell) (or (blocked ?c) (and (or (not (connected ?to ?c))))))"]
+        "(forall (?c - cell) (or (blocked ?c) (and (not (connected ?to ?c)))))"]
 
 
 def test_construct_restrictive_universal_preconditions_creates_correct_restrictive_preconditions_for_the_action_when_literal_is_effect(
@@ -812,7 +812,7 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
 
     print(test_action.manual_preconditions)
     assert test_action.manual_preconditions == [
-        "(forall (?c - cell) (or (blocked ?c) (and (or (not (connected ?to ?c)))) (and (connected ?to ?c))))"]
+        "(forall (?c - cell) (or (blocked ?c) (and (not (connected ?to ?c))) (and (connected ?to ?c))))"]
 
 
 def test_construct_restrictive_universal_effect_constructs_correct_restrictive_universal_effect(
