@@ -132,10 +132,8 @@ class PredicatesMatcher:
         self.logger.info(f"Finding the possible matches for the grounded action - {str(grounded_action_call)}")
         possible_matches = []
         for state_predicate in state_literals:
-            if extra_grounded_object is None:
+            if extra_grounded_object is None or extra_grounded_object not in state_predicate.grounded_objects:
                 possible_matches.extend(self.match_predicate_to_action_literals(state_predicate, grounded_action_call))
-
-            elif extra_grounded_object not in state_predicate.grounded_objects:
                 continue
 
             possible_matches.extend(self.match_predicate_to_action_literals(

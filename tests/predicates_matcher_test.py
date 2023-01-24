@@ -400,7 +400,7 @@ def test_get_possible_literal_matches_with_extra_literal_extends_the_possible_se
         test_state_predicates,
         extra_grounded_object="pos-5-2",
         extra_lifted_object="?cadj")
-    assert len(possible_matches) == 1
+    assert len(possible_matches) == len(test_state_predicates)
 
 
 def test_get_possible_literal_matches_with_extra_literal_extends_the_possible_set_of_matches_with_correct_data(

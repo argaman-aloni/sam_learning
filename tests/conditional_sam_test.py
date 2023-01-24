@@ -88,8 +88,7 @@ def test_create_additional_parameter_name_creates_a_parameter_name_based_on_the_
         nurikabe_conditional_sam: ConditionalSAM):
     learner_domain = nurikabe_conditional_sam.partial_domain
     action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
-    additional_object = PDDLObject(name="c4", type=learner_domain.types["cell"])
-    parameter_name = create_additional_parameter_name(learner_domain, action_call, additional_object)
+    parameter_name = create_additional_parameter_name(learner_domain, action_call, learner_domain.types["cell"])
     assert parameter_name == '?c'
 
 
@@ -116,7 +115,7 @@ def test_initialize_actions_dependencies_adds_correct_dependencies(conditional_s
         next_state=spider_observation.components[0].next_state)
 
     conditional_sam._initialize_actions_dependencies(grounded_action)
-    assert conditional_sam.dependency_set[grounded_action.name] is not None
+    assert conditional_sam.conditional_antecedents[grounded_action.name] is not None
 
 
 def test_initialize_universal_dependencies_adds_additional_parameter_for_each_newly_created_type(
@@ -164,7 +163,7 @@ def test_initialize_universal_dependencies_adds_possible_dependencies_for_action
         next_state=nurikabe_observation.components[0].next_state)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
-    assert len(nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]["cell"].dependencies) > 0
+    assert len(nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].dependencies) > 0
 
 
 def test_initialize_universal_dependencies_creates_dependency_set_for_each_type_of_quantified_object(
@@ -177,7 +176,7 @@ def test_initialize_universal_dependencies_creates_dependency_set_for_each_type_
         next_state=nurikabe_observation.components[0].next_state)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
-    assert len(nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]) == 3
+    assert len(nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]) == 3
 
 
 def test_initialize_universal_dependencies_initialize_dependencies_objects_with_new_data(
@@ -186,7 +185,7 @@ def test_initialize_universal_dependencies_initialize_dependencies_objects_with_
     nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
-    assert len(nurikabe_conditional_sam.quantified_dependency_set) > 0
+    assert len(nurikabe_conditional_sam.quantified_antecedents) > 0
 
 
 def test_initialize_universal_dependencies_adds_the_new_additional_parameters_for_the_action(
@@ -204,7 +203,7 @@ def test_initialize_universal_dependencies_not_add_dependencies_if_additional_pa
     nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
-    assert "(not (next n0 ?n2))" not in nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name][
+    assert "(not (next n0 ?n2))" not in nurikabe_conditional_sam.quantified_antecedents[grounded_action.name][
         "num"].dependencies
 
 
@@ -333,7 +332,7 @@ def test_remove_existing_previous_state_quantified_dependencies_removes_correct_
 
     for not_dependency in not_dependencies:
         assert {not_dependency} not in \
-               nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]["cell"].dependencies[
+               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].dependencies[
                    "(painted ?c)"]
 
 
@@ -381,7 +380,7 @@ def test_remove_existing_previous_state_quantified_dependencies_shrinks_dependen
     previous_dependencies_size = 16
     nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
     assert any(len(dependencies) < previous_dependencies_size for dependencies in
-               nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name]["cell"].dependencies.values())
+               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].dependencies.values())
 
 
 def test_remove_non_existing_previous_state_dependencies_removes_correct_predicates_from_literals_that_are_effects_only(
@@ -400,7 +399,7 @@ def test_remove_non_existing_previous_state_dependencies_removes_correct_predica
                         "(currently-dealing )"}
 
     for not_dependency in not_dependencies:
-        assert {not_dependency} not in conditional_sam.dependency_set[grounded_action.name].dependencies[
+        assert {not_dependency} not in conditional_sam.conditional_antecedents[grounded_action.name].dependencies[
             "(currently-dealing )"]
 
 
@@ -441,10 +440,10 @@ def test_remove_existing_previous_state_dependencies_removes_correct_predicates_
 
     tested_literal = "(not (currently-collecting-deck ))"
     for dependency in positive_dependencies:
-        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
+        assert {dependency} in conditional_sam.conditional_antecedents[grounded_action.name].dependencies[tested_literal]
 
     for dependency in negative_dependencies:
-        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[
+        assert {dependency} in conditional_sam.conditional_antecedents[grounded_action.name].dependencies[
             tested_literal]
 
 
@@ -459,7 +458,7 @@ def test_update_effects_data_updates_the_relevant_effects_and_removes_irrelevant
     conditional_sam._initialize_actions_dependencies(grounded_action)
     initialized_add_effects = conditional_sam.partial_domain.actions[grounded_action.name].add_effects
     initialized_delete_effects = conditional_sam.partial_domain.actions[grounded_action.name].delete_effects
-    conditional_sam._update_effects_data(grounded_action, previous_state, next_state)
+    conditional_sam._apply_inductive_rules(grounded_action, previous_state, next_state)
     positive_dependencies = {"(currently-updating-movable )", "(currently-updating-unmovable )",
                              "(currently-updating-part-of-tableau )", "(currently-collecting-deck )",
                              "(currently-dealing )"}
@@ -473,12 +472,12 @@ def test_update_effects_data_updates_the_relevant_effects_and_removes_irrelevant
         initialized_delete_effects)
 
     for dependency in positive_dependencies:
-        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
-        assert {dependency} not in conditional_sam.dependency_set[grounded_action.name].dependencies[
+        assert {dependency} in conditional_sam.conditional_antecedents[grounded_action.name].dependencies[tested_literal]
+        assert {dependency} not in conditional_sam.conditional_antecedents[grounded_action.name].dependencies[
             "(currently-dealing )"]
 
     for dependency in negative_dependencies:
-        assert {dependency} in conditional_sam.dependency_set[grounded_action.name].dependencies[tested_literal]
+        assert {dependency} in conditional_sam.conditional_antecedents[grounded_action.name].dependencies[tested_literal]
 
 
 def test_add_new_action_updates_action_negative_preconditions(conditional_sam: ConditionalSAM,
@@ -677,7 +676,7 @@ def test_construct_restrictive_conditional_effects_constructs_the_correct_condit
     test_action = conditional_sam.partial_domain.actions["deal-card"]
 
     conditional_sam.observed_effects[test_action.name].add("(make-unmovable ?to)")
-    conditional_sam._construct_restrictive_conditional_effects(test_action, dependecy_set, "(make-unmovable ?to)")
+    conditional_sam._construct_restrictive_effect(test_action, dependecy_set, "(make-unmovable ?to)")
     conditional_effect = test_action.conditional_effects.pop()
     print(str(conditional_effect))
     assert str(conditional_effect) == "(when (and (not (can-continue-group ?c ?to))) (and (make-unmovable ?to)))"
@@ -715,21 +714,21 @@ def test_remove_preconditions_from_effects_removes_action_preconditions_from_dep
         conditional_sam: ConditionalSAM, spider_observation: Observation):
     conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
-    conditional_sam._remove_preconditions_from_dependency_set(
+    conditional_sam._remove_preconditions_from_antecedents(
         conditional_sam.partial_domain.actions["start-dealing"])
-    assert "(not (currently-updating-movable ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
-    assert "(not (currently-updating-unmovable ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
-    assert "(not (currently-updating-part-of-tableau ))" not in conditional_sam.dependency_set[
+    assert "(not (currently-updating-movable ))" not in conditional_sam.conditional_antecedents["start-dealing"].dependencies
+    assert "(not (currently-updating-unmovable ))" not in conditional_sam.conditional_antecedents["start-dealing"].dependencies
+    assert "(not (currently-updating-part-of-tableau ))" not in conditional_sam.conditional_antecedents[
         "start-dealing"].dependencies
-    assert "(not (currently-collecting-deck ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
-    assert "(not (currently-dealing ))" not in conditional_sam.dependency_set["start-dealing"].dependencies
+    assert "(not (currently-collecting-deck ))" not in conditional_sam.conditional_antecedents["start-dealing"].dependencies
+    assert "(not (currently-dealing ))" not in conditional_sam.conditional_antecedents["start-dealing"].dependencies
 
 
 def test_handle_single_trajectory_component_learns_correct_information(
         conditional_sam: ConditionalSAM, spider_observation: Observation):
     conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
-    conditional_sam._remove_preconditions_from_dependency_set(
+    conditional_sam._remove_preconditions_from_antecedents(
         conditional_sam.partial_domain.actions["start-dealing"])
     pddl_action = conditional_sam.partial_domain.actions["start-dealing"].to_pddl()
     assert "(not (currently-updating-unmovable ))" in pddl_action
@@ -833,7 +832,7 @@ def test_construct_restrictive_universal_effect_constructs_correct_restrictive_u
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
 
-    nurikabe_conditional_sam.quantified_dependency_set[grounded_action.name][tested_type] = dependency_set
+    nurikabe_conditional_sam.quantified_antecedents[grounded_action.name][tested_type] = dependency_set
     nurikabe_conditional_sam.observed_universal_effects[test_action.name][tested_type].add("(blocked ?c)")
     nurikabe_conditional_sam._construct_restrictive_universal_effect(
         test_action, tested_type, "(blocked ?c)")

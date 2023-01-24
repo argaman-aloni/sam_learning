@@ -5,7 +5,8 @@ from typing import Dict, List, Optional, Generator, Tuple, Set
 
 from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, GroundedPredicate
 
-from sam_learning.core import LearnerDomain, LearnerAction, PredicatesMatcher
+from sam_learning.core.learner_domain import LearnerDomain, LearnerAction
+from sam_learning.core.predicates_matcher import PredicatesMatcher
 
 NOT_PREFIX = "(not"
 FORALL = "forall"
@@ -18,7 +19,7 @@ def extract_predicate_data(
 
     :param action: the action that contains the predicate.
     :param predicate_str: the string representation of the predicate.
-    :param domain_constants: the constants of the domain if exist.
+    :param domain_constants: the constants of the domain if exists.
     :return: the predicate object matching the string.
     """
     predicate_data = predicate_str.replace("(", "").replace(")", "").split(" ")
@@ -52,8 +53,8 @@ def create_additional_parameter_name(
 
 
 def find_unique_objects_by_type(
-        trajectory_objects: Dict[str, PDDLObject], exclude_list: Optional[List[str]] = None) -> Dict[
-    str, List[PDDLObject]]:
+        trajectory_objects: Dict[str, PDDLObject],
+        exclude_list: Optional[List[str]] = None) -> Dict[str, List[PDDLObject]]:
     """Returns a dictionary containing a single object of each type.
 
     :param trajectory_objects: the objects that were observed in the trajectory.
