@@ -67,6 +67,9 @@ class SAMLearner:
                                                   predicate.untyped_representation not in state_predicate_strs]
             negative_state_predicates.update(filtered_grounded_state_predicates)
 
+        for negative_predicate in negative_state_predicates:
+            negative_predicate.is_positive = False
+
         for lifted_predicate_name, grounded_state_predicates in state.state_predicates.items():
             positive_state_predicates.update(grounded_state_predicates)
 

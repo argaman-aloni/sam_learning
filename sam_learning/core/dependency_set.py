@@ -85,8 +85,13 @@ class DependencySet:
         literals_str = {literal.untyped_representation for literal in lifted_literals}
         literals_str.update({f"(not {literal.untyped_representation})" for literal in lifted_literals})
         for literal in literals_str:
-            self.dependencies[literal] = create_antecedents_combination(literals_str, self.max_size_antecedents) if \
-                antecedents is None else create_antecedents_combination(antecedents, self.max_size_antecedents)
+            if antecedents is not None:
+                antecedents_literals = {antecedent.untyped_representation for antecedent in antecedents}
+                self.dependencies[literal] = create_antecedents_combination(
+                    antecedents_literals, self.max_size_antecedents)
+
+            else:
+                self.dependencies[literal] = create_antecedents_combination(literals_str, self.max_size_antecedents)
 
     def remove_dependencies(self, literal: str, literals_to_remove: Set[str], include_supersets: bool = False) -> None:
         """Remove a dependency from the dependency set.
@@ -138,6 +143,14 @@ class DependencySet:
         self.logger.info("Determining whether the literal %s is a conditional effect with safe number of antecedents",
                          literal)
         return len(self.dependencies[literal]) == 1 and self.dependencies[literal][0] != {literal}
+
+    def is_possible_result(self, literal: str) -> bool:
+        """Determines whether the literal is a possible result.
+
+        :param literal: the literal to check.
+        :return: True if the literal is a key in the dependency set, False otherwise.
+        """
+        return literal in self.dependencies
 
     def extract_safe_conditionals(self, literal: str) -> Tuple[Set[str], Set[str]]:
         """Extracts the safe conditional effects from the dependency set.

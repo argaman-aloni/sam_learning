@@ -251,11 +251,11 @@ class ConditionalSAM(SAMLearner):
                     pddl_object.name, additional_param))
 
             for literal in not_results:
-                if additional_param not in literal:
+                type_dependency = self.quantified_antecedents[grounded_action.name][type_name]
+                if not type_dependency.is_possible_result(literal):
                     continue
 
-                self.quantified_antecedents[grounded_action.name][type_name].remove_dependencies(
-                    literal=literal, literals_to_remove=previous_state_literals, include_supersets=True)
+                type_dependency.remove_dependencies(literal, previous_state_literals, include_supersets=True)
 
         self.logger.debug(f"Done removing existing previous state quantified dependencies for every object.")
 

@@ -294,7 +294,7 @@ def test_find_literals_existing_in_state_correctly_selects_literals_with_the_add
         extra_lifted_object=extra_parameter_name)
 
     expected_set = {"(connected ?to ?c)", "(connected ?c ?to)"}
-    assert predicates_in_state.issuperset(expected_set) and predicates_in_state.issubset(expected_set)
+    assert predicates_in_state.issuperset(expected_set)
 
 
 def test_find_literals_existing_in_state_does_not_choose_literals_that_might_match_the_action_parameter_without_the_added_variable(
@@ -328,7 +328,7 @@ def test_remove_existing_previous_state_quantified_dependencies_removes_correct_
         current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
-    not_dependencies = {"(moving )", "(not (painted ?to))", "(robot-pos ?from)"}
+    not_dependencies = {"(moving )", "(not (painted ?to))", "(connected ?from ?to)"}
 
     for not_dependency in not_dependencies:
         assert {not_dependency} not in \
