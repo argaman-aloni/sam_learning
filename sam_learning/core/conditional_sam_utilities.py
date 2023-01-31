@@ -1,12 +1,11 @@
-"""File containing utilities for conditional SAM module."""
+"""File containing utilities for conditional / universal SAM modules."""
 
 from collections import defaultdict
-from typing import Dict, List, Optional, Generator, Tuple, Set
+from typing import Dict, List, Optional, Generator, Tuple
 
-from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, GroundedPredicate
+from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, ConditionalEffect
 
 from sam_learning.core.learner_domain import LearnerDomain, LearnerAction
-from sam_learning.core.predicates_matcher import PredicatesMatcher
 
 NOT_PREFIX = "(not"
 FORALL = "forall"
@@ -70,31 +69,42 @@ def find_unique_objects_by_type(
     return unique_objects_by_type
 
 
-def extract_quantified_effects(
-        grounded_action: ActionCall,
-        grounded_add_effects: Set[GroundedPredicate],
-        grounded_del_effects: Set[GroundedPredicate],
+def iterate_over_objects_of_same_type(
         trajectory_objects: Dict[str, PDDLObject],
-        matcher: PredicatesMatcher,
-        action_additional_parameters: Dict[str, str]) -> \
-        Generator[Tuple[Set[GroundedPredicate], Set[GroundedPredicate], str, PDDLObject], None, None]:
-    """Extract the quantified effects from the grounded effects as a generator.
+        action_additional_parameters: Dict[str, str],
+        exclude_list: Optional[List[str]] = None) -> Generator[Tuple[PDDLObject, str, str], None, None]:
+    """Iterate over the objects of the same type.
 
-    :param grounded_action: the action that is currently being observed.
-    :param grounded_add_effects: the grounded add effects.
-    :param grounded_del_effects: the grounded delete effects.
     :param trajectory_objects: the objects that were observed in the trajectory.
-    :param matcher: the matcher object.
     :param action_additional_parameters: the additional parameters of the action for any possible type.
-    :return: generator of tuples containing the add effects, delete effects, type name and object.
+    :param exclude_list: the list of objects to exclude.
+    :return: generator of tuples containing the type name and object.
     """
-    objects_by_type = find_unique_objects_by_type(trajectory_objects, grounded_action.parameters)
-    for pddl_type_name, pddl_objects in objects_by_type.items():
-        additional_parameter_name = action_additional_parameters[pddl_type_name]
-        for pddl_object in pddl_objects:
-            lifted_add_effects = matcher.get_possible_literal_matches(
-                grounded_action, list(grounded_add_effects), pddl_object.name, additional_parameter_name)
-            lifted_delete_effects = matcher.get_possible_literal_matches(
-                grounded_action, list(grounded_del_effects), pddl_object.name, additional_parameter_name)
+    objects_by_type = find_unique_objects_by_type(trajectory_objects, exclude_list)
+    for parameter_type, parameter_name in action_additional_parameters.items():
+        for pddl_object in objects_by_type[parameter_type]:
+            yield pddl_object, parameter_type, parameter_name
 
-            yield lifted_add_effects, lifted_delete_effects, pddl_type_name, pddl_object
+
+def check_equal_antecedents(effect: ConditionalEffect, other_effect: ConditionalEffect) -> bool:
+    """Checks if two conditional effects' antecedents are equal.
+
+    :param effect: the first effect.
+    :param other_effect: the second effect.
+    :return: True if the effects' antecedents are equal, False otherwise.
+    """
+    if len(effect.positive_conditions) != len(other_effect.positive_conditions):
+        return False
+
+    for condition in effect.positive_conditions:
+        if condition not in other_effect.positive_conditions:
+            return False
+
+    if len(effect.negative_conditions) != len(other_effect.negative_conditions):
+        return False
+
+    for condition in effect.negative_conditions:
+        if condition not in other_effect.negative_conditions:
+            return False
+
+    return True

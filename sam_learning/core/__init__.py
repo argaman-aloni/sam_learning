@@ -1,5 +1,5 @@
 from .conditional_sam_utilities import extract_predicate_data, create_additional_parameter_name, \
-    find_unique_objects_by_type, NOT_PREFIX, FORALL, extract_quantified_effects
+    find_unique_objects_by_type, NOT_PREFIX, FORALL, iterate_over_objects_of_same_type, check_equal_antecedents
 from .dependency_set import DependencySet
 from .exceptions import NotSafeActionError
 from .learner_domain import LearnerAction, LearnerDomain

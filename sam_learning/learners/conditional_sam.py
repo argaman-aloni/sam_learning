@@ -1,85 +1,34 @@
-"""Module containing the algorithm to learn action models with conditional and universal effects."""
+"""Module containing the algorithm to learn action models with conditional effects."""
 import logging
 from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall, Observation, \
-    ObservedComponent, ConditionalEffect, PDDLObject, UniversalQuantifiedEffect, PDDLType, Predicate
+    ObservedComponent, ConditionalEffect, PDDLObject, PDDLType
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
-    create_additional_parameter_name, find_unique_objects_by_type, \
-    extract_predicate_data, FORALL, NOT_PREFIX, extract_quantified_effects
+    extract_predicate_data, FORALL, NOT_PREFIX, check_equal_antecedents
 from sam_learning.learners import SAMLearner
 
 
 class ConditionalSAM(SAMLearner):
     """Class dedicated to learning action models with conditional effects."""
     conditional_antecedents: Dict[str, DependencySet]
-    quantified_antecedents: Dict[str, Dict[str, DependencySet]]  # action_name -> type_name -> dependency_set
-    additional_parameters: Dict[str, Dict[str, str]]  # action_name -> type_name -> parameter_name
     logger: logging.Logger
     max_antecedents_size: int
     current_trajectory_objects: Dict[str, PDDLObject]
     observed_effects: Dict[str, Set[str]]
-    observed_universal_effects: Dict[str, Dict[str, Set[str]]]
-    action_contains_universals: Dict[str, bool]
 
     def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
-                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-                 action_to_universal_effects_map: Optional[Dict[str, bool]] = None):
+                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
         self.logger = logging.getLogger(__name__)
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
         self.safe_actions = []
         self.max_antecedents_size = max_antecedents_size
         self.conditional_antecedents = {}
-        self.quantified_antecedents = {action_name: {} for action_name in self.partial_domain.actions}
         self.additional_parameters = defaultdict(dict)
         self.observed_effects = {action_name: set() for action_name in self.partial_domain.actions}
-        self.observed_universal_effects = {action_name: {} for action_name in self.partial_domain.actions}
-        self.action_contains_universals = action_to_universal_effects_map if \
-            action_to_universal_effects_map else {action_name: True for action_name in self.partial_domain.actions}
-
-    def _create_antecedents_and_results_dicts(
-            self, additional_parameter_name: str, lifted_action_signature: Dict[str, PDDLType],
-            pddl_type: PDDLType) -> Tuple[Set[Predicate], Set[Predicate]]:
-        """Create the antecedents and results dictionaries for a given type.
-
-        :param additional_parameter_name: the name of the additional parameter.
-        :param lifted_action_signature: the signature of the lifted action.
-        :param pddl_type: the type of the additional parameter to create the dictionaries for.
-        :return: the antecedents and results dictionaries.
-        """
-        self.logger.debug("Creating the dictionary containing the possible results for the action")
-        results_dictionary = self.vocabulary_creator.create_lifted_vocabulary(
-            self.partial_domain, {**lifted_action_signature, additional_parameter_name: pddl_type},
-            must_be_parameter=additional_parameter_name)
-        self.logger.debug("Creating the dictionary containing the possible antecedents for the action")
-        antecedents_dictionary = self.vocabulary_creator.create_lifted_vocabulary(
-            self.partial_domain, {**lifted_action_signature, additional_parameter_name: pddl_type})
-        return antecedents_dictionary, results_dictionary
-
-    def _initialize_universal_dependencies(self, ground_action: ActionCall) -> None:
-        """Initialize the universal antecedents candidates for a universal effect.
-
-        :param ground_action: the action to initialize the universal dependencies for.
-        """
-        self.logger.debug("Initializing the universal antecedents candidates for action %s.", ground_action.name)
-        action_signature = self.partial_domain.actions[ground_action.name].signature
-        for pddl_type_name, pddl_type in self.partial_domain.types.items():
-            if pddl_type_name == "object":
-                continue
-
-            additional_param = create_additional_parameter_name(self.partial_domain, ground_action, pddl_type)
-            antecedents, results = self._create_antecedents_and_results_dicts(additional_param, action_signature,
-                                                                              pddl_type)
-            dependency_set = DependencySet(self.max_antecedents_size)
-            dependency_set.initialize_dependencies(lifted_literals=results, antecedents=antecedents)
-            self.quantified_antecedents[ground_action.name][pddl_type_name] = dependency_set
-            self.additional_parameters[ground_action.name][pddl_type_name] = additional_param
-            self.observed_universal_effects[ground_action.name][pddl_type_name] = set()
-            self.partial_domain.actions[ground_action.name].universal_effects.add(
-                UniversalQuantifiedEffect(additional_param, pddl_type))
 
     def _initialize_actions_dependencies(self, grounded_action: ActionCall) -> None:
         """Initialize the dependency set for a single action.
@@ -110,26 +59,20 @@ class ConditionalSAM(SAMLearner):
                                       delete_effects}
         return non_quantified_add_effects, non_quantified_del_effects
 
-    def _update_quantified_effects(
-            self, add_effects: Set[Predicate], delete_effects: Set[Predicate],
-            grounded_action: ActionCall, pddl_type_name: str, simple_add_effects: Set[str],
-            simple_del_effects: Set[str]) -> None:
-        """Update the quantified effects of the action.
+    def _extract_lifted_conditional_effects(
+            self, grounded_action: ActionCall, next_state: State, previous_state: State) -> Tuple[Set[str], Set[str]]:
+        """Extract the simple lifted add and delete effects from the action.
 
-        :param add_effects: the lifted add effects of the action observed in the action triplet.
-        :param delete_effects: the lifted delete effects of the action observed in the action triplet.
-        :param grounded_action: the grounded action that is currently being executed.
-        :param pddl_type_name: the name of the type of the additional parameter.
-        :param simple_add_effects: the non quantified add effects of the action.
-        :param simple_del_effects: the non quantified delete effects of the action.
+        :param grounded_action: the action that is currently being executed.
+        :param next_state: the state after the action was executed.
+        :param previous_state: the state before the action was executed.
+        :return: the simple add and delete effects.
         """
-        quantified_add_effects = {positive_literal.untyped_representation for positive_literal in add_effects}
-        quantified_del_effects = {f"{NOT_PREFIX} {negative_literal.untyped_representation})" for negative_literal in
-                                  delete_effects}
-        self.observed_universal_effects[grounded_action.name][pddl_type_name].update(
-            quantified_add_effects.difference(simple_add_effects))
-        self.observed_universal_effects[grounded_action.name][pddl_type_name].update(
-            quantified_del_effects.difference(simple_del_effects))
+        self.logger.debug(f"extracting the simple effects for the action {grounded_action.name}.")
+        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
+        simple_add_effects, simple_del_effects = self._locate_non_quantified_effects(
+            grounded_action, grounded_add_effects, grounded_del_effects)
+        return simple_add_effects, simple_del_effects
 
     def _update_observed_effects(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Set the correct data for the action's effects.
@@ -139,21 +82,10 @@ class ConditionalSAM(SAMLearner):
         :param next_state: the state after the action was executed.
         """
         self.logger.debug(f"updating the effects for the action {grounded_action.name}.")
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
-        simple_add_effects, simple_del_effects = self._locate_non_quantified_effects(
-            grounded_action, grounded_add_effects, grounded_del_effects)
+        simple_add_effects, simple_del_effects = self._extract_lifted_conditional_effects(grounded_action, next_state,
+                                                                                          previous_state)
         self.observed_effects[grounded_action.name].update(simple_add_effects)
         self.observed_effects[grounded_action.name].update(simple_del_effects)
-
-        self.logger.debug("adding observed universal effects.")
-        if not self.action_contains_universals[grounded_action.name]:
-            return
-
-        for add_effects, delete_effects, pddl_type_name, _ in extract_quantified_effects(
-                grounded_action, grounded_add_effects, grounded_del_effects, self.current_trajectory_objects,
-                self.matcher, self.additional_parameters[grounded_action.name]):
-            self._update_quantified_effects(add_effects, delete_effects, grounded_action, pddl_type_name,
-                                            simple_add_effects, simple_del_effects)
 
     def _find_literals(
             self, grounded_action: ActionCall, positive_predicates: Set[GroundedPredicate],
@@ -229,36 +161,6 @@ class ConditionalSAM(SAMLearner):
                 literal=literal, literals_to_remove=previous_state_literals, include_supersets=True)
         self.logger.debug(f"Done removing existing previous state dependencies.")
 
-    def _remove_existing_previous_state_quantified_dependencies(self, grounded_action: ActionCall) -> None:
-        """Removes the literals that exist in the previous state from the dependency set of a literal that is
-            not in the next state.
-
-        :param grounded_action: the action that is being executed.
-        """
-        self.logger.debug(
-            "Removing existing previous state quantified antecedents from literals not in the post state.")
-        objects_by_type = find_unique_objects_by_type(self.current_trajectory_objects, grounded_action.parameters)
-        for type_name, additional_param in self.additional_parameters[grounded_action.name].items():
-            pddl_objects = objects_by_type[type_name]
-            not_results, previous_state_literals = set(), set()
-            for pddl_object in pddl_objects:
-                not_results.update(self._find_literals_not_in_state(
-                    grounded_action, self.next_state_positive_predicates, self.next_state_negative_predicates,
-                    pddl_object.name, additional_param))
-
-                previous_state_literals.update(self._find_literals_existing_in_state(
-                    grounded_action, self.next_state_positive_predicates, self.next_state_negative_predicates,
-                    pddl_object.name, additional_param))
-
-            for literal in not_results:
-                type_dependency = self.quantified_antecedents[grounded_action.name][type_name]
-                if not type_dependency.is_possible_result(literal):
-                    continue
-
-                type_dependency.remove_dependencies(literal, previous_state_literals, include_supersets=True)
-
-        self.logger.debug(f"Done removing existing previous state quantified dependencies for every object.")
-
     def _remove_non_existing_previous_state_dependencies(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Removed literals that don't appear in the previous state from the dependency set of a literal that is
@@ -270,44 +172,13 @@ class ConditionalSAM(SAMLearner):
         :return:
         """
         self.logger.debug("Removing non-existing previous state antecedents from literals observed in s'/ s.")
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
-        simple_add_effects, simple_del_effects = self._locate_non_quantified_effects(
-            grounded_action, grounded_add_effects, grounded_del_effects)
+        simple_add_effects, simple_del_effects = self._extract_lifted_conditional_effects(grounded_action, next_state,
+                                                                                          previous_state)
         missing_pre_state_literals = self._find_literals_not_in_state(
             grounded_action, self.previous_state_positive_predicates, self.previous_state_negative_predicates)
         for literal in simple_add_effects.union(simple_del_effects):
             self.conditional_antecedents[grounded_action.name].remove_dependencies(
                 literal=literal, literals_to_remove=missing_pre_state_literals)
-
-    def _remove_non_existing_previous_state_quantified_dependencies(
-            self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
-        """Removed literals that don't appear in the previous state from the dependency set of a literal that is
-            guaranteed as an effect.
-
-        :param grounded_action: the action that is being executed.
-        :param previous_state: the state prior to the action execution.
-        :param next_state: the state after the action execution.
-        """
-        self.logger.debug("Removing non-existing previous state quantified antecedents from quantified literals "
-                          "observed in s'/ s.")
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
-        for lifted_add_effects, lifted_delete_effects, pddl_type_name, pddl_object in \
-                extract_quantified_effects(
-                    grounded_action, grounded_add_effects, grounded_del_effects,
-                    self.current_trajectory_objects, self.matcher, self.additional_parameters[grounded_action.name]):
-            additional_param = self.additional_parameters[grounded_action.name][pddl_type_name]
-            missing_pre_state_literals = self._find_literals_not_in_state(
-                grounded_action, self.previous_state_positive_predicates, self.previous_state_negative_predicates,
-                pddl_object.name, additional_param)
-            effects_str = [literal.untyped_representation for literal in lifted_add_effects]
-            effects_str.extend([f"{NOT_PREFIX} {literal.untyped_representation})" for literal in lifted_delete_effects])
-
-            for literal in effects_str:
-                if additional_param not in literal:
-                    continue
-
-                self.quantified_antecedents[grounded_action.name][pddl_type_name].remove_dependencies(
-                    literal=literal, literals_to_remove=missing_pre_state_literals)
 
     def _remove_not_possible_dependencies(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -319,15 +190,21 @@ class ConditionalSAM(SAMLearner):
         """
         self._remove_existing_previous_state_dependencies(grounded_action)
         self._remove_non_existing_previous_state_dependencies(grounded_action, previous_state, next_state)
-        if not self.action_contains_universals[grounded_action.name]:
-            return
 
-        self._remove_existing_previous_state_quantified_dependencies(grounded_action)
-        self._remove_non_existing_previous_state_quantified_dependencies(grounded_action, previous_state, next_state)
+    def _combine_precondition_predicates(self, action: LearnerAction) -> Set[str]:
+        """Combines the positive and negative preconditions of an action into a single set of strings.
+
+        :param action: the action whose preconditions are to be combined.
+        :return: the set of strings representing the preconditions.
+        """
+        preconditions_str = {precondition.untyped_representation for precondition in self.partial_domain.actions[
+            action.name].positive_preconditions}
+        preconditions_str.update(f"{NOT_PREFIX} {precondition.untyped_representation})" for precondition in
+                                 self.partial_domain.actions[action.name].negative_preconditions)
+        return preconditions_str
 
     def _construct_restrictive_preconditions(
-            self, action: LearnerAction, action_dependency_set: DependencySet, literal: str,
-            quantified_type: Optional[str] = None) -> None:
+            self, action: LearnerAction, action_dependency_set: DependencySet, literal: str) -> None:
         """Constructs the additional preconditions that are required for the action to be safe.
 
         :param action: the action that contains unsafe literals in the effects.
@@ -336,22 +213,12 @@ class ConditionalSAM(SAMLearner):
         :param quantified_type: the type of the quantified literal (if exists).
         """
         self.logger.info(f"Constructing restrictive preconditions for the unsafe action {action.name}.")
-        preconditions_str = {precondition.untyped_representation for precondition in self.partial_domain.actions[
-            action.name].positive_preconditions}
-        preconditions_str.update(f"{NOT_PREFIX} {precondition.untyped_representation})" for precondition in
-                                 self.partial_domain.actions[action.name].negative_preconditions)
+        preconditions_str = self._combine_precondition_predicates(action)
 
-        is_effect = literal in self.observed_effects[action.name] if quantified_type is None else \
-            literal in self.observed_universal_effects[action.name][quantified_type]
+        is_effect = literal in self.observed_effects[action.name]
         conservative_preconditions = action_dependency_set.construct_restrictive_preconditions(
             preconditions_str, literal, is_effect)
-        if quantified_type is None:
-            action.manual_preconditions.append(conservative_preconditions) if conservative_preconditions else None
-
-        else:
-            action.manual_preconditions.append(
-                f"({FORALL} ({self.additional_parameters[action.name][quantified_type]} - {quantified_type}) "
-                f"{conservative_preconditions})") if conservative_preconditions else None
+        action.manual_preconditions.append(conservative_preconditions) if conservative_preconditions else None
 
     def _construct_antecedents(self, action: LearnerAction, action_dependency_set: DependencySet,
                                conditional_effect: ConditionalEffect, literal: str,
@@ -411,28 +278,6 @@ class ConditionalSAM(SAMLearner):
 
         return conditional_effect
 
-    def _construct_restrictive_universal_effect(
-            self, action: LearnerAction, quantified_type: str, quantified_literal: str) -> None:
-        """Removes the universal effect from the action.
-
-        :param action: the action that contains the universal effect.
-        :param quantified_type: the type of the quantified variable.
-        :param quantified_literal: the literal that is quantified.
-        """
-        self.logger.info(f"Constructing restrictive universal effect for the unsafe action {action.name}.")
-        if quantified_literal not in self.observed_universal_effects[action.name][quantified_type]:
-            return
-
-        combined_conditions = set()
-        dependency_set = self.quantified_antecedents[action.name][quantified_type]
-        additional_param = self.additional_parameters[action.name][quantified_type]
-        effect = self._construct_restrictive_effect(
-            action, dependency_set, quantified_literal,
-            quantified_parameter=additional_param, quantified_type=quantified_type)
-        universal_effect = [effect for effect in self.partial_domain.actions[action.name].universal_effects
-                            if effect.quantified_type.name == quantified_type][0]
-        universal_effect.conditional_effects.add(effect)
-
     def _construct_restrictive_effect(
             self, action: LearnerAction, dependency_set: DependencySet, literal: str,
             quantified_parameter: Optional[str] = None, quantified_type: Optional[str] = None) -> ConditionalEffect:
@@ -452,26 +297,6 @@ class ConditionalSAM(SAMLearner):
         return self._construct_conditional_effect_data(action, temp_dependency_set, literal, quantified_parameter,
                                                        quantified_type)
 
-    def _construct_universal_effects_from_dependency_set(
-            self, action: LearnerAction, action_dependency_set: DependencySet, quantified_type: str,
-            quantified_literal: str) -> None:
-        """Constructs the conditional effects of the action from the data available in the dependency set.
-
-        :param action: the action that is being constructed.
-        :param action_dependency_set: the action's dependency set.
-        :param quantified_type: the type of the quantified variable.
-        :param quantified_literal: the literal that is quantified.
-        """
-        universal_effect = [effect for effect in self.partial_domain.actions[action.name].universal_effects
-                            if effect.quantified_type.name == quantified_type][0]
-
-        self.logger.debug(f"Extracting the universal effect - {quantified_literal} from the dependency set.")
-        additional_parameter = self.additional_parameters[action.name][quantified_type]
-        conditional_effect = self._construct_conditional_effect_data(
-            action, action_dependency_set, quantified_literal, additional_parameter=additional_parameter,
-            additional_parameter_type=self.partial_domain.types[quantified_type])
-        universal_effect.conditional_effects.add(conditional_effect)
-
     def _remove_preconditions_from_antecedents(self, action: LearnerAction) -> None:
         """Removes the preconditions predicates from the action's dependency set.
 
@@ -482,9 +307,6 @@ class ConditionalSAM(SAMLearner):
         preconditions_literals.update(
             {f"(not {predicate.untyped_representation})" for predicate in action.negative_preconditions})
         self.conditional_antecedents[action.name].remove_preconditions_literals(preconditions_literals)
-        for quantified_type in self.quantified_antecedents[action.name]:
-            self.quantified_antecedents[action.name][quantified_type].remove_preconditions_literals(
-                preconditions_literals)
 
     def _construct_simple_effect(self, action: LearnerAction, literal: str) -> None:
         """Constructs a simple effect (non-conditional effect) from the literal.
@@ -534,6 +356,31 @@ class ConditionalSAM(SAMLearner):
         effect = self._construct_conditional_effect_data(action, action_dependency, literal)
         return effect
 
+    def _compress_conditional_effects(self, conditional_effects: List[ConditionalEffect]) -> List[ConditionalEffect]:
+        """Compresses conditional effects that have the same antecedents to contain multiple results.
+
+        :param conditional_effects: the list of conditional effects that are being compressed.
+        :return: the compressed list of conditional effects.
+        """
+        self.logger.debug("Trying to compress the conditional effects based on their antecedents.")
+        compressed_effects = []
+        effects_to_remove = set()
+        while len(conditional_effects) > 0:
+            effect = conditional_effects.pop(0)
+            compressed_effects.append(effect)
+            for other_effect in conditional_effects:
+                if not check_equal_antecedents(effect, other_effect):
+                    continue
+
+                effect.add_effects.update(other_effect.add_effects)
+                effect.delete_effects.update(other_effect.delete_effects)
+                effects_to_remove.add(other_effect)
+
+            for effect_to_remove in effects_to_remove:
+                conditional_effects.remove(effect_to_remove)
+
+        return compressed_effects
+
     def _verify_and_construct_safe_conditional_effects(self, action: LearnerAction) -> None:
         """Verifies that the action is safe and constructs its effects and preconditions.
 
@@ -547,28 +394,11 @@ class ConditionalSAM(SAMLearner):
             if conditional_effect is not None:
                 conditional_effects.append(conditional_effect)
 
+        if len(conditional_effects) == 0:
+            return
+
         compressed_effects = self._compress_conditional_effects(conditional_effects)
-        action.conditional_effects.update(compressed_effects)
-
-    def _verify_and_construct_safe_universal_effects(self, action: LearnerAction) -> None:
-        """Constructs the single-agent actions that are safe to execute."""
-        self.logger.info("Constructing the safe universal effects.")
-        for quantified_type, dependency_set in self.quantified_antecedents[action.name].items():
-            for possible_result in dependency_set.dependencies:
-                if not dependency_set.is_safe_literal(possible_result):
-                    self.logger.debug(f"The quantified literal {possible_result} "
-                                      f"is not considered to be safe for {action.name}.")
-                    self._construct_restrictive_preconditions(action, dependency_set, possible_result,
-                                                              quantified_type)
-                    self._construct_restrictive_universal_effect(action, quantified_type, possible_result)
-
-                if possible_result not in self.observed_universal_effects[action.name][quantified_type]:
-                    self.logger.debug(f"The literal {possible_result} was not observed as a universal effect.")
-                    continue
-
-                self.logger.info(f"The quantified literal {possible_result} is safe for action {action.name}.")
-                self._construct_universal_effects_from_dependency_set(action, dependency_set, quantified_type,
-                                                                      possible_result)
+        action.conditional_effects = compressed_effects
 
     def _apply_inductive_rules(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Updates the literals that cannot be effects as well as updates the dependency set.
@@ -620,7 +450,6 @@ class ConditionalSAM(SAMLearner):
             grounded_action, previous_state, next_state, should_ignore_action=True)
         if action_name not in self.observed_actions:
             self._initialize_actions_dependencies(grounded_action)
-            self._initialize_universal_dependencies(grounded_action)
             self.add_new_action(grounded_action, previous_state, next_state)
 
         else:
@@ -634,9 +463,6 @@ class ConditionalSAM(SAMLearner):
         for action in self.partial_domain.actions.values():
             self._remove_preconditions_from_antecedents(action)
             self._verify_and_construct_safe_conditional_effects(action)
-            if self.action_contains_universals[action.name]:
-                self._verify_and_construct_safe_universal_effects(action)
-
             self.logger.debug(f"Finished handling action {action.name}.")
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
@@ -655,11 +481,3 @@ class ConditionalSAM(SAMLearner):
         self.construct_safe_actions()
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report
-
-    def _compress_conditional_effects(self, conditional_effects: List[ConditionalEffect]) -> List[ConditionalEffect]:
-        """Compresses conditional effects that have the same antecedents to contain multiple results.
-
-        :param conditional_effects: the list of conditional effects that are being compressed.
-        :return: the compressed list of conditional effects.
-        """
-        pass
