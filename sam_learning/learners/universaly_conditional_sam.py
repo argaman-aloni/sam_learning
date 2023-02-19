@@ -322,7 +322,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         :param next_state: the state that was created after executing the action on the previous
             state.
         """
-        super()._update_action_preconditions(grounded_action, previous_state)
+        super()._update_action_preconditions(grounded_action)
         self._apply_inductive_rules(grounded_action, previous_state, next_state)
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 

@@ -424,3 +424,12 @@ def test_get_possible_literal_matches_with_extra_literal_extends_the_possible_se
         extra_lifted_object="?cadj")
     assert len(possible_matches) == 1
     assert possible_matches[0].untyped_representation == "(connected ?cadj ?to)"
+
+
+def test_get_injective_match_returns_a_single_match_with_a_predicate_that_has_is_positive_property_set_to_false_when_given_a_negative_grounded_predicate_as_input(
+        predicate_matcher_no_consts: PredicatesMatcher):
+    IN_GROUNDED_PREDICATE.is_positive = False
+    test_action_call = ActionCall(name="unload-airplane", grounded_parameters=["airplane1", "pack1", "pos1"])
+    possible_matches = predicate_matcher_no_consts.get_injective_match(IN_GROUNDED_PREDICATE, test_action_call)
+    assert possible_matches is not None
+    assert possible_matches.is_positive is False

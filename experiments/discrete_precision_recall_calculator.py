@@ -168,7 +168,9 @@ class PrecisionRecallCalculator:
         """
         action_precision = self.calculate_action_precision(action_name)
         action_recall = self.calculate_action_recall(action_name)
-        action_f1_score = 2 * (action_precision * action_recall) / (action_precision + action_recall)
+        action_f1_score = 0 if action_precision == 0 and action_recall == 0 else\
+            2 * (action_precision * action_recall) / (action_precision + action_recall)
+
         return {
             "preconditions_precision": calculate_precision(self.preconditions[action_name],
                                                            self.ground_truth_preconditions[action_name]),

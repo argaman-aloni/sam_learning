@@ -1,19 +1,18 @@
 """The POL main framework - Compile, Learn and Plan."""
 import argparse
 import logging
-import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
-from pddl_plus_parser.models import MultiAgentObservation
+from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 
 from experiments import NumericPerformanceCalculator
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.utils import init_numeric_performance_calculator
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import MultiAgentSAM
+from sam_learning.learners import MultiAgentSAM, SAMLearner
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
@@ -50,21 +49,21 @@ class MAPlanningWithOfflineLearning:
         self.performance_calculator = None
         self.ma_domain_path = None
 
-    def _filter_baseline_multi_agent_trajectory(
-            self, complete_observation: MultiAgentObservation) -> MultiAgentObservation:
-        """
+    @staticmethod
+    def _filter_baseline_multi_agent_trajectory(complete_observation: MultiAgentObservation) -> Observation:
+        """Create a single agent observation from a multi-agent observation.
 
-        :param complete_observation:
-        :return:
+        :param complete_observation: the multi-agent observation to filter.
+        :return: the filtered single agent observation.
         """
-        filtered_observation = MultiAgentObservation(executing_agents=self.executing_agents)
+        filtered_observation = Observation()
         filtered_observation.add_problem_objects(complete_observation.grounded_objects)
         for component in complete_observation.components:
             if component.grounded_joint_action.action_count > 1:
                 continue
 
             filtered_observation.add_component(component.previous_state,
-                                               component.grounded_joint_action.actions,
+                                               component.grounded_joint_action.operational_actions[0],
                                                component.next_state)
         return filtered_observation
 
@@ -94,8 +93,8 @@ class MAPlanningWithOfflineLearning:
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        allowed_complete_observations = []
-        allowed_filtered_observations = []
+        allowed_ma_observations = []
+        allowed_sa_observations = []
         observed_objects = {}
         for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
@@ -104,30 +103,48 @@ class MAPlanningWithOfflineLearning:
             complete_observation: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
                 trajectory_file_path, self.executing_agents)
             filtered_observation = self._filter_baseline_multi_agent_trajectory(complete_observation)
-            allowed_complete_observations.append(complete_observation)
-            allowed_filtered_observations.append(filtered_observation)
-            self.logger.info(f"Learning the action model using {len(allowed_complete_observations)} trajectories!")
-            self.learn_non_modified_trajectories(allowed_complete_observations, partial_domain, test_set_dir_path)
-            self.learn_baseline_action_model(allowed_filtered_observations, partial_domain, test_set_dir_path)
+            allowed_ma_observations.append(complete_observation)
+            allowed_sa_observations.append(filtered_observation)
+            self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
+            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
 
-        self.performance_calculator.calculate_semantic_performance(self.ma_domain_path,
-                                                                   len(allowed_complete_observations))
+        self.performance_calculator.calculate_semantic_performance(self.ma_domain_path, len(allowed_ma_observations))
         self.performance_calculator.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
-    def learn_baseline_action_model(self, allowed_filtered_observations, partial_domain, test_set_dir_path):
-        learner = MultiAgentSAM(partial_domain=partial_domain)
-        self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam.ma_sam_baseline
-        self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_baseline
-        learned_model, learning_report = learner.learn_combined_action_model(allowed_filtered_observations)
+    def learn_baseline_action_model(
+            self, allowed_filtered_observations: List[Observation], partial_domain: Domain,
+            test_set_dir_path: Path, fold_num: int) -> None:
+        """Learns the action model using the baseline algorithm.
+
+        :param allowed_filtered_observations: the list of observations that are allowed to be used for learning.
+        :param partial_domain: the domain will be learned from the observations.
+        :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
+        :param fold_num: the index of the current fold in the cross validation process.
+        """
+        learner = SAMLearner(partial_domain=partial_domain)
+        self.domain_validator.learning_algorithm = LearningAlgorithmType.sam_learning
+        self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.sam_learning
+        learned_model, learning_report = learner.learn_action_model(allowed_filtered_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_filtered_observations, learned_model,
                                                              learning_report)
-        self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"ma_baseline_domain_{len(allowed_filtered_observations)}_trajectories.pddl")
+        self.export_learned_domain(
+            learned_model, self.working_directory_path / "results_directory",
+            f"ma_baseline_domain_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
         self.validate_learned_domain(allowed_filtered_observations, learned_model, test_set_dir_path)
 
-    def learn_non_modified_trajectories(self, allowed_complete_observations, partial_domain, test_set_dir_path):
+    def learn_ma_action_model(
+            self, allowed_complete_observations: List[MultiAgentObservation],
+            partial_domain: Domain, test_set_dir_path: Path, fold_num: int) -> None:
+        """Learns the action model using the multi-agent action model learning algorithm.
+
+        :param allowed_complete_observations: the list of observations that are allowed to be used for learning.
+        :param partial_domain: the domain will be learned from the observations.
+        :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
+        :param fold_num: the index of the current fold in the cross validation process.
+        """
         learner = MultiAgentSAM(partial_domain=partial_domain)
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam
@@ -135,11 +152,11 @@ class MAPlanningWithOfflineLearning:
         self.learning_statistics_manager.add_to_action_stats(allowed_complete_observations, learned_model,
                                                              learning_report)
         self.ma_domain_path = self.working_directory_path / "results_directory" / \
-                              f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories.pddl"
+                              f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories_fold_{fold_num}.pddl"
         self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
         self.validate_learned_domain(allowed_complete_observations, learned_model, test_set_dir_path)
 
-    def validate_learned_domain(self, allowed_observations: List[MultiAgentObservation],
+    def validate_learned_domain(self, allowed_observations: List[Union[Observation, MultiAgentObservation]],
                                 learned_model: LearnerDomain,
                                 test_set_dir_path: Path) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.

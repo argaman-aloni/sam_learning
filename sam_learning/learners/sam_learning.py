@@ -1,5 +1,6 @@
 """The Safe Action Model Learning algorithm module."""
 import logging
+import time
 from collections import defaultdict
 from itertools import combinations
 from typing import List, Tuple, Dict, Set, Optional
@@ -7,8 +8,8 @@ from typing import List, Tuple, Dict, Set, Optional
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
     GroundedPredicate
 
-from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, VocabularyCreator, \
-    LearnerAction
+from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, \
+    VocabularyCreator, LearnerAction
 
 
 class SAMLearner:
@@ -27,8 +28,12 @@ class SAMLearner:
     next_state_negative_predicates: Set[GroundedPredicate]
     next_state_positive_predicates: Set[GroundedPredicate]
     current_trajectory_objects: Dict[str, PDDLObject]
+    learning_start_time: float
+    learning_end_time: float
 
     def __init__(self, partial_domain: Domain):
+        self.learning_start_time = 0
+        self.learning_end_time = 0
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -40,6 +45,13 @@ class SAMLearner:
         self.next_state_positive_predicates = set()
         self.next_state_negative_predicates = set()
         self.current_trajectory_objects = {}
+
+    def _remove_unobserved_actions_from_partial_domain(self):
+        """Removes the actions that were not observed from the partial domain."""
+        self.logger.debug("Removing unobserved actions from the partial domain")
+        actions_to_remove = [action for action in self.partial_domain.actions if action not in self.observed_actions]
+        for action in actions_to_remove:
+            self.partial_domain.actions.pop(action)
 
     def _create_complete_world_state(self, relevant_objects: Dict[str, PDDLObject],
                                      state: State) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
@@ -105,66 +117,40 @@ class SAMLearner:
         :return: the effect containing the add and del list of predicates.
         """
         self.logger.debug(f"Starting to learn the effects of {str(grounded_action)}.")
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
+        grounded_add_effects, grounded_del_effects = extract_effects(
+            previous_state, next_state, add_predicates_sign=True)
         self.logger.debug("Updating the negative state predicates based on the action's execution.")
         lifted_add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
         lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_del_effects))
         return lifted_add_effects, lifted_delete_effects
 
-    def _update_action_preconditions(
-            self, grounded_action: ActionCall, previous_state: State,
-            action_to_update: Optional[LearnerAction] = None) -> None:
+    def _update_action_preconditions(self, grounded_action: ActionCall) -> None:
         """Updates the preconditions of an action after it was observed at least once.
 
         :param grounded_action: the grounded action that is being executed in the trajectory component.
-        :param previous_state: the state that was seen prior to the action's execution.
         """
-        current_action = action_to_update or self.partial_domain.actions[grounded_action.name]
-        possible_preconditions = set()
-        for lifted_predicate_name, grounded_state_predicates in previous_state.state_predicates.items():
-            self.logger.debug(f"trying to match the predicate - {lifted_predicate_name} "
-                              f"to the action call - {str(grounded_action)}")
-            lifted_matches = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_state_predicates))
-            possible_preconditions.update(lifted_matches)
+        current_action = self.partial_domain.actions[grounded_action.name]
+        positive_predicates = set(self.matcher.get_possible_literal_matches(
+            grounded_action, list(self.previous_state_positive_predicates)))
+        negative_predicates = set(self.matcher.get_possible_literal_matches(
+            grounded_action, list(self.previous_state_negative_predicates)))
 
-        if len(possible_preconditions) > 0:
-            current_action.positive_preconditions.intersection_update(possible_preconditions)
-            current_action.negative_preconditions.difference_update(possible_preconditions)
+        current_action.positive_preconditions.intersection_update(positive_predicates)
+        current_action.negative_preconditions.intersection_update(negative_predicates)
 
-        else:
-            self.logger.warning(f"while handling the action {grounded_action.name} "
-                                f"inconsistency occurred, since we do not allow for duplicates we do not update the "
-                                f"preconditions.")
-
-    def _add_negative_predicates(self, grounded_action: ActionCall) -> Set[Predicate]:
-        """Adds a negative predicate to the action when it is first encountered.
-
-        :param grounded_action: the action that was encountered.
-        :return: the possible negative predicates that were added to the action.
-        """
-        possible_negative_predicates = set()
-        lifted_matches = self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.previous_state_negative_predicates))
-        possible_negative_predicates.update(lifted_matches)
-        return possible_negative_predicates
-
-    def _add_new_action_preconditions(self, grounded_action: ActionCall,
-                                      action_to_update: Optional[LearnerAction] = None) -> None:
+    def _add_new_action_preconditions(self, grounded_action: ActionCall) -> None:
         """General method to add new action's discrete preconditions.
 
         :param grounded_action: the action that is currently being executed.
-        :param action_to_update: the action that is being updated, if None the action is
-            created based on the partial domain.
         """
-        observed_action = action_to_update or self.partial_domain.actions[grounded_action.name]
-        possible_preconditions = set()
-        negative_predicates = self._add_negative_predicates(grounded_action)
-        lifted_matches = self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.previous_state_positive_predicates))
-        possible_preconditions.update(lifted_matches)
+        observed_action = self.partial_domain.actions[grounded_action.name]
+        possible_preconditions = set(self.matcher.get_possible_literal_matches(
+            grounded_action, list(self.previous_state_positive_predicates)))
+        negative_predicates = set(self.matcher.get_possible_literal_matches(
+            grounded_action, list(self.previous_state_negative_predicates)))
 
-        observed_action.positive_preconditions.update(possible_preconditions)
-        observed_action.negative_preconditions.update(negative_predicates)
+        observed_action.positive_preconditions = possible_preconditions
+        observed_action.negative_preconditions = negative_predicates
 
     def _construct_learning_report(self) -> Dict[str, str]:
         """Constructs the learning report of the learned actions.
@@ -178,6 +164,7 @@ class SAMLearner:
         learning_report.update({action_name: "NOT SAFE" for action_name in self.partial_domain.actions
                                 if action_name in observed_unsafe_actions})
         learning_report.update({action_name: "UNOBSERVED" for action_name in unobserved_actions})
+        learning_report["learning_time"] = str(self.learning_end_time - self.learning_start_time)
         return learning_report
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -210,7 +197,7 @@ class SAMLearner:
         """
         action_name = grounded_action.name
         observed_action = self.partial_domain.actions[action_name]
-        self._update_action_preconditions(grounded_action, previous_state)
+        self._update_action_preconditions(grounded_action)
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
@@ -245,14 +232,13 @@ class SAMLearner:
         previous_state = component.previous_state
         grounded_action = component.grounded_action_call
         next_state = component.next_state
-        action_name = grounded_action.name
 
         if self._verify_parameter_duplication(grounded_action):
             self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM.")
             return
 
         self._create_fully_observable_triplet_predicates(grounded_action, previous_state, next_state)
-        if action_name not in self.observed_actions:
+        if grounded_action.name not in self.observed_actions:
             self.add_new_action(grounded_action, previous_state, next_state)
 
         else:
@@ -270,6 +256,17 @@ class SAMLearner:
         """Constructs the single-agent actions that are safe to execute."""
         pass
 
+    def start_measure_learning_time(self) -> None:
+        """Starts measuring the learning time."""
+        self.logger.info("Starting to measure the time it takes to learn the action model!")
+        self.learning_start_time = time.time()
+
+    def end_measure_learning_time(self) -> None:
+        """Ends measuring the learning time."""
+        self.learning_end_time = time.time()
+        self.logger.info(f"Finished learning the action model in "
+                         f"{self.learning_end_time - self.learning_start_time} seconds.")
+
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
@@ -277,6 +274,7 @@ class SAMLearner:
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
+        self.start_measure_learning_time()
         self.deduce_initial_inequality_preconditions()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
@@ -284,5 +282,6 @@ class SAMLearner:
                 self.handle_single_trajectory_component(component)
 
         self.construct_safe_actions()
+        self.end_measure_learning_time()
         learning_report = {action_name: "OK" for action_name in self.partial_domain.actions}
         return self.partial_domain, learning_report

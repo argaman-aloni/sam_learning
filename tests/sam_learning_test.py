@@ -94,7 +94,7 @@ def test_add_new_action_with_single_trajectory_component_adds_action_data_to_lea
     preconditions_str = set([p.untyped_representation for p in learned_action_data.positive_preconditions])
     assert preconditions_str.issuperset(["(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"])
     assert [p.untyped_representation for p in learned_action_data.add_effects] == ["(lift-at ?lift ?f2)"]
-    assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(lift-at ?lift ?f1)"]
+    assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(not (lift-at ?lift ?f1))"]
 
 
 def test_deduce_initial_inequality_preconditions_deduce_that_all_objects_with_same_type_should_not_be_equal(
@@ -115,6 +115,92 @@ def test_verify_parameter_duplication_removes_inequality_if_found_action_with_du
     sam_learning._verify_parameter_duplication(duplicated_action_call)
     assert len(action.inequality_preconditions) == 0
 
+
+def test_handle_action_effects_returns_delete_effects_with_predicates_with_is_positive_false_in_the_delete_effects_and_is_positive_true_in_the_add_effects(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+    observed_objects = elevators_observation.grounded_objects
+    sam_learning.current_trajectory_objects = observed_objects
+    add_effects, delete_effects = sam_learning._handle_action_effects(test_action_call, previous_state, next_state)
+    assert len(add_effects) > 0
+    assert len(delete_effects) > 0
+    for add_effects_predicate in add_effects:
+        assert add_effects_predicate.is_positive
+
+    for delete_effects_predicate in delete_effects:
+        assert not delete_effects_predicate.is_positive
+
+
+def test_handle_action_effects_does_not_create_intersecting_sets_of_effects(sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+    observed_objects = elevators_observation.grounded_objects
+    sam_learning.current_trajectory_objects = observed_objects
+    add_effects, delete_effects = sam_learning._handle_action_effects(test_action_call, previous_state, next_state)
+    add_effects_str = set([p.untyped_representation for p in add_effects])
+    delete_effects_str = set([p.untyped_representation for p in delete_effects])
+    assert not add_effects_str.intersection(delete_effects_str)
+
+def test_add_new_action_preconditions_adds_both_negative_and_positive_preconditions_to_the_action(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+    observed_objects = elevators_observation.grounded_objects
+    sam_learning.current_trajectory_objects = observed_objects
+    sam_learning._create_fully_observable_triplet_predicates(
+        current_action=test_action_call,
+        previous_state=previous_state,
+        next_state=next_state)
+    sam_learning._add_new_action_preconditions(grounded_action=test_action_call)
+    learned_action_data = sam_learning.partial_domain.actions[test_action_call.name]
+    assert len(learned_action_data.positive_preconditions) > 0
+    assert len(learned_action_data.negative_preconditions) > 0
+    print(learned_action_data.to_pddl())
+
+
+def test_add_new_action_preconditions_adds_correct_positive_preconditions_to_action(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+    observed_objects = elevators_observation.grounded_objects
+    sam_learning.current_trajectory_objects = observed_objects
+    sam_learning._create_fully_observable_triplet_predicates(
+        current_action=test_action_call,
+        previous_state=previous_state,
+        next_state=next_state)
+    sam_learning._add_new_action_preconditions(grounded_action=test_action_call)
+    learned_action_data = sam_learning.partial_domain.actions[test_action_call.name]
+    positive_conditions = {p.untyped_representation for p in learned_action_data.positive_preconditions}
+    expected_conditions = {"(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"}
+    assert expected_conditions.issubset(positive_conditions)
+
+
+def test_add_new_action_preconditions_do_not_adds_intersecting_positive_and_negative_preconditions(
+        sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+    observed_objects = elevators_observation.grounded_objects
+    sam_learning.current_trajectory_objects = observed_objects
+    sam_learning._create_fully_observable_triplet_predicates(
+        current_action=test_action_call,
+        previous_state=previous_state,
+        next_state=next_state)
+    sam_learning._add_new_action_preconditions(grounded_action=test_action_call)
+    learned_action_data = sam_learning.partial_domain.actions[test_action_call.name]
+    positive_conditions = {p.untyped_representation for p in learned_action_data.positive_preconditions}
+    negative_conditions = {p.untyped_representation for p in learned_action_data.negative_preconditions}
+    assert not positive_conditions.intersection(negative_conditions)
 
 def test_update_action_with_two_trajectory_component_updates_action_data_correctly(
         sam_learning: SAMLearner, elevators_observation: Observation):
@@ -150,7 +236,7 @@ def test_update_action_with_two_trajectory_component_updates_action_data_correct
     preconditions_str = set([p.untyped_representation for p in learned_action_data.positive_preconditions])
     assert preconditions_str.issuperset(["(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"])
     assert [p.untyped_representation for p in learned_action_data.add_effects] == ["(lift-at ?lift ?f2)"]
-    assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(lift-at ?lift ?f1)"]
+    assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(not (lift-at ?lift ?f1))"]
 
 
 def test_handle_single_trajectory_component_not_allowing_actions_with_duplicated_parameters(
@@ -181,7 +267,7 @@ def test_handle_single_trajectory_component_learns_preconditions_and_effects_whe
     preconditions_str = set([p.untyped_representation for p in learned_action_data.positive_preconditions])
     assert preconditions_str.issuperset(["(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"])
     assert [p.untyped_representation for p in learned_action_data.add_effects] == ["(lift-at ?lift ?f2)"]
-    assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(lift-at ?lift ?f1)"]
+    assert [p.untyped_representation for p in learned_action_data.delete_effects] == ["(not (lift-at ?lift ?f1))"]
 
 
 def test_learn_action_model_returns_learned_model(sam_learning: SAMLearner, elevators_observation: Observation):

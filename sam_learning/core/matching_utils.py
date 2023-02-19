@@ -58,11 +58,13 @@ def contains_duplicates(parameter_objects: List[str]) -> bool:
     return len(set(parameter_objects)) != len(parameter_objects)
 
 
-def extract_effects(previous_state: State, next_state: State) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
+def extract_effects(previous_state: State, next_state: State,
+                    add_predicates_sign: bool = False) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
     """Extracts discrete the effects from the state object.
 
     :param previous_state: the previous state object containing the grounded literals.
     :param next_state: the next state object containing its grounded literals.
+    :param add_predicates_sign: whether to add the sign to the delete effects.
     :return: tuple containing the add and delete effects of the action.
     """
     prev_state_predicate = previous_state.state_predicates
@@ -82,5 +84,9 @@ def extract_effects(previous_state: State, next_state: State) -> Tuple[Set[Groun
     # Checking all delete effects
     for lifted_predicate, grounded_predicates in prev_state_predicate.items():
         delete_effects.update(grounded_predicates.difference(next_state_predicate[lifted_predicate]))
+
+    if add_predicates_sign:
+        for delete_effect in delete_effects:
+            delete_effect.is_positive = False
 
     return add_effects, delete_effects

@@ -174,8 +174,8 @@ class NumericFluentStateStorage:
 
         return injunctive_conditions, ConditionType.disjunctive
 
-    def _create_convex_hull_linear_inequalities(self, points: np.ndarray,
-                                                display_mode: bool = False) -> tuple[List[List[float]], List[float]]:
+    def _create_convex_hull_linear_inequalities(
+            self, points: np.ndarray, display_mode: bool = False) -> Tuple[List[List[float]], List[float]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :param points: the points that represent the values of the function in the states of the observations.

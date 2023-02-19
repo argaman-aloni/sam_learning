@@ -68,6 +68,7 @@ class NumericSAMLearner(SAMLearner):
         :return: a domain containing the actions that were learned and the metadata about the learning.
         """
         self.logger.info("Starting to learn the action model!")
+        super().start_measure_learning_time()
         allowed_actions = {}
         learning_metadata = {}
         super().deduce_initial_inequality_preconditions()
@@ -98,6 +99,9 @@ class NumericSAMLearner(SAMLearner):
                 learning_metadata[action_name] = e.solution_type.name
 
         self.partial_domain.actions = allowed_actions
+
+        super().end_measure_learning_time()
+        learning_metadata["learning_time"] = str(self.learning_end_time - self.learning_start_time)
         return self.partial_domain, learning_metadata
 
 

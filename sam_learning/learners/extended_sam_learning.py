@@ -150,7 +150,7 @@ class ExtendedSAM(SAMLearner):
         """
         action_name = grounded_action.name
         observed_action = self.partial_domain.actions[action_name]
-        super()._update_action_preconditions(grounded_action, previous_state)
+        super()._update_action_preconditions(grounded_action)
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 

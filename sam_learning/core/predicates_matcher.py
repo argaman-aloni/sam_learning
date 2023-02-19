@@ -77,7 +77,7 @@ class PredicatesMatcher:
                          f"to the action call {str(action_call)}")
         if len(grounded_predicate.signature) == 0:
             self.logger.debug("The predicate has no parameters, by default matches the action!")
-            return [Predicate(name=grounded_predicate.name, signature={})]
+            return [Predicate(name=grounded_predicate.name, signature={}, is_positive=grounded_predicate.is_positive)]
 
         lifted_action_data = self.matcher_domain.actions[action_call.name]
         constants = self.matcher_domain.constants
@@ -110,12 +110,28 @@ class PredicatesMatcher:
                     name=grounded_predicate.name, signature={
                         lifted_parameter_name: combined_types[lifted_parameter_name] for lifted_parameter_name in
                         lifted_parameters
-                    }))
+                    }, is_positive=grounded_predicate.is_positive))
                 grounded_base_params.append(possible_match_action_objects)
 
         possible_matches = self._filter_out_impossible_combinations(grounded_predicate, possible_matches,
                                                                     grounded_base_params)
         return possible_matches
+
+    def get_injective_match(self, grounded_predicate: GroundedPredicate, action_call: ActionCall) -> Optional[
+        Predicate]:
+        """Get the injective match for the predicate and the action.
+
+        :param grounded_predicate: the grounded predicate that was observed.
+        :param action_call: the action that was called in the observation.
+        :return: lifted predicates with signatures matching the action.
+        """
+        possible_matches = self.match_predicate_to_action_literals(grounded_predicate, action_call)
+        if len(possible_matches) == 1:
+            lifted_match = possible_matches[0]
+            lifted_match.is_positive = grounded_predicate.is_positive
+            return lifted_match
+
+        return None
 
     def get_possible_literal_matches(
             self, grounded_action_call: ActionCall, state_literals: List[GroundedPredicate],

@@ -85,21 +85,16 @@ def ma_sam(combined_domain: Domain) -> MultiAgentSAM:
 
 def test_initialize_cnfs_sets_correct_predicates_in_the_cnf_dictionary(ma_sam: MultiAgentSAM, combined_domain: Domain):
     ma_sam._initialize_cnfs()
-    assert len(ma_sam.positive_literals_cnf) == len(combined_domain.predicates)
-    assert len(ma_sam.negative_literals_cnf) == len(combined_domain.predicates)
+    assert len(ma_sam.literals_cnf) == 2 * len(combined_domain.predicates)
 
 
-def test_locate_executing_action_when_only_one_action_is_in_the_joint_action_returns_single_action(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall):
-    assert ma_sam._locate_executing_action(JointActionCall(
-        [do_plane_first_action_call, ActionCall(NOP_ACTION, [])])) == [do_plane_first_action_call]
-
-
-def test_locate_executing_action_when_two_actions_are_in_the_joint_action_returns_two_actions(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, do_plane_second_action_call: ActionCall):
-    assert ma_sam._locate_executing_action(JointActionCall(
-        [do_plane_first_action_call, do_plane_second_action_call, ActionCall(NOP_ACTION, [])])) == \
-           [do_plane_first_action_call, do_plane_second_action_call]
+def test_initialize_cnfs_sets_negative_predicates_correctly_in_the_negative_cnf(ma_sam: MultiAgentSAM,
+                                                                                combined_domain: Domain):
+    ma_sam._initialize_cnfs()
+    positive_literals = [literal for literal in ma_sam.literals_cnf if not literal.startswith("(not ")]
+    negative_literals = [literal for literal in ma_sam.literals_cnf if literal.startswith("(not ")]
+    assert len(positive_literals) == len(negative_literals)
+    assert len(positive_literals) == len(combined_domain.predicates)
 
 
 def test_compute_interacting_actions_returns_empty_list_if_no_action_interacts_with_the_predicate(
@@ -149,7 +144,7 @@ def test_compute_interacting_actions_returns_two_actions_when_two_when_third_act
 def test_construct_safe_actions_returns_empty_list_if_no_action_is_safe(
         ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain,
         ma_literals_cnf: LiteralCNF):
-    ma_sam.positive_literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
+    ma_sam.literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
     possible_effects = [("do-immersion-varnish", "(surface-condition ?agent ?newcolour)"),
                         ("do-grind", "(surface-condition ?agent ?oldcolour)"),
                         ("do-plane", "(surface-condition ?agent ?colour)")]
@@ -163,10 +158,11 @@ def test_construct_safe_actions_returns_empty_list_if_no_action_is_safe(
                   bounded_param: obj_type for bounded_param, obj_type in zip(predicate_params, predicate_types)}))}}
     ma_sam.observed_actions.append("do-plane")
     ma_sam.construct_safe_actions()
+
     assert "do-plane" not in ma_sam.safe_actions
 
 
-def test_update_single_agent_executed_action_updates_single_agent_action_count(
+def test_update_single_agent_executed_action_updates_action_count(
         ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
     first_trajectory_component = multi_agent_observation.components[0]
     test_action = ActionCall("do-grind", ["grinder0", "p0", "smooth", "red", "varnished", "colourfragments"])
@@ -180,64 +176,13 @@ def test_update_single_agent_executed_action_updates_single_agent_action_count(
         executed_action=test_action,
         previous_state=first_trajectory_component.previous_state,
         next_state=first_trajectory_component.next_state)
-    assert "do-grind" in ma_sam.observed_single_agent_actions
-
-
-def test_update_single_agent_executed_action_updates_restrictive_domain(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
-    first_trajectory_component = multi_agent_observation.components[0]
-    test_action = ActionCall("do-grind", ["grinder0", "p0", "smooth", "red", "varnished", "colourfragments"])
-    ma_sam._initialize_cnfs()
-    ma_sam._create_fully_observable_triplet_predicates(
-        test_action,
-        first_trajectory_component.previous_state,
-        first_trajectory_component.next_state)
-
-    ma_sam.update_single_agent_executed_action(
-        executed_action=test_action,
-        previous_state=first_trajectory_component.previous_state,
-        next_state=first_trajectory_component.next_state)
-    assert len(ma_sam.restrictive_domain.actions[test_action.name].positive_preconditions) > 0
-
-
-def test_update_multiple_executed_actions_does_not_updates_single_agent_action_count(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
-    first_trajectory_component = multi_agent_observation.components[0]
-    test_action = ActionCall("do-grind", ["grinder0", "p0", "smooth", "red", "varnished", "colourfragments"])
-    ma_sam._initialize_cnfs()
-    ma_sam._create_fully_observable_triplet_predicates(
-        test_action,
-        first_trajectory_component.previous_state,
-        first_trajectory_component.next_state)
-
-    ma_sam.update_multiple_executed_actions(
-        joint_action=first_trajectory_component.grounded_joint_action,
-        previous_state=first_trajectory_component.previous_state,
-        next_state=first_trajectory_component.next_state)
-    assert "do-grind" not in ma_sam.observed_single_agent_actions
-
-
-def test_update_multiple_executed_actions_does_not_update_restrictive_domain(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
-    first_trajectory_component = multi_agent_observation.components[0]
-    test_action = ActionCall("do-grind", ["grinder0", "p0", "smooth", "red", "varnished", "colourfragments"])
-    ma_sam._initialize_cnfs()
-    ma_sam._create_fully_observable_triplet_predicates(
-        test_action,
-        first_trajectory_component.previous_state,
-        first_trajectory_component.next_state)
-
-    ma_sam.update_multiple_executed_actions(
-        joint_action=first_trajectory_component.grounded_joint_action,
-        previous_state=first_trajectory_component.previous_state,
-        next_state=first_trajectory_component.next_state)
-    assert len(ma_sam.restrictive_domain.actions[test_action.name].positive_preconditions) == 0
+    assert "do-grind" in ma_sam.observed_actions
 
 
 def test_construct_safe_actions_returns_safe_action_when_it_has_only_one_effect_with_no_ambiguities(
         ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain,
         ma_literals_cnf: LiteralCNF):
-    ma_sam.positive_literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
+    ma_sam.literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
     possible_effects = [("do-grind", "(surface-condition ?agent ?oldcolour)"),
                         ("do-plane", "(surface-condition ?agent ?colour)")]
     ma_literals_cnf.add_possible_effect(possible_effects)
