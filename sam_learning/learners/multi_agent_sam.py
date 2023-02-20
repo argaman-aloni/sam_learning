@@ -1,12 +1,11 @@
 """Module to learn action models from multi-agent trajectories with joint actions."""
 import logging
-from collections import defaultdict
 from typing import Dict, List, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
     GroundedPredicate, JointActionCall
 
-from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction
+from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners import SAMLearner
 
 
@@ -15,7 +14,6 @@ class MultiAgentSAM(SAMLearner):
     logger: logging.Logger
     literals_cnf: Dict[str, LiteralCNF]
     preconditions_fluent_map: Dict[str, List[str]]
-    lifted_bounded_predicates: Dict[str, Dict[str, Set[Tuple[str, Predicate]]]]
     safe_actions: List[str]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
@@ -23,8 +21,6 @@ class MultiAgentSAM(SAMLearner):
         self.logger = logging.getLogger(__name__)
         self.literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
-        self.lifted_bounded_predicates = {action_name: defaultdict(set) for action_name in
-                                          self.partial_domain.actions.keys()}
         self.safe_actions = []
 
     def _initialize_cnfs(self) -> None:
@@ -71,18 +67,12 @@ class MultiAgentSAM(SAMLearner):
         :return: whether the action is safe to execute.
         """
         for domain_literal, cnf in self.literals_cnf.items():
-            if domain_literal not in self.lifted_bounded_predicates[action.name] or \
-                    not cnf.is_action_acting_in_cnf(action.name):
+            if not cnf.is_action_acting_in_cnf(action.name):
                 self.logger.debug(f"The literal {domain_literal} does not relate to {action.name}.")
                 continue
 
-            bounded_action_predicates = self.lifted_bounded_predicates[action.name][domain_literal]
-            bounded_predicates_str = {predicate_str for predicate_str, _ in bounded_action_predicates}
-            bounded_predicates_str.difference_update([p.untyped_representation for p in preconditions_to_filter])
-            if len(bounded_predicates_str) == 0:
-                continue
-
-            if not cnf.is_action_safe(action_name=action.name, bounded_lifted_predicates=bounded_predicates_str):
+            action_preconditions = {p.untyped_representation for p in preconditions_to_filter}
+            if not cnf.is_action_safe(action_name=action.name, action_preconditions=action_preconditions):
                 self.logger.debug("Action %s is not safe to execute!", action.name)
                 return False
 
@@ -102,8 +92,7 @@ class MultiAgentSAM(SAMLearner):
 
             self.literals_cnf[predicate.lifted_untyped_representation].add_not_effect(
                 executed_action.name, bounded_lifted_literal)
-            self.lifted_bounded_predicates[executed_action.name][predicate.lifted_untyped_representation].add(
-                (bounded_lifted_literal.untyped_representation, bounded_lifted_literal))
+            self.logger.debug(f"Removing the literal from being an effect of the action {executed_action.name}.")
 
     def add_must_be_effect_to_cnf(self, executed_action: ActionCall, grounded_effects: Set[GroundedPredicate]) -> None:
         """Adds an effect that has no ambiguities on which action caused it.
@@ -120,8 +109,6 @@ class MultiAgentSAM(SAMLearner):
             self.literals_cnf[grounded_literal.lifted_untyped_representation].add_possible_effect(
                 [(executed_action.name, lifted_effect.untyped_representation)])
             domain_predicate = self.partial_domain.predicates[lifted_effect.name]
-            self.lifted_bounded_predicates[executed_action.name][domain_predicate.untyped_representation].add(
-                (lifted_effect.untyped_representation, lifted_effect))
 
     def compute_interacting_actions(self, grounded_predicate: GroundedPredicate, executing_actions: List[ActionCall]):
         """Computes the set of actions that interact with a certain predicate.
@@ -150,21 +137,15 @@ class MultiAgentSAM(SAMLearner):
         :param action: the action that is currently being handled.
         :param relevant_preconditions: the preconditions of the action to filter the possible effects from.
         """
-        effects = set()
         relevant_preconditions_str = {predicate.untyped_representation for predicate in relevant_preconditions}
         for domain_predicate, cnf in self.literals_cnf.items():
-            cnf_effects = cnf.extract_action_effects(action.name)
+            cnf_effects = cnf.extract_action_effects(action.name, relevant_preconditions_str)
             for effect in cnf_effects:
-                bounded_predicates = [predicate_obj for lifted_representation, predicate_obj in
-                                      self.lifted_bounded_predicates[action.name][domain_predicate]
-                                      if lifted_representation == effect]
-                if len(bounded_predicates) == 0 or bounded_predicates[0].untyped_representation in relevant_preconditions_str:
-                    continue
-
-                effects.add(bounded_predicates[0])
-
-        action.add_effects = {predicate for predicate in effects if predicate.is_positive}
-        action.delete_effects = {predicate for predicate in effects if not predicate.is_positive}
+                lifted_predicate = extract_predicate_data(action, effect, self.partial_domain.constants)
+                if lifted_predicate.is_positive:
+                    action.add_effects.add(lifted_predicate)
+                else:
+                    action.delete_effects.add(lifted_predicate)
 
     def handle_concurrent_execution(
             self, grounded_effect: GroundedPredicate, executing_actions: List[ActionCall]) -> None:
@@ -183,8 +164,6 @@ class MultiAgentSAM(SAMLearner):
         for interacting_action in interacting_actions:
             lifted_match = self.matcher.get_injective_match(grounded_effect, interacting_action)
             concurrent_execution.append((interacting_action.name, lifted_match.untyped_representation))
-            self.lifted_bounded_predicates[interacting_action.name][grounded_effect.lifted_untyped_representation].add(
-                (lifted_match.untyped_representation, lifted_match))
 
         self.literals_cnf[grounded_effect.lifted_untyped_representation].add_possible_effect(concurrent_execution)
 
@@ -258,7 +237,7 @@ class MultiAgentSAM(SAMLearner):
 
         if joint_action.action_count == 1:
             executing_action = joint_action.operational_actions[0]
-            self._create_fully_observable_triplet_predicates(executing_action, previous_state, next_state)
+            super()._create_fully_observable_triplet_predicates(executing_action, previous_state, next_state)
             self.update_single_agent_executed_action(executing_action, previous_state, next_state)
             return
 
@@ -298,6 +277,6 @@ class MultiAgentSAM(SAMLearner):
 
         self.construct_safe_actions()
         self.logger.info("Finished learning the action model!")
-        super().start_measure_learning_time()
+        super().end_measure_learning_time()
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report

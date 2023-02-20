@@ -21,6 +21,11 @@ def extract_predicate_data(
     :param domain_constants: the constants of the domain if exists.
     :return: the predicate object matching the string.
     """
+    is_positive = True
+    if predicate_str.startswith(NOT_PREFIX):
+        predicate_str = predicate_str.replace(NOT_PREFIX, "").replace(")", "").strip()
+        is_positive = False
+
     predicate_data = predicate_str.replace("(", "").replace(")", "").split(" ")
     predicate_data = [data for data in predicate_data if data != ""]
     predicate_name = predicate_data[0]
@@ -30,7 +35,7 @@ def extract_predicate_data(
 
     combined_signature.update({constant.name: constant.type for constant in domain_constants.values()})
     predicate_signature = {parameter: combined_signature[parameter] for parameter in predicate_data[1:]}
-    return Predicate(predicate_name, predicate_signature)
+    return Predicate(predicate_name, predicate_signature, is_positive=is_positive)
 
 
 def create_additional_parameter_name(

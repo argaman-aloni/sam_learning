@@ -56,13 +56,22 @@ def test_add_possible_effect_does_not_add_effect_to_an_action_if_effect_declared
     assert ma_literals_cnf.possible_lifted_effects[0] == possible_effects[1:]
 
 
+def test_is_action_safe_when_an_action_contains_ambiguity_on_effect_not_solved_but_predicate_is_in_preconditions_returns_true(
+        ma_literals_cnf: LiteralCNF, combined_domain: Domain):
+    possible_effects = [("do-plane", "(has-colour ?agent ?colour)"),
+                        ("do-immersion-varnish", "(has-colour ?agent ?newcolour)"),
+                        ("do-grind", "(has-colour ?agent ?oldcolour)")]
+    ma_literals_cnf.add_possible_effect(possible_effects)
+    assert ma_literals_cnf.is_action_safe("do-plane", {"(has-colour ?agent ?colour)"})
+
+
 def test_is_action_safe_when_an_action_contains_ambiguity_returns_that_action_is_not_safe(
         ma_literals_cnf: LiteralCNF, combined_domain: Domain):
     possible_effects = [("do-plane", "(has-colour ?agent ?colour)"),
                         ("do-immersion-varnish", "(has-colour ?agent ?newcolour)"),
                         ("do-grind", "(has-colour ?agent ?oldcolour)")]
     ma_literals_cnf.add_possible_effect(possible_effects)
-    assert not ma_literals_cnf.is_action_safe("do-plane", {"(has-colour ?agent ?colour)"})
+    assert not ma_literals_cnf.is_action_safe("do-plane", {})
 
 
 def test_is_action_safe_when_an_actions_effect_declared_as_not_effect_considered_as_safe(
@@ -101,7 +110,7 @@ def test_extract_action_effects_extract_an_action_effect_only_from_unit_clause_c
                         ("do-grind", "(has-colour ?agent ?oldcolour)")]
     ma_literals_cnf.add_possible_effect(possible_effects)
     ma_literals_cnf.add_possible_effect([("do-plane", "(has-colour ?agent ?colour)")])
-    effects = ma_literals_cnf.extract_action_effects("do-plane")
+    effects = ma_literals_cnf.extract_action_effects("do-plane", {})
     assert len(effects) == 1
 
 
@@ -111,5 +120,5 @@ def test_extract_action_effects_extract_an_action_effect_from_non_unit_clause_re
                         ("do-grind", "(has-colour ?agent ?oldcolour)"),
                         ("do-plane", "(has-colour ?agent ?colour)")]
     ma_literals_cnf.add_possible_effect(possible_effects)
-    effects = ma_literals_cnf.extract_action_effects("do-plane")
+    effects = ma_literals_cnf.extract_action_effects("do-plane", {})
     assert len(effects) == 0

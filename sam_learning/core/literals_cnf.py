@@ -43,24 +43,21 @@ class LiteralCNF:
 
         self.possible_lifted_effects.append(filtered_joint_effect)
 
-    def is_action_safe(self, action_name: str, bounded_lifted_predicates: Set[str]) -> bool:
+    def is_action_safe(self, action_name: str, action_preconditions: Set[str]) -> bool:
         """Checks if an action is safe to execute based on this CNF clause.
 
         :param action_name: the name of the action.
-        :param bounded_lifted_predicates: the lifted predicates bounded by the action's parameters.
+        :param action_preconditions: the preconditions of the action.
         :return: True if the action is safe to execute, False otherwise.
         """
-        possible_lifted_bounded_predicates = []
-        for possible_predicate in self.possible_lifted_effects:
-            possible_lifted_bounded_predicates.extend([effect for (_, effect) in possible_predicate])
+        for lifted_options in self.possible_lifted_effects:
+            if action_name in [action for (action, _) in lifted_options]:
+                if len(lifted_options) == 1:
+                    continue
 
-        for predicate in bounded_lifted_predicates:
-            if predicate not in possible_lifted_bounded_predicates and predicate not in self.not_effects[action_name]:
-                continue
-
-            for lifted_options in self.possible_lifted_effects:
-                if (action_name, predicate) in lifted_options and len(lifted_options) > 1:
-                    return False
+                for (action, predicate) in lifted_options:
+                    if action == action_name and predicate not in action_preconditions:
+                        return False
 
         return True
 
@@ -79,16 +76,19 @@ class LiteralCNF:
 
         return False
 
-    def extract_action_effects(self, action_name: str) -> List[str]:
+    def extract_action_effects(self, action_name: str, action_preconditions: Set[str]) -> List[str]:
         """Extract the effects that an action is acting on.
 
         :param action_name: the name of the action.
+        :param action_preconditions: the preconditions of the action.
         :return: the list of effects that the action is acting on.
         """
         effects = []
         for possible_joint_effect in self.possible_lifted_effects:
             if len(possible_joint_effect) == 1 and \
                     action_name in [action for (action, _) in possible_joint_effect]:
-                effects.extend([effect for (_, effect) in possible_joint_effect])
+                (_, effect) = possible_joint_effect[0]
+                if effect not in action_preconditions:
+                    effects.append(effect)
 
         return effects
