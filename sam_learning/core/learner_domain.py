@@ -145,10 +145,12 @@ class LearnerAction:
 
         :return: the PDDL string representing the action.
         """
-        return f"(:action {self.name}\n" \
+        action_string = f"(:action {self.name}\n" \
                f"\t:parameters {self._signature_to_pddl()}\n" \
                f"\t:precondition {self._preconditions_to_pddl()}\n" \
-               f"\t:effect {self._effects_to_pddl()})\n"
+               f"\t:effect {self._effects_to_pddl()})"
+        formatted_string = "\n".join([line for line in action_string.split("\n") if line.strip()])
+        return f"{formatted_string}\n"
 
 
 class LearnerDomain:

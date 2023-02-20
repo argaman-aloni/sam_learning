@@ -3,13 +3,13 @@ import logging
 import time
 from collections import defaultdict
 from itertools import combinations
-from typing import List, Tuple, Dict, Set, Optional
+from typing import List, Tuple, Dict, Set
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
     GroundedPredicate
 
 from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, \
-    VocabularyCreator, LearnerAction
+    VocabularyCreator
 
 
 class SAMLearner:
@@ -32,8 +32,6 @@ class SAMLearner:
     learning_end_time: float
 
     def __init__(self, partial_domain: Domain):
-        self.learning_start_time = 0
-        self.learning_end_time = 0
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -45,6 +43,8 @@ class SAMLearner:
         self.next_state_positive_predicates = set()
         self.next_state_negative_predicates = set()
         self.current_trajectory_objects = {}
+        self.learning_start_time = 0
+        self.learning_end_time = 0
 
     def _remove_unobserved_actions_from_partial_domain(self):
         """Removes the actions that were not observed from the partial domain."""
@@ -68,22 +68,25 @@ class SAMLearner:
         vocabulary = self.vocabulary_creator.create_vocabulary(domain=self.partial_domain,
                                                                observed_objects=relevant_objects)
 
-        for lifted_predicate_name, possible_state_predicates in vocabulary.items():
+        for lifted_predicate_name, possible_missing_predicates in vocabulary.items():
             if lifted_predicate_name not in state.state_predicates:
-                negative_state_predicates.update(possible_state_predicates)
+                negative_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
+                                                                    object_mapping=p.object_mapping, is_positive=False)
+                                                  for p in possible_missing_predicates])
                 continue
 
             state_predicate_strs = [predicate.untyped_representation for predicate in
                                     state.state_predicates[lifted_predicate_name]]
-            filtered_grounded_state_predicates = [predicate for predicate in possible_state_predicates if
+            filtered_grounded_state_predicates = [predicate for predicate in possible_missing_predicates if
                                                   predicate.untyped_representation not in state_predicate_strs]
-            negative_state_predicates.update(filtered_grounded_state_predicates)
-
-        for negative_predicate in negative_state_predicates:
-            negative_predicate.is_positive = False
+            negative_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
+                                                                object_mapping=p.object_mapping, is_positive=False)
+                                              for p in filtered_grounded_state_predicates])
 
         for lifted_predicate_name, grounded_state_predicates in state.state_predicates.items():
-            positive_state_predicates.update(grounded_state_predicates)
+            positive_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
+                                                                object_mapping=p.object_mapping, is_positive=True)
+                                              for p in grounded_state_predicates])
 
         return positive_state_predicates, negative_state_predicates
 
