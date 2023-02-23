@@ -108,7 +108,6 @@ class MultiAgentSAM(SAMLearner):
 
             self.literals_cnf[grounded_literal.lifted_untyped_representation].add_possible_effect(
                 [(executed_action.name, lifted_effect.untyped_representation)])
-            domain_predicate = self.partial_domain.predicates[lifted_effect.name]
 
     def compute_interacting_actions(self, grounded_predicate: GroundedPredicate, executing_actions: List[ActionCall]):
         """Computes the set of actions that interact with a certain predicate.
@@ -252,6 +251,8 @@ class MultiAgentSAM(SAMLearner):
             action_preconditions = action.positive_preconditions.union(action.negative_preconditions)
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
+                action.positive_preconditions = set()
+                action.negative_preconditions = set()
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)

@@ -49,8 +49,22 @@ class MAPlanningWithOfflineLearning:
         self.performance_calculator = None
         self.ma_domain_path = None
 
-    @staticmethod
-    def _filter_baseline_multi_agent_trajectory(complete_observation: MultiAgentObservation) -> Observation:
+    def _assert_all_state_predicates_are_positive(self, observation: MultiAgentObservation) -> None:
+        """
+
+        :param observation:
+        :return:
+        """
+        for component in observation.components:
+            for grounded_predicates_set in component.previous_state.state_predicates.values():
+                for grounded_predicate in grounded_predicates_set:
+                    grounded_predicate.is_positive = True
+
+            for grounded_predicates_set in component.next_state.state_predicates.values():
+                for grounded_predicate in grounded_predicates_set:
+                    grounded_predicate.is_positive = True
+
+    def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
         """Create a single agent observation from a multi-agent observation.
 
         :param complete_observation: the multi-agent observation to filter.
@@ -60,6 +74,8 @@ class MAPlanningWithOfflineLearning:
         filtered_observation.add_problem_objects(complete_observation.grounded_objects)
         for component in complete_observation.components:
             if component.grounded_joint_action.action_count > 1:
+                self.logger.debug(f"Skipping the joint action - {component.grounded_joint_action} "
+                                  f"since it contains multiple agents executing at once.!")
                 continue
 
             filtered_observation.add_component(component.previous_state,
@@ -102,7 +118,9 @@ class MAPlanningWithOfflineLearning:
             observed_objects.update(problem.objects)
             complete_observation: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
                 trajectory_file_path, self.executing_agents)
-            filtered_observation = self._filter_baseline_multi_agent_trajectory(complete_observation)
+
+            self._assert_all_state_predicates_are_positive(complete_observation)
+            filtered_observation = self._filter_baseline_single_agent_trajectory(complete_observation)
             allowed_ma_observations.append(complete_observation)
             allowed_sa_observations.append(filtered_observation)
             self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")

@@ -21,10 +21,17 @@ class LiteralCNF:
         :param action_name: the name of the action in which the predicate is not part of its effects.
         :param predicate: the predicate that is not the action's effect.
         """
+        redundant_items_indexes = []
         self.not_effects[action_name].add(predicate.untyped_representation)
-        for possible_joint_effect in self.possible_lifted_effects:
+        for index, possible_joint_effect in enumerate(self.possible_lifted_effects):
             if (action_name, predicate.untyped_representation) in possible_joint_effect:
                 possible_joint_effect.remove((action_name, predicate.untyped_representation))
+                if len(possible_joint_effect) == 0:
+                    redundant_items_indexes.append(index)
+
+        for index in redundant_items_indexes:
+            self.possible_lifted_effects.pop(index)
+
 
     def add_possible_effect(self, possible_joint_effect: List[Tuple[str, str]]) -> None:
         """Add a possible joint effect to the list of possible effects.

@@ -75,10 +75,15 @@ class SAMLearner:
                                                   for p in possible_missing_predicates])
                 continue
 
+            for predicate in state.state_predicates[lifted_predicate_name]:
+                predicate.is_positive = True
+
             state_predicate_strs = [predicate.untyped_representation for predicate in
                                     state.state_predicates[lifted_predicate_name]]
             filtered_grounded_state_predicates = [predicate for predicate in possible_missing_predicates if
                                                   predicate.untyped_representation not in state_predicate_strs]
+            filtered_grounded_state_predicates_str = [predicate.untyped_representation for predicate in
+                                                      filtered_grounded_state_predicates]
             negative_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
                                                                 object_mapping=p.object_mapping, is_positive=False)
                                               for p in filtered_grounded_state_predicates])
@@ -186,6 +191,7 @@ class SAMLearner:
 
         observed_action.add_effects.update(lifted_add_effects)
         observed_action.delete_effects.update(lifted_delete_effects)
+        observed_action.negative_preconditions.difference_update(lifted_delete_effects)
 
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
@@ -206,6 +212,7 @@ class SAMLearner:
 
         observed_action.add_effects.update(lifted_add_effects)
         observed_action.delete_effects.update(lifted_delete_effects)
+        observed_action.negative_preconditions.difference_update(lifted_delete_effects)
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
     def _verify_parameter_duplication(self, grounded_action: ActionCall) -> bool:
