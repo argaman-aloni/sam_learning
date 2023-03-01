@@ -17,7 +17,7 @@ from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLe
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
-DEFAULT_SPLIT = 0
+DEFAULT_SPLIT = 5
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
                       LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]

@@ -90,7 +90,8 @@ class LinearRegressionLearner:
         self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
 
         functions_including_dummy = list(regression_matrix.columns[:-1]) + ["(dummy)"]
-        if coefficient_vector[list(regression_matrix.columns).index(lifted_function)] != 0:
+        if lifted_function in regression_matrix.columns and coefficient_vector[
+            list(regression_matrix.columns).index(lifted_function)] != 0:
             self.logger.debug("the assigned party is a part of the equation, "
                               "cannot use circular dependency so changing the format!")
             coefficients_map = {lifted_func: coef for lifted_func, coef in
