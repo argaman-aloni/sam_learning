@@ -108,7 +108,8 @@ class LearnerAction:
         preconditions_str = "\t\t\n".join(preconditions)
         equality_conditions_str = self._extract_inequality_preconditions()
         if len(self.numeric_preconditions) > 0:
-            return self._extract_numeric_preconditions(preconditions, equality_conditions_str)
+            return self._extract_numeric_preconditions(preconditions + self.manual_preconditions,
+                                                       equality_conditions_str)
 
         manual_preconditions_str = "\t\t\n".join(self.manual_preconditions)
 
@@ -146,9 +147,9 @@ class LearnerAction:
         :return: the PDDL string representing the action.
         """
         action_string = f"(:action {self.name}\n" \
-               f"\t:parameters {self._signature_to_pddl()}\n" \
-               f"\t:precondition {self._preconditions_to_pddl()}\n" \
-               f"\t:effect {self._effects_to_pddl()})"
+                        f"\t:parameters {self._signature_to_pddl()}\n" \
+                        f"\t:precondition {self._preconditions_to_pddl()}\n" \
+                        f"\t:effect {self._effects_to_pddl()})"
         formatted_string = "\n".join([line for line in action_string.split("\n") if line.strip()])
         return f"{formatted_string}\n"
 
@@ -248,13 +249,15 @@ class LearnerDomain:
         """
         self._complete_missing_requirements()
         predicates = "\n\t".join([str(p) for p in self.predicates.values()])
+        predicates_str = f"(:predicates {predicates}\n)\n\n" if len(self.predicates) > 0 else ""
+        types_str = f"(:types {self._types_to_pddl()}\n)\n\n" if len(self.types) > 0 else ""
         actions = "\n".join(action.to_pddl() for action in self.actions.values())
         constants = f"(:constants {self._constants_to_pddl()}\n)\n\n" if len(self.constants) > 0 else ""
         functions = f"(:functions {self._functions_to_pddl()}\n)\n\n" if len(self.functions) > 0 else ""
         return f"(define (domain {self.name})\n" \
                f"(:requirements {' '.join(self.requirements)})\n" \
-               f"(:types {self._types_to_pddl()}\n)\n\n" \
+               f"{types_str}" \
                f"{constants}" \
-               f"(:predicates {predicates}\n)\n\n" \
+               f"{predicates_str}" \
                f"{functions}" \
                f"{actions}\n)"

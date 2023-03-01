@@ -17,7 +17,7 @@ from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLe
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
-DEFAULT_SPLIT = 5
+DEFAULT_SPLIT = 0
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
                       LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]
@@ -125,7 +125,7 @@ class POL:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if index % 10 != 0:
+            if index % 2 != 0:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")

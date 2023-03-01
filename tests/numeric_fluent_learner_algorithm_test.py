@@ -105,7 +105,7 @@ def test_convert_to_array_format_with_simple_state_fluents_returns_correct_array
         }
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
 
-    array = load_action_state_fluent_storage._convert_to_array_format(storage_name="previous_state")
+    array = load_action_state_fluent_storage._convert_to_dataframe(storage_name="previous_state")
     assert array.shape == (10, 3)
 
 

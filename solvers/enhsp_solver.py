@@ -10,7 +10,7 @@ from typing import Dict
 from jdk4py import JAVA
 
 ENHSP_FILE_PATH = os.environ["ENHSP_FILE_PATH"]
-MAX_RUNNING_TIME = 60  # seconds
+MAX_RUNNING_TIME = 1  # seconds
 
 TIMEOUT_ERROR_CODE = b"Timeout has been reached"
 PROBLEM_SOLVED = b"Problem Solved"
@@ -41,7 +41,7 @@ class ENHSPSolver:
             process.wait(timeout=MAX_RUNNING_TIME)
 
         except subprocess.TimeoutExpired:
-            self.logger.debug(
+            self.logger.warning(
                 f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "timeout"
             os.kill(process.pid, signal.SIGTERM)
@@ -50,6 +50,7 @@ class ENHSPSolver:
 
         if process.returncode is None:
             solving_stats[problem_file_path.stem] = "timeout"
+            self.logger.warning(f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
             return
 
         self.logger.info("ENHSP finished its execution!")

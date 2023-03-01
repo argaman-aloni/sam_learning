@@ -16,7 +16,8 @@ class NumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 max_antecedents_size: Optional[int] = None):
         super().__init__(partial_domain)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)
@@ -90,8 +91,9 @@ class NumericSAMLearner(SAMLearner):
                     action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
                         self.preconditions_fluent_map[action_name])
 
-                action.numeric_effects = self.storage[action_name].construct_assignment_equations()
+                action.numeric_effects, added_conditions = self.storage[action_name].construct_assignment_equations()
                 allowed_actions[action_name] = action
+                action.manual_preconditions.extend(added_conditions)
                 learning_metadata[action_name] = "OK"
 
             except NotSafeActionError as e:
