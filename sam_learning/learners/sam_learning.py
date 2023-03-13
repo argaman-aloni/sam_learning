@@ -277,6 +277,20 @@ class SAMLearner:
         self.logger.info(f"Finished learning the action model in "
                          f"{self.learning_end_time - self.learning_start_time} seconds.")
 
+    def are_state_different(self, previous_state: State, next_state: State) -> bool:
+        """Checks if the previous state differs from the next state.
+
+        :param previous_state: the previous state.
+        :param next_state: the next state.
+        :return: whether the states differ.
+        """
+        if previous_state.serialize() == next_state.serialize():
+            self.logger.warning("The previous state is the same as the next state. "
+                                "This is not supported by the SAFE action model.")
+            return False
+
+        return True
+
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
@@ -289,6 +303,9 @@ class SAMLearner:
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
+                if not self.are_state_different(component.previous_state, component.next_state):
+                    continue
+
                 self.handle_single_trajectory_component(component)
 
         self.construct_safe_actions()

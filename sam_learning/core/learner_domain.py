@@ -37,6 +37,7 @@ class LearnerAction:
         self.negative_preconditions = set()
         self.inequality_preconditions = set()
         self.numeric_preconditions = tuple()
+        self.numeric_constant_constraints = []
         self.manual_preconditions = []
         self.add_effects = set()
         self.delete_effects = set()

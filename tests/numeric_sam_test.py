@@ -10,7 +10,8 @@ from sam_learning.learners.numeric_sam import NumericSAMLearner
 from tests.consts import NUMERIC_DOMAIN_PATH, \
     NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, DEPOT_FLUENTS_MAP_PATH, SATELLITE_DOMAIN_PATH, \
     SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, SATELLITE_FLUENTS_MAP_PATH, \
-    SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH
+    SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH, MINECRAFT_DOMAIN_PATH, \
+    MINECRAFT_PROBLEM_PATH, MINECRAFT_TRAJECTORY_PATH, MINECRAFT_FLUENTS_MAP_PATH
 
 
 @fixture()
@@ -32,6 +33,12 @@ def numeric_observation(depot_domain: Domain, depot_problem: Problem) -> Observa
 @fixture()
 def depot_fluents_map() -> Dict[str, List[str]]:
     with open(DEPOT_FLUENTS_MAP_PATH, "rt") as json_file:
+        return json.load(json_file)
+
+
+@fixture()
+def minecraft_fluents_map() -> Dict[str, List[str]]:
+    with open(MINECRAFT_FLUENTS_MAP_PATH, "rt") as json_file:
         return json.load(json_file)
 
 
@@ -78,6 +85,26 @@ def satellite_sam_learning(satellite_domain: Domain, satellite_fluents_map: Dict
     return NumericSAMLearner(satellite_domain, satellite_fluents_map)
 
 
+@fixture()
+def minecraft_domain() -> Domain:
+    domain_parser = DomainParser(MINECRAFT_DOMAIN_PATH, partial_parsing=True)
+    return domain_parser.parse_domain()
+
+@fixture()
+def minecraft_problem(minecraft_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=MINECRAFT_PROBLEM_PATH, domain=minecraft_domain).parse_problem()
+
+
+@fixture()
+def minecraft_observation(minecraft_domain: Domain, minecraft_problem: Problem) -> Observation:
+    return TrajectoryParser(minecraft_domain, minecraft_problem).parse_trajectory(MINECRAFT_TRAJECTORY_PATH)
+
+
+@fixture()
+def minecraft_nsam(minecraft_domain: Domain, minecraft_fluents_map: Dict[str, List[str]]) -> NumericSAMLearner:
+    return NumericSAMLearner(minecraft_domain, minecraft_fluents_map)
+
+
 def test_add_new_action_adds_action_to_fluents_storage(
         numeric_sam_learning: NumericSAMLearner, numeric_observation: Observation):
     initial_state = numeric_observation.components[0].previous_state
@@ -121,3 +148,13 @@ def test_learn_action_model_for_satellite_with_problematic_trajectory_domain_ret
     print()
     print(learning_metadata)
     print(learned_model.to_pddl())
+
+
+
+def test_learn_action_model_with_minecraft_domain_creates_domain_with_correct_preconditions_and_effects(
+        minecraft_nsam: NumericSAMLearner, minecraft_observation: Observation):
+    learned_model, learning_metadata = minecraft_nsam.learn_action_model([minecraft_observation])
+    print()
+    print(learning_metadata)
+    print(learned_model.to_pddl())
+
