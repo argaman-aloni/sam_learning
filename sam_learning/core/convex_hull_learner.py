@@ -153,6 +153,10 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         equality_conditions, filtered_pre_state_df = self._filter_all_convex_hull_inconsistencies(state_data)
+        if len(filtered_pre_state_df.columns) == 0:
+            self.logger.debug("After filtering, no dimensions remained in the preconditions!")
+            return equality_conditions, ConditionType.conjunctive
+
         needed_dimensions = len(filtered_pre_state_df.columns) + 1
 
         if filtered_pre_state_df.shape[1] < 2:
