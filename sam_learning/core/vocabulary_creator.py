@@ -50,13 +50,13 @@ class VocabularyCreator:
         :return: list containing all the predicates with the different combinations of parameters.
         """
         vocabulary = defaultdict(set)
-        possible_objects = list(observed_objects.keys()) + list(domain.constants.keys())
+        possible_objects_str = list(observed_objects.keys()) + list(domain.constants.keys())
         objects_and_consts = list(observed_objects.values()) + list(domain.constants.values())
         for predicate in domain.predicates.values():
             predicate_name = predicate.name
-            signature_permutations = choose_objects_subset(possible_objects, len(predicate.signature))
+            signature_permutations = choose_objects_subset(possible_objects_str, len(predicate.signature))
             for signature_permutation in signature_permutations:
-                grounded_signature = {object_name: objects_and_consts[possible_objects.index(object_name)].type
+                grounded_signature = {object_name: objects_and_consts[possible_objects_str.index(object_name)].type
                                       for object_name in signature_permutation}
                 if not self._validate_type_matching(grounded_signature, predicate):
                     continue

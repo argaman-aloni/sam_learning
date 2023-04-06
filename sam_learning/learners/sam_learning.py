@@ -3,13 +3,12 @@ import logging
 import time
 from collections import defaultdict
 from itertools import combinations
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict
 
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
-    GroundedPredicate
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
 
 from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, \
-    VocabularyCreator
+    VocabularyCreator, EnvironmentSnapshot
 
 
 class SAMLearner:
@@ -23,10 +22,7 @@ class SAMLearner:
     matcher: PredicatesMatcher
     observed_actions: List[str]
     safe_actions: List[str]
-    previous_state_positive_predicates: Set[GroundedPredicate]
-    previous_state_negative_predicates: Set[GroundedPredicate]
-    next_state_negative_predicates: Set[GroundedPredicate]
-    next_state_positive_predicates: Set[GroundedPredicate]
+    triplet_snapshot: EnvironmentSnapshot
     current_trajectory_objects: Dict[str, PDDLObject]
     learning_start_time: float
     learning_end_time: float
@@ -35,13 +31,10 @@ class SAMLearner:
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
-        self.observed_actions = []
         self.vocabulary_creator = VocabularyCreator()
+        self.triplet_snapshot = EnvironmentSnapshot(partial_domain=partial_domain)
+        self.observed_actions = []
         self.safe_actions = []
-        self.previous_state_positive_predicates = set()
-        self.previous_state_negative_predicates = set()
-        self.next_state_positive_predicates = set()
-        self.next_state_negative_predicates = set()
         self.current_trajectory_objects = {}
         self.learning_start_time = 0
         self.learning_end_time = 0
@@ -52,67 +45,6 @@ class SAMLearner:
         actions_to_remove = [action for action in self.partial_domain.actions if action not in self.observed_actions]
         for action in actions_to_remove:
             self.partial_domain.actions.pop(action)
-
-    def _create_complete_world_state(self, relevant_objects: Dict[str, PDDLObject],
-                                     state: State) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
-        """Creates a complete representation of the world state from the observed objects in the trajectory.
-
-        :param relevant_objects: the objects extracted from the trajectory which are relevant to the action.
-        :param state: the state that contains only the predicates that are true in it.
-        :return: a complete representation of the world state containing both positive predicates and negative
-            predicates.
-        """
-        self.logger.debug("Creating a complete world state")
-        positive_state_predicates = set()
-        negative_state_predicates = set()
-        vocabulary = self.vocabulary_creator.create_vocabulary(domain=self.partial_domain,
-                                                               observed_objects=relevant_objects)
-
-        for lifted_predicate_name, possible_missing_predicates in vocabulary.items():
-            if lifted_predicate_name not in state.state_predicates:
-                negative_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
-                                                                    object_mapping=p.object_mapping, is_positive=False)
-                                                  for p in possible_missing_predicates])
-                continue
-
-            for predicate in state.state_predicates[lifted_predicate_name]:
-                predicate.is_positive = True
-
-            state_predicate_strs = [predicate.untyped_representation for predicate in
-                                    state.state_predicates[lifted_predicate_name]]
-            filtered_grounded_state_predicates = [predicate for predicate in possible_missing_predicates if
-                                                  predicate.untyped_representation not in state_predicate_strs]
-            filtered_grounded_state_predicates_str = [predicate.untyped_representation for predicate in
-                                                      filtered_grounded_state_predicates]
-            negative_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
-                                                                object_mapping=p.object_mapping, is_positive=False)
-                                              for p in filtered_grounded_state_predicates])
-
-        for lifted_predicate_name, grounded_state_predicates in state.state_predicates.items():
-            positive_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
-                                                                object_mapping=p.object_mapping, is_positive=True)
-                                              for p in grounded_state_predicates])
-
-        return positive_state_predicates, negative_state_predicates
-
-    def _create_fully_observable_triplet_predicates(
-            self, current_action: ActionCall, previous_state: State, next_state: State,
-            should_ignore_action: bool = False) -> None:
-        """Sets the fully observable previous state and next state predicates for the current action.
-
-        :param current_action: the action that is currently being executed.
-        :param previous_state: the state prior to the action's execution.
-        :param next_state: the state following the action's execution.
-        :param should_ignore_action: whether the action should be ignored and then use all trajectory objects or not.
-        """
-        relevant_objects = {object_name: object_data for object_name, object_data in
-                            self.current_trajectory_objects.items()
-                            if object_name in current_action.parameters} \
-            if not should_ignore_action else self.current_trajectory_objects
-        self.previous_state_positive_predicates, self.previous_state_negative_predicates = \
-            self._create_complete_world_state(relevant_objects=relevant_objects, state=previous_state)
-        self.next_state_positive_predicates, self.next_state_negative_predicates = \
-            self._create_complete_world_state(relevant_objects=relevant_objects, state=next_state)
 
     def _handle_action_effects(self, grounded_action: ActionCall, previous_state: State,
                                next_state: State) -> Tuple[List[Predicate], List[Predicate]]:
@@ -139,9 +71,9 @@ class SAMLearner:
         """
         current_action = self.partial_domain.actions[grounded_action.name]
         positive_predicates = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.previous_state_positive_predicates)))
+            grounded_action, list(self.triplet_snapshot.previous_state_positive_predicates)))
         negative_predicates = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.previous_state_negative_predicates)))
+            grounded_action, list(self.triplet_snapshot.previous_state_negative_predicates)))
 
         current_action.positive_preconditions.intersection_update(positive_predicates)
         current_action.negative_preconditions.intersection_update(negative_predicates)
@@ -153,9 +85,9 @@ class SAMLearner:
         """
         observed_action = self.partial_domain.actions[grounded_action.name]
         possible_preconditions = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.previous_state_positive_predicates)))
+            grounded_action, list(self.triplet_snapshot.previous_state_positive_predicates)))
         negative_predicates = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.previous_state_negative_predicates)))
+            grounded_action, list(self.triplet_snapshot.previous_state_negative_predicates)))
 
         observed_action.positive_preconditions = possible_preconditions
         observed_action.negative_preconditions = negative_predicates
@@ -247,7 +179,9 @@ class SAMLearner:
             self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM.")
             return
 
-        self._create_fully_observable_triplet_predicates(grounded_action, previous_state, next_state)
+        self.triplet_snapshot.create_snapshot(
+            previous_state=previous_state, next_state=next_state, current_action=grounded_action,
+            observation_objects=self.current_trajectory_objects)
         if grounded_action.name not in self.observed_actions:
             self.add_new_action(grounded_action, previous_state, next_state)
 
@@ -277,16 +211,18 @@ class SAMLearner:
         self.logger.info(f"Finished learning the action model in "
                          f"{self.learning_end_time - self.learning_start_time} seconds.")
 
-    def are_state_different(self, previous_state: State, next_state: State) -> bool:
+    def are_states_different(self, previous_state: State, next_state: State) -> bool:
         """Checks if the previous state differs from the next state.
 
         :param previous_state: the previous state.
         :param next_state: the next state.
         :return: whether the states differ.
         """
+        self.logger.debug(f"Checking if the previous state {previous_state} "
+                          f"is different from the next state {next_state}")
         if previous_state.serialize() == next_state.serialize():
             self.logger.warning("The previous state is the same as the next state. "
-                                "This is not supported by the SAFE action model.")
+                                "This is not supported by the SAFE action model learning algorithm.")
             return False
 
         return True
@@ -303,7 +239,7 @@ class SAMLearner:
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
-                if not self.are_state_different(component.previous_state, component.next_state):
+                if not self.are_states_different(component.previous_state, component.next_state):
                     continue
 
                 self.handle_single_trajectory_component(component)

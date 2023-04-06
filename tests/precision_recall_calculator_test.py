@@ -7,7 +7,7 @@ from pddl_plus_parser.models import Predicate, Domain
 from experiments import calculate_number_true_positives, calculate_number_false_negatives, \
     calculate_number_false_positives, \
     calculate_precision, calculate_recall, PrecisionRecallCalculator
-from tests.consts import LOCATION_TYPE, OBJECT_TYPE, NUMERIC_DOMAIN_PATH, TRUCK_TYPE
+from tests.consts import LOCATION_TYPE, OBJECT_TYPE, DEPOTS_NUMERIC_DOMAIN_PATH, TRUCK_TYPE
 from sam_learning.core import LearnerAction
 
 TEST_SYMMETRIC_LEARNED_PRECONDITIONS = [
@@ -51,7 +51,7 @@ TEST_ACTION_NAME = "drive"
 
 @fixture()
 def expected_domain() -> Domain:
-    domain_parser = DomainParser(NUMERIC_DOMAIN_PATH, partial_parsing=False)
+    domain_parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=False)
     return domain_parser.parse_domain()
 
 

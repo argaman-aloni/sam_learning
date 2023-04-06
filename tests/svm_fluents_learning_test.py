@@ -6,18 +6,18 @@ from pddl_plus_parser.models import Domain, Problem, Observation
 from pytest import fixture
 
 from sam_learning.core import SVMFluentsLearning
-from tests.consts import NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH
+from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, DEPOTS_NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH
 
 
 @fixture()
 def numeric_domain() -> Domain:
-    parser = DomainParser(NUMERIC_DOMAIN_PATH, partial_parsing=True)
+    parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=True)
     return parser.parse_domain()
 
 
 @fixture()
 def numeric_problem(numeric_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=NUMERIC_PROBLEM_PATH, domain=numeric_domain).parse_problem()
+    return ProblemParser(problem_path=DEPOTS_NUMERIC_PROBLEM_PATH, domain=numeric_domain).parse_problem()
 
 
 @fixture()

@@ -2,16 +2,20 @@
 import os
 from pathlib import Path
 
-from pddl_plus_parser.models import PDDLType, Predicate, PDDLFunction
+from pddl_plus_parser.models import PDDLType, Predicate, PDDLFunction, ObservedComponent, PDDLObject, \
+    MultiAgentComponent, ActionCall
+from typing import Dict
+
+from sam_learning.learners import SAMLearner, MultiAgentSAM
 
 CWD = os.getcwd()
 EXAMPLES_DIR_PATH = Path(CWD, "examples")
-DOMAIN_NO_CONSTS_PATH = EXAMPLES_DIR_PATH / "domain-logistics.pddl"
+LOGISTICS_DOMAIN_PATH = EXAMPLES_DIR_PATH / "domain-logistics.pddl"
 WOODWORKING_DOMAIN_PATH = EXAMPLES_DIR_PATH / "woodworking-domain.pddl"
 WOODWORKING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_problem.pddl"
 WOODWORKING_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "woodworking_trajectory.trajectory"
-NUMERIC_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_numeric.pddl"
-NUMERIC_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile2.pddl"
+DEPOTS_NUMERIC_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_numeric.pddl"
+DEPOTS_NUMERIC_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile2.pddl"
 ELEVATORS_DOMAIN_PATH = EXAMPLES_DIR_PATH / "elevators_domain.pddl"
 ELEVATORS_PROBLEM_PATH = EXAMPLES_DIR_PATH / "elevators_p03.pddl"
 ELEVATORS_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "test_trajectory"
@@ -36,11 +40,9 @@ WOODWORKING_COMBINED_DOMAIN_PATH = EXAMPLES_DIR_PATH / "woodworking_combined_dom
 WOODWORKING_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_combined_problem.pddl"
 WOODWORKING_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "ma_woodworking_trajectory.trajectory"
 
-
 ROVERS_COMBINED_DOMAIN_PATH = EXAMPLES_DIR_PATH / "rover_combined_domain.pddl"
 ROVERS_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "rovers_conflicing_actions_problem.pddl"
 ROVERS_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "rovers_conflicting_actions_trajectory.trajectory"
-
 
 SPIDER_DOMAIN_PATH = EXAMPLES_DIR_PATH / "spider_domain.pddl"
 SPIDER_PROBLEM_PATH = EXAMPLES_DIR_PATH / "spider_problem.pddl"
@@ -53,7 +55,6 @@ NURIKABE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "nurikabe_pfile_random-9x9-107.tr
 ADL_SATELLITE_DOMAIN_PATH = EXAMPLES_DIR_PATH / "adlSat.pddl"
 ADL_SATELLITE_PROBLEM_PATH = EXAMPLES_DIR_PATH / "adlSat_problem.pddl"
 ADL_SATELLITE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "adlSat_trajectory.trajectory"
-
 
 MINECRAFT_DOMAIN_PATH = EXAMPLES_DIR_PATH / "minecraft_domain.pddl"
 MINECRAFT_PROBLEM_PATH = EXAMPLES_DIR_PATH / "minecraft_pfile0.pddl"
@@ -73,6 +74,7 @@ TRUCK_TYPE = PDDLType(name="truck", parent=AGENT_TYPE)
 CRATE_TYPE = PDDLType(name="crate", parent=OBJECT_TYPE)
 AIRPLANE_TYPE = PDDLType(name="airplane", parent=AGENT_TYPE)
 LOCATION_TYPE = PDDLType(name="location", parent=OBJECT_TYPE)
+COUNT_TYPE = PDDLType(name="count", parent=OBJECT_TYPE)
 
 AT_TRUCK_PREDICATE = Predicate(name="at",
                                signature={"?a": AGENT_TYPE,
@@ -84,3 +86,24 @@ LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signat
 CURRENT_LOAD_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"?z": TRUCK_TYPE})
 CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature={"truck1": TRUCK_TYPE})
 WEIGHT_FUNCTION = PDDLFunction(name="weight", signature={"?c": CRATE_TYPE})
+
+
+def sync_snapshot(sam_learning: SAMLearner, component: ObservedComponent,
+                  trajectory_objects: Dict[str, PDDLObject]) -> None:
+    previous_state = component.previous_state
+    next_state = component.next_state
+    test_action_call = component.grounded_action_call
+    sam_learning.current_trajectory_objects = trajectory_objects
+    sam_learning.triplet_snapshot.create_snapshot(
+        previous_state=previous_state, next_state=next_state, current_action=test_action_call,
+        observation_objects=trajectory_objects, should_include_all_objects=False)
+
+
+def sync_ma_snapshot(ma_sam: MultiAgentSAM, component: MultiAgentComponent, action_call: ActionCall,
+                     trajectory_objects: Dict[str, PDDLObject]) -> None:
+    previous_state = component.previous_state
+    next_state = component.next_state
+    ma_sam.current_trajectory_objects = trajectory_objects
+    ma_sam.triplet_snapshot.create_snapshot(
+        previous_state=previous_state, next_state=next_state, current_action=action_call,
+        observation_objects=trajectory_objects, should_include_all_objects=False)

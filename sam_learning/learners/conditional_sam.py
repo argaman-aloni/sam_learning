@@ -446,8 +446,10 @@ class ConditionalSAM(SAMLearner):
         grounded_action = component.grounded_action_call
         next_state = component.next_state
         action_name = grounded_action.name
-        super()._create_fully_observable_triplet_predicates(
-            grounded_action, previous_state, next_state, should_ignore_action=True)
+
+        self.triplet_snapshot.create_snapshot(
+            previous_state=previous_state, next_state=next_state, current_action=grounded_action,
+            observation_objects=self.current_trajectory_objects)
         if action_name not in self.observed_actions:
             self._initialize_actions_dependencies(grounded_action)
             self.add_new_action(grounded_action, previous_state, next_state)

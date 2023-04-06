@@ -75,7 +75,7 @@ class NumericSAMLearner(SAMLearner):
         super().deduce_initial_inequality_preconditions()
         for observation in observations:
             for component in observation.components:
-                if not super().are_state_different(component.previous_state, component.next_state):
+                if not super().are_states_different(component.previous_state, component.next_state):
                     continue
 
                 self.handle_single_trajectory_component(component)

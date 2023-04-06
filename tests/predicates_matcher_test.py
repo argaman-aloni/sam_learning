@@ -1,15 +1,12 @@
 """Test the extended functionality of the predicate matcher."""
 
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import GroundedPredicate, Domain, ActionCall, Predicate, Problem, Observation
+from pddl_plus_parser.models import GroundedPredicate, Domain, ActionCall, Predicate, Observation
 from pytest import fixture
 
 from sam_learning.core import PredicatesMatcher
-from tests.consts import LOCATION_TYPE, AGENT_TYPE, WOODWORKING_DOMAIN_PATH, DOMAIN_NO_CONSTS_PATH, PART_TYPE, \
-    TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, ELEVATORS_DOMAIN_PATH, \
-    ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH, NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, \
-    DEPOT_NUMERIC_TRAJECTORY_PATH, COLOR_TYPE, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, SPIDER_DOMAIN_PATH, \
-    NURIKABE_DOMAIN_PATH
+from tests.consts import LOCATION_TYPE, AGENT_TYPE, PART_TYPE, \
+    TREATMENT_STATUS_TYPE, SURFACE_TYPE, CITY_TYPE, OBJECT_TYPE, AIRPLANE_TYPE, TRUCK_TYPE, COLOR_TYPE, \
+    COUNT_TYPE
 
 TRUCK_AT_LOCATION_GROUNDED_PREDICATE = GroundedPredicate(
     name="at",
@@ -41,43 +38,21 @@ IS_SMOOTH_GROUNDED_PREDICATE = GroundedPredicate(
     signature={"?surface": SURFACE_TYPE},
     object_mapping={"?surface": "verysmooth"})
 
-
-@fixture()
-def discrete_domain() -> Domain:
-    parser = DomainParser(DOMAIN_NO_CONSTS_PATH, partial_parsing=True)
-    return parser.parse_domain()
-
-
-@fixture()
-def elevators_domain() -> Domain:
-    domain_parser = DomainParser(ELEVATORS_DOMAIN_PATH, partial_parsing=True)
-    return domain_parser.parse_domain()
+NEXT_GROUNDED_PREDICATE = GroundedPredicate(
+    name="next",
+    signature={"?n1": COUNT_TYPE,
+               "?n2": COUNT_TYPE},
+    object_mapping={"?n1": "f1", "?n2": "f1"})
 
 
 @fixture()
-def elevators_problem(elevators_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=ELEVATORS_PROBLEM_PATH, domain=elevators_domain).parse_problem()
+def logistics_predicate_matcher(logistics_domain: Domain) -> PredicatesMatcher:
+    return PredicatesMatcher(domain=logistics_domain)
 
 
 @fixture()
-def elevators_observation(elevators_domain: Domain, elevators_problem: Problem) -> Observation:
-    return TrajectoryParser(elevators_domain, elevators_problem).parse_trajectory(ELEVATORS_TRAJECTORY_PATH)
-
-
-@fixture()
-def discrete_domain_with_consts() -> Domain:
-    parser = DomainParser(WOODWORKING_DOMAIN_PATH, partial_parsing=True)
-    return parser.parse_domain()
-
-
-@fixture()
-def predicate_matcher_no_consts(discrete_domain: Domain) -> PredicatesMatcher:
-    return PredicatesMatcher(domain=discrete_domain)
-
-
-@fixture()
-def predicate_matcher_with_consts(discrete_domain_with_consts: Domain) -> PredicatesMatcher:
-    return PredicatesMatcher(domain=discrete_domain_with_consts)
+def woodworking_predicate_matcher(woodworking_domain: Domain) -> PredicatesMatcher:
+    return PredicatesMatcher(domain=woodworking_domain)
 
 
 @fixture()
@@ -86,39 +61,8 @@ def elevators_predicate_matcher(elevators_domain: Domain) -> PredicatesMatcher:
 
 
 @fixture()
-def depot_domain() -> Domain:
-    domain_parser = DomainParser(NUMERIC_DOMAIN_PATH, partial_parsing=True)
-    return domain_parser.parse_domain()
-
-
-@fixture()
-def depot_problem(depot_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=NUMERIC_PROBLEM_PATH, domain=depot_domain).parse_problem()
-
-
-@fixture()
-def depot_observation(depot_domain: Domain, depot_problem: Problem) -> Observation:
-    return TrajectoryParser(depot_domain, depot_problem).parse_trajectory(DEPOT_NUMERIC_TRAJECTORY_PATH)
-
-
-@fixture()
 def depot_predicate_matcher(depot_domain: Domain) -> PredicatesMatcher:
     return PredicatesMatcher(domain=depot_domain)
-
-
-@fixture()
-def spider_domain() -> Domain:
-    return DomainParser(SPIDER_DOMAIN_PATH, partial_parsing=True).parse_domain()
-
-
-@fixture()
-def spider_problem(spider_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=SPIDER_PROBLEM_PATH, domain=spider_domain).parse_problem()
-
-
-@fixture()
-def spider_observation(spider_domain: Domain, spider_problem: Problem) -> Observation:
-    return TrajectoryParser(spider_domain, spider_problem).parse_trajectory(SPIDER_TRAJECTORY_PATH)
 
 
 @fixture()
@@ -127,28 +71,23 @@ def spider_predicate_matcher(spider_domain: Domain) -> PredicatesMatcher:
 
 
 @fixture()
-def nurikabe_domain() -> Domain:
-    return DomainParser(NURIKABE_DOMAIN_PATH, partial_parsing=True).parse_domain()
-
-
-@fixture()
 def nurikabe_predicate_matcher(nurikabe_domain: Domain) -> PredicatesMatcher:
     return PredicatesMatcher(domain=nurikabe_domain)
 
 
 def test_match_predicate_to_action_with_no_match_returns_empty_list(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru2", "pos1", "pos2", "city1"])
-    actual_predicates = predicate_matcher_no_consts.match_predicate_to_action_literals(
+    actual_predicates = logistics_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=TRUCK_AT_LOCATION_GROUNDED_PREDICATE, action_call=test_action_call)
 
     assert len(actual_predicates) == 0
 
 
 def test_match_predicate_to_action_with_no_duplicated_parameters_returns_correct_match(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru1", "pos1", "pos2", "city1"])
-    actual_predicates = predicate_matcher_no_consts.match_predicate_to_action_literals(
+    actual_predicates = logistics_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=TRUCK_AT_LOCATION_GROUNDED_PREDICATE, action_call=test_action_call)
 
     expected_predicate = Predicate(name="at", signature={"?truck": TRUCK_TYPE, "?loc-from": LOCATION_TYPE})
@@ -158,9 +97,9 @@ def test_match_predicate_to_action_with_no_duplicated_parameters_returns_correct
 
 
 def test_match_predicate_to_action_with_out_of_order_parameters_returns_correct_match(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     test_action_call = ActionCall(name="unload-airplane", grounded_parameters=["airplane1", "pack1", "pos1"])
-    actual_predicates = predicate_matcher_no_consts.match_predicate_to_action_literals(
+    actual_predicates = logistics_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=IN_GROUNDED_PREDICATE, action_call=test_action_call)
 
     expected_predicate = Predicate(name="in", signature={"?obj": OBJECT_TYPE, "?airplane": AIRPLANE_TYPE})
@@ -170,10 +109,10 @@ def test_match_predicate_to_action_with_out_of_order_parameters_returns_correct_
 
 
 def test_match_predicate_to_action_with_no_duplicated_parameters_with_consts_returns_correct_match(
-        predicate_matcher_with_consts: PredicatesMatcher):
+        woodworking_predicate_matcher):
     test_action_call = ActionCall(name="do-spray-varnish",
                                   grounded_parameters=["m1", "obj1", "natural", "rough"])
-    actual_predicates = predicate_matcher_with_consts.match_predicate_to_action_literals(
+    actual_predicates = woodworking_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=TREATMENT_GROUNDED_PREDICATE, action_call=test_action_call)
 
     expected_predicate = Predicate(name="treatment", signature={"?x": AGENT_TYPE, "untreated": LOCATION_TYPE})
@@ -183,7 +122,7 @@ def test_match_predicate_to_action_with_no_duplicated_parameters_with_consts_ret
 
 
 def test_match_predicate_to_action_with_two_possible_options_for_match_one_with_constant_and_one_without_returns_two_options(
-        predicate_matcher_with_consts: PredicatesMatcher):
+        woodworking_predicate_matcher):
     test_action_call = ActionCall(name="do-immersion-varnish",
                                   grounded_parameters=["m1", "obj1", "natural", "rough"])
     test_conflicting_predicate = GroundedPredicate(
@@ -191,7 +130,7 @@ def test_match_predicate_to_action_with_two_possible_options_for_match_one_with_
         signature={"?obj": PART_TYPE,
                    "?color": COLOR_TYPE},
         object_mapping={"?obj": "obj1", "?color": "natural"})
-    actual_predicates = predicate_matcher_with_consts.match_predicate_to_action_literals(
+    actual_predicates = woodworking_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=test_conflicting_predicate, action_call=test_action_call)
     print([p.untyped_representation for p in actual_predicates])
 
@@ -206,10 +145,10 @@ def test_match_predicate_to_action_with_two_possible_options_for_match_one_with_
 
 
 def test_match_predicate_to_action_with_no_duplicated_parameters_where_predicate_contains_only_consts_returns_correct_match(
-        predicate_matcher_with_consts: PredicatesMatcher):
+        woodworking_predicate_matcher):
     test_action_call = ActionCall(name="do-spray-varnish",
                                   grounded_parameters=["m1", "obj1", "natural", "verysmooth"])
-    actual_predicates = predicate_matcher_with_consts.match_predicate_to_action_literals(
+    actual_predicates = woodworking_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=IS_SMOOTH_GROUNDED_PREDICATE, action_call=test_action_call)
 
     expected_predicates = [Predicate(name="is-smooth", signature={"?surface": SURFACE_TYPE}),
@@ -257,9 +196,9 @@ def test_match_predicate_to_action_literals_with_complex_action_with_duplicates_
 
 
 def test_match_predicate_to_action_with_duplicated_objects_finds_all_possible_matches(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru1", "pos1", "pos1", "city1"])
-    actual_predicates = predicate_matcher_no_consts.match_predicate_to_action_literals(
+    actual_predicates = logistics_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=TRUCK_AT_LOCATION_GROUNDED_PREDICATE, action_call=test_action_call)
     expected_predicates = [Predicate(name="at", signature={"?truck": AGENT_TYPE, "?loc-from": LOCATION_TYPE}),
                            Predicate(name="at", signature={"?truck": AGENT_TYPE, "?loc-to": LOCATION_TYPE})]
@@ -270,10 +209,10 @@ def test_match_predicate_to_action_with_duplicated_objects_finds_all_possible_ma
 
 
 def test_get_possible_literal_matches_with_single_predicate_without_duplicates_returns_correct_matches(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru1", "pos1", "pos2", "city1"])
     test_state_predicates = [TRUCK_AT_LOCATION_GROUNDED_PREDICATE]
-    possible_matches = predicate_matcher_no_consts.get_possible_literal_matches(test_action_call,
+    possible_matches = logistics_predicate_matcher.get_possible_literal_matches(test_action_call,
                                                                                 test_state_predicates)
 
     expected_predicate = Predicate(name="at", signature={"?truck": AGENT_TYPE, "?loc-from": LOCATION_TYPE})
@@ -283,10 +222,10 @@ def test_get_possible_literal_matches_with_single_predicate_without_duplicates_r
 
 
 def test_get_possible_literal_matches_with_single_predicate_with_duplicates_returns_correct_matches(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru1", "pos1", "pos1", "city1"])
     test_state_predicates = [TRUCK_AT_LOCATION_GROUNDED_PREDICATE]
-    possible_matches = predicate_matcher_no_consts.get_possible_literal_matches(test_action_call,
+    possible_matches = logistics_predicate_matcher.get_possible_literal_matches(test_action_call,
                                                                                 test_state_predicates)
 
     expected_predicates = [Predicate(name="at", signature={"?truck": AGENT_TYPE, "?loc-from": LOCATION_TYPE}),
@@ -298,10 +237,10 @@ def test_get_possible_literal_matches_with_single_predicate_with_duplicates_retu
 
 
 def test_get_possible_literal_matches_with_two_predicate_returns_correct_matches(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru1", "pos1", "pos2", "city1"])
     test_state_predicates = [TRUCK_AT_LOCATION_GROUNDED_PREDICATE, IN_CITY_GROUNDED_PREDICATE]
-    possible_matches = predicate_matcher_no_consts.get_possible_literal_matches(test_action_call,
+    possible_matches = logistics_predicate_matcher.get_possible_literal_matches(test_action_call,
                                                                                 test_state_predicates)
 
     expected_predicates = [
@@ -427,9 +366,17 @@ def test_get_possible_literal_matches_with_extra_literal_extends_the_possible_se
 
 
 def test_get_injective_match_returns_a_single_match_with_a_predicate_that_has_is_positive_property_set_to_false_when_given_a_negative_grounded_predicate_as_input(
-        predicate_matcher_no_consts: PredicatesMatcher):
+        logistics_predicate_matcher):
     IN_GROUNDED_PREDICATE.is_positive = False
     test_action_call = ActionCall(name="unload-airplane", grounded_parameters=["airplane1", "pack1", "pos1"])
-    possible_matches = predicate_matcher_no_consts.get_injective_match(IN_GROUNDED_PREDICATE, test_action_call)
+    possible_matches = logistics_predicate_matcher.get_injective_match(IN_GROUNDED_PREDICATE, test_action_call)
     assert possible_matches is not None
     assert possible_matches.is_positive is False
+
+
+def test_get_injective_match_returns_none_if_there_are_multiple_matches(
+        elevators_predicate_matcher: PredicatesMatcher):
+    NEXT_GROUNDED_PREDICATE.is_positive = False
+    test_action_call = ActionCall(name="move-up-slow", grounded_parameters=["slow-lift", "f1", "f1"])
+    possible_matches = elevators_predicate_matcher.get_injective_match(NEXT_GROUNDED_PREDICATE, test_action_call)
+    assert possible_matches is None

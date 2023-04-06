@@ -1,14 +1,11 @@
-"""Module test for the multi agent action model learning."""
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, Problem, MultiAgentObservation, ActionCall, MultiAgentComponent, \
-    JointActionCall, NOP_ACTION, GroundedPredicate, Predicate
+"""Module test for the multi-agent action model learning."""
+from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, MultiAgentComponent, \
+    GroundedPredicate
 from pytest import fixture
 
 from sam_learning.core import LiteralCNF
 from sam_learning.learners import MultiAgentSAM
-from tests.consts import WOODWORKING_COMBINED_DOMAIN_PATH, WOODWORKING_COMBINED_PROBLEM_PATH, \
-    WOODWORKING_COMBINED_TRAJECTORY_PATH, ROVERS_COMBINED_DOMAIN_PATH, ROVERS_COMBINED_PROBLEM_PATH, \
-    ROVERS_COMBINED_TRAJECTORY_PATH
+from tests.consts import sync_ma_snapshot
 
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0",
                            "spray-varnisher0"]
@@ -16,24 +13,13 @@ ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
 
 
 @fixture()
-def combined_domain() -> Domain:
-    return DomainParser(WOODWORKING_COMBINED_DOMAIN_PATH, partial_parsing=True).parse_domain()
+def woodworking_ma_sam(woodworking_ma_combined_domain: Domain) -> MultiAgentSAM:
+    return MultiAgentSAM(woodworking_ma_combined_domain)
 
 
 @fixture()
-def combined_problem(combined_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=WOODWORKING_COMBINED_PROBLEM_PATH, domain=combined_domain).parse_problem()
-
-
-@fixture()
-def multi_agent_observation(combined_domain: Domain, combined_problem: Problem) -> MultiAgentObservation:
-    return TrajectoryParser(combined_domain, combined_problem).parse_trajectory(
-        WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
-
-
-@fixture()
-def ma_sam(combined_domain: Domain) -> MultiAgentSAM:
-    return MultiAgentSAM(combined_domain)
+def rovers_ma_sam(ma_rovers_domain) -> MultiAgentSAM:
+    return MultiAgentSAM(ma_rovers_domain)
 
 
 @fixture()
@@ -52,155 +38,216 @@ def do_plane_second_action_call() -> ActionCall:
 
 
 @fixture()
-def ma_literals_cnf(combined_domain: Domain) -> LiteralCNF:
-    action_names = [action for action in combined_domain.actions.keys()]
+def communicate_image_data_action_call() -> ActionCall:
+    return ActionCall("communicate_image_data", ["rover0", "lander0", "objective4", "colour", "waypoint0", "waypoint1"])
+
+
+@fixture()
+def woodworking_literals_cnf(woodworking_ma_combined_domain: Domain) -> LiteralCNF:
+    action_names = [action for action in woodworking_ma_combined_domain.actions.keys()]
     return LiteralCNF(action_names)
 
 
 @fixture()
-def rovers_domain() -> Domain:
-    return DomainParser(ROVERS_COMBINED_DOMAIN_PATH, partial_parsing=True).parse_domain()
+def rovers_literals_cnf(ma_rovers_domain: Domain) -> LiteralCNF:
+    action_names = [action for action in ma_rovers_domain.actions.keys()]
+    return LiteralCNF(action_names)
 
 
-@fixture()
-def rovers_problem(rovers_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=ROVERS_COMBINED_PROBLEM_PATH, domain=rovers_domain).parse_problem()
+def test_initialize_cnfs_sets_correct_predicates_in_the_cnf_dictionary(woodworking_ma_sam: MultiAgentSAM,
+                                                                       woodworking_ma_combined_domain: Domain):
+    woodworking_ma_sam._initialize_cnfs()
+    assert len(woodworking_ma_sam.literals_cnf) == 2 * len(woodworking_ma_combined_domain.predicates)
 
 
-@fixture()
-def rovers_ma_observation(rovers_domain: Domain, rovers_problem: Problem) -> MultiAgentObservation:
-    return TrajectoryParser(rovers_domain, rovers_problem).parse_trajectory(
-        ROVERS_COMBINED_TRAJECTORY_PATH, executing_agents=ROVERS_AGENT_NAMES)
-
-
-@fixture()
-def rovers_ma_sam(rovers_domain: Domain) -> MultiAgentSAM:
-    return MultiAgentSAM(rovers_domain)
-
-
-@fixture()
-def ma_sam(combined_domain: Domain) -> MultiAgentSAM:
-    return MultiAgentSAM(combined_domain)
-
-
-def test_initialize_cnfs_sets_correct_predicates_in_the_cnf_dictionary(ma_sam: MultiAgentSAM, combined_domain: Domain):
-    ma_sam._initialize_cnfs()
-    assert len(ma_sam.literals_cnf) == 2 * len(combined_domain.predicates)
-
-
-def test_initialize_cnfs_sets_negative_predicates_correctly_in_the_negative_cnf(ma_sam: MultiAgentSAM,
-                                                                                combined_domain: Domain):
-    ma_sam._initialize_cnfs()
-    positive_literals = [literal for literal in ma_sam.literals_cnf if not literal.startswith("(not ")]
-    negative_literals = [literal for literal in ma_sam.literals_cnf if literal.startswith("(not ")]
+def test_initialize_cnfs_sets_negative_predicates_correctly_in_the_negative_cnf(
+        woodworking_ma_sam: MultiAgentSAM, woodworking_ma_combined_domain: Domain):
+    woodworking_ma_sam._initialize_cnfs()
+    positive_literals = [literal for literal in woodworking_ma_sam.literals_cnf if not literal.startswith("(not ")]
+    negative_literals = [literal for literal in woodworking_ma_sam.literals_cnf if literal.startswith("(not ")]
     assert len(positive_literals) == len(negative_literals)
-    assert len(positive_literals) == len(combined_domain.predicates)
+    assert len(negative_literals) == len(woodworking_ma_combined_domain.predicates)
+
+
+def test_extract_relevant_not_effects_returns_empty_list_if_none_of_the_predicates_is_relevant_to_the_action(
+        woodworking_ma_sam: MultiAgentSAM, woodworking_ma_combined_domain: Domain,
+        do_plane_first_action_call: ActionCall):
+    lifted_predicate = woodworking_ma_combined_domain.predicates["boardsize-successor"]
+    in_state_test_predicates = {GroundedPredicate(name="boardsize-successor", signature=lifted_predicate.signature,
+                                                  object_mapping={"?size1": "s8", "?size2": "s10"})}
+    assert woodworking_ma_sam._extract_relevant_not_effects(in_state_predicates=in_state_test_predicates,
+                                                            removed_state_predicates=set(),
+                                                            executing_actions=[do_plane_first_action_call],
+                                                            relevant_action=do_plane_first_action_call) == []
+
+
+def test_extract_relevant_not_effects_returns_one_negative_literal_when_only_giving_literals_in_state(
+        woodworking_ma_sam: MultiAgentSAM, woodworking_ma_combined_domain: Domain,
+        do_plane_first_action_call: ActionCall):
+    lifted_predicate = woodworking_ma_combined_domain.predicates["surface-condition"]
+    in_state_test_predicates = {GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
+                                                  object_mapping={"?obj": "p2", "?surface": "verysmooth"})}
+    not_effects = woodworking_ma_sam._extract_relevant_not_effects(in_state_predicates=in_state_test_predicates,
+                                                                   removed_state_predicates=set(),
+                                                                   executing_actions=[do_plane_first_action_call],
+                                                                   relevant_action=do_plane_first_action_call)
+    assert len(not_effects) == 1
+    assert not_effects[0].untyped_representation == "(not (surface-condition p2 verysmooth))"
+
+
+def test_extract_relevant_not_effects_returns_one_positive_literal_when_only_giving_literals_in_state(
+        woodworking_ma_sam: MultiAgentSAM, woodworking_ma_combined_domain: Domain,
+        do_plane_first_action_call: ActionCall):
+    lifted_predicate = woodworking_ma_combined_domain.predicates["surface-condition"]
+    removed_state_test_predicates = {GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
+                                                       object_mapping={"?obj": "p2", "?surface": "verysmooth"},
+                                                       is_positive=False)}
+    not_effects = woodworking_ma_sam._extract_relevant_not_effects(
+        in_state_predicates=set(),
+        removed_state_predicates=removed_state_test_predicates,
+        executing_actions=[do_plane_first_action_call],
+        relevant_action=do_plane_first_action_call)
+
+    assert len(not_effects) == 1
+    assert not_effects[0].untyped_representation == "(surface-condition p2 verysmooth)"
 
 
 def test_compute_interacting_actions_returns_empty_list_if_no_action_interacts_with_the_predicate(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain):
-    lifted_predicate = combined_domain.predicates["boardsize-successor"]
+        woodworking_ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall,
+        woodworking_ma_combined_domain: Domain):
+    lifted_predicate = woodworking_ma_combined_domain.predicates["boardsize-successor"]
     grounded_predicate = GroundedPredicate(name="boardsize-successor", signature=lifted_predicate.signature,
                                            object_mapping={"?size1": "s0", "?size2": "s1"})
-    assert ma_sam.compute_interacting_actions(grounded_predicate, executing_actions=[do_plane_first_action_call]) == []
+    assert woodworking_ma_sam.compute_interacting_actions(grounded_predicate,
+                                                          executing_actions=[do_plane_first_action_call]) == []
 
 
 def test_compute_interacting_actions_returns_one_action_call_if_only_one_interacts_with_the_predicate(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain):
+        woodworking_ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall,
+        woodworking_ma_combined_domain: Domain):
     # (do-plane planer0 p2 verysmooth natural varnished)
-    lifted_predicate = combined_domain.predicates["surface-condition"]
+    lifted_predicate = woodworking_ma_combined_domain.predicates["surface-condition"]
     grounded_predicate = GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
                                            object_mapping={"?obj": "p2", "?surface": "verysmooth"})
-    assert ma_sam.compute_interacting_actions(grounded_predicate, executing_actions=[do_plane_first_action_call]) == \
+    assert woodworking_ma_sam.compute_interacting_actions(grounded_predicate,
+                                                          executing_actions=[do_plane_first_action_call]) == \
            [do_plane_first_action_call]
 
 
 def test_compute_interacting_actions_returns_two_actions_when_two_actions_interact_with_the_same_predicate(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, do_plane_second_action_call: ActionCall,
-        combined_domain: Domain):
-    lifted_predicate = combined_domain.predicates["surface-condition"]
+        woodworking_ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall,
+        do_plane_second_action_call: ActionCall,
+        woodworking_ma_combined_domain: Domain):
+    lifted_predicate = woodworking_ma_combined_domain.predicates["surface-condition"]
     grounded_predicate = GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
                                            object_mapping={"?obj": "p2", "?surface": "verysmooth"})
 
-    assert ma_sam.compute_interacting_actions(
+    assert woodworking_ma_sam.compute_interacting_actions(
         grounded_predicate, executing_actions=[do_plane_first_action_call, do_plane_second_action_call]) == \
            [do_plane_first_action_call, do_plane_second_action_call]
 
 
 def test_compute_interacting_actions_returns_two_actions_when_two_when_third_action_does_not_interact_with_the_predicate(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, do_plane_second_action_call: ActionCall,
-        combined_domain: Domain):
-    lifted_predicate = combined_domain.predicates["surface-condition"]
+        woodworking_ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall,
+        do_plane_second_action_call: ActionCall,
+        woodworking_ma_combined_domain: Domain):
+    lifted_predicate = woodworking_ma_combined_domain.predicates["surface-condition"]
     grounded_predicate = GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature,
                                            object_mapping={"?obj": "p2", "?surface": "verysmooth"})
 
     non_interacting_action = ActionCall("do-plane", ["planer1", "p1", "verysmooth", "natural", "untreated"])
-    assert ma_sam.compute_interacting_actions(
+    assert woodworking_ma_sam.compute_interacting_actions(
         grounded_predicate,
         executing_actions=[do_plane_first_action_call, do_plane_second_action_call, non_interacting_action]) == \
            [do_plane_first_action_call, do_plane_second_action_call]
 
 
+def test_add_not_effect_to_cnf_adds_not_effect_to_cnf_if_not_effect_is_not_in_cnf(
+        rovers_ma_sam: MultiAgentSAM,
+        communicate_image_data_action_call: ActionCall,
+        ma_rovers_domain: Domain, rovers_literals_cnf: LiteralCNF):
+    lifted_predicate = ma_rovers_domain.predicates["communicated_image_data"]
+    rovers_ma_sam.literals_cnf["(communicated_image_data ?o ?m)"] = rovers_literals_cnf
+    not_effects = [GroundedPredicate(name="communicated_image_data", signature=lifted_predicate.signature,
+                                     object_mapping={"?o": "objective4", "?m": "colour"})]
+
+    rovers_ma_sam.add_not_effect_to_cnf(executed_action=communicate_image_data_action_call,
+                                        not_effects=not_effects)
+    assert rovers_ma_sam.literals_cnf["(communicated_image_data ?o ?m)"].not_effects[
+               communicate_image_data_action_call.name] == {"(communicated_image_data ?o ?m)"}
+
+
+def test_add_must_be_effect_to_cnf_adds_the_literal_to_possible_effects_when_there_is_an_injective_match(
+        rovers_ma_sam: MultiAgentSAM,
+        communicate_image_data_action_call: ActionCall,
+        ma_rovers_domain: Domain, rovers_literals_cnf: LiteralCNF):
+    lifted_predicate = ma_rovers_domain.predicates["communicated_image_data"]
+    rovers_ma_sam.literals_cnf["(communicated_image_data ?o ?m)"] = rovers_literals_cnf
+    not_effects = {GroundedPredicate(name="communicated_image_data", signature=lifted_predicate.signature,
+                                     object_mapping={"?o": "objective4", "?m": "colour"})}
+
+    rovers_ma_sam.add_must_be_effect_to_cnf(executed_action=communicate_image_data_action_call,
+                                            grounded_effects=not_effects)
+    assert rovers_ma_sam.literals_cnf["(communicated_image_data ?o ?m)"].possible_lifted_effects \
+           == [[(communicate_image_data_action_call.name, "(communicated_image_data ?o ?m)")]]
+
+
 def test_construct_safe_actions_returns_empty_list_if_no_action_is_safe(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain,
-        ma_literals_cnf: LiteralCNF):
-    ma_sam.literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
+        woodworking_ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall,
+        woodworking_ma_combined_domain: Domain,
+        woodworking_literals_cnf):
+    woodworking_ma_sam.literals_cnf["(surface-condition ?obj ?surface)"] = woodworking_literals_cnf
     possible_effects = [("do-immersion-varnish", "(surface-condition ?agent ?newcolour)"),
                         ("do-grind", "(surface-condition ?agent ?oldcolour)"),
                         ("do-plane", "(surface-condition ?agent ?colour)")]
-    ma_literals_cnf.add_possible_effect(possible_effects)
-    predicate_params = ["?agent", "?colour"]
-    predicate_types = combined_domain.predicates["surface-condition"].signature.values()
-    ma_sam.observed_actions.append("do-plane")
-    ma_sam.construct_safe_actions()
-
-    assert "do-plane" not in ma_sam.safe_actions
+    woodworking_literals_cnf.add_possible_effect(possible_effects)
+    woodworking_ma_sam.observed_actions.append("do-plane")
+    woodworking_ma_sam.construct_safe_actions()
+    assert "do-plane" not in woodworking_ma_sam.safe_actions
 
 
 def test_update_single_agent_executed_action_updates_action_count(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
+        woodworking_ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
     first_trajectory_component = multi_agent_observation.components[0]
     test_action = ActionCall("do-grind", ["grinder0", "p0", "smooth", "red", "varnished", "colourfragments"])
-    ma_sam._initialize_cnfs()
-    ma_sam._create_fully_observable_triplet_predicates(
-        test_action,
-        first_trajectory_component.previous_state,
-        first_trajectory_component.next_state)
-
-    ma_sam.update_single_agent_executed_action(
+    woodworking_ma_sam._initialize_cnfs()
+    sync_ma_snapshot(ma_sam=woodworking_ma_sam, component=first_trajectory_component, action_call=test_action,
+                     trajectory_objects=multi_agent_observation.grounded_objects)
+    woodworking_ma_sam.update_single_agent_executed_action(
         executed_action=test_action,
         previous_state=first_trajectory_component.previous_state,
         next_state=first_trajectory_component.next_state)
-    assert "do-grind" in ma_sam.observed_actions
+    assert "do-grind" in woodworking_ma_sam.observed_actions
 
 
 def test_construct_safe_actions_returns_safe_action_when_it_has_only_one_effect_with_no_ambiguities(
-        ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall, combined_domain: Domain,
-        ma_literals_cnf: LiteralCNF):
-    ma_sam.literals_cnf["(surface-condition ?obj ?surface)"] = ma_literals_cnf
+        woodworking_ma_sam: MultiAgentSAM, do_plane_first_action_call: ActionCall,
+        woodworking_ma_combined_domain: Domain,
+        woodworking_literals_cnf):
+    woodworking_ma_sam.literals_cnf["(surface-condition ?obj ?surface)"] = woodworking_literals_cnf
     possible_effects = [("do-grind", "(surface-condition ?m ?oldcolour)"),
                         ("do-plane", "(surface-condition ?m ?colour)")]
-    ma_literals_cnf.add_possible_effect(possible_effects)
-    ma_literals_cnf.add_possible_effect([("do-immersion-varnish", "(surface-condition ?m ?newcolour)")])
-    ma_sam.observed_actions.append("do-plane")
-    ma_sam.observed_actions.append("do-immersion-varnish")
-    ma_sam.observed_actions.append("do-grind")
+    woodworking_literals_cnf.add_possible_effect(possible_effects)
+    woodworking_literals_cnf.add_possible_effect([("do-immersion-varnish", "(surface-condition ?m ?newcolour)")])
+    woodworking_ma_sam.observed_actions.append("do-plane")
+    woodworking_ma_sam.observed_actions.append("do-immersion-varnish")
+    woodworking_ma_sam.observed_actions.append("do-grind")
 
-    ma_sam.construct_safe_actions()
-    assert "do-plane" not in ma_sam.safe_actions
-    assert "do-grind" not in ma_sam.safe_actions
-    assert "do-immersion-varnish" in ma_sam.safe_actions
+    woodworking_ma_sam.construct_safe_actions()
+    assert "do-plane" not in woodworking_ma_sam.safe_actions
+    assert "do-grind" not in woodworking_ma_sam.safe_actions
+    assert "do-immersion-varnish" in woodworking_ma_sam.safe_actions
 
 
 def test_learn_action_model_with_colliding_actions_returns_that_actions_are_unsafe(
-        rovers_ma_sam: MultiAgentSAM, rovers_ma_observation: MultiAgentObservation):
-    _, learning_report = rovers_ma_sam.learn_combined_action_model([rovers_ma_observation])
+        rovers_ma_sam: MultiAgentSAM, ma_rovers_observation):
+    _, learning_report = rovers_ma_sam.learn_combined_action_model([ma_rovers_observation])
     assert learning_report["navigate"] == "NOT SAFE"
     assert learning_report["communicate_rock_data"] == "NOT SAFE"
 
 
 def test_learn_action_model_returns_learned_model(
-        ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
-    learned_model, learning_report = ma_sam.learn_combined_action_model([multi_agent_observation])
+        woodworking_ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
+    learned_model, learning_report = woodworking_ma_sam.learn_combined_action_model([multi_agent_observation])
     print(learning_report)
     print(learned_model.to_pddl())

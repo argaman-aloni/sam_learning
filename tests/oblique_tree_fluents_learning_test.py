@@ -7,19 +7,19 @@ from pytest import fixture
 
 from sam_learning.core import ObliqueTreeFluentsLearning
 from sam_learning.core.unsafe_numeric_fluents_learning_base import UnsafeFluentsLearning
-from tests.consts import NUMERIC_DOMAIN_PATH, NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, FUEL_COST_FUNCTION, \
+from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, DEPOTS_NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, FUEL_COST_FUNCTION, \
     LOAD_LIMIT_TRAJECTORY_FUNCTION, TRUCK_TYPE
 
 
 @fixture()
 def numeric_domain() -> Domain:
-    parser = DomainParser(NUMERIC_DOMAIN_PATH, partial_parsing=True)
+    parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=True)
     return parser.parse_domain()
 
 
 @fixture()
 def numeric_problem(numeric_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=NUMERIC_PROBLEM_PATH, domain=numeric_domain).parse_problem()
+    return ProblemParser(problem_path=DEPOTS_NUMERIC_PROBLEM_PATH, domain=numeric_domain).parse_problem()
 
 
 @fixture()

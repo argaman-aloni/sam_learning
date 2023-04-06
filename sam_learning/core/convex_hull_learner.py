@@ -24,14 +24,14 @@ class ConvexHullLearner:
         self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
         self.action_name = action_name
 
+    @staticmethod
     def _construct_pddl_inequality_scheme(
-            self, coefficient_matrix: np.ndarray, border_points: np.ndarray, headers: List[str]) -> List[str]:
+            coefficient_matrix: np.ndarray, border_points: np.ndarray, headers: List[str]) -> List[str]:
         """Construct the inequality strings in the appropriate PDDL format.
 
         :param coefficient_matrix: the matrix containing the coefficient vectors for each inequality.
         :param border_points: the convex hull point which ensures that Ax <= b.
-        :param relevant_fluents: the fluents relevant to the creation of the preconditions if exists, if not,
-            should be ALL the previous state variables.
+        :param headers: the headers of the columns in the coefficient matrix.
         :return: the inequalities PDDL formatted strings.
         """
         inequalities = set()
@@ -42,8 +42,9 @@ class ConvexHullLearner:
 
         return list(inequalities)
 
+    @staticmethod
     def _create_disjunctive_preconditions(
-            self, previous_state_matrix: DataFrame, equality_conditions=None) -> Tuple[List[str], ConditionType]:
+            previous_state_matrix: DataFrame, equality_conditions=None) -> Tuple[List[str], ConditionType]:
         """Create the disjunctive representation of the preconditions.
 
         :param previous_state_matrix: the matrix containing the previous state values.

@@ -1,34 +1,18 @@
 """module tests for the SAM learning algorithm"""
 
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, ActionCall, Problem, Observation, \
+from pddl_plus_parser.lisp_parsers import DomainParser
+from pddl_plus_parser.models import Domain, ActionCall, Observation, \
     GroundedPredicate
 from pytest import fixture
 
 from sam_learning.learners import ExtendedSAM
-from tests.consts import WOODWORKING_DOMAIN_PATH, WOODWORKING_PROBLEM_PATH, WOODWORKING_TRAJECTORY_PATH
-
-
-@fixture()
-def woodworking_domain() -> Domain:
-    domain_parser = DomainParser(WOODWORKING_DOMAIN_PATH, partial_parsing=True)
-    return domain_parser.parse_domain()
+from tests.consts import WOODWORKING_DOMAIN_PATH
 
 
 @fixture()
 def woodworking_complete_domain() -> Domain:
     domain_parser = DomainParser(WOODWORKING_DOMAIN_PATH, partial_parsing=False)
     return domain_parser.parse_domain()
-
-
-@fixture()
-def woodworking_problem(woodworking_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=WOODWORKING_PROBLEM_PATH, domain=woodworking_domain).parse_problem()
-
-
-@fixture()
-def woodworking_observation(woodworking_domain: Domain, woodworking_problem: Problem) -> Observation:
-    return TrajectoryParser(woodworking_domain, woodworking_problem).parse_trajectory(WOODWORKING_TRAJECTORY_PATH)
 
 
 @fixture()

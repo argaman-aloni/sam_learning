@@ -7,14 +7,14 @@ from pddl_plus_parser.models import Action, Domain
 from pytest import fixture
 
 from fault_detection import FaultGenerator
-from tests.consts import NUMERIC_DOMAIN_PATH
+from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH
 
 WORKING_DIRECTORY_PATH = Path("tests/")
 
 
 @fixture()
 def domain() -> Domain:
-    domain_parser = DomainParser(NUMERIC_DOMAIN_PATH)
+    domain_parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH)
     return domain_parser.parse_domain()
 
 

@@ -117,8 +117,8 @@ class PredicatesMatcher:
                                                                     grounded_base_params)
         return possible_matches
 
-    def get_injective_match(self, grounded_predicate: GroundedPredicate, action_call: ActionCall) -> Optional[
-        Predicate]:
+    def get_injective_match(self, grounded_predicate: GroundedPredicate,
+                            action_call: ActionCall) -> Optional[Predicate]:
         """Get the injective match for the predicate and the action.
 
         :param grounded_predicate: the grounded predicate that was observed.

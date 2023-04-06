@@ -5,7 +5,7 @@ from pddl_plus_parser.models import Domain, Problem, State, Operator
 from pytest import fixture
 
 from fault_detection import FaultRepair, FaultGenerator, DefectType
-from tests.consts import EXAMPLES_DIR_PATH, NUMERIC_DOMAIN_PATH
+from tests.consts import EXAMPLES_DIR_PATH, DEPOTS_NUMERIC_DOMAIN_PATH
 
 FAULTY_DOMAIN_PATH = EXAMPLES_DIR_PATH / "faulty_domain.pddl"
 DEPOT_FLUENTS_MAP_PATH = EXAMPLES_DIR_PATH / "depot_fluents_map.json"
@@ -15,7 +15,7 @@ DEPOT_FAULTY_PLAN_PATH = EXAMPLES_DIR_PATH / "faulty_plan.solution"
 
 @fixture()
 def domain() -> Domain:
-    domain_parser = DomainParser(NUMERIC_DOMAIN_PATH)
+    domain_parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH)
     return domain_parser.parse_domain()
 
 

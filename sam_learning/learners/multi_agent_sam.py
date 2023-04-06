@@ -34,31 +34,33 @@ class MultiAgentSAM(SAMLearner):
                 LiteralCNF(action_names=list(self.partial_domain.actions.keys()))
 
     def _extract_relevant_not_effects(
-            self, in_state_predicates: Set[GroundedPredicate],
-            removed_predicates: Set[GroundedPredicate],
+            self, in_state_predicates: Set[GroundedPredicate], removed_state_predicates: Set[GroundedPredicate],
             executing_actions: List[ActionCall], relevant_action: ActionCall) -> List[GroundedPredicate]:
         """Extracts the literals that cannot be an effect of the relevant action.
 
-        :param in_state_predicates: the predicates that appear in the next state and cannot be delete effects of the action.
-        :param removed_predicates: the predicates that are missing in the next state and cannot be add effects of the action.
-        :param executing_actions: the actions that are executed in the joint action triplet.
+        :param in_state_predicates: the predicates that appear in the next state and cannot be delete-effects of the action.
+        :param removed_state_predicates: the predicates that are missing in the next state and cannot be add-effects of the action.
+        :param executing_actions: the actions that are being executed in the joint action triplet.
         :param relevant_action: the current action that is being tested.
         :return: the literals that cannot be effects of the action.
         """
-        not_effects = []
-        cannot_be_add_effects = [grounded_predicate for grounded_predicate in removed_predicates if relevant_action in
+        combined_not_effects = []
+        cannot_be_add_effects = [grounded_predicate for grounded_predicate in removed_state_predicates if
+                                 relevant_action in
                                  self.compute_interacting_actions(grounded_predicate, executing_actions)]
         for not_add_effect in cannot_be_add_effects:
-            not_effects.append(GroundedPredicate(name=not_add_effect.name, signature=not_add_effect.signature,
-                                                 object_mapping=not_add_effect.object_mapping, is_positive=True))
+            combined_not_effects.append(GroundedPredicate(name=not_add_effect.name, signature=not_add_effect.signature,
+                                                          object_mapping=not_add_effect.object_mapping,
+                                                          is_positive=True))
 
         cannot_be_del_effects = [grounded_predicate for grounded_predicate in in_state_predicates if relevant_action in
                                  self.compute_interacting_actions(grounded_predicate, executing_actions)]
         for not_del_effect in cannot_be_del_effects:
-            not_effects.append(GroundedPredicate(name=not_del_effect.name, signature=not_del_effect.signature,
-                                                 object_mapping=not_del_effect.object_mapping, is_positive=False))
+            combined_not_effects.append(GroundedPredicate(name=not_del_effect.name, signature=not_del_effect.signature,
+                                                          object_mapping=not_del_effect.object_mapping,
+                                                          is_positive=False))
 
-        return not_effects
+        return combined_not_effects
 
     def _is_action_safe(self, action: LearnerAction, preconditions_to_filter: Set[Predicate]) -> bool:
         """Checks if the given action is safe to execute.
@@ -188,8 +190,9 @@ class MultiAgentSAM(SAMLearner):
         self.logger.debug("Updating the literals that must be effects of the action.")
         self.add_must_be_effect_to_cnf(executed_action, grounded_add_effects.union(grounded_del_effects))
         not_effects = self._extract_relevant_not_effects(
-            in_state_predicates=self.next_state_positive_predicates,
-            removed_predicates=self.next_state_negative_predicates, executing_actions=[executed_action],
+            in_state_predicates=self.triplet_snapshot.next_state_positive_predicates,
+            removed_state_predicates=self.triplet_snapshot.next_state_negative_predicates,
+            executing_actions=[executed_action],
             relevant_action=executed_action)
         self.add_not_effect_to_cnf(executed_action, not_effects)
 
@@ -205,7 +208,9 @@ class MultiAgentSAM(SAMLearner):
         executing_actions = joint_action.operational_actions
         for executed_action in executing_actions:
             observed_action = self.partial_domain.actions[executed_action.name]
-            self._create_fully_observable_triplet_predicates(executed_action, previous_state, next_state)
+            self.triplet_snapshot.create_snapshot(
+                previous_state=previous_state, next_state=next_state, current_action=executed_action,
+                observation_objects=self.current_trajectory_objects)
             if executed_action.name not in self.observed_actions:
                 super()._add_new_action_preconditions(executed_action)
                 self.observed_actions.append(observed_action.name)
@@ -217,8 +222,9 @@ class MultiAgentSAM(SAMLearner):
                                                                      add_predicates_sign=True)
         for executed_action in executing_actions:
             not_effects = self._extract_relevant_not_effects(
-                in_state_predicates=self.next_state_positive_predicates,
-                removed_predicates=self.next_state_negative_predicates, executing_actions=[executed_action],
+                in_state_predicates=self.triplet_snapshot.next_state_positive_predicates,
+                removed_state_predicates=self.triplet_snapshot.next_state_negative_predicates,
+                executing_actions=[executed_action],
                 relevant_action=executed_action)
             self.add_not_effect_to_cnf(executed_action, not_effects)
 
@@ -236,7 +242,9 @@ class MultiAgentSAM(SAMLearner):
 
         if joint_action.action_count == 1:
             executing_action = joint_action.operational_actions[0]
-            super()._create_fully_observable_triplet_predicates(executing_action, previous_state, next_state)
+            self.triplet_snapshot.create_snapshot(
+                previous_state=previous_state, next_state=next_state, current_action=executing_action,
+                observation_objects=self.current_trajectory_objects)
             self.update_single_agent_executed_action(executing_action, previous_state, next_state)
             return
 

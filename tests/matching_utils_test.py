@@ -6,7 +6,7 @@ from pddl_plus_parser.models import Domain, GroundedPredicate, State
 from pytest import fixture
 
 from sam_learning.core import extract_effects
-from tests.consts import NUMERIC_DOMAIN_PATH
+from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH
 
 TEST_LIFTED_SIGNATURE_ITEMS = ["?s", "?d", "?i", "?m"]
 TEST_GROUNDED_ACTION_CALL = ["s1", "test_direction", "test_instrument", "test_mode"]
@@ -14,7 +14,7 @@ TEST_GROUNDED_ACTION_CALL = ["s1", "test_direction", "test_instrument", "test_mo
 
 @fixture()
 def domain() -> Domain:
-    domain_parser = DomainParser(NUMERIC_DOMAIN_PATH)
+    domain_parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH)
     return domain_parser.parse_domain()
 
 

@@ -7,8 +7,8 @@ from pddl_plus_parser.models import Domain, Problem, Observation
 from pytest import fixture
 
 from sam_learning.learners.numeric_sam import NumericSAMLearner
-from tests.consts import NUMERIC_DOMAIN_PATH, \
-    NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, DEPOT_FLUENTS_MAP_PATH, SATELLITE_DOMAIN_PATH, \
+from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, \
+    DEPOTS_NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, DEPOT_FLUENTS_MAP_PATH, SATELLITE_DOMAIN_PATH, \
     SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, SATELLITE_FLUENTS_MAP_PATH, \
     SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH, MINECRAFT_DOMAIN_PATH, \
     MINECRAFT_PROBLEM_PATH, MINECRAFT_TRAJECTORY_PATH, MINECRAFT_FLUENTS_MAP_PATH
@@ -16,13 +16,13 @@ from tests.consts import NUMERIC_DOMAIN_PATH, \
 
 @fixture()
 def depot_domain() -> Domain:
-    domain_parser = DomainParser(NUMERIC_DOMAIN_PATH, partial_parsing=True)
+    domain_parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=True)
     return domain_parser.parse_domain()
 
 
 @fixture()
 def depot_problem(depot_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=NUMERIC_PROBLEM_PATH, domain=depot_domain).parse_problem()
+    return ProblemParser(problem_path=DEPOTS_NUMERIC_PROBLEM_PATH, domain=depot_domain).parse_problem()
 
 
 @fixture()
