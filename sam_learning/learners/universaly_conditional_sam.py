@@ -175,7 +175,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
                 self.quantified_antecedents[grounded_action.name][parameter_type].remove_dependencies(
                     literal=literal, literals_to_remove=missing_pre_state_literals)
 
-    def _remove_not_possible_dependencies(
+    def _remove_not_antecedents(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Removes the literals that are not possible as antecedent candidates from the dependency set.
 
@@ -183,7 +183,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         :param previous_state: the state prior to the action's execution.
         :param next_state: the state following the action's execution.
         """
-        super()._remove_not_possible_dependencies(grounded_action, previous_state, next_state)
+        super()._remove_not_antecedents(grounded_action, previous_state, next_state)
         self._remove_existing_previous_state_quantified_dependencies(grounded_action)
         self._remove_non_existing_previous_state_quantified_dependencies(grounded_action, previous_state, next_state)
 
@@ -258,10 +258,9 @@ class UniversallyConditionalSAM(ConditionalSAM):
             super()._construct_restrictive_preconditions(action, action_dependency_set, literal)
             return
 
-        preconditions_str = super()._combine_precondition_predicates(action)
         is_effect = literal in self.observed_universal_effects[action.name][quantified_type]
         conservative_preconditions = action_dependency_set.construct_restrictive_preconditions(
-            preconditions_str, literal, is_effect)
+            action.preconditions_str_set, literal, is_effect)
         action.manual_preconditions.append(
             f"({FORALL} ({self.additional_parameters[action.name][quantified_type]} - {quantified_type}) "
             f"{conservative_preconditions})") if conservative_preconditions else None
@@ -270,7 +269,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         """Constructs the single-agent actions that are safe to execute."""
         self.logger.info("Constructing the safe universal effects.")
         for quantified_type, dependency_set in self.quantified_antecedents[action.name].items():
-            for possible_result in dependency_set.dependencies:
+            for possible_result in dependency_set.possible_antecedents:
                 if not dependency_set.is_safe_literal(possible_result):
                     self._construct_restrictive_preconditions(
                         action, dependency_set, possible_result, quantified_type)
@@ -297,7 +296,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         :param previous_state: the state prior to the action's execution.
         """
         self._update_observed_effects(grounded_action, previous_state, next_state)
-        self._remove_not_possible_dependencies(grounded_action, previous_state, next_state)
+        self._remove_not_antecedents(grounded_action, previous_state, next_state)
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.

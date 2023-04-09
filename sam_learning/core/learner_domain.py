@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import Set, List, Dict, Tuple
 
 from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain, \
-    ConditionalEffect, UniversalQuantifiedEffect
+    ConditionalEffect, UniversalQuantifiedEffect, UniversalQuantifiedPrecondition
 
 from .learning_types import ConditionType
 
@@ -12,6 +12,27 @@ NEGATIVE_PRECONDITIONS_REQ = ":negative-preconditions"
 EQUALITY_REQ = ":equality"
 ADDED_LEARNING_REQUIREMENTS = [DISJUNCTIVE_PRECONDITIONS_REQ, NEGATIVE_PRECONDITIONS_REQ, EQUALITY_REQ]
 
+
+class CompoundPreconditions:
+    """class that defines the compound structure of the preconditions of an action."""
+    disjunctions: Set[Set[Predicate]]
+    conjunctions: Set[Predicate]
+    universal_preconditions: Set[UniversalQuantifiedPrecondition]
+
+    def __init__(self):
+        self.disjunctions = set()
+        self.conjunctions = set()
+        self.universal_preconditions = set()
+
+    def __str__(self):
+        conjunctions_str = []
+        for predicate_conjunction in self.disjunctions:
+            disjunctive_
+            conjunction_str = []
+            for predicate in conjunction:
+                conjunction_str.append(str(predicate))
+            conjunctions_str.append(" ".join(conjunction_str))
+        return " ".join(conjunctions_str)
 
 class LearnerAction:
     """Class representing an action that the learning algorithm outputs."""
@@ -56,6 +77,12 @@ class LearnerAction:
     @property
     def parameter_names(self) -> List[str]:
         return list(self.signature.keys())
+
+    @property
+    def preconditions_str_set(self) -> Set[str]:
+        """Returns the set of the string representations of the preconditions."""
+        return {precond.untyped_representation for precond in self.positive_preconditions}.union(
+            {precond.untyped_representation for precond in self.negative_preconditions})
 
     def _signature_to_pddl(self) -> str:
         """Converts the action's signature to the PDDL format.

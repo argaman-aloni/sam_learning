@@ -10,7 +10,8 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     WOODWORKING_COMBINED_PROBLEM_PATH, WOODWORKING_COMBINED_TRAJECTORY_PATH, ROVERS_COMBINED_DOMAIN_PATH, \
     ROVERS_COMBINED_PROBLEM_PATH, ROVERS_COMBINED_TRAJECTORY_PATH, LOGISTICS_DOMAIN_PATH, SPIDER_DOMAIN_PATH, \
     SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, DEPOTS_NUMERIC_DOMAIN_PATH, DEPOTS_NUMERIC_PROBLEM_PATH, \
-    DEPOT_NUMERIC_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH
+    DEPOT_NUMERIC_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH, MINECRAFT_DOMAIN_PATH, MINECRAFT_PROBLEM_PATH, \
+    MINECRAFT_TRAJECTORY_PATH, SATELLITE_DOMAIN_PATH, SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH
 from tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
 
 
@@ -130,3 +131,36 @@ def depot_observation(depot_domain: Domain, depot_problem: Problem) -> Observati
 @fixture()
 def nurikabe_domain() -> Domain:
     return DomainParser(NURIKABE_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def minecraft_domain() -> Domain:
+    domain_parser = DomainParser(MINECRAFT_DOMAIN_PATH, partial_parsing=True)
+    return domain_parser.parse_domain()
+
+
+@fixture()
+def minecraft_problem(minecraft_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=MINECRAFT_PROBLEM_PATH, domain=minecraft_domain).parse_problem()
+
+
+@fixture()
+def minecraft_observation(minecraft_domain: Domain, minecraft_problem: Problem) -> Observation:
+    return TrajectoryParser(minecraft_domain, minecraft_problem).parse_trajectory(MINECRAFT_TRAJECTORY_PATH)
+
+
+@fixture()
+def satellite_numeric_domain() -> Domain:
+    domain_parser = DomainParser(SATELLITE_DOMAIN_PATH, partial_parsing=True)
+    return domain_parser.parse_domain()
+
+
+@fixture()
+def satellite_numeric_problem(satellite_numeric_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=SATELLITE_PROBLEM_PATH, domain=satellite_numeric_domain).parse_problem()
+
+
+@fixture()
+def satellite_numeric_observation(satellite_numeric_domain: Domain, satellite_numeric_problem: Problem) -> Observation:
+    return TrajectoryParser(satellite_numeric_domain, satellite_numeric_problem).parse_trajectory(
+        SATELLITE_NUMERIC_TRAJECTORY_PATH)

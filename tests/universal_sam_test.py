@@ -35,13 +35,13 @@ def satellite_domain() -> Domain:
 
 
 @fixture()
-def satellite_problem(satellite_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=ADL_SATELLITE_PROBLEM_PATH, domain=satellite_domain).parse_problem()
+def satellite_problem(satellite_numeric_domain) -> Problem:
+    return ProblemParser(problem_path=ADL_SATELLITE_PROBLEM_PATH, domain=satellite_numeric_domain).parse_problem()
 
 
 @fixture()
-def satellite_observation(satellite_domain: Domain, satellite_problem: Problem) -> Observation:
-    return TrajectoryParser(satellite_domain, satellite_problem).parse_trajectory(ADL_SATELLITE_TRAJECTORY_PATH)
+def satellite_observation(satellite_numeric_domain, satellite_numeric_problem) -> Observation:
+    return TrajectoryParser(satellite_numeric_domain, satellite_numeric_problem).parse_trajectory(ADL_SATELLITE_TRAJECTORY_PATH)
 
 
 @fixture()
@@ -50,8 +50,8 @@ def nurikabe_conditional_sam(nurikabe_domain: Domain) -> UniversallyConditionalS
 
 
 @fixture()
-def satellite_conditional_sam(satellite_domain: Domain) -> UniversallyConditionalSAM:
-    return UniversallyConditionalSAM(satellite_domain, max_antecedents_size=1)
+def satellite_conditional_sam(satellite_numeric_domain) -> UniversallyConditionalSAM:
+    return UniversallyConditionalSAM(satellite_numeric_domain, max_antecedents_size=1)
 
 
 def test_create_additional_parameter_name_creates_a_parameter_name_based_on_the_type_and_action_name(
@@ -77,17 +77,17 @@ def test_find_unique_objects_by_type_returns_correct_objects(nurikabe_observatio
 
 
 def test_initialize_universal_dependencies_adds_additional_parameter_for_each_newly_created_type(
-        satellite_conditional_sam: UniversallyConditionalSAM, satellite_domain: Domain,
-        satellite_observation: Observation):
+        satellite_conditional_sam: UniversallyConditionalSAM, satellite_numeric_domain,
+        satellite_numeric_observation):
     grounded_action = ActionCall(name="switch_off", grounded_parameters=["instrument7", "satellite2"])
-    satellite_conditional_sam.current_trajectory_objects = satellite_observation.grounded_objects
+    satellite_conditional_sam.current_trajectory_objects = satellite_numeric_observation.grounded_objects
     satellite_conditional_sam._create_fully_observable_triplet_predicates(
         current_action=grounded_action,
-        previous_state=satellite_observation.components[0].previous_state,
-        next_state=satellite_observation.components[0].next_state)
+        previous_state=satellite_numeric_observation.components[0].previous_state,
+        next_state=satellite_numeric_observation.components[0].next_state)
     satellite_conditional_sam._initialize_universal_dependencies(grounded_action)
 
-    for pddl_type in satellite_domain.types:
+    for pddl_type in satellite_numeric_domain.types:
         if pddl_type == "object":
             continue
 
@@ -95,17 +95,17 @@ def test_initialize_universal_dependencies_adds_additional_parameter_for_each_ne
 
 
 def test_initialize_universal_dependencies_adds_additional_parameter_for_each_newly_created_type_for_every_action(
-        satellite_conditional_sam: UniversallyConditionalSAM, satellite_domain: Domain,
-        satellite_observation: Observation):
+        satellite_conditional_sam: UniversallyConditionalSAM, satellite_numeric_domain,
+        satellite_numeric_observation):
     for action_name in satellite_conditional_sam.partial_domain.actions:
         grounded_action = ActionCall(name=action_name, grounded_parameters=[])
-        satellite_conditional_sam.current_trajectory_objects = satellite_observation.grounded_objects
+        satellite_conditional_sam.current_trajectory_objects = satellite_numeric_observation.grounded_objects
         satellite_conditional_sam._create_fully_observable_triplet_predicates(
             current_action=grounded_action,
-            previous_state=satellite_observation.components[0].previous_state,
-            next_state=satellite_observation.components[0].next_state)
+            previous_state=satellite_numeric_observation.components[0].previous_state,
+            next_state=satellite_numeric_observation.components[0].next_state)
         satellite_conditional_sam._initialize_universal_dependencies(grounded_action)
-        for pddl_type in satellite_domain.types:
+        for pddl_type in satellite_numeric_domain.types:
             if pddl_type == "object":
                 continue
 
@@ -124,7 +124,7 @@ def test_initialize_universal_dependencies_adds_possible_dependencies_for_action
         next_state=nurikabe_observation.components[0].next_state)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
-    assert len(nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].dependencies) > 0
+    assert len(nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].possible_antecedents) > 0
 
 
 def test_initialize_universal_dependencies_creates_dependency_set_for_each_type_of_quantified_object(
@@ -169,7 +169,7 @@ def test_initialize_universal_dependencies_not_add_dependencies_if_additional_pa
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
     assert "(not (next n0 ?n2))" not in nurikabe_conditional_sam.quantified_antecedents[grounded_action.name][
-        "num"].dependencies
+        "num"].possible_antecedents
 
 
 def test_update_observed_effects_does_not_add_universal_effect_if_not_observed_in_post_state(
@@ -246,7 +246,7 @@ def test_remove_existing_previous_state_quantified_dependencies_removes_correct_
 
     for not_dependency in not_dependencies:
         assert {not_dependency} not in \
-               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].dependencies[
+               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].possible_antecedents[
                    "(painted ?c)"]
 
 
@@ -280,7 +280,7 @@ def test_remove_existing_previous_state_quantified_dependencies_shrinks_dependen
     previous_dependencies_size = 16
     nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
     assert any(len(dependencies) < previous_dependencies_size for dependencies in
-               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].dependencies.values())
+               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].possible_antecedents.values())
 
 
 def test_remove_non_existing_previous_state_quantified_dependencies_does_not_raise_error(
@@ -312,7 +312,7 @@ def test_construct_universal_effects_from_dependency_set_constructs_correct_cond
         current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
 
     dependency_set = DependencySet(max_size_antecedents=1)
-    dependency_set.dependencies = {
+    dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
@@ -341,7 +341,7 @@ def test_construct_universal_effects_from_dependency_set_constructs_correct_univ
         current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
 
     dependency_set = DependencySet(max_size_antecedents=1)
-    dependency_set.dependencies = {
+    dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
@@ -365,7 +365,7 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
         current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
 
     dependency_set = DependencySet(max_size_antecedents=1)
-    dependency_set.dependencies = {
+    dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
@@ -390,7 +390,7 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
         current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
 
     dependency_set = DependencySet(max_size_antecedents=1)
-    dependency_set.dependencies = {
+    dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
@@ -417,7 +417,7 @@ def test_construct_restrictive_universal_effect_constructs_correct_restrictive_u
         current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
 
     dependency_set = DependencySet(max_size_antecedents=1)
-    dependency_set.dependencies = {
+    dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }

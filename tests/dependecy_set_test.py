@@ -54,7 +54,7 @@ def test_create_antecedents_with_real_domain_predicates(woodworking_predicates: 
 def test_extract_superset_dependencies_when_the_literal_is_not_subset_of_other_dependencies_returns_empty_list():
     """Test the extraction of superset dependencies when the literal is not subset of other dependencies."""
     dependency_set = DependencySet(max_size_antecedents=2)
-    dependency_set.dependencies = {"a": [{"a", "b"}, {"a", "c"}], "b": [{"b", "c"}]}
+    dependency_set.possible_antecedents = {"a": [{"a", "b"}, {"a", "c"}], "b": [{"b", "c"}]}
     assert dependency_set._extract_superset_dependencies("a", [{"a", "d"}]) == []
 
 
@@ -63,7 +63,7 @@ def test_extract_superset_dependencies_creates_supersets_of_dependencies_contain
     test_literals = ["a", "b", "c"]
     dependency_set = DependencySet(max_size_antecedents=3)
     possible_literals_combinations = create_antecedents_combination(set(test_literals), 3)
-    dependency_set.dependencies = {literal: possible_literals_combinations for literal in test_literals}
+    dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
 
     expected_superset_dependencies = [{"a", "b", "c"}, {"a", "b"}, {"a", "c"}, {"a"}]
     superset_dependencies = dependency_set._extract_superset_dependencies("a", [{"a"}])
@@ -77,7 +77,7 @@ def test_initialize_dependencies_with_real_domain_predicates_initialize_both_neg
     """Test the initialization of the dependency set with real domain predicates."""
     dependency_set = DependencySet(max_size_antecedents=2)
     dependency_set.initialize_dependencies(set(woodworking_predicates))
-    assert len(dependency_set.dependencies) == 2 * len(woodworking_predicates)
+    assert len(dependency_set.possible_antecedents) == 2 * len(woodworking_predicates)
 
 
 def test_initialize_dependencies_with_real_domain_predicates_creates_correct_set_of_literals_in_the_values(
@@ -87,7 +87,7 @@ def test_initialize_dependencies_with_real_domain_predicates_creates_correct_set
     dependency_set.initialize_dependencies(set(woodworking_predicates))
     # C(28, 2) = 28! / (2! * (28-2)!) = 28! / (2! * 26!) = (28 * 27) / (1 * 2) = 378 sets.
     # The number of sets of size 1 that can be created from 28 objects is 28.
-    assert len(dependency_set.dependencies[
+    assert len(dependency_set.possible_antecedents[
                    woodworking_predicates[0].untyped_representation]) == TOTAL_NUMBER_OF_WOODWORKING_COMBINATIONS
 
 
@@ -96,14 +96,14 @@ def test_remove_dependencies_removes_correct_literals_on_simple_case_with_no_sup
     dependency_set = DependencySet(max_size_antecedents=2)
     antecedents = [{"a"}, {"b"}, {"c"}, {"a", "b"}, {"a", "c"}, {"b", "c"}]
     init_antecedents_length = len(antecedents)
-    dependency_set.dependencies = {"a": antecedents}
+    dependency_set.possible_antecedents = {"a": antecedents}
 
     tested_literal = "a"
     literals_to_remove = {"a", "b"}
     dependency_set.remove_dependencies(tested_literal, literals_to_remove)
 
     expected_removed_literals = create_antecedents_combination(literals_to_remove, 2)
-    assert len(dependency_set.dependencies[tested_literal]) == init_antecedents_length - len(expected_removed_literals)
+    assert len(dependency_set.possible_antecedents[tested_literal]) == init_antecedents_length - len(expected_removed_literals)
 
 
 def test_remove_dependencies_removes_correct_literals_on_simple_case_with_superset_literals():
@@ -111,14 +111,14 @@ def test_remove_dependencies_removes_correct_literals_on_simple_case_with_supers
     dependency_set = DependencySet(max_size_antecedents=3)
     antecedents = create_antecedents_combination({"a", "b", "c"}, 3)
     init_antecedents_length = len(antecedents)
-    dependency_set.dependencies = {"a": antecedents}
+    dependency_set.possible_antecedents = {"a": antecedents}
 
     tested_literal = "a"
     literals_to_remove = {"a", "b"}
     dependency_set.remove_dependencies(tested_literal, literals_to_remove, include_supersets=True)
 
     expected_removed_literals = create_antecedents_combination(literals_to_remove, 2)
-    assert len(dependency_set.dependencies[tested_literal]) == 1
+    assert len(dependency_set.possible_antecedents[tested_literal]) == 1
 
 
 def test_remove_dependencies_removed_correct_set_of_literals_and_all_subsets(woodworking_predicates: List[Predicate]):
@@ -129,7 +129,7 @@ def test_remove_dependencies_removed_correct_set_of_literals_and_all_subsets(woo
     predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
     expected_removed_literals = create_antecedents_combination(predicates_to_remove, 2)
     dependency_set.remove_dependencies(tested_predicate, predicates_to_remove)
-    assert len(dependency_set.dependencies[tested_predicate]) == TOTAL_NUMBER_OF_WOODWORKING_COMBINATIONS - len(
+    assert len(dependency_set.possible_antecedents[tested_predicate]) == TOTAL_NUMBER_OF_WOODWORKING_COMBINATIONS - len(
         expected_removed_literals)
 
 
@@ -142,7 +142,7 @@ def test_remove_preconditions_literals_correctly_removed_preconditions_from_the_
     dependency_set.remove_preconditions_literals(preconditions)
 
     for literal in preconditions:
-        assert literal not in dependency_set.dependencies
+        assert literal not in dependency_set.possible_antecedents
 
 
 def test_is_safe_literal_returns_literal_unsafe_if_contains_more_that_one_item(woodworking_predicates: List[Predicate]):
@@ -158,7 +158,7 @@ def test_is_safe_literal_returns_literal_safe_if_contains_zero_items(woodworking
     """Test the check if a literal is safe when the literal contains zero items."""
     dependency_set = DependencySet(max_size_antecedents=2)
     tested_predicate = "(available ?obj)"
-    dependency_set.dependencies[tested_predicate] = []
+    dependency_set.possible_antecedents[tested_predicate] = []
     assert dependency_set.is_safe_literal(tested_predicate)
 
 
@@ -166,7 +166,7 @@ def test_is_safe_literal_returns_literal_safe_if_contains_one_item(woodworking_p
     """Test the removal of a dependency from the dependency set."""
     dependency_set = DependencySet(max_size_antecedents=2)
     tested_predicate = "(available ?obj)"
-    dependency_set.dependencies[tested_predicate] = [{"(available ?obj)"}]
+    dependency_set.possible_antecedents[tested_predicate] = [{"(available ?obj)"}]
     assert dependency_set.is_safe_literal(tested_predicate)
 
 
@@ -174,7 +174,7 @@ def test_is_conditional_effect_returns_true_when_the_the_literal_contains_a_sing
     """Check if a literal is a conditional effect when it contains one antecedent different from the literal."""
     dependency_set = DependencySet(max_size_antecedents=2)
     tested_predicate = "(available ?obj)"
-    dependency_set.dependencies[tested_predicate] = [{"(not (available ?obj))"}]
+    dependency_set.possible_antecedents[tested_predicate] = [{"(not (available ?obj))"}]
     assert dependency_set.is_conditional_effect(tested_predicate)
 
 
@@ -182,7 +182,7 @@ def test_is_conditional_effect_returns_false_when_there_are_no_antecedents_for_t
     """Check if a literal is a conditional effect when it contains no antecedents."""
     dependency_set = DependencySet(max_size_antecedents=2)
     tested_predicate = "(available ?obj)"
-    dependency_set.dependencies[tested_predicate] = []
+    dependency_set.possible_antecedents[tested_predicate] = []
     assert not dependency_set.is_conditional_effect(tested_predicate)
 
 
@@ -190,7 +190,7 @@ def test_extract_safe_conditionals_extracts_correct_set_of_literals():
     """Test that extract_safe_conditionals returns the correct set of literals."""
     dependency_set = DependencySet(max_size_antecedents=3)
     antecedents = {"a", "b", "(not c)"}
-    dependency_set.dependencies = {"a": [antecedents]}
+    dependency_set.possible_antecedents = {"a": [antecedents]}
     expected_positive_literals = {"a", "b"}
     expected_negative_literals = {"c"}
     positive_literals, negative_literals = dependency_set.extract_safe_conditionals("a")
@@ -216,7 +216,7 @@ def test_construct_restrictive_preconditions_creates_conditions_that_do_not_incl
     test_literals = ["a", "b", "c"]
     dependency_set = DependencySet(max_size_antecedents=3)
     possible_literals_combinations = create_antecedents_combination(set(test_literals), 3)
-    dependency_set.dependencies = {literal: possible_literals_combinations for literal in test_literals}
+    dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
     preconditions = {"(not a)"}
     tested_literal = "a"
 
@@ -241,7 +241,7 @@ def test_construct_restrictive_preconditions_creates_conditions_with_negated_lit
     test_literals = ["a", "b", "c"]
     dependency_set = DependencySet(max_size_antecedents=1)
     possible_literals_combinations = create_antecedents_combination(set(test_literals), 1)
-    dependency_set.dependencies = {literal: possible_literals_combinations for literal in test_literals}
+    dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
     preconditions = {"a"}
     tested_literal = "a"
 
@@ -255,7 +255,7 @@ def test_construct_restrictive_preconditions_creates_conditions_with_negated_lit
     test_literals = ["(a)", "(b)", "(c)"]
     dependency_set = DependencySet(max_size_antecedents=1)
     possible_literals_combinations = create_antecedents_combination(set(test_literals), 1)
-    dependency_set.dependencies = {literal: possible_literals_combinations for literal in test_literals}
+    dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
     preconditions = {"(a)"}
     tested_literal = "(a)"
 

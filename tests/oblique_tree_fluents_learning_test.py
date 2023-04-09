@@ -1,40 +1,23 @@
 """Module tests for the oblique tree fluents learning functionality."""
 from collections import defaultdict
 
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, Problem, Observation, PDDLFunction, State, ActionCall
+from pddl_plus_parser.models import Domain, Observation, PDDLFunction, State, ActionCall
 from pytest import fixture
 
 from sam_learning.core import ObliqueTreeFluentsLearning
 from sam_learning.core.unsafe_numeric_fluents_learning_base import UnsafeFluentsLearning
-from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, DEPOTS_NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, FUEL_COST_FUNCTION, \
+from tests.consts import FUEL_COST_FUNCTION, \
     LOAD_LIMIT_TRAJECTORY_FUNCTION, TRUCK_TYPE
 
 
 @fixture()
-def numeric_domain() -> Domain:
-    parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=True)
-    return parser.parse_domain()
+def oblique_tree_fluents_learning_zero_degree_polynom(depot_domain: Domain) -> ObliqueTreeFluentsLearning:
+    return ObliqueTreeFluentsLearning(action_name="drive", polynomial_degree=0, partial_domain=depot_domain)
 
 
 @fixture()
-def numeric_problem(numeric_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=DEPOTS_NUMERIC_PROBLEM_PATH, domain=numeric_domain).parse_problem()
-
-
-@fixture()
-def depot_observation(numeric_domain: Domain, numeric_problem: Problem) -> Observation:
-    return TrajectoryParser(numeric_domain, numeric_problem).parse_trajectory(DEPOT_NUMERIC_TRAJECTORY_PATH)
-
-
-@fixture()
-def oblique_tree_fluents_learning_zero_degree_polynom(numeric_domain: Domain) -> ObliqueTreeFluentsLearning:
-    return ObliqueTreeFluentsLearning(action_name="drive", polynomial_degree=0, partial_domain=numeric_domain)
-
-
-@fixture()
-def oblique_tree_fluents_learning_first_degree_polynom(numeric_domain: Domain) -> ObliqueTreeFluentsLearning:
-    return ObliqueTreeFluentsLearning(action_name="drive", polynomial_degree=1, partial_domain=numeric_domain)
+def oblique_tree_fluents_learning_first_degree_polynom(depot_domain: Domain) -> ObliqueTreeFluentsLearning:
+    return ObliqueTreeFluentsLearning(action_name="drive", polynomial_degree=1, partial_domain=depot_domain)
 
 
 def test_create_polynomial_string_returns_correct_string(
@@ -66,8 +49,8 @@ def test_add_polynomial_adds_correct_polynom_when_polynomial_degree_is_one(
     assert storage_keys == ["(* (fuel-cost ) (load_limit ?z))"]
 
 
-def test_add_polynomial_adds_correct_polynom_when_polynomial_degree_is_two(numeric_domain: Domain):
-    oblique_tree = ObliqueTreeFluentsLearning(action_name="drive", polynomial_degree=2, partial_domain=numeric_domain)
+def test_add_polynomial_adds_correct_polynom_when_polynomial_degree_is_two(depot_domain: Domain):
+    oblique_tree = ObliqueTreeFluentsLearning(action_name="drive", polynomial_degree=2, partial_domain=depot_domain)
     FUEL_COST_FUNCTION.set_value(2.0)
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(3.0)
     simple_state_fluents = {

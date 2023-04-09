@@ -19,15 +19,15 @@ def extract_predicate_data(
     :param action: the action that contains the predicate.
     :param predicate_str: the string representation of the predicate.
     :param domain_constants: the constants of the domain if exists.
+    :param additional_parameter: an additional parameter to add to the signature (for universal predicates)
+    :param additional_parameter_type: the type of the additional parameter.
     :return: the predicate object matching the string.
     """
-    is_positive = True
-    if predicate_str.startswith(NOT_PREFIX):
-        predicate_str = predicate_str.replace(NOT_PREFIX, "").replace(")", "").strip()
-        is_positive = False
-
-    predicate_data = predicate_str.replace("(", "").replace(")", "").split(" ")
-    predicate_data = [data for data in predicate_data if data != ""]
+    is_positive = not predicate_str.startswith(NOT_PREFIX)
+    predicate_data = predicate_str.replace(f"{NOT_PREFIX} (", "").strip(")").split(" ") if predicate_str.startswith(
+        NOT_PREFIX) \
+        else predicate_str.replace("(", "").replace(")", "").split(" ")
+    predicate_data = [data for data in predicate_data if data != ""]  # Remove empty strings
     predicate_name = predicate_data[0]
     combined_signature = {**action.signature}
     if additional_parameter is not None:

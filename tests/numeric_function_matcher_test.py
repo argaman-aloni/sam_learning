@@ -1,11 +1,9 @@
 """Module tests for the numeric function matcher."""
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, PDDLFunction, ActionCall, Problem, Observation
+from pddl_plus_parser.models import Domain, PDDLFunction, ActionCall, Observation
 from pytest import fixture
 
 from sam_learning.core import NumericFunctionMatcher
-from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, TRUCK_TYPE, DEPOTS_NUMERIC_PROBLEM_PATH, DEPOT_NUMERIC_TRAJECTORY_PATH, \
-    FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION, \
+from tests.consts import TRUCK_TYPE, FUEL_COST_FUNCTION, CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION, \
     LOAD_LIMIT_GROUNDED_TRAJECTORY_FUNCTION
 
 TEST_NUMERIC_LOAD_LIMIT_FUNCTION = PDDLFunction(name="load_limit", signature={
@@ -20,24 +18,8 @@ CURRENT_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", signature=
 
 
 @fixture()
-def numeric_domain() -> Domain:
-    parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=True)
-    return parser.parse_domain()
-
-
-@fixture()
-def numeric_problem(numeric_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=DEPOTS_NUMERIC_PROBLEM_PATH, domain=numeric_domain).parse_problem()
-
-
-@fixture()
-def depot_observation(numeric_domain: Domain, numeric_problem: Problem) -> Observation:
-    return TrajectoryParser(numeric_domain, numeric_problem).parse_trajectory(DEPOT_NUMERIC_TRAJECTORY_PATH)
-
-
-@fixture()
-def numeric_function_matcher(numeric_domain: Domain) -> NumericFunctionMatcher:
-    return NumericFunctionMatcher(domain=numeric_domain)
+def numeric_function_matcher(depot_domain: Domain) -> NumericFunctionMatcher:
+    return NumericFunctionMatcher(domain=depot_domain)
 
 
 def test_create_possible_function_signatures_with_simple_action_creates_all_possible_signature_permutations(
@@ -52,9 +34,9 @@ def test_create_possible_function_signatures_with_simple_action_creates_all_poss
 
 
 def test_lift_matched_parameters_creates_lifted_version_of_function(
-        numeric_function_matcher: NumericFunctionMatcher, numeric_domain: Domain):
+        numeric_function_matcher: NumericFunctionMatcher, depot_domain: Domain):
     TEST_GROUNDED_NUMERIC_LOAD_LIMIT_FUNCTION.set_value(132.87)
-    test_lifted_action = numeric_domain.actions["load"]
+    test_lifted_action = depot_domain.actions["load"]
     test_action_call_params = ActionCall(name="load", grounded_parameters=["hoist1", "crate1", "tru1", "loc1"])
     lifted_function = numeric_function_matcher.lift_matched_parameters(
         executed_action=test_lifted_action, grounded_call_parameters=test_action_call_params.parameters,

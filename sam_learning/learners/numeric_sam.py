@@ -17,7 +17,7 @@ class NumericSAMLearner(SAMLearner):
     preconditions_fluent_map: Dict[str, List[str]]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-                 max_antecedents_size: Optional[int] = None):
+                 **kwargs):
         super().__init__(partial_domain)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)

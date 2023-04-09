@@ -16,6 +16,7 @@ def create_antecedents_combination(antecedents: Set[str], max_antecedents_size: 
 
     :param antecedents: the list of antecedents that may be trigger for conditional effects.
     :param max_antecedents_size: the maximal size of the antecedents' combination.
+    :param exclude_literals: the literals to exclude from the antecedents combinations.
     :return: all possible subsets of the antecedents up to the given size.
     """
     antecedents_combinations = []
@@ -31,12 +32,12 @@ def create_antecedents_combination(antecedents: Set[str], max_antecedents_size: 
 
 class DependencySet:
     """Class representing the dependency set of an action."""
-    dependencies: Dict[str, List[Set[str]]]
+    possible_antecedents: Dict[str, List[Set[str]]]
     max_size_antecedents: int
     logger: logging.Logger
 
     def __init__(self, max_size_antecedents: int):
-        self.dependencies = {}
+        self.possible_antecedents = {}
         self.max_size_antecedents = max_size_antecedents
         self.logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class DependencySet:
         """
         self.logger.debug(f"Extracting superset dependencies for literal {literal}")
         superset_dependencies = []
-        for dependency in self.dependencies[literal]:
+        for dependency in self.possible_antecedents[literal]:
             for dependency_to_remove in dependencies_to_remove:
                 if dependency_to_remove.issubset(dependency):
                     superset_dependencies.append(dependency)
@@ -87,11 +88,11 @@ class DependencySet:
         for literal in literals_str:
             if antecedents is not None:
                 antecedents_literals = {antecedent.untyped_representation for antecedent in antecedents}
-                self.dependencies[literal] = create_antecedents_combination(
+                self.possible_antecedents[literal] = create_antecedents_combination(
                     antecedents_literals, self.max_size_antecedents)
 
             else:
-                self.dependencies[literal] = create_antecedents_combination(literals_str, self.max_size_antecedents)
+                self.possible_antecedents[literal] = create_antecedents_combination(literals_str, self.max_size_antecedents)
 
     def remove_dependencies(self, literal: str, literals_to_remove: Set[str], include_supersets: bool = False) -> None:
         """Remove a dependency from the dependency set.
@@ -102,14 +103,13 @@ class DependencySet:
         """
         self.logger.info(f"Removing dependencies {literals_to_remove} for literal {literal}")
         dependencies_to_remove = create_antecedents_combination(literals_to_remove, self.max_size_antecedents)
-        superset_dependencies = []
         if include_supersets:
             superset_dependencies = self._extract_superset_dependencies(literal, dependencies_to_remove)
             dependencies_to_remove.extend(superset_dependencies)
 
         for dependency in dependencies_to_remove:
-            if dependency in self.dependencies[literal]:
-                self.dependencies[literal].remove(dependency)
+            if dependency in self.possible_antecedents[literal]:
+                self.possible_antecedents[literal].remove(dependency)
 
     def remove_preconditions_literals(self, preconditions_literals: Set[str]) -> None:
         """Removes the preconditions literals from the dependency set (from both the antecedents and the results).
@@ -117,9 +117,9 @@ class DependencySet:
         :param preconditions_literals: the preconditions of the action.
         """
         for literal in preconditions_literals:
-            self.dependencies.pop(literal, None)
+            self.possible_antecedents.pop(literal, None)
 
-        for literal in self.dependencies:
+        for literal in self.possible_antecedents:
             self.remove_dependencies(literal, preconditions_literals, include_supersets=True)
 
     def is_safe_literal(self, literal: str, preconditions_literals: Optional[Set[str]] = None) -> bool:
@@ -132,7 +132,7 @@ class DependencySet:
         if preconditions_literals is not None:
             self.remove_dependencies(literal, preconditions_literals, include_supersets=True)
 
-        return len(self.dependencies[literal]) <= 1
+        return len(self.possible_antecedents[literal]) <= 1
 
     def is_conditional_effect(self, literal: str) -> bool:
         """Determines whether the literal is a conditional effect with safe number of antecedents.
@@ -142,7 +142,7 @@ class DependencySet:
         """
         self.logger.info("Determining whether the literal %s is a conditional effect with safe number of antecedents",
                          literal)
-        return len(self.dependencies[literal]) == 1 and self.dependencies[literal][0] != {literal}
+        return len(self.possible_antecedents[literal]) == 1 and self.possible_antecedents[literal][0] != {literal}
 
     def is_possible_result(self, literal: str) -> bool:
         """Determines whether the literal is a possible result.
@@ -150,7 +150,7 @@ class DependencySet:
         :param literal: the literal to check.
         :return: True if the literal is a key in the dependency set, False otherwise.
         """
-        return literal in self.dependencies
+        return literal in self.possible_antecedents
 
     def extract_safe_conditionals(self, literal: str) -> Tuple[Set[str], Set[str]]:
         """Extracts the safe conditional effects from the dependency set.
@@ -158,7 +158,7 @@ class DependencySet:
         :return: the safe conditional effects.
         """
         self.logger.info("Extracting the tuple of the safe antecedents for the literal %s", literal)
-        safe_conditionals = self.dependencies[literal].copy()
+        safe_conditionals = self.possible_antecedents[literal].copy()
         safe_conditions = safe_conditionals.pop()
         positive_predicates = set()
         negative_predicates = set()
@@ -181,7 +181,7 @@ class DependencySet:
         :return: the negative and positive conditions that need to be added or None.
         """
         self.logger.debug("Constructing restrictive preconditions from the unsafe antecedents for literal %s", literal)
-        unsafe_antecedents = self.dependencies[literal]
+        unsafe_antecedents = self.possible_antecedents[literal]
         negated_conditions_statement = []
         positive_antecedents = set()
         for antecedent_conjunction in unsafe_antecedents:

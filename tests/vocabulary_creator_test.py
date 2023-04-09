@@ -13,27 +13,6 @@ def vocabulary_creator() -> VocabularyCreator:
     return VocabularyCreator()
 
 
-@fixture()
-def elevators_domain() -> Domain:
-    domain_parser = DomainParser(ELEVATORS_DOMAIN_PATH, partial_parsing=True)
-    return domain_parser.parse_domain()
-
-
-@fixture()
-def elevators_problem(elevators_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=ELEVATORS_PROBLEM_PATH, domain=elevators_domain).parse_problem()
-
-
-@fixture()
-def woodworking_domain() -> Domain:
-    return DomainParser(WOODWORKING_DOMAIN_PATH, partial_parsing=True).parse_domain()
-
-
-@fixture()
-def woodworking_problem(woodworking_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=WOODWORKING_PROBLEM_PATH, domain=woodworking_domain).parse_problem()
-
-
 def test_create_vocabulary_creates_grounded_predicates_only_for_those_with_matching_types(
         elevators_domain: Domain, vocabulary_creator: VocabularyCreator, elevators_problem: Problem):
     vocabulary_predicates = vocabulary_creator.create_vocabulary(
