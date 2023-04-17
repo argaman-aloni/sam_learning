@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 
 from pddl_plus_parser.models import PDDLType, Predicate, PDDLFunction, ObservedComponent, PDDLObject, \
-    MultiAgentComponent, ActionCall
-from typing import Dict
+    MultiAgentComponent, ActionCall, CompoundPrecondition
+from typing import Dict, List
 
 from sam_learning.learners import SAMLearner, MultiAgentSAM
 
@@ -107,3 +107,12 @@ def sync_ma_snapshot(ma_sam: MultiAgentSAM, component: MultiAgentComponent, acti
     ma_sam.triplet_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=action_call,
         observation_objects=trajectory_objects, should_include_all_objects=False)
+
+
+def extract_preconditions_predicates(compound_preconditions: CompoundPrecondition) -> List[Predicate]:
+    predicates = []
+    for _, precond in compound_preconditions:
+        if isinstance(precond, Predicate):
+            predicates.append(precond)
+
+    return predicates

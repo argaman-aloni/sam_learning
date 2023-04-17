@@ -70,27 +70,23 @@ class SAMLearner:
         :param grounded_action: the grounded action that is being executed in the trajectory component.
         """
         current_action = self.partial_domain.actions[grounded_action.name]
-        positive_predicates = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.triplet_snapshot.previous_state_positive_predicates)))
-        negative_predicates = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.triplet_snapshot.previous_state_negative_predicates)))
+        previous_state_predicates = set(self.matcher.get_possible_literal_matches(
+            grounded_action, list(self.triplet_snapshot.previous_state_predicates)))
 
-        current_action.positive_preconditions.intersection_update(positive_predicates)
-        current_action.negative_preconditions.intersection_update(negative_predicates)
+        for predicate in previous_state_predicates:
+            current_action.preconditions.root.add_condition(predicate)
 
     def _add_new_action_preconditions(self, grounded_action: ActionCall) -> None:
         """General method to add new action's discrete preconditions.
 
         :param grounded_action: the action that is currently being executed.
         """
-        observed_action = self.partial_domain.actions[grounded_action.name]
-        possible_preconditions = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.triplet_snapshot.previous_state_positive_predicates)))
-        negative_predicates = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.triplet_snapshot.previous_state_negative_predicates)))
+        current_action = self.partial_domain.actions[grounded_action.name]
+        previous_state_predicates = set(self.matcher.get_possible_literal_matches(
+            grounded_action, list(self.triplet_snapshot.previous_state_predicates)))
 
-        observed_action.positive_preconditions = possible_preconditions
-        observed_action.negative_preconditions = negative_predicates
+        for predicate in previous_state_predicates:
+            current_action.preconditions.root.add_condition(predicate)
 
     def _construct_learning_report(self) -> Dict[str, str]:
         """Constructs the learning report of the learned actions.
@@ -121,9 +117,9 @@ class SAMLearner:
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
-        observed_action.add_effects.update(lifted_add_effects)
-        observed_action.delete_effects.update(lifted_delete_effects)
-        observed_action.negative_preconditions.difference_update(lifted_delete_effects)
+        observed_action.discrete_effects.update(lifted_add_effects)
+        observed_action.discrete_effects.update(lifted_delete_effects)
+        # observed_action.negative_preconditions.difference_update(lifted_delete_effects)
 
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
@@ -142,9 +138,9 @@ class SAMLearner:
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
-        observed_action.add_effects.update(lifted_add_effects)
-        observed_action.delete_effects.update(lifted_delete_effects)
-        observed_action.negative_preconditions.difference_update(lifted_delete_effects)
+        observed_action.discrete_effects.update(lifted_add_effects)
+        observed_action.discrete_effects.update(lifted_delete_effects)
+        # observed_action.negative_preconditions.difference_update(lifted_delete_effects)
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
     def _verify_parameter_duplication(self, grounded_action: ActionCall) -> bool:
@@ -162,7 +158,7 @@ class SAMLearner:
 
             for lifted_duplicates_list in grounded_signature_map.values():
                 for (obj1, obj2) in combinations(lifted_duplicates_list, 2):
-                    action.inequality_preconditions.discard((obj1, obj2))
+                    action.preconditions.root.inequality_preconditions.discard((obj1, obj2))
 
         return has_duplicates
 
@@ -194,7 +190,7 @@ class SAMLearner:
         for action_name, action_data in self.partial_domain.actions.items():
             for (lifted_param1, lifted_param2) in combinations(action_data.parameter_names, 2):
                 if action_data.signature[lifted_param1] == action_data.signature[lifted_param2]:
-                    action_data.inequality_preconditions.add((lifted_param1, lifted_param2))
+                    action_data.preconditions.root.inequality_preconditions.add((lifted_param1, lifted_param2))
 
     def construct_safe_actions(self) -> None:
         """Constructs the single-agent actions that are safe to execute."""

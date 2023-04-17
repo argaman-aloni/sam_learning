@@ -3,7 +3,8 @@ from collections import defaultdict
 from typing import Set, List, Dict, Tuple
 
 from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain, \
-    ConditionalEffect, UniversalQuantifiedEffect, UniversalQuantifiedPrecondition
+    ConditionalEffect, UniversalQuantifiedEffect, UniversalQuantifiedPrecondition, CompoundPrecondition, \
+    UniversalEffect, NumericalExpressionTree
 
 from .learning_types import ConditionType
 
@@ -13,58 +14,25 @@ EQUALITY_REQ = ":equality"
 ADDED_LEARNING_REQUIREMENTS = [DISJUNCTIVE_PRECONDITIONS_REQ, NEGATIVE_PRECONDITIONS_REQ, EQUALITY_REQ]
 
 
-class CompoundPreconditions:
-    """class that defines the compound structure of the preconditions of an action."""
-    disjunctions: Set[Set[Predicate]]
-    conjunctions: Set[Predicate]
-    universal_preconditions: Set[UniversalQuantifiedPrecondition]
-
-    def __init__(self):
-        self.disjunctions = set()
-        self.conjunctions = set()
-        self.universal_preconditions = set()
-
-    def __str__(self):
-        conjunctions_str = []
-        for predicate_conjunction in self.disjunctions:
-            disjunctive_
-            conjunction_str = []
-            for predicate in conjunction:
-                conjunction_str.append(str(predicate))
-            conjunctions_str.append(" ".join(conjunction_str))
-        return " ".join(conjunctions_str)
-
 class LearnerAction:
     """Class representing an action that the learning algorithm outputs."""
 
     name: str
     signature: SignatureType
-    positive_preconditions: Set[Predicate]
-    negative_preconditions: Set[Predicate]
-    inequality_preconditions: Set[Tuple[str, str]]  # set of parameters names that should not be equal.
-    numeric_preconditions: Tuple[List[str], ConditionType]  # tuple mapping the numeric preconditions to their type.
-    manual_preconditions: List[str]  # in case the preconditions don't fit any of the above.
-    numeric_constant_constraints: List[str]
-    add_effects: Set[Predicate]
-    delete_effects: Set[Predicate]
-    numeric_effects: List[str]  # set of the strings representing the equations creating the numeric effect.
+    preconditions: CompoundPrecondition
+    discrete_effects: Set[Predicate]
     conditional_effects: Set[ConditionalEffect]
-    universal_effects: Set[UniversalQuantifiedEffect]
+    universal_effects: Set[UniversalEffect]
+    numeric_effects: Set[NumericalExpressionTree]
 
     def __init__(self, name: str, signature: SignatureType):
         self.name = name
         self.signature = signature
-        self.positive_preconditions = set()
-        self.negative_preconditions = set()
-        self.inequality_preconditions = set()
-        self.numeric_preconditions = tuple()
-        self.numeric_constant_constraints = []
-        self.manual_preconditions = []
-        self.add_effects = set()
-        self.delete_effects = set()
-        self.numeric_effects = []
+        self.preconditions = CompoundPrecondition()
+        self.discrete_effects = set()
         self.conditional_effects = set()
         self.universal_effects = set()
+        self.numeric_effects = set()
 
     def __str__(self):
         signature_str_items = []
@@ -81,8 +49,12 @@ class LearnerAction:
     @property
     def preconditions_str_set(self) -> Set[str]:
         """Returns the set of the string representations of the preconditions."""
-        return {precond.untyped_representation for precond in self.positive_preconditions}.union(
-            {precond.untyped_representation for precond in self.negative_preconditions})
+        precondition_str_set = set()
+        for _, precondition in self.preconditions:
+            if isinstance(precondition, Predicate):
+                precondition_str_set.add(precondition.untyped_representation)
+
+        return precondition_str_set
 
     def _signature_to_pddl(self) -> str:
         """Converts the action's signature to the PDDL format.
@@ -96,61 +68,12 @@ class LearnerAction:
         signature_str = " ".join(signature_str_items)
         return f"({signature_str})"
 
-    def _extract_inequality_preconditions(self) -> str:
-        """Extracts the inequality preconditions from the learned action.
-
-        :return: the inequality precondition of the action.
-        """
-        inequality_precondition_str = ""
-        if len(self.inequality_preconditions) > 0:
-            inequality_precondition_str = " ".join(f"(not (= {obj[0]} {obj[1]}))" for obj in
-                                                   self.inequality_preconditions)
-            inequality_precondition_str += "\n"
-        return inequality_precondition_str
-
-    def _extract_numeric_preconditions(self, preconditions: List[str], precondition_str: str) -> str:
-        """Extract the numeric preconditions from the action.
-
-        :param preconditions: the literals (positive and negative) to append to the string.
-        :param precondition_str: the precondition string up to this point.
-        :return: the string containing the numeric preconditions.
-        """
-        numeric_preconditions, conditions_type = self.numeric_preconditions
-        numeric_preconditions_str = "\t\t\n".join(numeric_preconditions)
-
-        if conditions_type == ConditionType.disjunctive:
-            numeric_preconditions_str = f"(or {numeric_preconditions_str})"
-
-        return f"(and {' '.join(preconditions)}\n" \
-               f"\t\t{precondition_str}" \
-               f"\t\t{numeric_preconditions_str})"
-
-    def _preconditions_to_pddl(self) -> str:
-        """Converts the action's preconditions to the needed PDDL format.
-
-        :return: the preconditions in PDDL format.
-        """
-        preconditions = [precond.untyped_representation for precond in self.positive_preconditions]
-        preconditions.extend([precond.untyped_representation for precond in self.negative_preconditions])
-
-        preconditions_str = "\t\t\n".join(preconditions)
-        equality_conditions_str = self._extract_inequality_preconditions()
-        if len(self.numeric_preconditions) > 0:
-            return self._extract_numeric_preconditions(preconditions + self.manual_preconditions,
-                                                       equality_conditions_str)
-
-        manual_preconditions_str = "\t\t\n".join(self.manual_preconditions)
-
-        return f"(and {preconditions_str}\n\t\t{equality_conditions_str}\n\t\t{manual_preconditions_str})"
-
     def _effects_to_pddl(self) -> str:
         """Converts the effects to the needed PDDL format.
 
         :return: the PDDL format of the effects.
         """
-        combined_effects = [effect.untyped_representation for effect in self.add_effects]
-        combined_effects.extend([effect.untyped_representation for effect in self.delete_effects])
-        simple_effects = "\n\t\t".join(combined_effects)
+        simple_effects = "\n\t\t".join([effect.untyped_representation for effect in self.discrete_effects])
 
         conditional_effects = "\n\t\t"
         conditional_effects += "\t\t\n".join([str(conditional_effect) for conditional_effect
@@ -161,7 +84,7 @@ class LearnerAction:
                                             in self.universal_effects])
 
         if len(self.numeric_effects) > 0:
-            numeric_effects = "\t\t\n".join([effect for effect in self.numeric_effects])
+            numeric_effects = "\t\t\n".join([effect.to_pddl() for effect in self.numeric_effects])
             return f"(and {simple_effects}\n" \
                    f"\t\t{conditional_effects}\n" \
                    f"\t\t{universal_effects}\n" \
@@ -176,7 +99,7 @@ class LearnerAction:
         """
         action_string = f"(:action {self.name}\n" \
                         f"\t:parameters {self._signature_to_pddl()}\n" \
-                        f"\t:precondition {self._preconditions_to_pddl()}\n" \
+                        f"\t:precondition {str(self.preconditions)}\n" \
                         f"\t:effect {self._effects_to_pddl()})"
         formatted_string = "\n".join([line for line in action_string.split("\n") if line.strip()])
         return f"{formatted_string}\n"

@@ -12,27 +12,23 @@ class EnvironmentSnapshot:
     """class representing the snapshot of the environment."""
 
     vocabulary_creator: VocabularyCreator
-    previous_state_positive_predicates: Set[GroundedPredicate]
-    previous_state_negative_predicates: Set[GroundedPredicate]
-    next_state_negative_predicates: Set[GroundedPredicate]
-    next_state_positive_predicates: Set[GroundedPredicate]
+    previous_state_predicates: Set[GroundedPredicate]
+    next_state_predicates: Set[GroundedPredicate]
     partial_domain: Domain
     logger: logging.Logger
 
     def __init__(self, partial_domain: Domain):
         self.logger = logging.getLogger(__name__)
         self.vocabulary_creator = VocabularyCreator()
-        self.previous_state_positive_predicates = set()
-        self.previous_state_negative_predicates = set()
-        self.next_state_negative_predicates = set()
-        self.next_state_positive_predicates = set()
+        self.previous_state_predicates = set()
+        self.next_state_predicates = set()
         self.previous_state_functions = {}
         self.next_state_functions = {}
         self.partial_domain = partial_domain
 
     def _create_state_discrete_snapshot(
             self, state: State,
-            relevant_objects: Dict[str, PDDLObject]) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
+            relevant_objects: Dict[str, PDDLObject]) -> Set[GroundedPredicate]:
         """Creates a snapshot of the state predicates.
 
         :param state: the state to create a snapshot of.
@@ -61,7 +57,7 @@ class EnvironmentSnapshot:
                                                                 object_mapping=p.object_mapping, is_positive=False)
                                               for p in vocabulary_predicates.difference(positive_state_predicates)])
 
-        return positive_state_predicates, negative_state_predicates
+        return positive_state_predicates.union(negative_state_predicates)
 
     def create_snapshot(
             self, previous_state: State, next_state: State, current_action: ActionCall,
@@ -79,8 +75,6 @@ class EnvironmentSnapshot:
         relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
                             if object_name in current_action.parameters} \
             if not should_include_all_objects else observation_objects
-        self.previous_state_positive_predicates, self.previous_state_negative_predicates = \
-            self._create_state_discrete_snapshot(previous_state, relevant_objects)
-        self.next_state_positive_predicates, self.next_state_negative_predicates = \
-            self._create_state_discrete_snapshot(next_state, relevant_objects)
+        self.previous_state_predicates = self._create_state_discrete_snapshot(previous_state, relevant_objects)
+        self.next_state_predicates = self._create_state_discrete_snapshot(next_state, relevant_objects)
         # TODO: ADD the creation of the functions snapshot.
