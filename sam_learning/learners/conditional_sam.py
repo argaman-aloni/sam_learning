@@ -273,40 +273,6 @@ class ConditionalSAM(SAMLearner):
         self.logger.debug(f"The literal {literal} is a simple effect of the action.")
         action.discrete_effects.add(extract_predicate_data(action.signature, literal, self.partial_domain.constants))
 
-    def verify_single_possible_conditional_effect(
-            self, action: LearnerAction, action_dependency: DependencySet, literal: str) -> Optional[ConditionalEffect]:
-        """Verifies whether the literal is a possible conditional effect of the action.
-
-        :param action: the action that is being verified.
-        :param action_dependency: the action's dependency set.
-        :param literal: the literal considered as a possible conditional effect.
-        """
-        if not self.conditional_antecedents[action.name].is_safe_literal(literal):
-            self.logger.debug(f"The literal {literal} is not considered to be safe for {action.name}.")
-            self._construct_restrictive_preconditions(action, self.conditional_antecedents[action.name], literal)
-            if literal not in self.observed_effects[action.name]:
-                self.logger.debug(f"The literal {literal} was not observed as an effect of the action {action.name}.")
-                return
-
-            effect = self._construct_restrictive_effect(action, self.conditional_antecedents[action.name], literal)
-            action.conditional_effects.add(effect)
-            return
-
-        self.logger.debug(f"The literal {literal} is safe to use in the action {action.name}.")
-        if literal not in self.observed_effects[action.name]:
-            self.logger.debug(f"The literal {literal} is not affected by the action {action.name}.")
-            return
-
-        if not self.conditional_antecedents[action.name].is_safe_conditional_effect(literal):
-            self.logger.debug(f"The literal {literal} is not a conditional effect of the action {action.name}, "
-                              f"constructing simple effect.")
-            self._construct_simple_effect(action, literal)
-            return
-
-        self.logger.debug(f"The literal {literal} is a conditional effect of the action {action.name}")
-        effect = self._construct_conditional_effect_data(action, action_dependency, literal)
-        return effect
-
     def _compress_conditional_effects(self, conditional_effects: List[ConditionalEffect]) -> List[ConditionalEffect]:
         """Compresses conditional effects that have the same antecedents to contain multiple results.
 
@@ -350,6 +316,40 @@ class ConditionalSAM(SAMLearner):
 
         compressed_effects = self._compress_conditional_effects(conditional_effects)
         action.conditional_effects = compressed_effects
+
+    def verify_single_possible_conditional_effect(
+            self, action: LearnerAction, action_dependency: DependencySet, literal: str) -> Optional[ConditionalEffect]:
+        """Verifies whether the literal is a possible conditional effect of the action.
+
+        :param action: the action that is being verified.
+        :param action_dependency: the action's dependency set.
+        :param literal: the literal considered as a possible conditional effect.
+        """
+        if not self.conditional_antecedents[action.name].is_safe_literal(literal):
+            self.logger.debug(f"The literal {literal} is not considered to be safe for {action.name}.")
+            self._construct_restrictive_preconditions(action, self.conditional_antecedents[action.name], literal)
+            if literal not in self.observed_effects[action.name]:
+                self.logger.debug(f"The literal {literal} was not observed as an effect of the action {action.name}.")
+                return
+
+            effect = self._construct_restrictive_effect(action, self.conditional_antecedents[action.name], literal)
+            action.conditional_effects.add(effect)
+            return
+
+        self.logger.debug(f"The literal {literal} is safe to use in the action {action.name}.")
+        if literal not in self.observed_effects[action.name]:
+            self.logger.debug(f"The literal {literal} is not affected by the action {action.name}.")
+            return
+
+        if not self.conditional_antecedents[action.name].is_safe_conditional_effect(literal):
+            self.logger.debug(f"The literal {literal} is not a conditional effect of the action {action.name}, "
+                              f"constructing simple effect.")
+            self._construct_simple_effect(action, literal)
+            return
+
+        self.logger.debug(f"The literal {literal} is a conditional effect of the action {action.name}")
+        effect = self._construct_conditional_effect_data(action, action_dependency, literal)
+        return effect
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds the action that is being observed for the first time.
