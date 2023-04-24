@@ -142,11 +142,8 @@ class MultiAgentSAM(SAMLearner):
         for domain_predicate, cnf in self.literals_cnf.items():
             cnf_effects = cnf.extract_action_effects(action.name, relevant_preconditions_str)
             for effect in cnf_effects:
-                lifted_predicate = extract_predicate_data(action, effect, self.partial_domain.constants)
-                if lifted_predicate.is_positive:
-                    action.add_effects.add(lifted_predicate)
-                else:
-                    action.delete_effects.add(lifted_predicate)
+                lifted_predicate = extract_predicate_data(action.signature, effect, self.partial_domain.constants)
+                action.discrete_effects.add(lifted_predicate)
 
     def handle_concurrent_execution(
             self, grounded_effect: GroundedPredicate, executing_actions: List[ActionCall]) -> None:

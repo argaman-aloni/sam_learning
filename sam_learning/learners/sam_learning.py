@@ -117,10 +117,7 @@ class SAMLearner:
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
-        observed_action.discrete_effects.update(lifted_add_effects)
-        observed_action.discrete_effects.update(lifted_delete_effects)
-        # observed_action.negative_preconditions.difference_update(lifted_delete_effects)
-
+        observed_action.discrete_effects.update(set(lifted_add_effects).union(lifted_delete_effects))
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
 
@@ -138,9 +135,7 @@ class SAMLearner:
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
-        observed_action.discrete_effects.update(lifted_add_effects)
-        observed_action.discrete_effects.update(lifted_delete_effects)
-        # observed_action.negative_preconditions.difference_update(lifted_delete_effects)
+        observed_action.discrete_effects.update(set(lifted_add_effects).union(lifted_delete_effects))
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
     def _verify_parameter_duplication(self, grounded_action: ActionCall) -> bool:

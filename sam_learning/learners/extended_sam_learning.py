@@ -133,9 +133,7 @@ class ExtendedSAM(SAMLearner):
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
 
-        observed_action.add_effects.update(lifted_add_effects)
-        observed_action.delete_effects.update(lifted_delete_effects)
-
+        observed_action.discrete_effects.update(set(lifted_add_effects).union(lifted_delete_effects))
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
 

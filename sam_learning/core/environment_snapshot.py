@@ -1,11 +1,11 @@
 """Represents the current snapshot of the environment."""
 
 import logging
-from typing import Set, Dict, Tuple
+from typing import Set, Dict
 
 from pddl_plus_parser.models import GroundedPredicate, State, PDDLObject, Domain, ActionCall
 
-from sam_learning.core import VocabularyCreator
+from sam_learning.core.vocabulary_creator import VocabularyCreator
 
 
 class EnvironmentSnapshot:

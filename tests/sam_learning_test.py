@@ -1,7 +1,7 @@
 """module tests for the SAM learning algorithm"""
 
 from pddl_plus_parser.models import ActionCall, Observation, \
-    ObservedComponent, Predicate
+    ObservedComponent
 
 from sam_learning.learners import SAMLearner
 from tests.consts import sync_snapshot, extract_preconditions_predicates
@@ -30,7 +30,8 @@ def test_add_new_action_preconditions_adds_correct_positive_preconditions_to_act
     elevators_sam_learning._add_new_action_preconditions(grounded_action=test_action_call)
     learned_action_data = elevators_sam_learning.partial_domain.actions[test_action_call.name]
     discrete_preconditions = extract_preconditions_predicates(learned_action_data.preconditions)
-    positive_preconditions = [precond.untyped_representation for precond in discrete_preconditions if precond.is_positive]
+    positive_preconditions = [precond.untyped_representation for precond in discrete_preconditions if
+                              precond.is_positive]
     expected_conditions = {"(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"}
     assert expected_conditions.issubset(positive_preconditions)
 
@@ -154,6 +155,27 @@ def test_add_new_action_maintains_the_correct_add_and_delete_effects(
            {"(lift-at ?lift ?f2)", "(not (lift-at ?lift ?f1))"}
 
 
+def test_add_action_does_not_add_the_same_predicates_twice_to_the_preconditions(
+        elevators_sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    sync_snapshot(elevators_sam_learning, observation_component, elevators_observation.grounded_objects)
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+
+    elevators_sam_learning.add_new_action(grounded_action=test_action_call,
+                                          previous_state=previous_state,
+                                          next_state=next_state)
+    learned_action = elevators_sam_learning.partial_domain.actions[test_action_call.name]
+    discrete_preconditions = extract_preconditions_predicates(learned_action.preconditions)
+    positive_preconditions = [precond.untyped_representation for precond in discrete_preconditions if
+                              precond.is_positive]
+    negative_preconditions = [precond.untyped_representation for precond in discrete_preconditions if
+                              not precond.is_positive]
+    assert len(positive_preconditions) == len(set(positive_preconditions))
+    assert len(negative_preconditions) == len(set(negative_preconditions))
+
+
 def test_update_action_does_not_remove_effects_from_the_action(
         elevators_sam_learning: SAMLearner, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]
@@ -175,6 +197,29 @@ def test_update_action_does_not_remove_effects_from_the_action(
     learned_action = elevators_sam_learning.partial_domain.actions[second_test_action_call.name]
     assert {p.untyped_representation for p in learned_action.discrete_effects} == \
            {"(lift-at ?lift ?f2)", "(not (lift-at ?lift ?f1))"}
+
+
+def test_update_action_does_not_add_the_same_predicates_twice_to_the_preconditions(
+        elevators_sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    sync_snapshot(elevators_sam_learning, observation_component, elevators_observation.grounded_objects)
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+
+    elevators_sam_learning.add_new_action(grounded_action=test_action_call,
+                                          previous_state=previous_state,
+                                          next_state=next_state)
+    elevators_sam_learning.update_action(grounded_action=test_action_call, previous_state=previous_state,
+                                         next_state=next_state)
+    learned_action = elevators_sam_learning.partial_domain.actions[test_action_call.name]
+    discrete_preconditions = extract_preconditions_predicates(learned_action.preconditions)
+    positive_preconditions = [precond.untyped_representation for precond in discrete_preconditions if
+                              precond.is_positive]
+    negative_preconditions = [precond.untyped_representation for precond in discrete_preconditions if
+                              not precond.is_positive]
+    assert len(positive_preconditions) == len(set(positive_preconditions))
+    assert len(negative_preconditions) == len(set(negative_preconditions))
 
 
 def test_update_action_with_two_trajectory_component_updates_action_data_correctly(
@@ -299,7 +344,8 @@ def test_handle_single_trajectory_component_learns_preconditions_and_effects_whe
 
     discrete_preconditions = extract_preconditions_predicates(learned_action_data.preconditions)
     discrete_preconditions_str = {p.untyped_representation for p in discrete_preconditions}
-    assert discrete_preconditions_str.issuperset(["(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"])
+    assert discrete_preconditions_str.issuperset(
+        ["(lift-at ?lift ?f1)", "(above ?f2 ?f1)", "(reachable-floor ?lift ?f2)"])
     assert {p.untyped_representation for p in learned_action_data.discrete_effects} == \
            {"(lift-at ?lift ?f2)", "(not (lift-at ?lift ?f1))"}
 

@@ -14,8 +14,9 @@ def test_create_state_discrete_snapshot_creates_a_snapshot_with_negative_predica
     observation_component = elevators_observation.components[0]
     initial_state = observation_component.previous_state
     observed_objects = elevators_observation.grounded_objects
-    _, negative_predicates = elevators_environment_snapshot._create_state_discrete_snapshot(
+    predicates = elevators_environment_snapshot._create_state_discrete_snapshot(
         state=initial_state, relevant_objects=observed_objects)
+    negative_predicates = [p for p in predicates if not p.is_positive]
     assert len(negative_predicates) > 0
 
 
@@ -24,10 +25,10 @@ def test_create_state_discrete_snapshot_creates_a_snapshot_with_negative_and_pos
     observation_component = elevators_observation.components[0]
     initial_state = observation_component.previous_state
     observed_objects = elevators_observation.grounded_objects
-    positive_predicates, negative_predicates = elevators_environment_snapshot._create_state_discrete_snapshot(
+    predicates = elevators_environment_snapshot._create_state_discrete_snapshot(
         state=initial_state, relevant_objects=observed_objects)
-    positive_predicates_str = set([p.untyped_representation for p in positive_predicates])
-    negative_predicates_str = set([p.untyped_representation for p in negative_predicates])
+    positive_predicates_str = set([p.untyped_representation for p in predicates if p.is_positive])
+    negative_predicates_str = set([p.untyped_representation for p in predicates if not p.is_positive])
     assert positive_predicates_str.intersection(negative_predicates_str) == set()
 
 
@@ -36,8 +37,9 @@ def test_create_state_discrete_snapshot_creates_a_snapshot_with_positive_predica
     observation_component = elevators_observation.components[0]
     initial_state = observation_component.previous_state
     observed_objects = elevators_observation.grounded_objects
-    positive_predicates, _ = elevators_environment_snapshot._create_state_discrete_snapshot(
+    predicates = elevators_environment_snapshot._create_state_discrete_snapshot(
         state=initial_state, relevant_objects=observed_objects)
+    positive_predicates = [p for p in predicates if p.is_positive]
     state_predicates = set()
     for predicates in initial_state.state_predicates.values():
         state_predicates.update(predicates)
@@ -58,14 +60,11 @@ def test_create_snapshot_when_should_not_include_all_objects_creates_lower_numbe
     elevators_environment_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=current_action,
         observation_objects=observed_objects, should_include_all_objects=False)
-    num_positive_predicates_without_all_objects = len(elevators_environment_snapshot.previous_state_positive_predicates)
-    num_negative_predicates_without_all_objects = len(elevators_environment_snapshot.previous_state_negative_predicates)
+    num_predicates_without_all_objects = len(elevators_environment_snapshot.previous_state_predicates)
 
     elevators_environment_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=current_action,
         observation_objects=observed_objects, should_include_all_objects=True)
-    num_positive_predicates_with_all_objects = len(elevators_environment_snapshot.previous_state_positive_predicates)
-    num_negative_predicates_with_all_objects = len(elevators_environment_snapshot.previous_state_negative_predicates)
+    num_predicates_with_all_objects = len(elevators_environment_snapshot.previous_state_predicates)
 
-    assert num_positive_predicates_without_all_objects < num_positive_predicates_with_all_objects
-    assert num_negative_predicates_without_all_objects < num_negative_predicates_with_all_objects
+    assert num_predicates_without_all_objects < num_predicates_with_all_objects

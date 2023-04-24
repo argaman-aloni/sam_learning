@@ -58,13 +58,11 @@ def contains_duplicates(parameter_objects: List[str]) -> bool:
     return len(set(parameter_objects)) != len(parameter_objects)
 
 
-def extract_effects(previous_state: State, next_state: State,
-                    add_predicates_sign: bool = False) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
+def extract_effects(previous_state: State, next_state: State) -> Tuple[Set[GroundedPredicate], Set[GroundedPredicate]]:
     """Extracts discrete the effects from the state object.
 
     :param previous_state: the previous state object containing the grounded literals.
     :param next_state: the next state object containing its grounded literals.
-    :param add_predicates_sign: whether to add the sign to the delete effects.
     :return: tuple containing the add and delete effects of the action.
     """
     prev_state_predicate = previous_state.state_predicates
@@ -73,20 +71,22 @@ def extract_effects(previous_state: State, next_state: State,
     add_effects = set()
     delete_effects = set()
 
-    # Checking all the add effects
-    for lifted_predicate, grounded_predicates in next_state_predicate.items():
-        if lifted_predicate not in prev_state_predicate:
-            add_effects.update(grounded_predicates)
-            continue
+    prev_state_predicates_map = {predicate.untyped_representation: predicate for predicate_set in
+                                 prev_state_predicate.values() for predicate in predicate_set}
 
-        add_effects.update(grounded_predicates.difference(prev_state_predicate[lifted_predicate]))
+    next_state_predicates_map = {predicate.untyped_representation: predicate for predicate_set in
+                                 next_state_predicate.values() for predicate in predicate_set}
+
+    # Checking all the add effects
+    for predicate_str, predicate_obj in next_state_predicates_map.items():
+        if predicate_str not in prev_state_predicates_map:
+            add_effects.add(predicate_obj)
 
     # Checking all delete effects
-    for lifted_predicate, grounded_predicates in prev_state_predicate.items():
-        delete_effects.update(grounded_predicates.difference(next_state_predicate[lifted_predicate]))
-
-    if add_predicates_sign:
-        for delete_effect in delete_effects:
-            delete_effect.is_positive = False
+    for predicate_str, predicate_obj in prev_state_predicates_map.items():
+        if predicate_str not in next_state_predicates_map:
+            new_predicate = predicate_obj.copy()
+            new_predicate.is_positive = False
+            delete_effects.add(new_predicate)
 
     return add_effects, delete_effects

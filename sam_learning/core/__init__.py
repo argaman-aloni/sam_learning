@@ -1,6 +1,7 @@
 from .conditional_sam_utilities import extract_predicate_data, create_additional_parameter_name, \
-    find_unique_objects_by_type, NOT_PREFIX, FORALL, iterate_over_objects_of_same_type, check_equal_antecedents
+    find_unique_objects_by_type, NOT_PREFIX, FORALL, iterate_over_objects_of_same_type
 from .dependency_set import DependencySet
+from .environment_snapshot import EnvironmentSnapshot
 from .exceptions import NotSafeActionError
 from .learner_domain import LearnerAction, LearnerDomain
 from .learning_types import EquationSolutionType, ConditionType
@@ -16,4 +17,3 @@ from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgo
 from .predicates_matcher import PredicatesMatcher
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
-from .environment_snapshot import EnvironmentSnapshot

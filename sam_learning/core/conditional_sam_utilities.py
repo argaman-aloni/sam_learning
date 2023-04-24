@@ -3,20 +3,20 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Generator, Tuple
 
-from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, ConditionalEffect
+from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, SignatureType
 
-from sam_learning.core.learner_domain import LearnerDomain, LearnerAction
+from sam_learning.core.learner_domain import LearnerDomain
 
 NOT_PREFIX = "(not"
 FORALL = "forall"
 
 
 def extract_predicate_data(
-        action: LearnerAction, predicate_str: str, domain_constants: Dict[str, PDDLConstant],
+        action_signature: SignatureType, predicate_str: str, domain_constants: Dict[str, PDDLConstant],
         additional_parameter: Optional[str] = None, additional_parameter_type: Optional[PDDLType] = None) -> Predicate:
     """Extracts the lifted bounded predicate from the string.
 
-    :param action: the action that contains the predicate.
+    :param action_signature: the action that contains the predicate.
     :param predicate_str: the string representation of the predicate.
     :param domain_constants: the constants of the domain if exists.
     :param additional_parameter: an additional parameter to add to the signature (for universal predicates)
@@ -29,7 +29,7 @@ def extract_predicate_data(
         else predicate_str.replace("(", "").replace(")", "").split(" ")
     predicate_data = [data for data in predicate_data if data != ""]  # Remove empty strings
     predicate_name = predicate_data[0]
-    combined_signature = {**action.signature}
+    combined_signature = {**action_signature}
     if additional_parameter is not None:
         combined_signature[additional_parameter] = additional_parameter_type
 
@@ -62,6 +62,7 @@ def find_unique_objects_by_type(
     """Returns a dictionary containing a single object of each type.
 
     :param trajectory_objects: the objects that were observed in the trajectory.
+    :param exclude_list: the list of objects to exclude.
     :return: a dictionary containing the type as key and a list of objects as value.
     """
     unique_objects_by_type = defaultdict(list)
@@ -89,27 +90,3 @@ def iterate_over_objects_of_same_type(
     for parameter_type, parameter_name in action_additional_parameters.items():
         for pddl_object in objects_by_type[parameter_type]:
             yield pddl_object, parameter_type, parameter_name
-
-
-def check_equal_antecedents(effect: ConditionalEffect, other_effect: ConditionalEffect) -> bool:
-    """Checks if two conditional effects' antecedents are equal.
-
-    :param effect: the first effect.
-    :param other_effect: the second effect.
-    :return: True if the effects' antecedents are equal, False otherwise.
-    """
-    if len(effect.positive_conditions) != len(other_effect.positive_conditions):
-        return False
-
-    for condition in effect.positive_conditions:
-        if condition not in other_effect.positive_conditions:
-            return False
-
-    if len(effect.negative_conditions) != len(other_effect.negative_conditions):
-        return False
-
-    for condition in effect.negative_conditions:
-        if condition not in other_effect.negative_conditions:
-            return False
-
-    return True
