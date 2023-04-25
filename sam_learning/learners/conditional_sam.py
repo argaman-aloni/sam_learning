@@ -63,7 +63,7 @@ class ConditionalSAM(SAMLearner):
     def _find_literals(
             self, grounded_action: ActionCall, grounded_predicates: List[GroundedPredicate], should_be_in_state: bool,
             extra_grounded_object: Optional[str] = None, extra_lifted_object: Optional[str] = None) -> Set[str]:
-        """Find the literals based on the input conditions.
+        """Find the *lifted* literals based on the input conditions.
 
         :param grounded_action: the action that is being executed.
         :param grounded_predicates: the state predicates to iterate over.

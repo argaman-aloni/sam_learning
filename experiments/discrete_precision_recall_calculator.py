@@ -5,18 +5,6 @@ from pddl_plus_parser.models import Action
 
 from sam_learning.core import LearnerAction
 
-PRECISION_RECALL_FIELD_NAMES = [
-    "preconditions_precision",
-    "add_effects_precision",
-    "delete_effects_precision",
-    "preconditions_recall",
-    "add_effects_recall",
-    "delete_effects_recall",
-    "action_precision",
-    "action_recall",
-    "f1_score"
-]
-
 
 def calculate_number_true_positives(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
     """Calculates the number of predicates that appear both in the model domain and in the learned domain.
@@ -163,16 +151,12 @@ class PrecisionRecallCalculator:
         return {
             "preconditions_precision": calculate_precision(self.preconditions[action_name],
                                                            self.ground_truth_preconditions[action_name]),
-            "add_effects_precision": calculate_precision(self.add_effects[action_name],
-                                                         self.ground_truth_add_effects[action_name]),
-            "delete_effects_precision": calculate_precision(self.delete_effects[action_name],
-                                                            self.ground_truth_delete_effects[action_name]),
+            "effects_precision": calculate_precision(self.discrete_effects[action_name],
+                                                     self.ground_discrete_effects[action_name]),
             "preconditions_recall": calculate_recall(self.preconditions[action_name],
                                                      self.ground_truth_preconditions[action_name]),
-            "add_effects_recall": calculate_recall(self.add_effects[action_name],
-                                                   self.ground_truth_add_effects[action_name]),
-            "delete_effects_recall": calculate_recall(self.delete_effects[action_name],
-                                                      self.ground_truth_delete_effects[action_name]),
+            "effects_recall": calculate_recall(self.discrete_effects[action_name],
+                                               self.ground_discrete_effects[action_name]),
             "action_precision": action_precision,
             "action_recall": action_recall,
             "f1_score": action_f1_score

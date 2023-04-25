@@ -196,7 +196,7 @@ def test_remove_existing_previous_state_quantified_dependencies_removes_correct_
                    "(painted ?c)"]
 
 
-def test_remove_existing_previous_state_quantified_dependencies_tries_to_remove_from_a_literal_that_does_not_contain_a_matching_parameter_not_will_fail(
+def test_remove_existing_previous_state_quantified_dependencies_tries_to_remove_from_a_literal_that_does_not_contain_a_matching_parameter_will_will_fail(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
     sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,

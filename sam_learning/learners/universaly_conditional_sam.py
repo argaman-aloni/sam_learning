@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 from pddl_plus_parser.models import Domain, State, ActionCall, Observation, \
-    ObservedComponent, PDDLType, Predicate, UniversalEffect, UniversalPrecondition
+    ObservedComponent, PDDLType, Predicate, UniversalEffect, UniversalPrecondition, GroundedPredicate
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
     create_additional_parameter_name, find_unique_objects_by_type, \
@@ -112,6 +112,22 @@ class UniversallyConditionalSAM(ConditionalSAM):
                 grounded_action, grounded_effects, pddl_object.name, parameter_name)
             self._update_quantified_effects(lifted_effects, grounded_action, parameter_type, lifted_simple_effects)
 
+    def _reduce_state_predicates_based_on_types(self, state_predicates: Set[GroundedPredicate],
+                                                legal_parameters: List[str]) -> Set[GroundedPredicate]:
+        """Reduce the state predicates based on the types of the objects in the state.
+
+        :param state_predicates: the predicates in the state that we need to reduce in number to optimize the search.
+        :param legal_parameters: the legal parameters of the action combined with the current searched object.
+        :return: the reduced state predicates.
+        """
+        self.logger.debug("Reducing the state predicates based on the types of the objects being currently searched.")
+        reduced_state = set()
+        for predicate in state_predicates:
+            if set(predicate.grounded_objects).issubset(legal_parameters):
+                reduced_state.add(predicate)
+
+        return reduced_state
+
     def _remove_existing_previous_state_quantified_dependencies(self, grounded_action: ActionCall) -> None:
         """Removes the literals that exist in the previous state from the dependency set of a literal that is
             not in the next state.
@@ -123,12 +139,18 @@ class UniversallyConditionalSAM(ConditionalSAM):
         for type_name, additional_param in self.additional_parameters[grounded_action.name].items():
             pddl_objects = objects_by_type[type_name]
             not_results, antecedents = set(), set()
+
             for pddl_object in pddl_objects:
+                allowed_objects = [*grounded_action.parameters, pddl_object.name]
+                reduced_previous_state = self._reduce_state_predicates_based_on_types(
+                    self.triplet_snapshot.previous_state_predicates, allowed_objects)
+                reduced_next_state = self._reduce_state_predicates_based_on_types(
+                    self.triplet_snapshot.next_state_predicates, allowed_objects)
+
                 not_results.update(self._find_literals_not_in_state(
-                    grounded_action, self.triplet_snapshot.next_state_predicates, pddl_object.name, additional_param))
-                antecedents.update(self._find_literals_existing_in_state(
-                    grounded_action, self.triplet_snapshot.previous_state_predicates, pddl_object.name,
-                    additional_param))
+                    grounded_action, reduced_next_state, pddl_object.name, additional_param))
+                antecedents.update(self._find_literals_existing_in_state(grounded_action, reduced_previous_state,
+                                                                         pddl_object.name, additional_param))
 
             for literal in not_results:
                 type_dependency = self.quantified_antecedents[grounded_action.name][type_name]
@@ -155,17 +177,20 @@ class UniversallyConditionalSAM(ConditionalSAM):
         for pddl_object, parameter_type, parameter_name in iterate_over_objects_of_same_type(
                 self.current_trajectory_objects, self.additional_parameters[grounded_action.name],
                 grounded_action.parameters):
+            allowed_objects = [*grounded_action.parameters, pddl_object.name]
+            reduced_previous_state = self._reduce_state_predicates_based_on_types(
+                self.triplet_snapshot.previous_state_predicates, allowed_objects)
             lifted_effects = self.matcher.get_possible_literal_matches(
                 grounded_action, grounded_effects, pddl_object.name, parameter_name)
-            missing_pre_state_literals = self._find_literals_not_in_state(
-                grounded_action, self.triplet_snapshot.previous_state_predicates, pddl_object.name, parameter_name)
+            missing_pre_state_literals = self._find_literals_not_in_state(grounded_action, reduced_previous_state,
+                                                                          pddl_object.name, parameter_name)
 
-            for literal in [effect.untyped_representation for effect in lifted_effects]:
-                if parameter_name not in literal:
+            for literal in lifted_effects:
+                if parameter_name not in literal.signature:
                     continue
 
                 self.quantified_antecedents[grounded_action.name][parameter_type].remove_dependencies(
-                    literal=literal, literals_to_remove=missing_pre_state_literals)
+                    literal=literal.untyped_representation, literals_to_remove=missing_pre_state_literals)
 
     def _remove_not_antecedents(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:

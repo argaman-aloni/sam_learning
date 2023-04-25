@@ -237,5 +237,5 @@ class SAMLearner:
 
         self.construct_safe_actions()
         self.end_measure_learning_time()
-        learning_report = {action_name: "OK" for action_name in self.partial_domain.actions}
+        learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report

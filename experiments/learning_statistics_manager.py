@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from pddl_plus_parser.lisp_parsers import DomainParser
-from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, MultiAgentComponent
+from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, MultiAgentComponent, Predicate
 
 from experiments.discrete_precision_recall_calculator import PrecisionRecallCalculator
 from sam_learning.core import LearnerDomain
@@ -15,6 +15,7 @@ LEARNED_ACTIONS_STATS_COLUMNS = [
     "learning_algorithm",
     "domain_name",
     "num_trajectories",
+    "learning_time",
     "num_trajectory_triplets",
     "total_number_of_actions",
     "num_safe_actions",
@@ -23,19 +24,14 @@ LEARNED_ACTIONS_STATS_COLUMNS = [
     "num_triplets_action_appeared",
     "learned_discrete_preconditions",
     "num_discrete_preconditions",
-    "learned_discrete_add_effects",
-    "num_discrete_add_effects",
-    "learned_discrete_delete_effects",
-    "num_discrete_delete_effects",
+    "learned_discrete_effects",
+    "num_discrete_effects",
     "ground_truth_preconditions",
-    "ground_truth_add_effects",
-    "ground_truth_delete_effects",
+    "ground_truth_effects",
     "preconditions_precision",
-    "add_effects_precision",
-    "delete_effects_precision",
+    "effects_precision",
     "preconditions_recall",
-    "add_effects_recall",
-    "delete_effects_recall",
+    "effects_recall",
     "action_precision",
     "action_recall",
     "f1_score"
@@ -104,16 +100,10 @@ class LearningStatisticsManager:
         return action_appearance_counter
 
     def _extract_all_preconditions(self, action_name, learned_domain):
-        learned_preconditions = [p.untyped_representation for p in
-                                 learned_domain.actions[action_name].positive_preconditions]
-        learned_preconditions.extend(
-            [f"(not {p.untyped_representation})" for p in
-             learned_domain.actions[action_name].negative_preconditions])
-        ground_truth_preconditions = [p.untyped_representation for p in
-                                      self.model_domain.actions[action_name].positive_preconditions]
-        ground_truth_preconditions.extend(
-            [f"(not {p.untyped_representation})" for p in
-             self.model_domain.actions[action_name].negative_preconditions])
+        learned_preconditions = [p.untyped_representation for _, p in
+                                 learned_domain.actions[action_name].preconditions if isinstance(p, Predicate)]
+        ground_truth_preconditions = [p.untyped_representation for _, p in
+                                      self.model_domain.actions[action_name].preconditions if isinstance(p, Predicate)]
         return ground_truth_preconditions, learned_preconditions
 
     def create_results_directory(self) -> None:
@@ -138,16 +128,18 @@ class LearningStatisticsManager:
             ground_truth_preconditions, learned_preconditions = self._extract_all_preconditions(action_name,
                                                                                                 learned_domain)
 
-            learned_add_effects = [p.untyped_representation for p in learned_domain.actions[action_name].add_effects]
-            learned_del_effects = [p.untyped_representation for p in learned_domain.actions[action_name].delete_effects]
+            learned_discrete_effects = [
+                p.untyped_representation for p in learned_domain.actions[action_name].discrete_effects]
             num_safe_actions = len([learning_report[action_name] for action_name in learning_report if
                                     learning_report[action_name] == "OK"])
             num_unsafe_actions = len([learning_report[action_name] for action_name in learning_report
                                       if learning_report[action_name] == "NOT SAFE"])
+            learning_time = learning_report["learning_time"]
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,
                 "domain_name": self.model_domain.name,
                 "num_trajectories": len(used_observations),
+                "learning_time": learning_time,
                 "num_trajectory_triplets": num_triplets,
                 "total_number_of_actions": len(self.model_domain.actions),
                 "num_safe_actions": num_safe_actions,
@@ -156,15 +148,11 @@ class LearningStatisticsManager:
                 "num_triplets_action_appeared": action_appearance_counter[action_name],
                 "learned_discrete_preconditions": learned_preconditions,
                 "num_discrete_preconditions": len(learned_preconditions),
-                "learned_discrete_add_effects": learned_add_effects,
-                "num_discrete_add_effects": len(learned_add_effects),
-                "learned_discrete_delete_effects": learned_del_effects,
-                "num_discrete_delete_effects": len(learned_del_effects),
+                "learned_discrete_effects": learned_discrete_effects,
+                "num_discrete_effects": len(learned_discrete_effects),
                 "ground_truth_preconditions": ground_truth_preconditions,
-                "ground_truth_add_effects": [p.untyped_representation for p in
-                                             self.model_domain.actions[action_name].add_effects],
-                "ground_truth_delete_effects": [p.untyped_representation for p in
-                                                self.model_domain.actions[action_name].delete_effects],
+                "ground_truth_effects": [p.untyped_representation for p in
+                                         self.model_domain.actions[action_name].discrete_effects],
                 **precision_recall_calculator.export_action_statistics(action_name)
             }
             self.action_learning_stats.append(action_stats)
