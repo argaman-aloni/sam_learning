@@ -89,14 +89,14 @@ WEIGHT_FUNCTION = PDDLFunction(name="weight", signature={"?c": CRATE_TYPE})
 
 
 def sync_snapshot(sam_learning: SAMLearner, component: ObservedComponent,
-                  trajectory_objects: Dict[str, PDDLObject]) -> None:
+                  trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False) -> None:
     previous_state = component.previous_state
     next_state = component.next_state
     test_action_call = component.grounded_action_call
     sam_learning.current_trajectory_objects = trajectory_objects
     sam_learning.triplet_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=test_action_call,
-        observation_objects=trajectory_objects, should_include_all_objects=False)
+        observation_objects=trajectory_objects, should_include_all_objects=should_include_all_objects)
 
 
 def sync_ma_snapshot(ma_sam: MultiAgentSAM, component: MultiAgentComponent, action_call: ActionCall,

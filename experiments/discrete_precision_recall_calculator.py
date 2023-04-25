@@ -88,22 +88,17 @@ class PrecisionRecallCalculator:
     """Class that manages the calculation of the precision and recall of the learned model."""
     preconditions: Dict[str, Set[str]]
     ground_truth_preconditions: Dict[str, Set[str]]
-    add_effects: Dict[str, Set[str]]
-    ground_truth_add_effects: Dict[str, Set[str]]
-    delete_effects: Dict[str, Set[str]]
-    ground_truth_delete_effects: Dict[str, Set[str]]
+    discrete_effects: Dict[str, Set[str]]
+    ground_discrete_effects: Dict[str, Set[str]]
     _learned_actions: List[str]
 
     def __init__(self):
         self.preconditions = defaultdict(set)
         self.ground_truth_preconditions = defaultdict(set)
-        self.add_effects = defaultdict(set)
-        self.ground_truth_add_effects = defaultdict(set)
-        self.delete_effects = defaultdict(set)
-        self.ground_truth_delete_effects = defaultdict(set)
+        self.discrete_effects = defaultdict(set)
+        self.ground_discrete_effects = defaultdict(set)
         self._compared_tuples = [(self.preconditions, self.ground_truth_preconditions),
-                                 (self.add_effects, self.ground_truth_add_effects),
-                                 (self.delete_effects, self.ground_truth_delete_effects)]
+                                 (self.discrete_effects, self.ground_discrete_effects)]
         self._learned_actions = []
 
     def add_action_data(self, learned_action: LearnerAction, model_action: Action) -> NoReturn:
@@ -114,20 +109,14 @@ class PrecisionRecallCalculator:
         """
         self._learned_actions.append(learned_action.name)
         self.preconditions[learned_action.name] = \
-            {p.untyped_representation for p in learned_action.positive_preconditions}
-        self.preconditions[learned_action.name].update(
-            {f"(not {p.untyped_representation})" for p in learned_action.negative_preconditions})
+            {p.untyped_representation for _, p in learned_action.preconditions}
 
         self.ground_truth_preconditions[model_action.name] = \
-            {p.untyped_representation for p in model_action.positive_preconditions}
-        self.ground_truth_preconditions[model_action.name].update(
-            {f"(not {p.untyped_representation})" for p in model_action.negative_preconditions})
+            {p.untyped_representation for _, p in model_action.preconditions}
 
-        self.add_effects[learned_action.name] = {p.untyped_representation for p in learned_action.add_effects}
-        self.ground_truth_add_effects[model_action.name] = {p.untyped_representation for p in model_action.add_effects}
-        self.delete_effects[learned_action.name] = {p.untyped_representation for p in learned_action.delete_effects}
-        self.ground_truth_delete_effects[model_action.name] = \
-            {p.untyped_representation for p in model_action.delete_effects}
+        self.discrete_effects[learned_action.name] = {p.untyped_representation for p in learned_action.discrete_effects}
+        self.ground_discrete_effects[model_action.name] = {p.untyped_representation for p in
+                                                           model_action.discrete_effects}
 
     def calculate_action_precision(self, action_name: str) -> float:
         """calculates the precision value of a certain action.
@@ -168,7 +157,7 @@ class PrecisionRecallCalculator:
         """
         action_precision = self.calculate_action_precision(action_name)
         action_recall = self.calculate_action_recall(action_name)
-        action_f1_score = 0 if action_precision == 0 and action_recall == 0 else\
+        action_f1_score = 0 if action_precision == 0 and action_recall == 0 else \
             2 * (action_precision * action_recall) / (action_precision + action_recall)
 
         return {

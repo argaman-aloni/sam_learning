@@ -415,6 +415,7 @@ class ConditionalSAM(SAMLearner):
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
+        super().start_measure_learning_time()
         super().deduce_initial_inequality_preconditions()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
@@ -422,5 +423,6 @@ class ConditionalSAM(SAMLearner):
                 self.handle_single_trajectory_component(component)
 
         self.construct_safe_actions()
+        super().end_measure_learning_time()
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report

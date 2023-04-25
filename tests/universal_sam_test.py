@@ -1,47 +1,15 @@
 """Module test for Universally Conditional SAM."""
 
 import pytest
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, Problem, Observation, ActionCall
+from pddl_plus_parser.models import Domain, Observation, ActionCall, UniversalPrecondition, Precondition, Predicate, \
+    UniversalEffect
 from pytest import fixture
 
 from sam_learning.core import DependencySet
 from sam_learning.learners import UniversallyConditionalSAM
 from sam_learning.learners.universaly_conditional_sam import create_additional_parameter_name, \
     find_unique_objects_by_type
-from tests.consts import NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, \
-    ADL_SATELLITE_PROBLEM_PATH, \
-    ADL_SATELLITE_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH
-
-
-@fixture()
-def nurikabe_domain() -> Domain:
-    return DomainParser(NURIKABE_DOMAIN_PATH, partial_parsing=True).parse_domain()
-
-
-@fixture()
-def nurikabe_problem(nurikabe_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=NURIKABE_PROBLEM_PATH, domain=nurikabe_domain).parse_problem()
-
-
-@fixture()
-def nurikabe_observation(nurikabe_domain: Domain, nurikabe_problem: Problem) -> Observation:
-    return TrajectoryParser(nurikabe_domain, nurikabe_problem).parse_trajectory(NURIKABE_TRAJECTORY_PATH)
-
-
-@fixture()
-def satellite_domain() -> Domain:
-    return DomainParser(ADL_SATELLITE_DOMAIN_PATH, partial_parsing=True).parse_domain()
-
-
-@fixture()
-def satellite_problem(satellite_numeric_domain) -> Problem:
-    return ProblemParser(problem_path=ADL_SATELLITE_PROBLEM_PATH, domain=satellite_numeric_domain).parse_problem()
-
-
-@fixture()
-def satellite_observation(satellite_numeric_domain, satellite_numeric_problem) -> Observation:
-    return TrajectoryParser(satellite_numeric_domain, satellite_numeric_problem).parse_trajectory(ADL_SATELLITE_TRAJECTORY_PATH)
+from tests.consts import sync_snapshot
 
 
 @fixture()
@@ -77,17 +45,14 @@ def test_find_unique_objects_by_type_returns_correct_objects(nurikabe_observatio
 
 
 def test_initialize_universal_dependencies_adds_additional_parameter_for_each_newly_created_type(
-        satellite_conditional_sam: UniversallyConditionalSAM, satellite_numeric_domain,
-        satellite_numeric_observation):
+        satellite_conditional_sam: UniversallyConditionalSAM, satellite_adl_domain: Domain,
+        satellite_adl_observation: Observation):
     grounded_action = ActionCall(name="switch_off", grounded_parameters=["instrument7", "satellite2"])
-    satellite_conditional_sam.current_trajectory_objects = satellite_numeric_observation.grounded_objects
-    satellite_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=satellite_numeric_observation.components[0].previous_state,
-        next_state=satellite_numeric_observation.components[0].next_state)
+    satellite_conditional_sam.current_trajectory_objects = satellite_adl_observation.grounded_objects
+    sync_snapshot(satellite_conditional_sam, satellite_adl_observation.components[0],
+                  satellite_adl_observation.grounded_objects, should_include_all_objects=True)
     satellite_conditional_sam._initialize_universal_dependencies(grounded_action)
-
-    for pddl_type in satellite_numeric_domain.types:
+    for pddl_type in satellite_adl_domain.types:
         if pddl_type == "object":
             continue
 
@@ -95,49 +60,39 @@ def test_initialize_universal_dependencies_adds_additional_parameter_for_each_ne
 
 
 def test_initialize_universal_dependencies_adds_additional_parameter_for_each_newly_created_type_for_every_action(
-        satellite_conditional_sam: UniversallyConditionalSAM, satellite_numeric_domain,
-        satellite_numeric_observation):
+        satellite_conditional_sam: UniversallyConditionalSAM, satellite_adl_domain: Domain,
+        satellite_adl_observation: Observation):
+    sync_snapshot(satellite_conditional_sam, satellite_adl_observation.components[0],
+                  satellite_adl_observation.grounded_objects, should_include_all_objects=True)
     for action_name in satellite_conditional_sam.partial_domain.actions:
         grounded_action = ActionCall(name=action_name, grounded_parameters=[])
-        satellite_conditional_sam.current_trajectory_objects = satellite_numeric_observation.grounded_objects
-        satellite_conditional_sam._create_fully_observable_triplet_predicates(
-            current_action=grounded_action,
-            previous_state=satellite_numeric_observation.components[0].previous_state,
-            next_state=satellite_numeric_observation.components[0].next_state)
         satellite_conditional_sam._initialize_universal_dependencies(grounded_action)
-        for pddl_type in satellite_numeric_domain.types:
+        for pddl_type in satellite_adl_domain.types:
             if pddl_type == "object":
                 continue
 
             assert pddl_type in satellite_conditional_sam.additional_parameters[grounded_action.name]
+
         print(satellite_conditional_sam.additional_parameters[grounded_action.name])
 
 
 def test_initialize_universal_dependencies_adds_possible_dependencies_for_action_in_dependency_set(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_domain: Domain,
         nurikabe_observation: Observation):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=nurikabe_observation.components[0].previous_state,
-        next_state=nurikabe_observation.components[0].next_state)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
-
     assert len(nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].possible_antecedents) > 0
 
 
 def test_initialize_universal_dependencies_creates_dependency_set_for_each_type_of_quantified_object(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_domain: Domain,
         nurikabe_observation: Observation):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=nurikabe_observation.components[0].previous_state,
-        next_state=nurikabe_observation.components[0].next_state)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
-
     assert len(nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]) == 3
 
 
@@ -145,7 +100,8 @@ def test_initialize_universal_dependencies_initialize_dependencies_objects_with_
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_domain: Domain,
         nurikabe_observation: Observation):
     grounded_action = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
     assert len(nurikabe_conditional_sam.quantified_antecedents) > 0
@@ -155,7 +111,8 @@ def test_initialize_universal_dependencies_adds_the_new_additional_parameters_fo
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_domain: Domain,
         nurikabe_observation: Observation):
     grounded_action = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
     assert len(nurikabe_conditional_sam.additional_parameters[grounded_action.name]) > 0
@@ -165,7 +122,8 @@ def test_initialize_universal_dependencies_not_add_dependencies_if_additional_pa
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_domain: Domain,
         nurikabe_observation: Observation):
     grounded_action = ActionCall(name="start-painting", grounded_parameters=["pos-1-2", "g3", "n1", "n2"])
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
 
     assert "(not (next n0 ?n2))" not in nurikabe_conditional_sam.quantified_antecedents[grounded_action.name][
@@ -175,33 +133,28 @@ def test_initialize_universal_dependencies_not_add_dependencies_if_additional_pa
 def test_update_observed_effects_does_not_add_universal_effect_if_not_observed_in_post_state(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation):
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=nurikabe_observation.components[0].previous_state,
-        next_state=nurikabe_observation.components[0].next_state)
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
 
     nurikabe_conditional_sam._initialize_actions_dependencies(grounded_action)
     nurikabe_conditional_sam._update_observed_effects(grounded_action,
                                                       nurikabe_observation.components[0].previous_state,
                                                       nurikabe_observation.components[0].next_state)
-    assert len(nurikabe_conditional_sam.observed_universal_effects[grounded_action.name]) == 0
+    for possible_effects in nurikabe_conditional_sam.observed_universal_effects[grounded_action.name].values():
+        assert len(possible_effects) == 0
 
 
 def test_find_literals_existing_in_state_correctly_selects_literals_with_the_additional_parameter(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=nurikabe_observation.components[0].previous_state,
-        next_state=nurikabe_observation.components[0].next_state)
     extra_parameter_name = "?c"
     predicates_in_state = nurikabe_conditional_sam._find_literals_existing_in_state(
         grounded_action=grounded_action,
-        positive_predicates=nurikabe_conditional_sam.previous_state_positive_predicates,
-        negative_predicates=nurikabe_conditional_sam.previous_state_negative_predicates,
+        grounded_predicates=nurikabe_conditional_sam.triplet_snapshot.previous_state_predicates,
         extra_grounded_object="pos-0-2",
         extra_lifted_object=extra_parameter_name)
 
@@ -212,19 +165,15 @@ def test_find_literals_existing_in_state_correctly_selects_literals_with_the_add
 def test_find_literals_existing_in_state_does_not_choose_literals_that_might_match_the_action_parameter_without_the_added_variable(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     grounded_action = nurikabe_observation.components[0].grounded_action_call
     nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action,
-        previous_state=nurikabe_observation.components[0].previous_state,
-        next_state=nurikabe_observation.components[0].next_state)
-
     extra_parameter_name = "?c"
     predicates_in_state = nurikabe_conditional_sam._find_literals_existing_in_state(
         grounded_action=grounded_action,
-        positive_predicates=nurikabe_conditional_sam.previous_state_positive_predicates,
-        negative_predicates=nurikabe_conditional_sam.previous_state_negative_predicates,
+        grounded_predicates=nurikabe_conditional_sam.triplet_snapshot.previous_state_predicates,
         extra_grounded_object="pos-0-2",
         extra_lifted_object=extra_parameter_name)
 
@@ -234,12 +183,9 @@ def test_find_literals_existing_in_state_does_not_choose_literals_that_might_mat
 def test_remove_existing_previous_state_quantified_dependencies_removes_correct_predicates_from_literals_that_are_effects_only(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
-    previous_state = nurikabe_observation.components[0].previous_state
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
     not_dependencies = {"(moving )", "(not (painted ?to))", "(connected ?from ?to)"}
@@ -253,12 +199,9 @@ def test_remove_existing_previous_state_quantified_dependencies_removes_correct_
 def test_remove_existing_previous_state_quantified_dependencies_tries_to_remove_from_a_literal_that_does_not_contain_a_matching_parameter_not_will_fail(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
-    previous_state = nurikabe_observation.components[0].previous_state
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     grounded_action = ActionCall(name="start-painting", grounded_parameters=["pos-1-2", "g3", "n1", "n2"])
-    next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
     try:
@@ -270,28 +213,25 @@ def test_remove_existing_previous_state_quantified_dependencies_tries_to_remove_
 def test_remove_existing_previous_state_quantified_dependencies_shrinks_dependencies_from_previous_iteration(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
-    previous_state = nurikabe_observation.components[0].previous_state
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     previous_dependencies_size = 16
     nurikabe_conditional_sam._remove_existing_previous_state_quantified_dependencies(grounded_action)
     assert any(len(dependencies) < previous_dependencies_size for dependencies in
-               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name]["cell"].possible_antecedents.values())
+               nurikabe_conditional_sam.quantified_antecedents[grounded_action.name][
+                   "cell"].possible_antecedents.values())
 
 
 def test_remove_non_existing_previous_state_quantified_dependencies_does_not_raise_error(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     previous_state = nurikabe_observation.components[0].previous_state
     grounded_action = nurikabe_observation.components[0].grounded_action_call
     next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     try:
         nurikabe_conditional_sam._remove_non_existing_previous_state_quantified_dependencies(
@@ -301,70 +241,116 @@ def test_remove_non_existing_previous_state_quantified_dependencies_does_not_rai
         pytest.fail(f"Unexpected error: {e}")
 
 
-def test_construct_universal_effects_from_dependency_set_constructs_correct_conditional_effect(
+def test_construct_universal_effects_from_dependency_set_will_not_add_conditional_effect_if_the_literal_not_observed_as_an_effect(
         nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
         nurikabe_domain: Domain):
-    previous_state = nurikabe_observation.components[0].previous_state
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
-
-    dependency_set = DependencySet(max_size_antecedents=1)
+    extended_signature = {**nurikabe_domain.actions[grounded_action.name].signature,
+                          "?c": nurikabe_domain.types["cell"]}
+    dependency_set = DependencySet(max_size_antecedents=1,
+                                   action_signature=extended_signature,
+                                   domain_constants=nurikabe_domain.constants)
     dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
     test_action = nurikabe_conditional_sam.partial_domain.actions["move"]
-    ground_action = ActionCall(name="move", grounded_parameters=["pos-0-0", "pos-0-1"])
-    nurikabe_conditional_sam._initialize_universal_dependencies(ground_action)
+    nurikabe_conditional_sam.observed_universal_effects[test_action.name]["cell"] = {"(blocked ?c)"}
+    nurikabe_conditional_sam.additional_parameters[test_action.name]["cell"] = "?c"
+    nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects.add(
+        UniversalEffect("?c", nurikabe_domain.types["cell"]))
+    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(
+        test_action, dependency_set, "cell", "(not (available ?c))")
+    universal_effect = \
+        [effect for effect in nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects
+         if effect.quantified_type.name == "cell"][0]
+    assert len(universal_effect.conditional_effects) == 0
+
+
+def test_construct_universal_effects_from_dependency_set_when_the_literal_is_safe_returns_the_effect_with_the_correct_result(
+        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
+        nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
+    grounded_action = nurikabe_observation.components[0].grounded_action_call
+    extended_signature = {**nurikabe_domain.actions[grounded_action.name].signature,
+                          "?c": nurikabe_domain.types["cell"]}
+    dependency_set = DependencySet(max_size_antecedents=1,
+                                   action_signature=extended_signature,
+                                   domain_constants=nurikabe_domain.constants)
+    dependency_set.possible_antecedents = {
+        "(blocked ?c)": [{"(connected ?to ?c)"}],
+        "(not (available ?c))": [{"(available ?c)"}]
+    }
+    test_action = nurikabe_conditional_sam.partial_domain.actions["move"]
+    nurikabe_conditional_sam.observed_universal_effects[test_action.name]["cell"] = {"(blocked ?c)"}
+    nurikabe_conditional_sam.additional_parameters[test_action.name]["cell"] = "?c"
+    nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects.add(
+        UniversalEffect("?c", nurikabe_domain.types["cell"]))
     nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(
         test_action, dependency_set, "cell", "(blocked ?c)")
     universal_effect = \
         [effect for effect in nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects
          if effect.quantified_type.name == "cell"][0]
-    print(universal_effect)
+    print(str(universal_effect))
 
     effect = universal_effect.conditional_effects.pop()
-    assert len(effect.positive_conditions) == 1
+    assert len(effect.discrete_effects) == 1
+    assert [eff.untyped_representation for eff in effect.discrete_effects] == ["(blocked ?c)"]
 
 
-def test_construct_universal_effects_from_dependency_set_constructs_correct_universal_effect(
-        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation):
+def test_construct_universal_effects_from_dependency_set_constructs_with_more_than_one_conditional_effect_when_called_with_two_safe_effects(
+        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
+        nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     tested_type = "cell"
-    previous_state = nurikabe_observation.components[0].previous_state
     grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
-    next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
-
-    dependency_set = DependencySet(max_size_antecedents=1)
+    extended_signature = {**nurikabe_domain.actions[grounded_action.name].signature,
+                          "?c": nurikabe_domain.types["cell"]}
+    dependency_set = DependencySet(max_size_antecedents=1,
+                                   action_signature=extended_signature,
+                                   domain_constants=nurikabe_domain.constants)
     dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
-    nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
+    nurikabe_conditional_sam.observed_universal_effects[test_action.name]["cell"] = {"(blocked ?c)",
+                                                                                     "(not (available ?c))"}
+    nurikabe_conditional_sam.additional_parameters[test_action.name]["cell"] = "?c"
+    nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects.add(
+        UniversalEffect("?c", nurikabe_domain.types["cell"]))
+
     nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(
         test_action, dependency_set, tested_type, "(not (available ?c))")
-    assert any(len(effect.conditional_effects) > 0 for effect in test_action.universal_effects)
+    nurikabe_conditional_sam._construct_universal_effects_from_dependency_set(
+        test_action, dependency_set, tested_type, "(blocked ?c)")
+
+    universal_effect = \
+        [effect for effect in nurikabe_conditional_sam.partial_domain.actions[test_action.name].universal_effects
+         if effect.quantified_type.name == "cell"][0]
+
+    assert len(universal_effect.conditional_effects) == 2
     for effect in test_action.universal_effects:
         print(str(effect))
 
 
 def test_construct_restrictive_universal_preconditions_creates_correct_restrictive_preconditions_for_the_action(
-        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation):
+        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
+        nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     tested_type = "cell"
-    previous_state = nurikabe_observation.components[0].previous_state
     grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
-    next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
+    extended_signature = {**nurikabe_domain.actions[grounded_action.name].signature,
+                          "?c": nurikabe_domain.types["cell"]}
 
-    dependency_set = DependencySet(max_size_antecedents=1)
+    dependency_set = DependencySet(max_size_antecedents=1,
+                                   action_signature=extended_signature,
+                                   domain_constants=nurikabe_domain.constants)
     dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
@@ -374,22 +360,36 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
     nurikabe_conditional_sam._construct_restrictive_preconditions(
         test_action, dependency_set, "(blocked ?c)", tested_type)
 
-    print(test_action.manual_preconditions)
-    assert test_action.manual_preconditions == [
-        "(forall (?c - cell) (or (blocked ?c) (and (not (connected ?to ?c)))))"]
+    # "(forall (?c - cell) (or (blocked ?c) (and (not (connected ?to ?c)))))"
+    assert len(test_action.preconditions.root.operands) == 1
+    universal_precondition = test_action.preconditions.root.operands.pop()
+    assert isinstance(universal_precondition, UniversalPrecondition)
+    assert universal_precondition.quantified_parameter == "?c"
+    assert universal_precondition.quantified_type.name == "cell"
+    assert len(universal_precondition.operands) == 1
+    first_layer_condition = universal_precondition.operands.pop()
+    assert first_layer_condition.binary_operator == "or"
+    for cond in first_layer_condition.operands:
+        if isinstance(cond, Predicate):
+            assert cond.untyped_representation == "(blocked ?c)"
+        if isinstance(cond, Precondition):
+            assert str(cond) == "(and (not (connected ?to ?c)))"
 
 
 def test_construct_restrictive_universal_preconditions_creates_correct_restrictive_preconditions_for_the_action_when_literal_is_effect(
-        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation):
+        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
+        nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     tested_type = "cell"
-    previous_state = nurikabe_observation.components[0].previous_state
     grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
-    next_state = nurikabe_observation.components[0].next_state
     nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
 
-    dependency_set = DependencySet(max_size_antecedents=1)
+    extended_signature = {**nurikabe_domain.actions[grounded_action.name].signature,
+                          "?c": nurikabe_domain.types["cell"]}
+    dependency_set = DependencySet(max_size_antecedents=1,
+                                   action_signature=extended_signature,
+                                   domain_constants=nurikabe_domain.constants)
     dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
@@ -400,23 +400,35 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
     nurikabe_conditional_sam.observed_universal_effects[test_action.name][tested_type].add("(blocked ?c)")
     nurikabe_conditional_sam._construct_restrictive_preconditions(
         test_action, dependency_set, "(blocked ?c)", tested_type)
-
-    print(test_action.manual_preconditions)
-    assert test_action.manual_preconditions == [
-        "(forall (?c - cell) (or (blocked ?c) (and (not (connected ?to ?c))) (and (connected ?to ?c))))"]
+    # "(forall (?c - cell) (or (blocked ?c) (and (not (connected ?to ?c))) (and (connected ?to ?c))))"
+    assert len(test_action.preconditions.root.operands) == 1
+    universal_precondition = test_action.preconditions.root.operands.pop()
+    assert isinstance(universal_precondition, UniversalPrecondition)
+    assert universal_precondition.quantified_parameter == "?c"
+    assert universal_precondition.quantified_type.name == "cell"
+    assert len(universal_precondition.operands) == 1
+    first_layer_condition = universal_precondition.operands.pop()
+    assert first_layer_condition.binary_operator == "or"
+    for cond in first_layer_condition.operands:
+        if isinstance(cond, Predicate):
+            assert cond.untyped_representation == "(blocked ?c)"
+        if isinstance(cond, Precondition):
+            assert str(cond) in ["(and (not (connected ?to ?c)))", "(and (connected ?to ?c))"]
 
 
 def test_construct_restrictive_universal_effect_constructs_correct_restrictive_universal_effect(
-        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation):
+        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation,
+        nurikabe_domain: Domain):
+    sync_snapshot(nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects,
+                  should_include_all_objects=True)
     tested_type = "cell"
-    previous_state = nurikabe_observation.components[0].previous_state
     grounded_action = ActionCall(name="move-painting", grounded_parameters=["pos-0-0", "pos-0-1", "g1", "n1", "n2"])
-    next_state = nurikabe_observation.components[0].next_state
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam._create_fully_observable_triplet_predicates(
-        current_action=grounded_action, previous_state=previous_state, next_state=next_state, should_ignore_action=True)
 
-    dependency_set = DependencySet(max_size_antecedents=1)
+    extended_signature = {**nurikabe_domain.actions[grounded_action.name].signature,
+                          "?c": nurikabe_domain.types["cell"]}
+    dependency_set = DependencySet(max_size_antecedents=1,
+                                   action_signature=extended_signature,
+                                   domain_constants=nurikabe_domain.constants)
     dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
@@ -429,8 +441,14 @@ def test_construct_restrictive_universal_effect_constructs_correct_restrictive_u
     nurikabe_conditional_sam._construct_restrictive_universal_effect(
         test_action, tested_type, "(blocked ?c)")
 
-    for universal_effect in test_action.universal_effects:
-        print(universal_effect)
+    non_empty_effects = [eff for eff in test_action.universal_effects if len(eff.conditional_effects) > 0]
+    assert len(non_empty_effects) == 1
+    universal_effect = non_empty_effects[0]
+    assert universal_effect.quantified_parameter == "?c"
+    assert universal_effect.quantified_type.name == "cell"
+    assert len(universal_effect.conditional_effects) == 1
+    conditional_effect = universal_effect.conditional_effects.pop()
+    assert [eff.untyped_representation for eff in conditional_effect.discrete_effects] == ["(blocked ?c)"]
 
 
 def test_handle_single_trajectory_component_updates_correct_observed_effects_for_conditional_effects_and_universal_effects(
@@ -443,18 +461,6 @@ def test_handle_single_trajectory_component_updates_correct_observed_effects_for
     for observed_effects in nurikabe_conditional_sam.observed_universal_effects[
         first_component.grounded_action_call.name].values():
         assert len(observed_effects) == 0
-
-
-def test_verify_and_construct_safe_conditional_effects_does_not_change_observed_effects(
-        nurikabe_conditional_sam: UniversallyConditionalSAM, nurikabe_observation: Observation):
-    first_component = nurikabe_observation.components[0]
-    nurikabe_conditional_sam.current_trajectory_objects = nurikabe_observation.grounded_objects
-    nurikabe_conditional_sam.handle_single_trajectory_component(first_component)
-    test_action = nurikabe_conditional_sam.partial_domain.actions[first_component.grounded_action_call.name]
-    nurikabe_conditional_sam._verify_and_construct_safe_conditional_effects(test_action)
-
-    expected_effects = {"(robot-pos ?to)", "(not (robot-pos ?from))"}
-    actual_effects = nurikabe_conditional_sam.observed_effects[first_component.grounded_action_call.name]
 
 
 def test_learn_action_model_learns_restrictive_action_mode(

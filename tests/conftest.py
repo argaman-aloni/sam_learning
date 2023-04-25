@@ -11,7 +11,9 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     ROVERS_COMBINED_PROBLEM_PATH, ROVERS_COMBINED_TRAJECTORY_PATH, LOGISTICS_DOMAIN_PATH, SPIDER_DOMAIN_PATH, \
     SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, DEPOTS_NUMERIC_DOMAIN_PATH, DEPOTS_NUMERIC_PROBLEM_PATH, \
     DEPOT_NUMERIC_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH, MINECRAFT_DOMAIN_PATH, MINECRAFT_PROBLEM_PATH, \
-    MINECRAFT_TRAJECTORY_PATH, SATELLITE_DOMAIN_PATH, SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH
+    MINECRAFT_TRAJECTORY_PATH, SATELLITE_DOMAIN_PATH, SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, \
+    NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
+    ADL_SATELLITE_TRAJECTORY_PATH
 from tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
 
 
@@ -131,6 +133,32 @@ def depot_observation(depot_domain: Domain, depot_problem: Problem) -> Observati
 @fixture()
 def nurikabe_domain() -> Domain:
     return DomainParser(NURIKABE_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def nurikabe_problem(nurikabe_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=NURIKABE_PROBLEM_PATH, domain=nurikabe_domain).parse_problem()
+
+
+@fixture()
+def nurikabe_observation(nurikabe_domain: Domain, nurikabe_problem: Problem) -> Observation:
+    return TrajectoryParser(nurikabe_domain, nurikabe_problem).parse_trajectory(NURIKABE_TRAJECTORY_PATH)
+
+
+@fixture()
+def satellite_adl_domain() -> Domain:
+    return DomainParser(ADL_SATELLITE_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def satellite_adl_problem(satellite_adl_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=ADL_SATELLITE_PROBLEM_PATH, domain=satellite_adl_domain).parse_problem()
+
+
+@fixture()
+def satellite_adl_observation(satellite_adl_domain: Domain, satellite_adl_problem: Problem) -> Observation:
+    return TrajectoryParser(satellite_adl_domain, satellite_adl_problem).parse_trajectory(ADL_SATELLITE_TRAJECTORY_PATH)
+
 
 
 @fixture()
