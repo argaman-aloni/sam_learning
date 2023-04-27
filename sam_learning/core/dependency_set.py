@@ -185,6 +185,9 @@ class DependencySet:
         """
         self.logger.info("Extracting the tuple of the safe antecedents for the literal %s", literal)
         antecedents_copy = self.possible_antecedents[literal].copy()
+        if len(antecedents_copy) == 0:
+            return set()
+
         safe_antecedents = antecedents_copy.pop()
         return safe_antecedents
 

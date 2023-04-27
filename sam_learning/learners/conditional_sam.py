@@ -190,7 +190,8 @@ class ConditionalSAM(SAMLearner):
         is_effect = literal in self.observed_effects[action.name]
         conservative_preconditions = action_dependency_set.construct_restrictive_preconditions(
             action.preconditions_str_set, literal, is_effect)
-        action.preconditions.root.add_condition(conservative_preconditions)
+        if conservative_preconditions is not None:
+            action.preconditions.add_condition(conservative_preconditions)
 
     def _construct_antecedents(self, action: LearnerAction, action_dependency_set: DependencySet,
                                conditional_effect: ConditionalEffect, literal: str,
@@ -207,7 +208,7 @@ class ConditionalSAM(SAMLearner):
         """
         antecedents = action_dependency_set.extract_safe_antecedents(literal)
         for antecedent in antecedents:
-            conditional_effect.antecedents.root.add_condition(extract_predicate_data(
+            conditional_effect.antecedents.add_condition(extract_predicate_data(
                 action.signature, antecedent, self.partial_domain.constants, additional_parameter,
                 additional_parameter_type))
 
@@ -293,7 +294,8 @@ class ConditionalSAM(SAMLearner):
                 effects_to_remove.add(other_effect)
 
             for effect_to_remove in effects_to_remove:
-                conditional_effects.remove(effect_to_remove)
+                if effect_to_remove in conditional_effects:
+                    conditional_effects.remove(effect_to_remove)
 
         return compressed_effects
 

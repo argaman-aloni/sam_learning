@@ -13,7 +13,8 @@ from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
 from experiments.utils import init_numeric_performance_calculator
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM
+from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM, \
+    UniversallyConditionalSAM
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
@@ -29,6 +30,7 @@ LEARNING_ALGORITHMS = {
     LearningAlgorithmType.raw_numeric_sam: NumericSAMLearner,
     LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
     LearningAlgorithmType.conditional_sam: ConditionalSAM,
+    LearningAlgorithmType.universal_sam: UniversallyConditionalSAM,
 }
 
 
@@ -64,8 +66,6 @@ class POL:
         if fluents_map_path is not None:
             with open(fluents_map_path, "rt") as json_file:
                 self.fluents_map = json.load(json_file)
-
-
         else:
             self.fluents_map = None
 
@@ -136,10 +136,10 @@ class POL:
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
 
-        # if self._learning_algorithm in NUMERIC_ALGORITHMS:
-        #     self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
-        #
-        # self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
+        if self._learning_algorithm in NUMERIC_ALGORITHMS:
+            self.numeric_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+
+        self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
@@ -182,15 +182,15 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the POL algorithm on the input domain.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
-    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6, 9],
+    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6, 9, 10],
                         help="The type of learning algorithm. "
                              "\n 1: sam_learning\n2: esam_learning\n3: numeric_sam\n4: raw_numeric_sam\n"
-                             "6: polynomial_sam\n 9: conditional_sam")
+                             "6: polynomial_sam\n 9: conditional_sam\n 10: universal_sam")
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
                                                                    "fluents", default=None)
     parser.add_argument("--universals_map", required=False, help="The path to the file mapping indicating whether there are usinversals or not", default=None)
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
-                        help="The solver that should be used for the sake of validation", default=3)
+                        help="The solver that should be used for the sake of validation.\n FD - 1, Metric-FF - 2, ENHSP - 3.", default=3)
     parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size", default=1)
 
     args = parser.parse_args()

@@ -117,7 +117,7 @@ class DomainValidator:
         :return: the number of trajectory triplets in the used observations.
         """
         for observation in used_observations:
-            if not isinstance(observation, Observation) and not isinstance(observation, MultiAgentObservation):
+            if isinstance(observation, Path):
                 with open(observation, "r") as observation_file:
                     num_operators = 0
                     for line in observation_file.readlines():

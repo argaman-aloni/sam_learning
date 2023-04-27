@@ -76,6 +76,31 @@ def test_update_action_preconditions_reduces_the_number_of_positive_predicates_b
     assert all([p.startswith("(not") for p in negative_preconditions])
 
 
+def test_update_action_preconditions_does_not_add_preconditions_not_observed_previously_when_first_added_the_action(
+        elevators_sam_learning: SAMLearner, elevators_observation: Observation):
+    observation_component = elevators_observation.components[0]
+    previous_state = observation_component.previous_state
+    next_state = observation_component.next_state
+    test_action_call = observation_component.grounded_action_call
+    test_partial_previous_state = previous_state.copy()
+    test_partial_previous_state.state_predicates["(reachable-floor ?lift ?floor)"] = set()
+    first_component = ObservedComponent(previous_state=test_partial_previous_state,
+                                        next_state=next_state, call=test_action_call)
+    sync_snapshot(elevators_sam_learning, first_component, elevators_observation.grounded_objects)
+
+    elevators_sam_learning.add_new_action(grounded_action=test_action_call,
+                                          previous_state=test_partial_previous_state,
+                                          next_state=next_state)
+    print(str(elevators_sam_learning.partial_domain.actions["move-down-slow"].preconditions))
+
+    second_component = ObservedComponent(previous_state=previous_state, next_state=next_state, call=test_action_call)
+    sync_snapshot(elevators_sam_learning, second_component, elevators_observation.grounded_objects)
+    elevators_sam_learning._update_action_preconditions(test_action_call)
+    discrete_preconditions = extract_preconditions_predicates(
+        elevators_sam_learning.partial_domain.actions["move-down-slow"].preconditions)
+    assert "(reachable-floor ?lift ?f2)" not in [precond.untyped_representation for precond in discrete_preconditions]
+
+
 def test_update_action_preconditions_reduces_the_number_of_negative_predicates_but_does_not_remove_actual_preconditions(
         elevators_sam_learning: SAMLearner, elevators_observation: Observation):
     observation_component = elevators_observation.components[0]

@@ -256,6 +256,14 @@ def test_extract_safe_antecedents_extracts_correct_set_of_literals():
     assert result_antecedents == antecedents
 
 
+def test_extract_safe_antecedents_empty_set_when_there_are_no_antecedents():
+    """Test that extract_safe_conditionals returns the correct set of literals."""
+    dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
+    dependency_set.possible_antecedents = {"a": []}
+    result_antecedents = dependency_set.extract_safe_antecedents("a")
+    assert len(result_antecedents) == 0
+
+
 def test_construct_restrictive_preconditions_returns_none_if_result_predicate_is_in_preconditions(
         do_saw_predicates: Set[Predicate], woodworking_domain: Domain):
     test_signature = woodworking_domain.actions["do-saw-small"].signature

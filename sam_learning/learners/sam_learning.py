@@ -57,8 +57,7 @@ class SAMLearner:
         :return: the effect containing the add and del list of predicates.
         """
         self.logger.debug(f"Starting to learn the effects of {str(grounded_action)}.")
-        grounded_add_effects, grounded_del_effects = extract_effects(
-            previous_state, next_state, add_predicates_sign=True)
+        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         self.logger.debug("Updating the negative state predicates based on the action's execution.")
         lifted_add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
         lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_del_effects))
@@ -73,8 +72,14 @@ class SAMLearner:
         previous_state_predicates = set(self.matcher.get_possible_literal_matches(
             grounded_action, list(self.triplet_snapshot.previous_state_predicates)))
 
-        for predicate in previous_state_predicates:
-            current_action.preconditions.root.add_condition(predicate)
+        conditions_to_remove = []
+        for current_precondition in current_action.preconditions.root.operands:
+            # assuming that the predicates in the preconditions are NOT nested.
+            if isinstance(current_precondition, Predicate) and current_precondition not in previous_state_predicates:
+                conditions_to_remove.append(current_precondition)
+
+        for condition in conditions_to_remove:
+            current_action.preconditions.remove_condition(condition)
 
     def _add_new_action_preconditions(self, grounded_action: ActionCall) -> None:
         """General method to add new action's discrete preconditions.
@@ -86,7 +91,7 @@ class SAMLearner:
             grounded_action, list(self.triplet_snapshot.previous_state_predicates)))
 
         for predicate in previous_state_predicates:
-            current_action.preconditions.root.add_condition(predicate)
+            current_action.preconditions.add_condition(predicate)
 
     def _construct_learning_report(self) -> Dict[str, str]:
         """Constructs the learning report of the learned actions.

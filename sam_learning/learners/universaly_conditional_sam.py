@@ -281,7 +281,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
             quantified_type=self.partial_domain.types[quantified_type])
         if conservative_preconditions is not None:
             universal_precondition.add_condition(conservative_preconditions)
-        action.preconditions.root.add_condition(universal_precondition)
+        action.preconditions.add_condition(universal_precondition)
 
     def _verify_and_construct_safe_universal_effects(self, action: LearnerAction) -> None:
         """Constructs the single-agent actions that are safe to execute."""
