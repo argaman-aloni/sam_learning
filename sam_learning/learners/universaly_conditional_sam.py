@@ -22,9 +22,11 @@ class UniversallyConditionalSAM(ConditionalSAM):
     quantified_antecedents: Dict[str, Dict[str, DependencySet]]  # action_name -> type_name -> dependency_set
     additional_parameters: Dict[str, Dict[str, str]]  # action_name -> type_name -> parameter_name
     observed_universal_effects: Dict[str, Dict[str, Set[str]]]
+    universals_map: Dict[str, bool]
 
     def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
-                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
+                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 universals_map: Dict[str, bool] = None):
         super().__init__(partial_domain, max_antecedents_size, preconditions_fluent_map)
         self.logger = logging.getLogger(__name__)
         self.quantified_antecedents = {action_name: {} for action_name in self.partial_domain.actions}
@@ -32,6 +34,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         self.observed_universal_effects = {action_name: {
             type_name: set() for type_name in self.partial_domain.types if type_name != "object"}
             for action_name in self.partial_domain.actions}
+        self.universals_map = universals_map if universals_map is not None else {}
 
     def _create_antecedents_and_results_dicts(
             self, additional_parameter_name: str, lifted_action_signature: Dict[str, PDDLType],
@@ -75,20 +78,6 @@ class UniversallyConditionalSAM(ConditionalSAM):
             self.partial_domain.actions[ground_action.name].universal_effects.add(
                 UniversalEffect(additional_param, pddl_type))
 
-    def _update_quantified_effects(
-            self, observed_effects: List[Predicate], grounded_action: ActionCall, pddl_type_name: str,
-            non_conditional_effects: Set[str]) -> None:
-        """Update the quantified effects of the action.
-
-        :param observed_effects: the lifted effects observed in the state (including quantified ones).
-        :param grounded_action: the grounded action that is currently being executed.
-        :param pddl_type_name: the name of the type of the additional parameter.
-        :param non_conditional_effects: the non quantified effects of the action to difference from.
-        """
-        observed_action_effects = {effect.untyped_representation for effect in observed_effects}
-        self.observed_universal_effects[grounded_action.name][pddl_type_name].update(
-            observed_action_effects.difference(non_conditional_effects))
-
     def _update_observed_effects(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Set the correct data for the action's effects.
 
@@ -100,17 +89,20 @@ class UniversallyConditionalSAM(ConditionalSAM):
         super()._update_observed_effects(grounded_action, previous_state, next_state)
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         grounded_effects = list(grounded_add_effects.union(grounded_del_effects))
-        lifted_simple_effects = super()._extract_lifted_conditional_effects(
-            grounded_action, previous_state=previous_state, next_state=next_state)
 
         self.logger.debug("adding observed universal effects.")
-        for pddl_object, parameter_type, parameter_name in iterate_over_objects_of_same_type(
-                trajectory_objects=self.current_trajectory_objects,
-                action_additional_parameters=self.additional_parameters[grounded_action.name],
-                exclude_list=grounded_action.parameters):
-            lifted_effects = self.matcher.get_possible_literal_matches(
-                grounded_action, grounded_effects, pddl_object.name, parameter_name)
-            self._update_quantified_effects(lifted_effects, grounded_action, parameter_type, lifted_simple_effects)
+        action_parameters = grounded_action.parameters
+        universal_effects = [eff for eff in grounded_effects if
+                             len(set(eff.grounded_objects).difference(action_parameters)) > 0]
+        for effect in universal_effects:
+            # we assume that there can only be one additional parameter per effect
+            additional_object = [obj for obj in effect.grounded_objects if obj not in action_parameters][0]
+            pddl_object = self.current_trajectory_objects[additional_object]
+            additional_parameter = self.additional_parameters[grounded_action.name][pddl_object.type.name]
+            lifted_effect = self.matcher.match_predicate_to_action_literals(
+                effect, grounded_action, pddl_object.name, additional_parameter)[0]
+            self.observed_universal_effects[grounded_action.name][pddl_object.type.name].add(
+                lifted_effect.untyped_representation)
 
     def _reduce_state_predicates_based_on_types(self, state_predicates: Set[GroundedPredicate],
                                                 legal_parameters: List[str]) -> Set[GroundedPredicate]:
@@ -138,8 +130,6 @@ class UniversallyConditionalSAM(ConditionalSAM):
         objects_by_type = find_unique_objects_by_type(self.current_trajectory_objects, grounded_action.parameters)
         for type_name, additional_param in self.additional_parameters[grounded_action.name].items():
             pddl_objects = objects_by_type[type_name]
-            not_results, antecedents = set(), set()
-
             for pddl_object in pddl_objects:
                 allowed_objects = [*grounded_action.parameters, pddl_object.name]
                 reduced_previous_state = self._reduce_state_predicates_based_on_types(
@@ -147,17 +137,17 @@ class UniversallyConditionalSAM(ConditionalSAM):
                 reduced_next_state = self._reduce_state_predicates_based_on_types(
                     self.triplet_snapshot.next_state_predicates, allowed_objects)
 
-                not_results.update(self._find_literals_not_in_state(
-                    grounded_action, reduced_next_state, pddl_object.name, additional_param))
-                antecedents.update(self._find_literals_existing_in_state(grounded_action, reduced_previous_state,
-                                                                         pddl_object.name, additional_param))
+                not_results = self._find_literals_not_in_state(
+                    grounded_action, reduced_next_state, pddl_object.name, additional_param)
+                antecedents = self._find_literals_existing_in_state(
+                    grounded_action, reduced_previous_state, pddl_object.name, additional_param)
 
-            for literal in not_results:
-                type_dependency = self.quantified_antecedents[grounded_action.name][type_name]
-                if not type_dependency.is_possible_result(literal):
-                    continue
+                for literal in not_results:
+                    type_dependency = self.quantified_antecedents[grounded_action.name][type_name]
+                    if not type_dependency.is_possible_result(literal) or literal in self.observed_universal_effects:
+                        continue
 
-                type_dependency.remove_dependencies(literal, antecedents, include_supersets=True)
+                    type_dependency.remove_dependencies(literal, antecedents)
 
         self.logger.debug(f"Done removing existing previous state quantified dependencies for every object.")
 
@@ -174,23 +164,25 @@ class UniversallyConditionalSAM(ConditionalSAM):
                           "observed in s'/ s.")
         grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         grounded_effects = list(grounded_add_effects.union(grounded_del_effects))
-        for pddl_object, parameter_type, parameter_name in iterate_over_objects_of_same_type(
-                self.current_trajectory_objects, self.additional_parameters[grounded_action.name],
-                grounded_action.parameters):
-            allowed_objects = [*grounded_action.parameters, pddl_object.name]
+        action_parameters = grounded_action.parameters
+        universal_effects = [eff for eff in grounded_effects if
+                             len(set(eff.grounded_objects).difference(action_parameters)) > 0]
+
+        for effect in universal_effects:
+            # we assume that there can only be one additional parameter per effect
+            additional_object = [obj for obj in effect.grounded_objects if obj not in action_parameters][0]
+            allowed_objects = [*action_parameters, additional_object]
+            pddl_object = self.current_trajectory_objects[additional_object]
+            additional_parameter = self.additional_parameters[grounded_action.name][pddl_object.type.name]
+            lifted_effect = self.matcher.match_predicate_to_action_literals(
+                effect, grounded_action, pddl_object.name, additional_parameter)[0]
             reduced_previous_state = self._reduce_state_predicates_based_on_types(
                 self.triplet_snapshot.previous_state_predicates, allowed_objects)
-            lifted_effects = self.matcher.get_possible_literal_matches(
-                grounded_action, grounded_effects, pddl_object.name, parameter_name)
-            missing_pre_state_literals = self._find_literals_not_in_state(grounded_action, reduced_previous_state,
-                                                                          pddl_object.name, parameter_name)
-
-            for literal in lifted_effects:
-                if parameter_name not in literal.signature:
-                    continue
-
-                self.quantified_antecedents[grounded_action.name][parameter_type].remove_dependencies(
-                    literal=literal.untyped_representation, literals_to_remove=missing_pre_state_literals)
+            missing_pre_state_literals = self._find_literals_not_in_state(
+                grounded_action, reduced_previous_state, pddl_object.name, additional_parameter)
+            self.quantified_antecedents[grounded_action.name][pddl_object.type.name].remove_dependencies(
+                literal=lifted_effect.untyped_representation, literals_to_remove=missing_pre_state_literals,
+                include_supersets=True)
 
     def _remove_not_antecedents(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -321,6 +313,10 @@ class UniversallyConditionalSAM(ConditionalSAM):
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         observed_action = self.partial_domain.actions[grounded_action.name]
         super()._add_new_action_preconditions(grounded_action)
+        if grounded_action.name not in self.universals_map:
+            super().add_new_action(grounded_action, previous_state, next_state)
+            return
+
         self._apply_inductive_rules(grounded_action, previous_state, next_state)
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
@@ -335,6 +331,10 @@ class UniversallyConditionalSAM(ConditionalSAM):
             state.
         """
         super()._update_action_preconditions(grounded_action)
+        if grounded_action.name not in self.universals_map:
+            super().update_action(grounded_action, previous_state, next_state)
+            return
+
         self._apply_inductive_rules(grounded_action, previous_state, next_state)
         self.logger.debug(f"Done updating the action - {grounded_action.name}")
 
@@ -365,7 +365,11 @@ class UniversallyConditionalSAM(ConditionalSAM):
             action_name: self.partial_domain.actions[action_name] for action_name in self.observed_actions}
 
         for action in self.partial_domain.actions.values():
+            self.conditional_antecedents[action.name].remove_preconditions_literals(action.preconditions_str_set)
             super()._verify_and_construct_safe_conditional_effects(action)
+            if action.name not in self.universals_map or not self.universals_map[action.name]:
+                continue
+
             self._remove_preconditions_from_antecedents(action)
             self._verify_and_construct_safe_universal_effects(action)
             self.logger.debug(f"Finished handling action {action.name}.")

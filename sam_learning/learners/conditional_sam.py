@@ -123,7 +123,7 @@ class ConditionalSAM(SAMLearner):
             grounded_action, self.triplet_snapshot.previous_state_predicates)
         for literal in missing_next_state_literals:
             self.conditional_antecedents[grounded_action.name].remove_dependencies(
-                literal=literal, literals_to_remove=previous_state_literals, include_supersets=True)
+                literal=literal, literals_to_remove=previous_state_literals)
         self.logger.debug(f"Done removing existing previous state dependencies.")
 
     def _remove_non_existing_previous_state_dependencies(
@@ -143,7 +143,7 @@ class ConditionalSAM(SAMLearner):
             grounded_action, self.triplet_snapshot.previous_state_predicates)
         for literal in effects:
             self.conditional_antecedents[grounded_action.name].remove_dependencies(
-                literal=literal, literals_to_remove=missing_pre_state_literals)
+                literal=literal, literals_to_remove=missing_pre_state_literals, include_supersets=True)
 
     def _update_observed_effects(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Set the correct data for the action's effects.

@@ -71,7 +71,8 @@ def test_extract_superset_dependencies_when_the_literal_is_not_subset_of_other_d
     """Test the extraction of superset dependencies when the literal is not subset of other dependencies."""
     dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
     dependency_set.possible_antecedents = {"a": [{"a", "b"}, {"a", "c"}], "b": [{"b", "c"}]}
-    assert dependency_set._extract_superset_dependencies("a", [{"a", "d"}]) == []
+    superset_dep = dependency_set._extract_superset_dependencies("a", {"a", "d"})
+    assert len(superset_dep) == 2
 
 
 def test_extract_superset_dependencies_creates_supersets_of_dependencies_containing_the_input_literals():
@@ -82,7 +83,7 @@ def test_extract_superset_dependencies_creates_supersets_of_dependencies_contain
     dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
 
     expected_superset_dependencies = [{"a", "b", "c"}, {"a", "b"}, {"a", "c"}, {"a"}]
-    superset_dependencies = dependency_set._extract_superset_dependencies("a", [{"a"}])
+    superset_dependencies = dependency_set._extract_superset_dependencies("a", {"a"})
     assert len(superset_dependencies) == 4
     for expected_superset_dependency in expected_superset_dependencies:
         assert expected_superset_dependency in superset_dependencies

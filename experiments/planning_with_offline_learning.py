@@ -129,9 +129,15 @@ class POL:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
-                                                                    preconditions_fluent_map=self.fluents_map,
-                                                                    max_antecedents_size=self.max_num_antecedents)
+            if self._learning_algorithm == LearningAlgorithmType.universal_sam:
+                learner = UniversallyConditionalSAM(partial_domain=partial_domain,
+                                                    preconditions_fluent_map=self.fluents_map,
+                                                    max_antecedents_size=self.max_num_antecedents,
+                                                    universals_map=self.action_to_universals_map)
+            else:
+                learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
+                                                                        preconditions_fluent_map=self.fluents_map,
+                                                                        max_antecedents_size=self.max_num_antecedents)
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
@@ -188,10 +194,14 @@ def parse_arguments() -> argparse.Namespace:
                              "6: polynomial_sam\n 9: conditional_sam\n 10: universal_sam")
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
                                                                    "fluents", default=None)
-    parser.add_argument("--universals_map", required=False, help="The path to the file mapping indicating whether there are usinversals or not", default=None)
+    parser.add_argument("--universals_map", required=False,
+                        help="The path to the file mapping indicating whether there are usinversals or not",
+                        default=None)
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
-                        help="The solver that should be used for the sake of validation.\n FD - 1, Metric-FF - 2, ENHSP - 3.", default=3)
-    parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size", default=1)
+                        help="The solver that should be used for the sake of validation.\n FD - 1, Metric-FF - 2, ENHSP - 3.",
+                        default=3)
+    parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size",
+                        default=1)
 
     args = parser.parse_args()
     return args

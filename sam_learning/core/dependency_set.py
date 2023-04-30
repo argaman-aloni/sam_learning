@@ -48,7 +48,7 @@ class DependencySet:
         self.domain_constants = domain_constants
         self.logger = logging.getLogger(__name__)
 
-    def _extract_superset_dependencies(self, literal: str, dependencies_to_remove: List[Set[str]]) -> List[Set[str]]:
+    def _extract_superset_dependencies(self, literal: str, dependencies_to_remove: Set[str]) -> List[Set[str]]:
         """Extracts the superset dependencies of the given literal.
 
         :param literal: the literal to check.
@@ -57,10 +57,10 @@ class DependencySet:
         """
         self.logger.debug(f"Extracting superset dependencies for literal {literal}")
         superset_dependencies = []
-        for dependency in self.possible_antecedents[literal]:
+        for antecedents_conjunction in self.possible_antecedents[literal]:
             for dependency_to_remove in dependencies_to_remove:
-                if dependency_to_remove.issubset(dependency):
-                    superset_dependencies.append(dependency)
+                if dependency_to_remove in antecedents_conjunction:
+                    superset_dependencies.append(antecedents_conjunction)
 
         return superset_dependencies
 
@@ -130,8 +130,7 @@ class DependencySet:
         self.logger.info(f"Removing dependencies {literals_to_remove} for literal {literal}")
         dependencies_to_remove = create_antecedents_combination(literals_to_remove, self.max_antecedents)
         if include_supersets:
-            superset_dependencies = self._extract_superset_dependencies(literal, dependencies_to_remove)
-            dependencies_to_remove.extend(superset_dependencies)
+            dependencies_to_remove = self._extract_superset_dependencies(literal, literals_to_remove)
 
         for dependency in dependencies_to_remove:
             if dependency in self.possible_antecedents[literal]:
