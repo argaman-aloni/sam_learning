@@ -7,8 +7,7 @@ from pddl_plus_parser.models import Domain, State, ActionCall, Observation, \
     ObservedComponent, PDDLType, Predicate, UniversalEffect, UniversalPrecondition, GroundedPredicate
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
-    create_additional_parameter_name, find_unique_objects_by_type, \
-    iterate_over_objects_of_same_type
+    create_additional_parameter_name, find_unique_objects_by_type
 from sam_learning.learners.conditional_sam import ConditionalSAM
 
 
@@ -22,7 +21,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
     quantified_antecedents: Dict[str, Dict[str, DependencySet]]  # action_name -> type_name -> dependency_set
     additional_parameters: Dict[str, Dict[str, str]]  # action_name -> type_name -> parameter_name
     observed_universal_effects: Dict[str, Dict[str, Set[str]]]
-    universals_map: Dict[str, bool]
+    universals_map: Dict[str, List[str]]
 
     def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
                  preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
@@ -63,7 +62,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         self.logger.debug("Initializing the universal antecedents candidates for action %s.", ground_action.name)
         action_signature = self.partial_domain.actions[ground_action.name].signature
         for pddl_type_name, pddl_type in self.partial_domain.types.items():
-            if pddl_type_name == "object":
+            if pddl_type_name == "object" or pddl_type_name not in self.universals_map[ground_action.name]:
                 continue
 
             additional_param = create_additional_parameter_name(self.partial_domain, ground_action, pddl_type)
@@ -313,7 +312,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         observed_action = self.partial_domain.actions[grounded_action.name]
         super()._add_new_action_preconditions(grounded_action)
-        if grounded_action.name not in self.universals_map:
+        if grounded_action.name not in self.universals_map or len(self.universals_map[grounded_action.name]) == 0:
             super().add_new_action(grounded_action, previous_state, next_state)
             return
 
@@ -331,7 +330,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
             state.
         """
         super()._update_action_preconditions(grounded_action)
-        if grounded_action.name not in self.universals_map:
+        if grounded_action.name not in self.universals_map or len(self.universals_map[grounded_action.name]) == 0:
             super().update_action(grounded_action, previous_state, next_state)
             return
 
@@ -348,9 +347,12 @@ class UniversallyConditionalSAM(ConditionalSAM):
         next_state = component.next_state
         action_name = grounded_action.name
 
+        specific_types = self.universals_map[action_name] if action_name in self.universals_map and len(
+            self.universals_map[action_name]) > 0 else []
         self.triplet_snapshot.create_snapshot(
             previous_state=previous_state, next_state=next_state, current_action=grounded_action,
-            observation_objects=self.current_trajectory_objects, should_include_all_objects=True)
+            observation_objects=self.current_trajectory_objects,
+            specific_types=specific_types)
         if action_name not in self.observed_actions:
             self._initialize_actions_dependencies(grounded_action)
             self._initialize_universal_dependencies(grounded_action)
@@ -358,6 +360,8 @@ class UniversallyConditionalSAM(ConditionalSAM):
 
         else:
             self.update_action(grounded_action, previous_state, next_state)
+
+        self.logger.debug(f"Finished handling the action {action_name}.")
 
     def construct_safe_actions(self) -> None:
         """Constructs the universal effects of the actions or a conservative version of them."""
@@ -367,7 +371,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         for action in self.partial_domain.actions.values():
             self.conditional_antecedents[action.name].remove_preconditions_literals(action.preconditions_str_set)
             super()._verify_and_construct_safe_conditional_effects(action)
-            if action.name not in self.universals_map or not self.universals_map[action.name]:
+            if action.name not in self.universals_map or len(self.universals_map[action.name]) == 0:
                 continue
 
             self._remove_preconditions_from_antecedents(action)

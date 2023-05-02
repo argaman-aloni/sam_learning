@@ -1,12 +1,10 @@
 """Module containing the datatype of the output domain that the learning algorithms return."""
 from collections import defaultdict
-from typing import Set, List, Dict, Tuple
+from typing import Set, List, Dict
 
 from pddl_plus_parser.models import SignatureType, Predicate, PDDLType, PDDLConstant, PDDLFunction, Domain, \
-    ConditionalEffect, UniversalQuantifiedEffect, UniversalQuantifiedPrecondition, CompoundPrecondition, \
+    ConditionalEffect, CompoundPrecondition, \
     UniversalEffect, NumericalExpressionTree
-
-from .learning_types import ConditionType
 
 DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
 NEGATIVE_PRECONDITIONS_REQ = ":negative-preconditions"

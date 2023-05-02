@@ -1,7 +1,7 @@
 """Represents the current snapshot of the environment."""
 
 import logging
-from typing import Set, Dict
+from typing import Set, Dict, Optional, List
 
 from pddl_plus_parser.models import GroundedPredicate, State, PDDLObject, Domain, ActionCall
 
@@ -61,20 +61,20 @@ class EnvironmentSnapshot:
 
     def create_snapshot(
             self, previous_state: State, next_state: State, current_action: ActionCall,
-            observation_objects: Dict[str, PDDLObject],
-            should_include_all_objects: bool = False) -> None:
+            observation_objects: Dict[str, PDDLObject],  specific_types: Optional[List[str]] = []) -> None:
         """Creates a snapshot of the environment.
 
         :param previous_state: the previous state of the environment.
         :param next_state: the next state of the environment.
         :param current_action: the current action.
         :param observation_objects: the objects in the observation.
+        :param specific_types: the types of the objects to include in the snapshot.
         :param should_include_all_objects: whether to include all objects in the observation.
         """
         self.logger.debug("Creating a snapshot of the environment.")
         relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
-                            if object_name in current_action.parameters} \
-            if not should_include_all_objects else observation_objects
+                            if object_name in current_action.parameters or object_data.type.name in specific_types} \
+
         self.previous_state_predicates = self._create_state_discrete_snapshot(previous_state, relevant_objects)
         self.next_state_predicates = self._create_state_discrete_snapshot(next_state, relevant_objects)
         # TODO: ADD the creation of the functions snapshot.

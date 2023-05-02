@@ -51,7 +51,7 @@ def test_create_state_discrete_snapshot_creates_a_snapshot_with_positive_predica
 
 
 def test_create_snapshot_when_should_not_include_all_objects_creates_lower_number_of_predicates_than_when_with_all_objects(
-        elevators_environment_snapshot: EnvironmentSnapshot, elevators_observation: Observation):
+        elevators_environment_snapshot: EnvironmentSnapshot, elevators_observation: Observation, elevators_domain: Domain):
     observation_component = elevators_observation.components[0]
     previous_state = observation_component.previous_state
     next_state = observation_component.next_state
@@ -59,12 +59,13 @@ def test_create_snapshot_when_should_not_include_all_objects_creates_lower_numbe
     observed_objects = elevators_observation.grounded_objects
     elevators_environment_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=current_action,
-        observation_objects=observed_objects, should_include_all_objects=False)
+        observation_objects=observed_objects)
     num_predicates_without_all_objects = len(elevators_environment_snapshot.previous_state_predicates)
 
+    all_types = [pddl_type for pddl_type in elevators_domain.types if pddl_type != "object"]
     elevators_environment_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=current_action,
-        observation_objects=observed_objects, should_include_all_objects=True)
+        observation_objects=observed_objects, specific_types=all_types)
     num_predicates_with_all_objects = len(elevators_environment_snapshot.previous_state_predicates)
 
     assert num_predicates_without_all_objects < num_predicates_with_all_objects

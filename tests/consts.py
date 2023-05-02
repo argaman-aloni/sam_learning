@@ -94,9 +94,14 @@ def sync_snapshot(sam_learning: SAMLearner, component: ObservedComponent,
     next_state = component.next_state
     test_action_call = component.grounded_action_call
     sam_learning.current_trajectory_objects = trajectory_objects
+    if should_include_all_objects:
+        all_types = [pddl_type for pddl_type in sam_learning.partial_domain.types if pddl_type != "object"]
+    else:
+        all_types = []
+
     sam_learning.triplet_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=test_action_call,
-        observation_objects=trajectory_objects, should_include_all_objects=should_include_all_objects)
+        observation_objects=trajectory_objects, specific_types=all_types)
 
 
 def sync_ma_snapshot(ma_sam: MultiAgentSAM, component: MultiAgentComponent, action_call: ActionCall,
@@ -106,7 +111,7 @@ def sync_ma_snapshot(ma_sam: MultiAgentSAM, component: MultiAgentComponent, acti
     ma_sam.current_trajectory_objects = trajectory_objects
     ma_sam.triplet_snapshot.create_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=action_call,
-        observation_objects=trajectory_objects, should_include_all_objects=False)
+        observation_objects=trajectory_objects)
 
 
 def extract_preconditions_predicates(compound_preconditions: CompoundPrecondition) -> List[Predicate]:
