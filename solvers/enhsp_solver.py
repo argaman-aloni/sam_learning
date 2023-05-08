@@ -72,7 +72,7 @@ class ENHSPSolver:
         else:
             self.logger.critical(f"While solving problem encountered unknown error! STDOUT - {stdout}")
             self.logger.critical(f"While solving problem encountered unknown error! STDERR - {stderr}")
-            solving_stats[problem_file_path.stem] = "no_solution"
+            solving_stats[problem_file_path.stem] = "solver_error"
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.

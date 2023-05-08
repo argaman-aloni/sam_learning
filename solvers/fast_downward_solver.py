@@ -66,15 +66,15 @@ class FastDownwardSolver:
                 self._remove_cost_from_file(solution_path)
 
             except subprocess.CalledProcessError as e:
-                if e.returncode == 23 or e.returncode == 21:
-                    self.logger.warning(f"Fast Downward returned status code 23 - timeout on problem {problem_file_path.stem}.")
+                if e.returncode in [21, 23, 247]:
+                    self.logger.warning(f"Fast Downward returned status code {e.returncode} - timeout on problem {problem_file_path.stem}.")
                     solving_stats[problem_file_path.stem] = "timeout"
-                elif e.returncode == 11 or e.returncode == 12:
+                elif e.returncode in [11, 12]:
                     self.logger.warning(f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}.")
                     solving_stats[problem_file_path.stem] = "no_solution"
                 else:
                     self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")
-                    solving_stats[problem_file_path.stem] = "no_solution"
+                    solving_stats[problem_file_path.stem] = "solver_error"
 
         self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / f"{domain_file_path.stem}_output.sas")
         return solving_stats

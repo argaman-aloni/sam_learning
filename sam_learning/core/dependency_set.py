@@ -12,6 +12,110 @@ AFTER_NOT_PREFIX_INDEX = 5
 RIGHT_BRACKET_INDEX = -1
 
 
+def check_complementary_literals(clause: Set[str]) -> bool:
+    """Checks if any two literals in the clause are complementary.
+
+    :param clause: the clause to check.
+    :return: True if any two literals in the clause are complementary, False otherwise.
+    """
+    for first_literal, second_literal in itertools.combinations(clause, 2):
+        if first_literal.startswith(NOT_PREFIX) and not second_literal.startswith(NOT_PREFIX) and \
+                first_literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX] == second_literal:
+            # Complementary literals
+            return True
+
+        if not first_literal.startswith(NOT_PREFIX) and second_literal.startswith(NOT_PREFIX) and \
+                first_literal == second_literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]:
+            # Complementary literals
+            return True
+
+    return False
+
+
+def minimize_cnf_clauses(clauses: List[Set[str]], assumptions: Set[str] = None) -> List[Set[str]]:
+    """Minimizes the CNF clauses based on unit clauses and complementary literals.
+
+    :param clauses: the CNF clauses to minimize.
+    :param assumptions: the assumptions to use for the minimization.
+    :return: the minimized CNF clauses.
+    """
+    used_assumptions = assumptions or set()
+    minimized_clauses = [clause for clause in clauses.copy() if len(clause) == 1 if
+                         not clause.intersection(used_assumptions)]
+    unit_clauses = {literal for clause in minimized_clauses for literal in clause}
+    if check_complementary_literals(unit_clauses):
+        raise ValueError("The unit clauses are contradicting one another!")
+
+    used_assumptions.update(unit_clauses)
+    non_unit_clauses = [clause for clause in clauses if len(clause) > 1]
+    for clause in non_unit_clauses:
+        # Checking if there are complementary literals in the clause - if so, the clause is always true
+        if check_complementary_literals(clause) or any([assumption in clause for assumption in used_assumptions]):
+            continue
+
+        for assumption in used_assumptions:
+            if assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})):
+                # We can remove the complementary literal
+                clause.remove(assumption[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX])
+
+            elif not assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})):
+                # We can remove the complementary literal
+                clause.remove(f"{NOT_PREFIX} {assumption})")
+
+        # There are no assumptions in the clause
+        if len(clause) > 0:
+            minimized_clauses.append(clause)
+
+    return minimized_clauses
+
+
+def minimize_dnf_clauses(clauses: List[Set[str]], assumptions: Set[str] = frozenset()) -> List[Set[str]]:
+    """Minimizes the DNF clauses based on unit clauses and complementary literals.
+
+    :param clauses: the DNF clauses to minimize.
+    :param assumptions: the assumptions to use for the minimization.
+    :return: the minimized DNF clauses.
+    """
+    if any([clause.issubset(assumptions) for clause in clauses]):
+        # There is a clause that is a subset of the assumptions, so we don't need to add it
+        return []
+
+    unit_clauses = {next(iter(clause)) for clause in clauses if len(clause) == 1}
+    if check_complementary_literals(unit_clauses):
+        # since this is a DNF and wwe have a literal and its negation combined with OR - the clause is always true
+        return []
+
+    minimized_clauses = [clause for clause in clauses if len(clause) == 1]
+    non_unit_clauses = [clause for clause in clauses if len(clause) > 1]
+    found_contradiction = len(minimized_clauses) == 0
+    for clause in non_unit_clauses:
+        # Checking if there are complementary literals in the clause, if so, the clause is always false (don't add it)
+        if check_complementary_literals(clause):
+            continue
+
+        # if there is a clause with an assumption negation, then this clause is always False
+        is_contradicting_assumptions = False
+        for assumption in assumptions:
+            if assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})) or \
+                    not assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})):
+                is_contradicting_assumptions = True
+                break
+
+        if is_contradicting_assumptions:
+            continue
+
+        # There are no complementary literals in the clause and the assumptions are not contradicting the clause
+        current_minimized_clause = clause.difference(assumptions)
+        if len(current_minimized_clause) > 0:
+            minimized_clauses.append(clause.difference(assumptions))
+            found_contradiction = False
+
+    if found_contradiction:
+        raise ValueError("The clauses are contradicting themselves!")
+
+    return minimized_clauses
+
+
 def create_antecedents_combination(antecedents: Set[str], max_antecedents_size: int,
                                    exclude_literals: Optional[Set[str]] = None) -> List[Set[str]]:
     """Creates all possible subset combinations of antecedents.
@@ -65,42 +169,39 @@ class DependencySet:
         return superset_dependencies
 
     @staticmethod
-    def _negate_predicates(antecedents: Set[str]) -> Union[Set[str], str]:
-        """Negates the given predicates.
+    def _flip_single_predicate(predicate: str) -> str:
+        """Flips the sign of the given predicate.
 
-        :param antecedents: the predicates to negate.
-        :return: the negated predicates.
+        :param predicate: the predicate to flip.
+        :return: the flipped predicate.
         """
-        negated_predicates = set()
-        for antecedent in antecedents:
-            negated_predicates.add(antecedent[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX] if
-                                   antecedent.startswith(NOT_PREFIX) else f"{NOT_PREFIX} {antecedent})")
+        if predicate.startswith(NOT_PREFIX):
+            return predicate[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]
 
-        if len(negated_predicates) == 1:
-            return negated_predicates.pop()
+        return f"(not {predicate})"
 
-        return negated_predicates
-
-    def _create_negated_antecedents(self, antecedents: Set[str]) -> Union[Predicate, Precondition]:
-        """Creates the negated antecedents.
-
-        :param antecedents: the antecedents to negate.
-        :return: the negated antecedents as a combined string.
+    def _extract_negated_minimized_antecedents(
+            self, unsafe_antecedents: List[Set[str]], preconditions: Set[str]) -> Union[List[Set[str]], bool]:
         """
-        negated_predicates = self._negate_predicates(antecedents)
-        if isinstance(negated_predicates, str):
-            return extract_predicate_data(action_signature=self.action_signature,
-                                          predicate_str=negated_predicates,
-                                          domain_constants=self.domain_constants)
 
-        antecedents_disjunction = Precondition("or")
-        for antecedent in negated_predicates:
-            lifted_antecedent = extract_predicate_data(action_signature=self.action_signature,
-                                                       predicate_str=antecedent,
-                                                       domain_constants=self.domain_constants)
-            antecedents_disjunction.add_condition(lifted_antecedent)
+        :param unsafe_antecedents:
+        :param preconditions:
+        :return:
+        """
+        negated_conditions_statement = []
+        for conjunction in unsafe_antecedents:
+            negated_conditions_statement.append({self._flip_single_predicate(predicate) for predicate in conjunction})
 
-        return antecedents_disjunction
+        try:
+            minimized_clauses = minimize_cnf_clauses(negated_conditions_statement, preconditions.copy())
+            if len(minimized_clauses) == 0:
+                return True
+
+            return minimized_clauses
+
+        except ValueError:
+            self.logger.warning("The CNF unit clauses are contradicting one another!")
+            return False
 
     def initialize_dependencies(self, lifted_literals: Set[Predicate],
                                 antecedents: Optional[Set[Predicate]] = None) -> None:
@@ -191,7 +292,8 @@ class DependencySet:
         return safe_antecedents
 
     def construct_restrictive_preconditions(
-            self, preconditions: Set[str], literal: str, is_effect: bool = False) -> Optional[Precondition]:
+            self, preconditions: Set[str], literal: str,
+            is_effect: bool = False) -> Optional[Union[Precondition, Predicate]]:
         """Extracts the safe conditional effects from the dependency set.
 
         :param preconditions: the preconditions of the action.
@@ -204,22 +306,64 @@ class DependencySet:
 
         unsafe_antecedents = self.possible_antecedents[literal]
         self.logger.debug("Constructing restrictive preconditions from the unsafe antecedents for literal %s", literal)
-        negated_conditions_statement = []
-        positive_antecedents = Precondition("and")
-        negated_antecedents_conjunction = Precondition("and")
-        for conjunction in unsafe_antecedents:
-            negated_conditions_statement.append(self._negate_predicates(conjunction))
-            negated_antecedents_conjunction.add_condition(self._create_negated_antecedents(conjunction))
-            for antecedent_literal in conjunction:
+        negated_minimized_antecedents = self._extract_negated_minimized_antecedents(unsafe_antecedents, preconditions)
+        positive_minimized_antecedents = set()
+        for disjunction in unsafe_antecedents:
+            positive_minimized_antecedents.update(disjunction)
+
+        if isinstance(negated_minimized_antecedents, bool) and negated_minimized_antecedents:
+            self.logger.debug(f"The negation of the antecedents for {literal} is the same as the preconditions"
+                              f" so it can never be triggered!")
+            return None
+
+        if isinstance(negated_minimized_antecedents, bool) and not negated_minimized_antecedents:
+            self.logger.debug(f"The negation of the antecedents for {literal} contains contradiction, "
+                              f"so the rest of the DNF must be true")
+            if not is_effect:
+                lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
+                                                                 predicate_str=literal,
+                                                                 domain_constants=self.domain_constants)
+                return lifted_result_predicate
+
+            # the literal was observed as an effect of the action, so either the positive clauses are
+            # true or the literal itself is true
+            if check_complementary_literals(positive_minimized_antecedents):
+                lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
+                                                                 predicate_str=literal,
+                                                                 domain_constants=self.domain_constants)
+                return lifted_result_predicate
+
+            positive_antecedents = Precondition("and")
+            for antecedent_literal in positive_minimized_antecedents:
                 positive_antecedents.add_condition(extract_predicate_data(action_signature=self.action_signature,
                                                                           predicate_str=antecedent_literal,
                                                                           domain_constants=self.domain_constants))
 
-        if all([isinstance(cond, str) for cond in negated_conditions_statement]) and \
-                set(negated_conditions_statement) == preconditions:
-            self.logger.debug(f"The negation of the antecedents for {literal} is the same as the preconditions"
-                              f" so it can never be triggered!")
-            return None
+            resulting_preconditions = Precondition("or")
+            lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
+                                                             predicate_str=literal,
+                                                             domain_constants=self.domain_constants)
+            resulting_preconditions.add_condition(lifted_result_predicate)
+            resulting_preconditions.add_condition(positive_antecedents)
+            return resulting_preconditions
+
+        # the negated antecedents are the minimized set of literals with no contradictions
+        negated_antecedents_preconditions = Precondition("and")
+        for disjunction in negated_minimized_antecedents:
+            if len(disjunction) == 1:
+                negated_antecedents_preconditions.add_condition(
+                    extract_predicate_data(action_signature=self.action_signature,
+                                           predicate_str=disjunction.pop(),
+                                           domain_constants=self.domain_constants))
+                continue
+
+            or_condition = Precondition("or")
+            for antecedent_literal in disjunction:
+                or_condition.add_condition(extract_predicate_data(action_signature=self.action_signature,
+                                                                  predicate_str=antecedent_literal,
+                                                                  domain_constants=self.domain_constants))
+
+            negated_antecedents_preconditions.add_condition(or_condition)
 
         negated_result = f"{NOT_PREFIX} {literal})"
         lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
@@ -227,17 +371,23 @@ class DependencySet:
                                                          domain_constants=self.domain_constants)
         if is_effect:
             restrictive_precondition = Precondition("or")
+            positive_antecedents = Precondition("and")
+            for antecedent_literal in positive_minimized_antecedents:
+                positive_antecedents.add_condition(extract_predicate_data(action_signature=self.action_signature,
+                                                                          predicate_str=antecedent_literal,
+                                                                          domain_constants=self.domain_constants))
+
             restrictive_precondition.add_condition(positive_antecedents)
-            restrictive_precondition.add_condition(negated_antecedents_conjunction)
+            restrictive_precondition.add_condition(negated_antecedents_preconditions)
             if negated_result not in preconditions:
                 restrictive_precondition.add_condition(lifted_result_predicate)
 
             return restrictive_precondition
 
         if negated_result in preconditions:
-            return negated_antecedents_conjunction
+            return negated_antecedents_preconditions
 
         not_result_precondition = Precondition("or")
         not_result_precondition.add_condition(lifted_result_predicate)
-        not_result_precondition.add_condition(negated_antecedents_conjunction)
+        not_result_precondition.add_condition(negated_antecedents_preconditions)
         return not_result_precondition

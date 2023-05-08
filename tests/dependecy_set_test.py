@@ -2,11 +2,12 @@
 from typing import List, Set
 
 from pddl_plus_parser.lisp_parsers import DomainParser
-from pddl_plus_parser.models import Domain, Predicate, PDDLType, Precondition
-from pytest import fixture
+from pddl_plus_parser.models import Domain, Predicate, PDDLType
+from pytest import fixture, raises
 
 from sam_learning.core import VocabularyCreator
-from sam_learning.core.dependency_set import create_antecedents_combination, DependencySet
+from sam_learning.core.dependency_set import create_antecedents_combination, DependencySet, minimize_cnf_clauses, \
+    minimize_dnf_clauses
 from tests.consts import WOODWORKING_COMBINED_DOMAIN_PATH
 
 TOTAL_NUMBER_OF_WOODWORKING_COMBINATIONS = 378 + 28
@@ -35,6 +36,115 @@ def do_saw_predicates(woodworking_domain: Domain) -> Set[Predicate]:
     lifted_action_signature = woodworking_domain.actions["do-saw-small"].signature
     vocabulary = VocabularyCreator().create_lifted_vocabulary(woodworking_domain, lifted_action_signature)
     return vocabulary
+
+
+def test_minimize_cnf_clauses_empty_clauses():
+    clauses = []
+    minimized_clauses = minimize_cnf_clauses(clauses)
+    assert minimized_clauses == []
+
+
+def test_minimize_cnf_clauses_single_clause():
+    clauses = [{'(p)', '(q)', '(r)'}]
+    minimized_clauses = minimize_cnf_clauses(clauses)
+    assert minimized_clauses == [{'(p)', '(q)', '(r)'}]
+
+
+def test_minimize_cnf_clauses_single_unit_clause():
+    clauses = [{'(p)'}]
+    minimized_clauses = minimize_cnf_clauses(clauses)
+    assert minimized_clauses == [{'(p)'}]
+
+
+def test_minimize_cnf_clauses_single_unit_clause_and_single_non_unit_clause():
+    clauses = [{'(p)'}, {'(p)', '(q)'}]
+    minimized_clauses = minimize_cnf_clauses(clauses)
+    assert minimized_clauses == [{'(p)'}]
+
+
+def test_minimize_cnf_clauses_multiple_non_unit_clauses():
+    clauses = [{'(p)', '(q)'}, {'(p)', '(r)'}, {'(q)', '(r)'}]
+    minimized_clauses = minimize_cnf_clauses(clauses)
+    assert minimized_clauses == [{'(p)', '(q)'}, {'(p)', '(r)'}, {'(q)', '(r)'}]
+
+
+def test_minimize_cnf_clauses_unit_clause_and_complementary_literals():
+    clauses = [{'(p)'}, {'(not (q))', '(r)'}, {'(not (p))', '(q)'}, {'(s)'}]
+    minimized_clauses = minimize_cnf_clauses(clauses)
+    assert len(minimized_clauses) == 4
+    expected_clauses = [{'(p)'}, {'(not (q))', '(r)'}, {'(q)'}, {'(s)'}]
+    for clause in expected_clauses:
+        assert clause in minimized_clauses
+
+
+def test_minimize_cnf_clauses_non_unit_clause_and_complementary_literals():
+    clauses = [{'(p)', '(q)'}, {'(not (p))'}, {'(r)'}, {'(not (q))'}, {'(s)'}, {'(t)'}]
+    minimized_clauses = minimize_cnf_clauses(clauses)
+    assert minimized_clauses == [{'(not (p))'}, {'(r)'}, {'(not (q))'}, {'(s)'}, {'(t)'}]
+
+
+def test_minimize_cnf_clauses_multiple_complementary_literals():
+    clauses = [{'(not (p))'}, {'(not q)', 'r'}, {'(not (r))', 'p'}, {'(p)'}]
+    with raises(ValueError):
+        minimize_cnf_clauses(clauses)
+
+
+def test_minimize_cnf_clauses_assumptions():
+    clauses = [{'(p)', '(not (q))', '(r)'}, {'(not (p))', '(s)'}, {'(q)', '(r)', '(t)'}, {'(not (t))', '(u)', '(v)'}]
+    assumptions = {'(p)', '(t)', '(v)'}
+    minimized_clauses = minimize_cnf_clauses(clauses, assumptions)
+    assert minimized_clauses == [{'(s)'}]
+
+
+def test_minimize_dnf_clauses_pddl_format_1():
+    # Test with one clause, no simplification possible
+    clauses = [{"(on table block1)"}]
+    expected_minimized_clauses = [{"(on table block1)"}]
+    assert minimize_dnf_clauses(clauses) == expected_minimized_clauses
+
+
+def test_minimize_dnf_clauses_pddl_format_2():
+    # Test with one clause, negation of assumption leads to contradiction
+    clauses = [{"(on table block1)", "(not (on table block1))"}]
+    with raises(ValueError):
+        minimize_dnf_clauses(clauses, {"(not (on table block1))"})
+
+
+def test_minimize_dnf_clauses_pddl_format_3():
+    # Test with two clauses, the assumption is part of one clause and its negation is part of the other clause
+    clauses = [{"(on table block1)", "(not (on table block2))"}, {"(not (on table block1))", "(on table block2)"}]
+    expected_minimized_clauses = [{"(not (on table block2))"}]
+    assert minimize_dnf_clauses(clauses, {"(on table block1)"}) == expected_minimized_clauses
+
+
+def test_minimize_dnf_clauses_pddl_format_4():
+    # Test with two clauses, one of them is always false
+    clauses = [{"(on table block1)"}, {"(not (on table block1))", "(not (on table block2))"}]
+    expected_minimized_clauses = [{"(on table block1)"}, {"(not (on table block1))"}]
+    assert minimize_dnf_clauses(clauses, {"(not (on table block2))"}) == expected_minimized_clauses
+
+
+def test_minimize_dnf_clauses_pddl_format_5():
+    # Test with three clauses, with multiple simplifications possible
+    clauses = [{"(on table block1)"}, {"(on table block2)"}, {"(not (on table block1))", "(not (on table block2))"}]
+    assert minimize_dnf_clauses(clauses) == clauses
+
+
+def test_minimize_dnf_clauses_no_minimization_needed():
+    clauses = [{'(on ?x ?y)'}]
+    minimized = minimize_dnf_clauses(clauses)
+    assert minimized == clauses
+
+
+def test_minimize_dnf_clauses_contain_unit_clauses_only():
+    clauses = [{'(on ?x ?y)'}, {'(above ?x ?y)'}, {'(near ?x ?y)'}]
+    minimized = minimize_dnf_clauses(clauses)
+    assert minimized == clauses
+
+
+def test_minimize_dnf_clauses_returns_empty_list():
+    clauses = [{'(on ?x ?y)'}, {'(not (on ?x ?y))'}]
+    assert minimize_dnf_clauses(clauses) == []
 
 
 def test_create_antecedents_combination_with_max_size_1():
@@ -87,50 +197,6 @@ def test_extract_superset_dependencies_creates_supersets_of_dependencies_contain
     assert len(superset_dependencies) == 4
     for expected_superset_dependency in expected_superset_dependencies:
         assert expected_superset_dependency in superset_dependencies
-
-
-def test_negate_predicates_creates_negated_string_for_each_literal_and_returns_the_negated_version_of_the_input_when_only_positive_literals_are_used():
-    """Test the negation of predicates."""
-    test_literals = {"(a )", "(b )", "(c )"}
-    dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
-    negated_literals = dependency_set._negate_predicates(test_literals)
-    assert len(negated_literals) == 3
-    for literal in test_literals:
-        assert f"(not {literal})" in negated_literals
-        assert literal not in negated_literals
-
-
-def test_negate_predicates_creates_negated_string_for_each_literal_and_returns_the_negated_version_of_the_input_with_positive_and_negative_literals():
-    """Test the negation of predicates."""
-    test_literals = {"(a )", "(b )", "(c )", "(not (d ))", "(not (e ))", "(not (f ))"}
-    expected_negation = {"(not (a ))", "(not (b ))", "(not (c ))", "(d )", "(e )", "(f )"}
-    dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
-    negated_literals = dependency_set._negate_predicates(test_literals)
-    assert len(negated_literals) == 6
-    for literal in negated_literals:
-        assert literal in expected_negation
-
-
-def test_create_negated_antecedents_creates_a_precondition_object_with_a_single_predicate_returns_correct_negated_predicate():
-    """Test the creation of negated antecedents."""
-    test_literals = {"(a )"}
-    dependency_set = DependencySet(max_size_antecedents=1, action_signature={}, domain_constants={})
-    negated_literals = dependency_set._create_negated_antecedents(test_literals)
-    assert isinstance(negated_literals, Predicate)
-    assert negated_literals.untyped_representation == "(not (a ))"
-
-
-def test_create_negated_antecedents_creates_a_precondition_object_with_simple_predicates_returns_correct_set_of_literals():
-    """Test the creation of negated antecedents."""
-    test_literals = {"(a )", "(b )", "(c )"}
-    negated_expected_literals = {"(not (a ))", "(not (b ))", "(not (c ))"}
-    dependency_set = DependencySet(max_size_antecedents=1, action_signature={}, domain_constants={})
-    negated_literals = dependency_set._create_negated_antecedents(test_literals)
-    assert isinstance(negated_literals, Precondition)
-    assert len(negated_literals.operands) == 3
-    for predicate in negated_literals.operands:
-        assert predicate.untyped_representation in negated_expected_literals
-    assert str(negated_literals).startswith("(or")
 
 
 def test_initialize_dependencies_with_real_domain_predicates_initialize_both_negative_and_positive_predicates_as_keys(
@@ -300,6 +366,7 @@ def test_construct_restrictive_preconditions_returns_none_if_the_negated_anteced
     tested_literal = "(a )"
 
     conditions = dependency_set.construct_restrictive_preconditions(preconditions, tested_literal)
+    print(str(conditions))
     assert not conditions
 
 
@@ -313,7 +380,7 @@ def test_construct_restrictive_preconditions_creates_conditions_that_do_not_incl
 
     conditions = dependency_set.construct_restrictive_preconditions(preconditions, tested_literal)
     restrictive_conditions = [cond.untyped_representation for _, cond in conditions if isinstance(cond, Predicate)]
-    assert sorted(restrictive_conditions) == ["(not (a ))", "(not (b ))", "(not (c ))"]
+    assert sorted(restrictive_conditions) == ["(not (b ))", "(not (c ))"]
 
 
 def test_construct_restrictive_preconditions_creates_conditions_that_do_not_include_precondition_literal_if_is_effect_and_negated_effect_is_precondition():
@@ -326,7 +393,7 @@ def test_construct_restrictive_preconditions_creates_conditions_that_do_not_incl
 
     conditions = dependency_set.construct_restrictive_preconditions(preconditions, tested_literal, is_effect=True)
     restrictive_conditions = [cond.untyped_representation for _, cond in conditions if isinstance(cond, Predicate)]
-    assert sorted(restrictive_conditions) == ["(a )", "(b )", "(c )", "(not (a ))", "(not (b ))", "(not (c ))"]
+    assert sorted(restrictive_conditions) == ["(a )", "(b )", "(c )", "(not (b ))", "(not (c ))"]
     print(str(conditions))
 
 
@@ -337,7 +404,8 @@ def test_construct_restrictive_preconditions_creates_nested_condition_with_corre
     tested_literal = "(effect )"
     dependency_set.possible_antecedents = {tested_literal: possible_literals_combinations}
     condition = dependency_set.construct_restrictive_preconditions(set(), tested_literal, is_effect=False)
-    # the preconditions should be (effect ) V (~aV~b ^~a ^~b)
+    # the preconditions should be (effect ) V (~aV~b)
+    print(str(condition))
     assert condition.binary_operator == "or"
     assert len(condition.operands) == 2
     for operand in condition.operands:
@@ -345,16 +413,10 @@ def test_construct_restrictive_preconditions_creates_nested_condition_with_corre
             assert operand.untyped_representation == "(effect )"
         else:
             assert operand.binary_operator == "and"
-            assert len(operand.operands) == 3
+            assert len(operand.operands) == 2
             for inner_operand in operand.operands:
-                if isinstance(inner_operand, Predicate):
-                    assert inner_operand.untyped_representation in ["(not (a ))", "(not (b ))"]
-                else:
-                    assert inner_operand.binary_operator == "or"
-                    assert len(inner_operand.operands) == 2
-                    for inner_inner_operand in inner_operand.operands:
-                        assert isinstance(inner_inner_operand, Predicate)
-                        assert inner_inner_operand.untyped_representation in ["(not (a ))", "(not (b ))"]
+                assert isinstance(inner_operand, Predicate)
+                assert inner_operand.untyped_representation in ["(not (a ))", "(not (b ))"]
 
 
 def test_construct_restrictive_preconditions_creates_nested_condition_with_correct_elements_with_size_three_antecedents():
@@ -364,7 +426,8 @@ def test_construct_restrictive_preconditions_creates_nested_condition_with_corre
     tested_literal = "(effect )"
     dependency_set.possible_antecedents = {tested_literal: possible_literals_combinations}
     condition = dependency_set.construct_restrictive_preconditions(set(), tested_literal, is_effect=False)
-    # the preconditions should be (effect ) V (~aV~bV~c ^~aV~b ^~aV~c ^~bV~c ^~a ^~b ^~c)
+    # the preconditions should be (effect ) V (^~a ^~b ^~c)
+    print(str(condition))
     assert condition.binary_operator == "or"
     assert len(condition.operands) == 2
     for operand in condition.operands:
@@ -372,4 +435,4 @@ def test_construct_restrictive_preconditions_creates_nested_condition_with_corre
             assert operand.untyped_representation == "(effect )"
         else:
             assert operand.binary_operator == "and"
-            assert len(operand.operands) == 7
+            assert len(operand.operands) == 3

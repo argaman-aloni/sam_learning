@@ -14,12 +14,19 @@ from tests.consts import sync_snapshot
 
 @fixture()
 def nurikabe_conditional_sam(nurikabe_domain: Domain) -> UniversallyConditionalSAM:
-    return UniversallyConditionalSAM(nurikabe_domain, max_antecedents_size=1)
+    universals_map = {}
+    for action in nurikabe_domain.actions:
+        universals_map[action] = [*nurikabe_domain.types]
+    return UniversallyConditionalSAM(nurikabe_domain, max_antecedents_size=1, universals_map=universals_map)
 
 
 @fixture()
-def satellite_conditional_sam(satellite_numeric_domain) -> UniversallyConditionalSAM:
-    return UniversallyConditionalSAM(satellite_numeric_domain, max_antecedents_size=1)
+def satellite_conditional_sam(satellite_numeric_domain: Domain) -> UniversallyConditionalSAM:
+    universals_map = {}
+    for action in satellite_numeric_domain.actions:
+        universals_map[action] = [*satellite_numeric_domain.types]
+    return UniversallyConditionalSAM(satellite_numeric_domain, max_antecedents_size=1,
+                                     universals_map=universals_map)
 
 
 def test_create_additional_parameter_name_creates_a_parameter_name_based_on_the_type_and_action_name(

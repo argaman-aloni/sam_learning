@@ -44,7 +44,7 @@ class MetricFFSolver:
 
         if process.returncode != 0:
             self.logger.warning(f"Solver returned status code {process.returncode}.")
-            solving_stats[problem_file_path.stem] = "no_solution"
+            solving_stats[problem_file_path.stem] = "solver_error"
             solution_path.unlink(missing_ok=True)
             return
 

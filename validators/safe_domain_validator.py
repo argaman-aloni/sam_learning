@@ -25,6 +25,7 @@ SOLVING_STATISTICS = [
     "ok",
     "no_solution",
     "timeout",
+    "solver_error",
     "not_applicable",
     "goal_not_achieved",
     "problems_ok",
@@ -38,6 +39,7 @@ DEBUG_STATISTICS = [
     "problems_ok",
     "problems_no_solution",
     "problems_timeout",
+    "problems_solver_error",
     "problems_not_applicable",
     "problems_goal_not_achieved"
 ]

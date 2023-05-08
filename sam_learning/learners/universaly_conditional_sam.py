@@ -25,7 +25,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
 
     def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
                  preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-                 universals_map: Dict[str, bool] = None):
+                 universals_map: Dict[str, List[str]] = None):
         super().__init__(partial_domain, max_antecedents_size, preconditions_fluent_map)
         self.logger = logging.getLogger(__name__)
         self.quantified_antecedents = {action_name: {} for action_name in self.partial_domain.actions}
