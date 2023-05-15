@@ -31,6 +31,7 @@ SOLVING_STATISTICS = [
     "problems_ok",
     "problems_no_solution",
     "problems_timeout",
+    "problems_solver_error",
     "problems_not_applicable",
     "problems_goal_not_achieved"
 ]
@@ -112,7 +113,7 @@ class DomainValidator:
 
     @staticmethod
     def _extract_num_triplets(used_observations: Union[List[Observation],
-                                                       List[MultiAgentObservation], List[Path]] = None) -> int:
+    List[MultiAgentObservation], List[Path]] = None) -> int:
         """Extracts the number of trajectory triplets from the observations.
 
         :param used_observations: the observations used to generate the plans.

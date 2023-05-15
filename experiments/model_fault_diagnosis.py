@@ -12,7 +12,7 @@ from pddl_plus_parser.models import Observation, Domain
 
 from experiments import LearningStatisticsManager, NumericPerformanceCalculator
 from experiments.k_fold_split import KFoldSplit
-from experiments.utils import init_numeric_performance_calculator
+from experiments.utils import init_semantic_performance_calculator
 from fault_detection import FaultGenerator, FaultRepair, DefectType, RepairAlgorithmType
 from sam_learning.core import LearnerDomain
 from solvers import ENHSPSolver
@@ -348,9 +348,9 @@ class ModelFaultDiagnosis:
     def run_fault_diagnosis(self) -> NoReturn:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
-        self.numeric_performance_calc = init_numeric_performance_calculator(self.working_directory_path,
-                                                                            self.model_domain_file_name,
-                                                                            LearningAlgorithmType.numeric_sam)
+        self.numeric_performance_calc = init_semantic_performance_calculator(self.working_directory_path,
+                                                                             self.model_domain_file_name,
+                                                                             LearningAlgorithmType.numeric_sam)
         for train_dir_path, test_dir_path in self.k_fold.create_k_fold():
             self.evaluate_fault_diagnosis(train_dir_path, test_dir_path)
 

@@ -73,7 +73,7 @@ class PredicatesMatcher:
             Used in cases where we observe universal effects / preconditions.
         :param extra_lifted_object: the additional lifted object matching the grounded observed one.
         """
-        self.logger.info(f"Trying to match the grounded predicate - {grounded_predicate.untyped_representation} "
+        self.logger.debug(f"Trying to match the grounded predicate - {grounded_predicate.untyped_representation} "
                          f"to the action call {str(action_call)}")
         if len(grounded_predicate.signature) == 0:
             self.logger.debug("The predicate has no parameters, by default matches the action!")
@@ -145,7 +145,7 @@ class PredicatesMatcher:
         :param extra_lifted_object: the additional lifted object matching the grounded observed one.
         :return: a list of possible preconditions for the action that is being executed.
         """
-        self.logger.info(f"Finding the possible matches for the grounded action - {str(grounded_action_call)}")
+        self.logger.debug(f"Finding the possible matches for the grounded action - {str(grounded_action_call)}")
         possible_matches = []
         for state_predicate in state_literals:
             if extra_grounded_object is None or extra_grounded_object not in state_predicate.grounded_objects:
