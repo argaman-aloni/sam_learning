@@ -1,5 +1,5 @@
 """Utility functionality for the experiments"""
-
+import random
 from pathlib import Path
 from typing import List, Union
 from typing import Optional
@@ -32,6 +32,10 @@ def init_semantic_performance_calculator(
     model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
     observations = []
     for test_problem_path in test_set_dir_path.glob("pfile*.pddl"):
+        should_skip = random.choice([True, False])
+        if should_skip:
+            continue
+
         trajectory_file_path = working_directory_path / f"{test_problem_path.stem}.trajectory"
         problem_path = working_directory_path / f"{test_problem_path.stem}.pddl"
         problem = ProblemParser(problem_path, partial_domain).parse_problem()

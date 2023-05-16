@@ -2,20 +2,23 @@
 
 from typing import Dict
 
-from pddl_plus_parser.models import Domain, Operator, ActionCall, State
+from pddl_plus_parser.models import Domain, Operator, ActionCall, State, PDDLObject
 
 
-def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain) -> Operator:
+def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain,
+                            problem_objects: Dict[str, PDDLObject]) -> Operator:
     """Ground the tested action based on the trajectory data.
 
     :param action_call: the grounded action call in the observation component.
     :param learned_domain: the domain that was learned using the action model learning algorithm.
+    :param problem_objects: the objects that were used in the problem definition.
     :return: the grounded operator.
     """
     grounded_operator = Operator(
         action=learned_domain.actions[action_call.name],
         domain=learned_domain,
-        grounded_action_call=action_call.parameters)
+        grounded_action_call=action_call.parameters,
+        problem_objects=problem_objects)
     grounded_operator.ground()
     return grounded_operator
 
@@ -23,20 +26,20 @@ def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain) -> 
 def _calculate_single_action_applicability_rate(
         action_call: ActionCall, learned_domain: Domain, complete_domain: Domain,
         num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int],
-        num_true_positives: Dict[str, int], observed_state: State):
+        num_true_positives: Dict[str, int], observed_state: State, problem_objects: Dict[str, PDDLObject]):
     """
 
-    :param action_call:
-    :param learned_domain:
-    :param complete_domain:
-    :param num_false_negatives:
-    :param num_false_positives:
-    :param num_true_positives:
-    :param observed_state:
-    :return:
+    :param action_call: the grounded action that is currently being tested.
+    :param learned_domain: the domain that was learned using the action model learning algorithm.
+    :param complete_domain: the complete domain that was used to generate the trajectory data.
+    :param num_false_negatives: the number of false negatives for each action.
+    :param num_false_positives: the number of false positives for each action.
+    :param num_true_positives: the number of true positives for each action.
+    :param observed_state: the state that was observed in the trajectory data.
+    :param problem_objects: the objects that were used in the problem definition.
     """
-    tested_grounded_operator = _ground_tested_operator(action_call, learned_domain)
-    model_grounded_operator = _ground_tested_operator(action_call, complete_domain)
+    tested_grounded_operator = _ground_tested_operator(action_call, learned_domain, problem_objects)
+    model_grounded_operator = _ground_tested_operator(action_call, complete_domain, problem_objects)
     is_applicable_in_test = tested_grounded_operator.is_applicable(observed_state)
     is_applicable_in_model = model_grounded_operator.is_applicable(observed_state)
     num_true_positives[action_call.name] += int(is_applicable_in_test == is_applicable_in_model)

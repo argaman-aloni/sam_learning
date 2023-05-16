@@ -329,6 +329,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         :param next_state: the state that was created after executing the action on the previous
             state.
         """
+        self.logger.info(f"Updating the action {grounded_action.name} preconditions and effects.")
         super()._update_action_preconditions(grounded_action)
         if grounded_action.name not in self.universals_map or len(self.universals_map[grounded_action.name]) == 0:
             super().update_action(grounded_action, previous_state, next_state)

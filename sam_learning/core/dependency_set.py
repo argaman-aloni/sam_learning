@@ -257,6 +257,36 @@ class DependencySet:
 
         return negated_antecedents_preconditions
 
+    def _handle_contradicting_antecedents(
+            self, is_effect: bool, literal: str,
+            positive_minimized_antecedents: Set[str]) -> Union[Predicate, Precondition]:
+        self.logger.debug(f"The negation of the antecedents for {literal} contains contradiction, "
+                          f"so the rest of the DNF must be true")
+        if not is_effect:
+            lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
+                                                             predicate_str=literal,
+                                                             domain_constants=self.domain_constants)
+            return lifted_result_predicate
+        # the literal was observed as an effect of the action, so either the positive clauses are
+        # true or the literal itself is true
+        if check_complementary_literals(positive_minimized_antecedents):
+            lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
+                                                             predicate_str=literal,
+                                                             domain_constants=self.domain_constants)
+            return lifted_result_predicate
+        positive_antecedents = Precondition("and")
+        for antecedent_literal in positive_minimized_antecedents:
+            positive_antecedents.add_condition(extract_predicate_data(action_signature=self.action_signature,
+                                                                      predicate_str=antecedent_literal,
+                                                                      domain_constants=self.domain_constants))
+        resulting_preconditions = Precondition("or")
+        lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
+                                                         predicate_str=literal,
+                                                         domain_constants=self.domain_constants)
+        resulting_preconditions.add_condition(lifted_result_predicate)
+        resulting_preconditions.add_condition(positive_antecedents)
+        return resulting_preconditions
+
     def _handle_effect_literal(
             self, lifted_result_predicate: Predicate,
             negated_antecedents_preconditions: Union[Precondition, Predicate],
@@ -402,35 +432,7 @@ class DependencySet:
             return None
 
         if isinstance(negated_minimized_antecedents, bool) and not negated_minimized_antecedents:
-            self.logger.debug(f"The negation of the antecedents for {literal} contains contradiction, "
-                              f"so the rest of the DNF must be true")
-            if not is_effect:
-                lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
-                                                                 predicate_str=literal,
-                                                                 domain_constants=self.domain_constants)
-                return lifted_result_predicate
-
-            # the literal was observed as an effect of the action, so either the positive clauses are
-            # true or the literal itself is true
-            if check_complementary_literals(positive_minimized_antecedents):
-                lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
-                                                                 predicate_str=literal,
-                                                                 domain_constants=self.domain_constants)
-                return lifted_result_predicate
-
-            positive_antecedents = Precondition("and")
-            for antecedent_literal in positive_minimized_antecedents:
-                positive_antecedents.add_condition(extract_predicate_data(action_signature=self.action_signature,
-                                                                          predicate_str=antecedent_literal,
-                                                                          domain_constants=self.domain_constants))
-
-            resulting_preconditions = Precondition("or")
-            lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
-                                                             predicate_str=literal,
-                                                             domain_constants=self.domain_constants)
-            resulting_preconditions.add_condition(lifted_result_predicate)
-            resulting_preconditions.add_condition(positive_antecedents)
-            return resulting_preconditions
+            return self._handle_contradicting_antecedents(is_effect, literal, positive_minimized_antecedents)
 
         # the negated antecedents are the minimized set of literals with no contradictions
         negated_antecedents_preconditions = self._create_negated_antecedent_preconditions(negated_minimized_antecedents)

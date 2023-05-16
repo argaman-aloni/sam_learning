@@ -40,7 +40,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                 if action_call.name not in learned_domain.actions:
                     continue
 
-                grounded_operator = _ground_tested_operator(action_call, learned_domain)
+                grounded_operator = _ground_tested_operator(action_call, learned_domain, observation.grounded_objects)
                 previous_state = observation_component.previous_state
                 learned_next_state_fluents = grounded_operator.update_state_functions(previous_state)
                 actual_next_state = observation_component.next_state

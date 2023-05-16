@@ -1,6 +1,7 @@
 """Module responsible for calculating our approach for numeric precision and recall."""
 import csv
 import logging
+import random
 from collections import defaultdict
 from itertools import permutations
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import List, Dict, Tuple, Any, Union
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, ActionCall, State, MultiAgentObservation, \
-    JointActionCall, MultiAgentComponent, Operator, PDDLObject, PDDLType, Action
+    JointActionCall, Operator, PDDLObject, PDDLType, Action
 
 from experiments.performance_calculation_utils import _calculate_single_action_applicability_rate
 from utilities import LearningAlgorithmType
@@ -31,6 +32,12 @@ def _calculate_precision_recall(
     precision_dict = {}
     recall_dict = {}
     for action_name, tp_rate in num_true_positives.items():
+        if tp_rate == 0 and num_false_positives[action_name] == 0:
+            precision_dict[action_name] = 1
+
+        if tp_rate == 0 and num_false_negatives[action_name] == 0:
+            precision_dict[action_name] = 1
+
         precision_dict[action_name] = tp_rate / (tp_rate + num_false_positives[action_name])
         recall_dict[action_name] = tp_rate / (tp_rate + num_false_negatives[action_name])
     return precision_dict, recall_dict
@@ -90,26 +97,33 @@ class SemanticPerformanceCalculator:
         :param observed_objects: the objects that were observed in the trajectory.
         :return: list containing all the predicates with the different combinations of parameters.
         """
+        self.logger.info("Creating grounded action vocabulary with sampled ground actions")
         vocabulary = []
         possible_objects_str = list(observed_objects.keys()) + list(domain.constants.keys())
         objects_and_consts = list(observed_objects.values()) + list(domain.constants.values())
         for action in domain.actions.values():
+            self.logger.debug(f"Creating grounded action vocabulary for action {action.name}")
             action_name = action.name
             signature_permutations = choose_objects_subset(possible_objects_str, len(action.signature))
+            action_vocabulary = []
             for signature_permutation in signature_permutations:
                 grounded_signature = {object_name: objects_and_consts[possible_objects_str.index(object_name)].type
                                       for object_name in signature_permutation}
                 if not self._validate_type_matching(grounded_signature, action):
                     continue
 
-                vocabulary.append(ActionCall(name=action_name, grounded_parameters=list(grounded_signature.keys())))
+                action_vocabulary.append(ActionCall(action_name, grounded_parameters=list(grounded_signature.keys())))
+
+            sampled_action_vocabulary = random.choices(action_vocabulary, k=10)
+            vocabulary.extend(sampled_action_vocabulary)
 
         return vocabulary
 
     def _calculate_action_applicability_rate(
             self, action_call: Union[ActionCall, JointActionCall], learned_domain: Domain,
             num_false_negatives: Dict[str, int],
-            num_false_positives: Dict[str, int], num_true_positives: Dict[str, int], observed_state: State) -> None:
+            num_false_positives: Dict[str, int], num_true_positives: Dict[str, int], observed_state: State,
+            problem_objects: Dict[str, PDDLObject]) -> None:
         """Test whether an action is applicable in both the model domain and the generated domain.
 
         :param action_call: the action call that is tested for applicability.
@@ -126,11 +140,19 @@ class SemanticPerformanceCalculator:
             for action in action_call.actions:
                 _calculate_single_action_applicability_rate(
                     action, learned_domain, self.model_domain, num_false_negatives, num_false_positives,
-                    num_true_positives, observed_state)
-        else:
-            _calculate_single_action_applicability_rate(
-                action_call, learned_domain, self.model_domain, num_false_negatives, num_false_positives,
-                num_true_positives, observed_state)
+                    num_true_positives, observed_state, problem_objects)
+
+            return
+
+        if action_call.name not in learned_domain.actions:
+            num_false_negatives[action_call.name] += 1
+            num_false_positives[action_call.name] += 0
+            num_true_positives[action_call.name] += 0
+            return
+
+        _calculate_single_action_applicability_rate(
+            action_call, learned_domain, self.model_domain, num_false_negatives, num_false_positives,
+            num_true_positives, observed_state, problem_objects)
 
     def _calculate_effects_difference_rate(
             self, observation: Observation, learned_domain: Domain,
@@ -144,6 +166,7 @@ class SemanticPerformanceCalculator:
         :param num_false_positives: the dictionary mapping between the action name and the number of false positive
         :param num_true_positives: the dictionary mapping between the action name and the number of true positive
         """
+        self.logger.info("Calculating effects difference rate")
         for observation_triplet in observation.components:
             model_previous_state = observation_triplet.previous_state
             executed_action = observation_triplet.grounded_action_call
@@ -203,13 +226,14 @@ class SemanticPerformanceCalculator:
             possible_ground_actions = self._create_grounded_action_vocabulary(self.model_domain, observation_objects)
             for component in observation.components:
                 tested_state = component.previous_state
+                possible_ground_actions.append(component.grounded_action_call)
                 for action in possible_ground_actions:
                     if action.name not in learned_domain.actions:
                         continue
 
                     self._calculate_action_applicability_rate(
                         action, learned_domain, num_false_negatives, num_false_positives, num_true_positives,
-                        tested_state)
+                        tested_state, observation_objects)
 
         return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
 
@@ -220,6 +244,7 @@ class SemanticPerformanceCalculator:
         :param learned_domain: the action model that was learned using the action model learning algorithm
         :return: the precision and recall dictionaries.
         """
+        self.logger.info("Starting to calculate the semantic effects performance")
         num_true_positives = defaultdict(int)
         num_false_negatives = defaultdict(int)
         num_false_positives = defaultdict(int)
@@ -236,8 +261,10 @@ class SemanticPerformanceCalculator:
         :param num_used_observations: the number of observations used to learn the domain.
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
+        self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
         preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(
             learned_domain)
+        self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         for action_name in learned_domain.actions:
             action_stats = {
