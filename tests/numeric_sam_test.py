@@ -3,12 +3,13 @@ import json
 from typing import Dict, List
 
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, Problem, Observation
+from pddl_plus_parser.models import Domain, Problem, Observation, Predicate
 from pytest import fixture
 
 from sam_learning.learners.numeric_sam import NumericSAMLearner
 from tests.consts import DEPOT_FLUENTS_MAP_PATH, SATELLITE_FLUENTS_MAP_PATH, \
-    SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH, MINECRAFT_FLUENTS_MAP_PATH
+    SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH, MINECRAFT_FLUENTS_MAP_PATH, \
+    sync_snapshot
 
 
 @fixture()
@@ -61,19 +62,92 @@ def test_add_new_action_adds_action_to_fluents_storage(depot_nsam: NumericSAMLea
     initial_state = depot_observation.components[0].previous_state
     action_call = depot_observation.components[0].grounded_action_call
     next_state = depot_observation.components[0].next_state
+    sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
     depot_nsam.add_new_action(
         grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     assert action_call.name in depot_nsam.storage
+
+
+def test_add_new_action_adds_discrete_preconditions_to_the_learned_action(
+        depot_nsam: NumericSAMLearner, depot_observation: Observation):
+    initial_state = depot_observation.components[0].previous_state
+    action_call = depot_observation.components[0].grounded_action_call
+    next_state = depot_observation.components[0].next_state
+    sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
+    depot_nsam.add_new_action(
+        grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    learned_action = depot_nsam.partial_domain.actions[action_call.name]
+    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if
+                                     isinstance(precondition, Predicate)]
+    assert len(action_discrete_preconditions) > 0
+
+
+def test_add_new_action_adds_the_required_predicates_to_the_action_preconditions(
+        depot_nsam: NumericSAMLearner, depot_observation: Observation):
+    initial_state = depot_observation.components[0].previous_state
+    action_call = depot_observation.components[0].grounded_action_call
+    next_state = depot_observation.components[0].next_state
+    sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
+    depot_nsam.add_new_action(
+        grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    learned_action = depot_nsam.partial_domain.actions[action_call.name]
+    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if
+                                     isinstance(precondition, Predicate)]
+    preconditions_str = {precondition.untyped_representation for precondition in action_discrete_preconditions}
+    assert preconditions_str.issuperset({"(at ?x ?y)"})
 
 
 def test_update_action_updates_action_in_the_storage(depot_nsam: NumericSAMLearner, depot_observation: Observation):
     initial_state = depot_observation.components[0].previous_state
     action_call = depot_observation.components[0].grounded_action_call
     next_state = depot_observation.components[0].next_state
+    sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
     depot_nsam.add_new_action(
         grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     depot_nsam.update_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     assert action_call.name in depot_nsam.storage
+
+
+def test_update_action_adds_discrete_preconditions_to_the_learned_action(
+        depot_nsam: NumericSAMLearner, depot_observation: Observation):
+    initial_state = depot_observation.components[0].previous_state
+    action_call = depot_observation.components[0].grounded_action_call
+    next_state = depot_observation.components[0].next_state
+    sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
+    depot_nsam.add_new_action(
+        grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    depot_nsam.update_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    learned_action = depot_nsam.partial_domain.actions[action_call.name]
+    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if
+                                     isinstance(precondition, Predicate)]
+    assert len(action_discrete_preconditions) > 0
+
+
+def test_update_action_adds_the_required_predicates_to_the_action_preconditions(
+        depot_nsam: NumericSAMLearner, depot_observation: Observation):
+    initial_state = depot_observation.components[0].previous_state
+    action_call = depot_observation.components[0].grounded_action_call
+    next_state = depot_observation.components[0].next_state
+    sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
+    depot_nsam.add_new_action(
+        grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    depot_nsam.update_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
+    learned_action = depot_nsam.partial_domain.actions[action_call.name]
+    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if
+                                     isinstance(precondition, Predicate)]
+    preconditions_str = {precondition.untyped_representation for precondition in action_discrete_preconditions}
+    assert preconditions_str.issuperset({"(at ?x ?y)"})
+
+
+def test_handle_single_trajectory_component_does_not_remove_the_required_predicates_to_the_action_preconditions(
+        depot_nsam: NumericSAMLearner, depot_observation: Observation):
+    depot_nsam.current_trajectory_objects = depot_observation.grounded_objects
+    depot_nsam.handle_single_trajectory_component(depot_observation.components[0])
+    learned_action = depot_nsam.partial_domain.actions["drive"]
+    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if
+                                     isinstance(precondition, Predicate)]
+    preconditions_str = {precondition.untyped_representation for precondition in action_discrete_preconditions}
+    assert preconditions_str.issuperset({"(at ?x ?y)"})
 
 
 def test_learn_action_model_returns_learned_model(depot_nsam: NumericSAMLearner, depot_observation: Observation):

@@ -1,11 +1,15 @@
 """Utility functions for handling and presenting numeric data."""
 import itertools
-from typing import Union, List, Dict, Tuple, Optional
+from typing import Union, List, Dict, Tuple, Optional, Set
 
 import math
 import numpy as np
 import sympy
 from pandas import DataFrame, Series
+from pddl_plus_parser.lisp_parsers import PDDLTokenizer
+from pddl_plus_parser.models import Precondition, PDDLFunction, construct_expression_tree, NumericalExpressionTree
+
+from sam_learning.core.learning_types import ConditionType
 
 EPSILON = 1e-10
 
@@ -111,7 +115,8 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
     return linear_coeff
 
 
-def filter_constant_features(input_df: DataFrame, column_to_ignore: Optional[str] = None) -> Tuple[DataFrame, List[str], List[str]]:
+def filter_constant_features(input_df: DataFrame, column_to_ignore: Optional[str] = None) -> Tuple[
+    DataFrame, List[str], List[str]]:
     """Filters out fluents that contain only constant values since they do not contribute to the convex hull.
 
     :param input_df: the matrix of the previous state values.
@@ -129,12 +134,14 @@ def filter_constant_features(input_df: DataFrame, column_to_ignore: Optional[str
     return result_ft, equal_fluent_strs, removed_fluents
 
 
-def detect_linear_dependent_features(data_matrix: DataFrame, column_to_ignore: Optional[str] = None) -> Tuple[DataFrame, List[str], Dict[str, str]]:
-    """
+def detect_linear_dependent_features(data_matrix: DataFrame, column_to_ignore: Optional[str] = None) -> Tuple[
+    DataFrame, List[str], Dict[str, str]]:
+    """Detects linear dependent features and adds the equality constraints to the problem.
 
-    :param data_matrix:
-    :param column_to_ignore:
-    :return:
+    :param data_matrix: the matrix of the previous state values.
+    :param column_to_ignore: the column to ignore.
+    :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal and the
+        column to column mapping.
     """
     additional_conditions = []
     dependent_columns = {}
@@ -145,7 +152,7 @@ def detect_linear_dependent_features(data_matrix: DataFrame, column_to_ignore: O
             continue
 
         reduced_form, inds = sympy.Matrix(filtered_matrix[[col1, col2]].values).rref()
-        if len(inds) > 0:
+        if len(inds) == 2:
             continue
 
         linear_coeff = extract_numeric_linear_coefficient(filtered_matrix[col1], filtered_matrix[col2])
@@ -155,3 +162,42 @@ def detect_linear_dependent_features(data_matrix: DataFrame, column_to_ignore: O
 
     filtered_matrix = filtered_matrix[[col for col in filtered_matrix.columns if col not in dependent_columns]]
     return filtered_matrix, additional_conditions, dependent_columns
+
+
+def construct_numeric_conditions(
+        conditions: List[str], condition_type: ConditionType,
+        domain_functions: Dict[str, PDDLFunction]) -> Precondition:
+    """Construct the numeric conditions from the given equality conditions.
+
+    :param conditions: the condition strings to create the preconditions from.
+    :param condition_type: the type of the conditions ('and' or 'or').
+    :param domain_functions: the domain functions to use for the numeric conditions.
+    :return: the constructed numeric precondition.
+    """
+    precondition_type = "and" if condition_type == ConditionType.conjunctive else "or"
+    constructed_precondition = Precondition(precondition_type)
+    for condition in conditions:
+        numeric_tokenizer = PDDLTokenizer(pddl_str=condition)
+        tokens = numeric_tokenizer.parse()
+        numeric_expression = construct_expression_tree(tokens, domain_functions)
+        constructed_precondition.add_condition(NumericalExpressionTree(numeric_expression))
+
+    return constructed_precondition
+
+
+def construct_numeric_effects(
+        effects: List[str], domain_functions: Dict[str, PDDLFunction]) -> Set[NumericalExpressionTree]:
+    """Construct the numeric effects for the given set of input strings.
+
+    :param effects: the effect strings to create the numeric effects from.
+    :param domain_functions: the domain functions to use for the numeric effects.
+    :return: the constructed numeric precondition.
+    """
+    numeric_effects = []
+    for condition in effects:
+        numeric_tokenizer = PDDLTokenizer(pddl_str=condition)
+        tokens = numeric_tokenizer.parse()
+        numeric_expression = construct_expression_tree(tokens, domain_functions)
+        numeric_effects.append(numeric_expression)
+
+    return {NumericalExpressionTree(expr) for expr in numeric_effects}

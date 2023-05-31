@@ -2,10 +2,10 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, ConditionalEffect, ObservedComponent
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
-    PolynomialFluentsLearningAlgorithm
+    PolynomialFluentsLearningAlgorithm, LearnerAction
 from sam_learning.learners import SAMLearner
 
 
@@ -23,6 +23,48 @@ class NumericSAMLearner(SAMLearner):
         self.function_matcher = NumericFunctionMatcher(partial_domain)
         self.preconditions_fluent_map = preconditions_fluent_map
 
+    def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
+        """Constructs the safe preconditions for the input action.
+
+        :param action: the action that the preconditions are constructed for.
+        """
+        action_name = action.name
+        if self.preconditions_fluent_map is None:
+            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
+
+        elif len(self.preconditions_fluent_map[action_name]) == 0:
+            self.logger.debug(f"The action {action_name} has no numeric preconditions.")
+            return
+
+        else:
+            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
+                self.preconditions_fluent_map[action_name])
+
+        if learned_numeric_preconditions.binary_operator == "and":
+            self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
+            for condition in learned_numeric_preconditions.operands:
+                action.preconditions.add_condition(condition)
+
+            return
+
+        self.logger.debug("The learned preconditions are not a conjunction. Adding them as a separate condition.")
+        action.preconditions.add_condition(learned_numeric_preconditions)
+
+    def _construct_safe_numeric_effects(self, action: LearnerAction) -> None:
+        """Constructs the safe numeric effects for the input action.
+
+        :param action: the action that its effects are constructed for.
+        """
+        result = self.storage[action.name].construct_assignment_equations()
+        if isinstance(result, ConditionalEffect):
+            action.conditional_effects.add(result)
+            return
+
+        numeric_effects, additional_preconditions = result
+        action.numeric_effects = numeric_effects
+        if additional_preconditions is not None:
+            action.preconditions.add_condition(additional_preconditions)
+
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.
 
@@ -36,7 +78,8 @@ class NumericSAMLearner(SAMLearner):
             grounded_action, previous_state.state_fluents)
         next_state_lifted_matches = self.function_matcher.match_state_functions(
             grounded_action, next_state.state_fluents)
-        self.storage[grounded_action.name] = NumericFluentStateStorage(grounded_action.name)
+        self.storage[grounded_action.name] = NumericFluentStateStorage(
+            grounded_action.name, self.partial_domain.functions)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
@@ -74,11 +117,13 @@ class NumericSAMLearner(SAMLearner):
         learning_metadata = {}
         super().deduce_initial_inequality_preconditions()
         for observation in observations:
+            self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
                 if not super().are_states_different(component.previous_state, component.next_state):
                     continue
 
                 self.handle_single_trajectory_component(component)
+                print(f"Done handling the component - {component}")
 
         for action_name, action in self.partial_domain.actions.items():
             if action_name not in self.storage:
@@ -87,16 +132,9 @@ class NumericSAMLearner(SAMLearner):
 
             self.storage[action_name].filter_out_inconsistent_state_variables()
             try:
-                if self.preconditions_fluent_map is None:
-                    action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
-
-                elif len(self.preconditions_fluent_map[action_name]) > 0:
-                    action.numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
-                        self.preconditions_fluent_map[action_name])
-
-                action.numeric_effects, added_conditions = self.storage[action_name].construct_assignment_equations()
+                self._construct_safe_numeric_preconditions(action)
+                self._construct_safe_numeric_effects(action)
                 allowed_actions[action_name] = action
-                action.manual_preconditions.extend(added_conditions)
                 learning_metadata[action_name] = "OK"
 
             except NotSafeActionError as e:

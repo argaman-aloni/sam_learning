@@ -42,7 +42,8 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
 
                 grounded_operator = _ground_tested_operator(action_call, learned_domain, observation.grounded_objects)
                 previous_state = observation_component.previous_state
-                learned_next_state_fluents = grounded_operator.update_state_functions(previous_state)
+                next_state = grounded_operator.apply(previous_state)
+                learned_next_state_fluents = next_state.state_fluents
                 actual_next_state = observation_component.next_state
                 for fluent_name, fluent_data in actual_next_state.state_fluents.items():
                     learned_value = learned_next_state_fluents[fluent_name].value

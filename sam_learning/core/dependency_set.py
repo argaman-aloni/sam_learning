@@ -5,7 +5,7 @@ from typing import Set, Dict, List, Optional, Union
 
 from pddl_plus_parser.models import Predicate, Precondition, SignatureType, PDDLConstant
 
-from sam_learning.core.conditional_sam_utilities import extract_predicate_data
+from sam_learning.core.discrete_utilities import extract_predicate_data
 
 NOT_PREFIX = "(not"
 AFTER_NOT_PREFIX_INDEX = 5

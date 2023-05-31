@@ -10,7 +10,7 @@ from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 from experiments import NumericPerformanceCalculator
 from experiments.k_fold_split import KFoldSplit
 from experiments.learning_statistics_manager import LearningStatisticsManager
-from experiments.utils import init_numeric_performance_calculator
+from experiments.utils import init_semantic_performance_calculator
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import MultiAgentSAM, SAMLearner
 from utilities import LearningAlgorithmType, SolverType
@@ -48,21 +48,6 @@ class MAPlanningWithOfflineLearning:
         self.executing_agents = executing_agents
         self.performance_calculator = None
         self.ma_domain_path = None
-
-    def _assert_all_state_predicates_are_positive(self, observation: MultiAgentObservation) -> None:
-        """
-
-        :param observation:
-        :return:
-        """
-        for component in observation.components:
-            for grounded_predicates_set in component.previous_state.state_predicates.values():
-                for grounded_predicate in grounded_predicates_set:
-                    grounded_predicate.is_positive = True
-
-            for grounded_predicates_set in component.next_state.state_predicates.values():
-                for grounded_predicate in grounded_predicates_set:
-                    grounded_predicate.is_positive = True
 
     def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
         """Create a single agent observation from a multi-agent observation.
@@ -119,7 +104,6 @@ class MAPlanningWithOfflineLearning:
             complete_observation: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
                 trajectory_file_path, self.executing_agents)
 
-            self._assert_all_state_predicates_are_positive(complete_observation)
             filtered_observation = self._filter_baseline_single_agent_trajectory(complete_observation)
             allowed_ma_observations.append(complete_observation)
             allowed_sa_observations.append(filtered_observation)
@@ -127,7 +111,7 @@ class MAPlanningWithOfflineLearning:
             self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
             self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
 
-        self.performance_calculator.calculate_semantic_performance(self.ma_domain_path, len(allowed_ma_observations))
+        self.performance_calculator.calculate_performance(self.ma_domain_path, len(allowed_ma_observations))
         self.performance_calculator.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
@@ -195,7 +179,7 @@ class MAPlanningWithOfflineLearning:
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
-        self.performance_calculator = init_numeric_performance_calculator(
+        self.performance_calculator = init_semantic_performance_calculator(
             self.working_directory_path, self.domain_file_name, LearningAlgorithmType.ma_sam,
             executing_agents=self.executing_agents)
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):

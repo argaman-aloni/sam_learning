@@ -1,3 +1,4 @@
+import os
 from typing import Dict
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
@@ -15,6 +16,8 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
     ADL_SATELLITE_TRAJECTORY_PATH
 from tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
+
+os.environ["CONVEX_HULL_ERROR_PATH"] = "tests\\convex_hull_error.txt"
 
 
 @fixture()
@@ -158,7 +161,6 @@ def satellite_adl_problem(satellite_adl_domain: Domain) -> Problem:
 @fixture()
 def satellite_adl_observation(satellite_adl_domain: Domain, satellite_adl_problem: Problem) -> Observation:
     return TrajectoryParser(satellite_adl_domain, satellite_adl_problem).parse_trajectory(ADL_SATELLITE_TRAJECTORY_PATH)
-
 
 
 @fixture()

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import Dict, Set, NoReturn, List
 
-from pddl_plus_parser.models import Action
+from pddl_plus_parser.models import Action, Predicate
 
 from sam_learning.core import LearnerAction
 
@@ -97,10 +97,10 @@ class PrecisionRecallCalculator:
         """
         self._learned_actions.append(learned_action.name)
         self.preconditions[learned_action.name] = \
-            {p.untyped_representation for _, p in learned_action.preconditions}
+            {p.untyped_representation for _, p in learned_action.preconditions if isinstance(p, Predicate)}
 
         self.ground_truth_preconditions[model_action.name] = \
-            {p.untyped_representation for _, p in model_action.preconditions}
+            {p.untyped_representation for _, p in model_action.preconditions if isinstance(p, Predicate)}
 
         self.discrete_effects[learned_action.name] = {p.untyped_representation for p in learned_action.discrete_effects}
         self.ground_discrete_effects[model_action.name] = {p.untyped_representation for p in
