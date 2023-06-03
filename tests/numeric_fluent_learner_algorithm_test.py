@@ -440,7 +440,7 @@ def test_detect_linear_dependent_features_detects_that_two_equal_features_are_li
     output_matrix, linear_dependent_fluent_strs, removed_fluents = \
         detect_linear_dependent_features(linear_dependant_matrix)
 
-    assert linear_dependent_fluent_strs == ["(= (fuel-cost ) (* 1.0 (current_load ?z)))"]
+    assert linear_dependent_fluent_strs == ["(= (current_load ?z) (* 1.0 (fuel-cost )))"]
     assert list(output_matrix.columns) == ["(fuel-cost )"]
     assert removed_fluents == {"(current_load ?z)": "(fuel-cost )"}
 
@@ -455,7 +455,7 @@ def test_detect_linear_dependent_features_detects_that_two_linear_dependent_feat
     output_matrix, linear_dependent_fluent_strs, removed_fluents = \
         detect_linear_dependent_features(linear_dependant_matrix)
 
-    assert linear_dependent_fluent_strs == ["(= (fuel-cost ) (* 0.5 (current_load ?z)))"]
+    assert linear_dependent_fluent_strs == ["(= (current_load ?z) (* 2.0 (fuel-cost )))"]
     assert removed_fluents == {"(current_load ?z)": "(fuel-cost )"}
     assert output_matrix.shape[1] == 1
 

@@ -29,19 +29,18 @@ class LinearRegressionLearner:
         self.action_name = action_name
         self.domain_functions = domain_functions
 
-    def _validate_legal_equations(self, values_df: DataFrame, allow_unsafe_learning: bool = True) -> None:
+    def _validate_legal_equations(self, values_df: DataFrame, allow_unsafe_learning: bool = False) -> None:
         """Validates that there are enough independent equations which enable for a single solution for the equation.
 
         :param values_df: the matrix constructed based on the observations.
         :param allow_unsafe_learning: whether to allow unsafe learning.
         """
         values_matrix = values_df.to_numpy()
-        num_dimensions = values_matrix.shape[1] + 1
+        num_dimensions = values_matrix.shape[1] + 1  # +1 for the bias.
         num_rows = values_matrix.shape[0]
         values_matrix_with_bias = np.c_[values_matrix, np.ones(num_rows)]
-        _, indices = sympy.Matrix(values_matrix_with_bias).T.rref()
-        independent_rows_matrix = np.array([values_matrix_with_bias[index] for index in indices])
-        if independent_rows_matrix.shape[0] >= num_dimensions:
+        _, pivot_cols = sympy.Matrix(values_matrix_with_bias).rref()
+        if len(pivot_cols) >= num_dimensions:
             return
 
         failure_reason = f"There are too few independent rows of data! " \
@@ -78,7 +77,7 @@ class LinearRegressionLearner:
         return coefficients, learning_score
 
     def _compute_non_constant_change(
-            self, lifted_function: str, regression_matrix: DataFrame, allow_unsafe_learning: bool = True) -> Optional[
+            self, lifted_function: str, regression_matrix: DataFrame, allow_unsafe_learning: bool = False) -> Optional[
         str]:
         """Computes the change in the function value based on the previous values of the function.
 
@@ -116,7 +115,7 @@ class LinearRegressionLearner:
         constructed_right_side = construct_linear_equation_string(multiplication_functions)
         return f"(assign {lifted_function} {constructed_right_side})"
 
-    def _construct_safe_conditional_effect(self, combined_data: DataFrame) -> ConditionalEffect:
+    def _construct_safe_conditional_effect(self, combined_data: DataFrame) -> Optional[ConditionalEffect]:
         """Constructs a safe conditional effect when the there is not enough data to learn the effect.
 
         :param combined_data: the data frame containing the previous and next state values.
@@ -136,6 +135,10 @@ class LinearRegressionLearner:
                     self.logger.debug("The next state fluent might be dependent on the current "
                                       "state fluent since it is not zero")
                     additional_conditions.append(f"(= {fluent} {combined_data[fluent].iloc[0]})")
+
+        if len(assignment_statements) == 0:
+            self.logger.debug("The algorithm could not find any changes in the state variables. Continuing.")
+            return None
 
         conditional_effect = ConditionalEffect()
         conditional_effect.antecedents.root = construct_numeric_conditions(
@@ -184,8 +187,8 @@ class LinearRegressionLearner:
     def construct_assignment_equations(
             self, previous_state_data: Dict[str, List[float]],
             next_state_data: Dict[str, List[float]],
-            allow_unsafe_learning: bool = True) -> Union[Tuple[
-        Set[NumericalExpressionTree], Optional[Precondition]], ConditionalEffect]:
+            allow_unsafe_learning: bool = False) -> Optional[Union[Tuple[
+        Set[NumericalExpressionTree], Optional[Precondition]], ConditionalEffect]]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
         :param previous_state_data: the data of the previous state.
@@ -222,13 +225,17 @@ class LinearRegressionLearner:
                 continue
 
             non_constant_change = self._compute_non_constant_change(
-                feature_fluent, regression_matrix, allow_unsafe_learning)
+                feature_fluent, regression_matrix, allow_unsafe_learning=allow_unsafe_learning)
             if non_constant_change is not None:
                 assignment_statements.append(non_constant_change)
                 continue
 
         if len(additional_conditions) == 0:
             return construct_numeric_effects(assignment_statements, self.domain_functions), None
+
+        if len(assignment_statements) == 0:
+            self.logger.debug("The algorithm could not find any effects by the action.")
+            return None
 
         return construct_numeric_effects(assignment_statements, self.domain_functions), \
             construct_numeric_conditions(list(additional_conditions), ConditionType.conjunctive, self.domain_functions)

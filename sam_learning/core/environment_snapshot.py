@@ -3,7 +3,7 @@
 import logging
 from typing import Set, Dict, Optional, List
 
-from pddl_plus_parser.models import GroundedPredicate, State, PDDLObject, Domain, ActionCall
+from pddl_plus_parser.models import GroundedPredicate, State, PDDLObject, Domain, ActionCall, PDDLFunction
 
 from sam_learning.core.vocabulary_creator import VocabularyCreator
 
@@ -14,6 +14,8 @@ class EnvironmentSnapshot:
     vocabulary_creator: VocabularyCreator
     previous_state_predicates: Set[GroundedPredicate]
     next_state_predicates: Set[GroundedPredicate]
+    previous_state_functions: Dict[str, PDDLFunction]
+    next_state_functions: Dict[str, PDDLFunction]
     partial_domain: Domain
     logger: logging.Logger
 
@@ -59,9 +61,26 @@ class EnvironmentSnapshot:
 
         return positive_state_predicates.union(negative_state_predicates)
 
+    def _create_state_numeric_snapshot(
+            self, state: State, relevant_objects: Dict[str, PDDLObject]) -> Dict[str, PDDLFunction]:
+        """
+
+        :param state:
+        :param relevant_objects:
+        :return:
+        """
+        self.logger.debug("Creating a snapshot of the state functions.")
+        result = {}
+        for function_str, pddl_function in state.state_fluents.items():
+            if len(pddl_function.signature.keys()) == 0 or \
+                    set(pddl_function.signature.keys()).issubset(relevant_objects):
+                result[function_str] = pddl_function
+
+        return result
+
     def create_snapshot(
             self, previous_state: State, next_state: State, current_action: ActionCall,
-            observation_objects: Dict[str, PDDLObject],  specific_types: Optional[List[str]] = []) -> None:
+            observation_objects: Dict[str, PDDLObject], specific_types: Optional[List[str]] = []) -> None:
         """Creates a snapshot of the environment.
 
         :param previous_state: the previous state of the environment.
@@ -69,12 +88,13 @@ class EnvironmentSnapshot:
         :param current_action: the current action.
         :param observation_objects: the objects in the observation.
         :param specific_types: the types of the objects to include in the snapshot.
-        :param should_include_all_objects: whether to include all objects in the observation.
         """
         self.logger.debug("Creating a snapshot of the environment.")
+        parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
         relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
-                            if object_name in current_action.parameters or object_data.type.name in specific_types} \
+                            if object_name in parameters_including_consts or object_data.type.name in specific_types}
 
         self.previous_state_predicates = self._create_state_discrete_snapshot(previous_state, relevant_objects)
         self.next_state_predicates = self._create_state_discrete_snapshot(next_state, relevant_objects)
-        # TODO: ADD the creation of the functions snapshot.
+        self.previous_state_functions = self._create_state_numeric_snapshot(previous_state, relevant_objects)
+        self.next_state_functions = self._create_state_numeric_snapshot(next_state, relevant_objects)

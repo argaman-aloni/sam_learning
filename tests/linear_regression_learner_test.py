@@ -35,6 +35,19 @@ def test_validate_legal_equations_does_not_raise_error_when_the_number_of_equati
         pytest.fail()
 
 
+def test_validate_legal_fails_when_there_are_not_enough_independant_equations(
+        linear_regression_learner: LinearRegressionLearner):
+    pre_state_data = {
+        "x": [0, 1, 2, 4],
+        "y": [0, 2, 4, 8],
+        "z": [0, 0, 18, 6]
+    }
+    dataframe = DataFrame(pre_state_data)
+    with pytest.raises(NotSafeActionError):
+        linear_regression_learner._validate_legal_equations(dataframe, allow_unsafe_learning=False)
+
+
+
 def test_validate_legal_equations_raises_error_when_the_number_of_equations_is_too_small(
         linear_regression_learner: LinearRegressionLearner):
     pre_state_data = {

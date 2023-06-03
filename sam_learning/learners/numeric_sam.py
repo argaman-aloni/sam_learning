@@ -56,6 +56,10 @@ class NumericSAMLearner(SAMLearner):
         :param action: the action that its effects are constructed for.
         """
         result = self.storage[action.name].construct_assignment_equations()
+        if result is None:
+            self.logger.debug(f"The action {action.name} has no numeric effects.")
+            return
+
         if isinstance(result, ConditionalEffect):
             action.conditional_effects.add(result)
             return
@@ -75,9 +79,9 @@ class NumericSAMLearner(SAMLearner):
         super().add_new_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
         previous_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, previous_state.state_fluents)
+            grounded_action, self.triplet_snapshot.previous_state_functions)
         next_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, next_state.state_fluents)
+            grounded_action, self.triplet_snapshot.next_state_functions)
         self.storage[grounded_action.name] = NumericFluentStateStorage(
             grounded_action.name, self.partial_domain.functions)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
@@ -98,9 +102,9 @@ class NumericSAMLearner(SAMLearner):
         self.logger.debug(
             f"Adding the numeric state variables to the numeric storage of action - {action_name}.")
         previous_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, previous_state.state_fluents)
+            grounded_action, self.triplet_snapshot.previous_state_functions)
         next_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, next_state.state_fluents)
+            grounded_action, self.triplet_snapshot.next_state_functions)
         self.storage[action_name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
@@ -123,7 +127,6 @@ class NumericSAMLearner(SAMLearner):
                     continue
 
                 self.handle_single_trajectory_component(component)
-                print(f"Done handling the component - {component}")
 
         for action_name, action in self.partial_domain.actions.items():
             if action_name not in self.storage:
@@ -136,6 +139,7 @@ class NumericSAMLearner(SAMLearner):
                 self._construct_safe_numeric_effects(action)
                 allowed_actions[action_name] = action
                 learning_metadata[action_name] = "OK"
+                self.logger.info(f"Done learning the action - {action_name}!")
 
             except NotSafeActionError as e:
                 self.logger.debug(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")

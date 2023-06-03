@@ -67,8 +67,8 @@ class NumericFluentStateStorage:
         return self.convex_hull_learner.construct_safe_linear_inequalities(
             self.previous_state_storage, relevant_fluents)
 
-    def construct_assignment_equations(self, allow_unsafe_learning: bool = True) -> Union[Tuple[
-        Set[NumericalExpressionTree], Optional[Precondition]], ConditionalEffect]:
+    def construct_assignment_equations(self, allow_unsafe_learning: bool = False) -> Optional[Union[Tuple[
+        Set[NumericalExpressionTree], Optional[Precondition]], ConditionalEffect]]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
         :param allow_unsafe_learning: whether to allow learning from unsafe data.

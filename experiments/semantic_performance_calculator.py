@@ -266,14 +266,14 @@ class SemanticPerformanceCalculator:
             learned_domain)
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
-        for action_name in learned_domain.actions:
+        for action_name in self.model_domain.actions:
             action_stats = {
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
-                "precondition_precision": preconditions_precision[action_name],
-                "precondition_recall": preconditions_recall[action_name],
-                "effects_precision": effects_precision[action_name],
-                "effects_recall": effects_recall[action_name]
+                "precondition_precision": preconditions_precision.get(action_name, 0),
+                "precondition_recall": preconditions_recall.get(action_name, 0),
+                "effects_precision": effects_precision.get(action_name, 0),
+                "effects_recall": effects_recall.get(action_name, 0)
             }
             self.combined_stats.append(action_stats)
 

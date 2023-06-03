@@ -192,7 +192,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
                                                                    "fluents", default=None)
     parser.add_argument("--universals_map", required=False,
-                        help="The path to the file mapping indicating whether there are usinversals or not",
+                        help="The path to the file mapping indicating whether there are universals or not",
                         default=None)
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
                         help="The solver that should be used for the sake of validation.\n FD - 1, Metric-FF - 2, ENHSP - 3.",

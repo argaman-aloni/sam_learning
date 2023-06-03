@@ -83,9 +83,10 @@ class PredicatesMatcher:
         constants = self.matcher_domain.constants
         grounded_predicate_call = grounded_predicate.grounded_objects
 
-        action_grounded_objects = action_call.parameters + list(constants.keys()) if extra_grounded_object is None \
+        constants_in_predicate = [obj for obj in grounded_predicate_call if obj in constants]
+        action_grounded_objects = action_call.parameters + constants_in_predicate if extra_grounded_object is None \
             else action_call.parameters + [extra_grounded_object]
-        lifted_action_params = list(lifted_action_data.signature.keys()) + list(constants.keys()) \
+        lifted_action_params = list(lifted_action_data.signature.keys()) + constants_in_predicate \
             if extra_lifted_object is None else list(lifted_action_data.signature.keys()) + [extra_lifted_object]
 
         if contains_duplicates(action_call.parameters):
@@ -99,7 +100,7 @@ class PredicatesMatcher:
             possible_match_action_objects, lifted_parameters = self._extract_combinations_data(possible_permutation)
             if set(possible_match_action_objects) == set(grounded_predicate_call):
                 combined_types = {**lifted_action_data.signature}
-                combined_types.update({name: constants[name].type for name in constants})
+                combined_types.update({name: constants[name].type for name in constants_in_predicate})
                 if extra_lifted_object is not None:
                     self.logger.debug(f"Adding the extra lifted object {extra_lifted_object} to the signature.")
                     additional_lifted_parameter = [key for key in grounded_predicate.object_mapping if
