@@ -134,49 +134,33 @@ def filter_constant_features(input_df: DataFrame, column_to_ignore: Optional[str
     return result_ft, equal_fluent_strs, removed_fluents
 
 
-def detect_linear_dependent_features(data_matrix: DataFrame, column_to_ignore: Optional[str] = None) -> Tuple[
-    DataFrame, List[str], Dict[str, str]]:
+def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame, List[str], Dict[str, str]]:
     """Detects linear dependent features and adds the equality constraints to the problem.
 
     The idea is: put together these column vectors as a matrix and calculate its row-echelon form.
     If the row-echelon form is diagonal with only ones, the set of vectors is independent, otherwise, it is dependent.
 
     :param data_matrix: the matrix of the previous state values.
-    :param column_to_ignore: the column to ignore.
     :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal and the
         column to column mapping.
     """
     additional_conditions = []
     dependent_columns = {}
-    filtered_matrix, equality_strs, _ = filter_constant_features(data_matrix.copy(), column_to_ignore)
-    additional_conditions.extend(equality_strs)
-    if len(filtered_matrix.columns) <= 1:
-        return filtered_matrix, additional_conditions, dependent_columns
 
-    for col1, col2 in itertools.combinations(filtered_matrix.columns, 2):
-        special_column = col1 if col1 == column_to_ignore else col2 if col2 == column_to_ignore else None
-        reduced_form, _ = sympy.Matrix(filtered_matrix[[col1, col2]].values).rref()
+    data_matrix_copy = data_matrix.copy()
+    for col1, col2 in itertools.combinations(data_matrix_copy.columns, 2):
+        reduced_form, _ = sympy.Matrix(data_matrix_copy[[col1, col2]].values).rref()
         diagonal_required_result = np.array([[1, 0], [0, 1]])
         if np.array_equal(diagonal_required_result, np.diag(np.diag(reduced_form))):
-            continue    # The columns are independent
+            continue  # The columns are independent
 
-        independent_column = col1
-        dependent_column = col2
-        if special_column and special_column == col1:
-            dependent_column = col2
-            independent_column = col1
-
-        elif special_column and special_column == col2:
-            dependent_column = col1
-            independent_column = col2
-
+        independent_column, dependent_column = col1, col2
         linear_coeff = extract_numeric_linear_coefficient(
-            filtered_matrix[dependent_column], filtered_matrix[independent_column])
+            data_matrix_copy[dependent_column], data_matrix_copy[independent_column])
         additional_conditions.append(f"(= {dependent_column} (* {linear_coeff} {independent_column}))")
-        filtered_matrix[independent_column] += filtered_matrix[dependent_column] * linear_coeff
         dependent_columns[dependent_column] = independent_column
 
-    filtered_matrix = filtered_matrix[[col for col in filtered_matrix.columns if col not in dependent_columns]]
+    filtered_matrix = data_matrix_copy[[col for col in data_matrix_copy.columns if col not in dependent_columns]]
     return filtered_matrix, additional_conditions, dependent_columns
 
 

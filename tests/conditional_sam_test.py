@@ -430,14 +430,10 @@ def test_construct_restrictive_preconditions_constructs_correct_restrictive_prec
     assert len(restrictive_precondition.root.operands) == 1
     or_condition = restrictive_precondition.root.operands.pop()
     assert or_condition.binary_operator == "or"
-    for operand in or_condition.operands:
-        if isinstance(operand, Predicate):
-            assert operand.untyped_representation == "(make-unmovable ?to)"
-            continue
-        if isinstance(operand, Precondition):
-            assert operand.binary_operator == "and"
-            assert len(operand.operands) == 1
-            assert operand.operands.pop().untyped_representation == "(can-continue-group ?c ?to)"
+    assert len(or_condition.operands) == 2
+    assert all([isinstance(operand, Predicate) for operand in or_condition.operands])
+    assert {p.untyped_representation for p in or_condition.operands} == {"(can-continue-group ?c ?to)",
+                                                                         "(make-unmovable ?to)"}
 
 
 def test_construct_restrictive_preconditions_constructs_correct_restrictive_precondition_string_as_required_when_is_effect(
@@ -459,16 +455,10 @@ def test_construct_restrictive_preconditions_constructs_correct_restrictive_prec
     assert len(restrictive_precondition.root.operands) == 1
     or_condition = restrictive_precondition.root.operands.pop()
     assert or_condition.binary_operator == "or"
-    for operand in or_condition.operands:
-        if isinstance(operand, Predicate):
-            assert operand.untyped_representation == "(make-unmovable ?to)"
-            continue
-
-        if isinstance(operand, Precondition):
-            assert operand.binary_operator == "and"
-            assert len(operand.operands) == 1
-            assert operand.operands.pop().untyped_representation in ["(can-continue-group ?c ?to)",
-                                                                     "(not (can-continue-group ?c ?to))"]
+    assert len(or_condition.operands) == 3
+    assert all([isinstance(operand, Predicate) for operand in or_condition.operands])
+    assert {p.untyped_representation for p in or_condition.operands} == {
+        "(can-continue-group ?c ?to)", "(make-unmovable ?to)", "(not (can-continue-group ?c ?to))"}
 
 
 def test_construct_restrictive_conditional_effects_constructs_the_correct_conditional_effect_in_the_action(

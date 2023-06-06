@@ -13,7 +13,7 @@ from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
 from sam_learning.core.numeric_utils import construct_multiplication_strings, construct_linear_equation_string, \
-    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions
+    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features
 
 
 class ConvexHullLearner:
@@ -149,8 +149,13 @@ class ConvexHullLearner:
                               "not enough to learn of linear dependency!")
             return [], previous_state_matrix
 
-        filtered_matrix, added_conditions, _ = detect_linear_dependent_features(previous_state_matrix)
-        return added_conditions, filtered_matrix
+        filtered_matrix, equality_conditions, _ = filter_constant_features(previous_state_matrix.copy())
+        if len(filtered_matrix.columns) <= 1:
+            return equality_conditions, filtered_matrix
+
+        filtered_matrix, linear_dependency_conditions, _ = detect_linear_dependent_features(previous_state_matrix)
+        combined_conditions = equality_conditions + linear_dependency_conditions
+        return combined_conditions, filtered_matrix
 
     def construct_safe_linear_inequalities(
             self, state_storge: Dict[str, List[float]],

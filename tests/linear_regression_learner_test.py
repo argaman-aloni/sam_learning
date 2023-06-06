@@ -20,7 +20,7 @@ def linear_regression_learner() -> LinearRegressionLearner:
     return LinearRegressionLearner(TEST_ACTION_NAME, domain_functions)
 
 
-def test_validate_legal_equations_does_not_raise_error_when_the_number_of_equations_is_valid_and_the_matrix_has_one_solution(
+def test_validate_legal_equations_returns_true_when_the_number_of_equations_is_valid_and_the_matrix_has_one_solution(
         linear_regression_learner: LinearRegressionLearner):
     pre_state_data = {
         "x": [2, 1, 3, 0],
@@ -28,14 +28,10 @@ def test_validate_legal_equations_does_not_raise_error_when_the_number_of_equati
         "z": [-1, 2, 4, 1]
     }
     dataframe = DataFrame(pre_state_data)
-    try:
-        linear_regression_learner._validate_legal_equations(dataframe, allow_unsafe_learning=False)
-
-    except NotSafeActionError:
-        pytest.fail()
+    assert linear_regression_learner._validate_legal_equations(dataframe)
 
 
-def test_validate_legal_fails_when_there_are_not_enough_independant_equations(
+def test_validate_legal_returns_false_when_there_are_not_enough_independent_equations(
         linear_regression_learner: LinearRegressionLearner):
     pre_state_data = {
         "x": [0, 1, 2, 4],
@@ -43,12 +39,10 @@ def test_validate_legal_fails_when_there_are_not_enough_independant_equations(
         "z": [0, 0, 18, 6]
     }
     dataframe = DataFrame(pre_state_data)
-    with pytest.raises(NotSafeActionError):
-        linear_regression_learner._validate_legal_equations(dataframe, allow_unsafe_learning=False)
+    assert not linear_regression_learner._validate_legal_equations(dataframe)
 
 
-
-def test_validate_legal_equations_raises_error_when_the_number_of_equations_is_too_small(
+def test_validate_legal_equations_returns_false_when_the_number_of_equations_is_too_small(
         linear_regression_learner: LinearRegressionLearner):
     pre_state_data = {
         "x": [2, 1, 3],
@@ -56,23 +50,7 @@ def test_validate_legal_equations_raises_error_when_the_number_of_equations_is_t
         "z": [-1, 2, 4]
     }
     dataframe = DataFrame(pre_state_data)
-    with pytest.raises(NotSafeActionError) as e:
-        linear_regression_learner._validate_legal_equations(dataframe, allow_unsafe_learning=False)
-
-
-def test_validate_legal_equations_does_not_raise_error_when_allows_unsafe_learning(
-        linear_regression_learner: LinearRegressionLearner):
-    pre_state_data = {
-        "x": [2, 1, 3],
-        "y": [3, -1, 2],
-        "z": [-1, 2, 4]
-    }
-    dataframe = DataFrame(pre_state_data)
-    try:
-        linear_regression_learner._validate_legal_equations(dataframe, allow_unsafe_learning=True)
-
-    except NotSafeActionError:
-        pytest.fail()
+    assert not linear_regression_learner._validate_legal_equations(dataframe)
 
 
 def test_solve_function_linear_equations_returns_correct_solution_for_a_solvable_matrix(
@@ -87,7 +65,7 @@ def test_solve_function_linear_equations_returns_correct_solution_for_a_solvable
     regression_array = np.array(dataframe.loc[:, dataframe.columns != "label"])
     function_post_values = np.array(dataframe["label"])
     try:
-        coefficients, learning_score = linear_regression_learner._solve_function_linear_equations(
+        coefficients, learning_score = linear_regression_learner._solve_regression_problem(
             regression_array, function_post_values)
         assert learning_score == 1
         assert len(coefficients) == 4
@@ -108,7 +86,7 @@ def test_solve_function_linear_equations_raises_error_when_there_is_no_solution_
     regression_array = np.array(dataframe.loc[:, dataframe.columns != "label"])
     function_post_values = np.array(dataframe["label"])
     with pytest.raises(NotSafeActionError) as e:
-        linear_regression_learner._solve_function_linear_equations(
+        linear_regression_learner._solve_regression_problem(
             regression_array, function_post_values, allow_unsafe_learning=False)
 
 
@@ -122,7 +100,7 @@ def test_compute_non_constant_change_returns_correct_pddl_equation_form_for_vari
     }
     dataframe = DataFrame(equation_matrix)
     try:
-        equation = linear_regression_learner._compute_non_constant_change("w", dataframe)
+        equation = linear_regression_learner._solve_safe_independent_equations("w", dataframe)
         assert equation is not None
         assert equation.startswith("(assign")
 
@@ -140,7 +118,7 @@ def test_compute_non_constant_change_returns_correct_pddl_equation_form_for_vari
     }
     dataframe = DataFrame(equation_matrix)
     try:
-        equation = linear_regression_learner._compute_non_constant_change("x", dataframe)
+        equation = linear_regression_learner._solve_safe_independent_equations("x", dataframe)
         assert equation is not None
         assert equation.startswith("(increase")
 
@@ -159,9 +137,17 @@ def test_construct_safe_conditional_effect_constructs_a_correct_conditional_effe
         "next_state_(z)": [-12],
     }
     dataframe = DataFrame(equation_matrix)
-    conditional_effect = linear_regression_learner._construct_safe_conditional_effect(dataframe)
+    result = linear_regression_learner._construct_multiple_safe_conditional_effects(dataframe)
+    assert result is not None
+
+    conditional_effects, disjunctive_preconditions = result
+    assert len(conditional_effects) == 1
+    conditional_effect = conditional_effects[0]
     assert len(conditional_effect.antecedents.root.operands) == 3
     assert len(conditional_effect.numeric_effects) == 3
+    assert disjunctive_preconditions is not None
+    assert disjunctive_preconditions.binary_operator == "and"
+    assert len(disjunctive_preconditions.operands) == 3
 
 
 def test_action_not_affects_fluent_returns_true_when_action_does_not_affect_fluent(
@@ -206,7 +192,7 @@ def test_combine_states_data_creates_correct_dataframe_with_correct_values(
     assert len(combined_state.columns) == 6
 
 
-def test_compute_constant_change_returns_correct_pddl_equation_form_for_variable_with_assignment_sign(
+def test_solve_safe_independent_equations_returns_correct_pddl_equation_form_for_variable_with_assignment_sign(
         linear_regression_learner: LinearRegressionLearner):
     equation_matrix = {
         "(x)": [2, 1, 3, 0],
@@ -215,12 +201,12 @@ def test_compute_constant_change_returns_correct_pddl_equation_form_for_variable
         "label": [21, 20, 22, 19]
     }
     dataframe = DataFrame(equation_matrix)
-    constant_change = linear_regression_learner._compute_constant_change("(x)", dataframe)
+    constant_change = linear_regression_learner._solve_safe_independent_equations("(x)", dataframe)
     assert constant_change is not None
-    assert constant_change == "(increase (x) 19)"
+    assert constant_change == "(increase (x) 19.0)"
 
 
-def test_compute_constant_change_returns_none_when_the_change_is_not_constant(
+def test_solve_safe_independent_equations_equation_form_when_linear_equations_are_solvable(
         linear_regression_learner: LinearRegressionLearner):
     equation_matrix = {
         "(x)": [2, 1, 3, 0],
@@ -229,8 +215,8 @@ def test_compute_constant_change_returns_none_when_the_change_is_not_constant(
         "label": [21, 23, 252, 129]
     }
     dataframe = DataFrame(equation_matrix)
-    constant_change = linear_regression_learner._compute_constant_change("(x)", dataframe)
-    assert constant_change is None
+    non_constant_change = linear_regression_learner._solve_safe_independent_equations("(x)", dataframe)
+    assert non_constant_change is not None
 
 
 def test_construct_assignment_equations_returns_correct_equations_for_all_fluents(
@@ -248,9 +234,10 @@ def test_construct_assignment_equations_returns_correct_equations_for_all_fluent
     result = linear_regression_learner.construct_assignment_equations(pre_state_matrix, next_state_matrix)
     assert result is not None
     assert len(result) == 2
-    effects, conditions = result
+    assert isinstance(result, set)
+    effects = result
     assert len(effects) == 2
+    pddl_effects = [eff.to_pddl() for eff in effects]
+    assert "(assign (z ) 1.0)" in pddl_effects
     for eff in effects:
         print(eff.to_pddl())
-
-    assert conditions is None

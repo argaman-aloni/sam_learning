@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, ConditionalEffect, ObservedComponent
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, ConditionalEffect, NumericalExpressionTree
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm, LearnerAction
@@ -56,18 +56,29 @@ class NumericSAMLearner(SAMLearner):
         :param action: the action that its effects are constructed for.
         """
         result = self.storage[action.name].construct_assignment_equations()
-        if result is None:
-            self.logger.debug(f"The action {action.name} has no numeric effects.")
+        if isinstance(result, set):
+            if len(result) == 0:
+                self.logger.debug(f"The action {action.name} has no numeric effects.")
+                return
+
+            action.numeric_effects = result
             return
 
-        if isinstance(result, ConditionalEffect):
-            action.conditional_effects.add(result)
-            return
-
-        numeric_effects, additional_preconditions = result
-        action.numeric_effects = numeric_effects
+        effects, additional_preconditions = result
         if additional_preconditions is not None:
             action.preconditions.add_condition(additional_preconditions)
+
+        if effects is None:
+            self.logger.debug(f"This happned since the action does not have enough data to learn its effects.")
+            return
+
+        if all([isinstance(effect, ConditionalEffect) for effect in effects]):
+            self.logger.debug("The learned effects are all conditional effects. Adding them as such.")
+            action.conditional_effects = effects
+
+        elif all([isinstance(effect, NumericalExpressionTree) for effect in effects]):
+            self.logger.debug("The learned effects are non conditional effects. Adding them as numeric effects.")
+            action.numeric_effects = effects
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.

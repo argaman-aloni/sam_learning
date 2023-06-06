@@ -2,11 +2,10 @@
 import random
 
 from pandas import DataFrame
-from pddl_plus_parser.models import NumericalExpressionTree, Precondition
-from pytest import fixture, raises
+from pddl_plus_parser.models import NumericalExpressionTree, Precondition, ConditionalEffect
+from pytest import fixture
 
-from sam_learning.core import NumericFluentStateStorage, NotSafeActionError, \
-    construct_non_circular_assignment
+from sam_learning.core import NumericFluentStateStorage, construct_non_circular_assignment
 from sam_learning.core.numeric_utils import detect_linear_dependent_features, filter_constant_features
 from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, \
     CURRENT_LOAD_TRAJECTORY_FUNCTION
@@ -120,7 +119,7 @@ def test_construct_non_circular_assignment_constructs_correct_equation_with_corr
     assert increase_statement == "(decrease (current_load ?z) (* (weight ?y) 1.0))"
 
 
-def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_in_variables_returns_empty_list(
+def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_in_variables_returns_empty_set(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     for i in range(4):
         random_prev_load_limit = random.randint(0, 100)
@@ -134,9 +133,9 @@ def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_prev_state_fluents)
         load_action_state_fluent_storage.add_to_next_state_storage(simple_prev_state_fluents)
 
-    assignment_equations, added_preconditions = load_action_state_fluent_storage.construct_assignment_equations()
+    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
+    assert isinstance(assignment_equations, set)
     assert len(assignment_equations) == 0
-    assert added_preconditions is None
 
 
 def test_construct_assignment_equations_when_change_is_caused_by_constant_returns_correct_value(
@@ -159,7 +158,8 @@ def test_construct_assignment_equations_when_change_is_caused_by_constant_return
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_equations, added_condition = load_action_state_fluent_storage.construct_assignment_equations()
+    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
+    assert isinstance(assignment_equations, set)
     assert assignment_equations.pop().to_pddl() == "(assign (current_load ?z) 10.0)"
 
 
@@ -182,7 +182,8 @@ def test_construct_assignment_equations_with_simple_2d_equations_returns_correct
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_equations, added_condition = load_action_state_fluent_storage.construct_assignment_equations()
+    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
+    assert isinstance(assignment_equations, set)
     assert len(assignment_equations) == 1
     assert assignment_equations.pop().to_pddl() == "(assign (current_load ?z) (* (load_limit ?z) 9.0))"
 
@@ -207,7 +208,8 @@ def test_construct_assignment_equations_with_two_equations_result_in_multiple_ch
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_numeric_expressions, added_conditions = load_action_state_fluent_storage.construct_assignment_equations()
+    assignment_numeric_expressions = load_action_state_fluent_storage.construct_assignment_equations()
+    assert isinstance(assignment_numeric_expressions, set)
     assignment_equations = {expression.to_pddl() for expression in assignment_numeric_expressions}
     assert len(assignment_equations) == 2
     assert set(assignment_equations) == {
@@ -235,13 +237,14 @@ def test_construct_assignment_equations_with_an_increase_change_results_in_corre
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_numeric_expressions, added_conditions = load_action_state_fluent_storage.construct_assignment_equations()
+    assignment_numeric_expressions = load_action_state_fluent_storage.construct_assignment_equations()
+    assert isinstance(assignment_numeric_expressions, set)
     assignment_equations = {expression.to_pddl() for expression in assignment_numeric_expressions}
     assert len(assignment_equations) == 1
     print(assignment_equations)
 
 
-def test_construct_assignment_equations_with_fewer_possible_observation_should_not_work(
+def test_construct_assignment_equations_with_fewer_equations_than_needed_to_create_single_solution_should_return_conditional_effects_and_preconditions(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     # Note the function that we are trying to calculate is y[i+1] = y[i] + 10 * x[i]
     # In this setting we create an observation where x[i] = 2 constantly but y[i] = 1, 2, 3, 4
@@ -260,8 +263,13 @@ def test_construct_assignment_equations_with_fewer_possible_observation_should_n
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    with raises(NotSafeActionError):
-        load_action_state_fluent_storage.construct_assignment_equations(allow_unsafe_learning=False)
+    result = load_action_state_fluent_storage.construct_assignment_equations(allow_unsafe_learning=False)
+    assert result is not None
+    conditional_effects, preconditions = result
+    for conditional_effect in conditional_effects:
+        assert isinstance(conditional_effect, ConditionalEffect)
+
+    assert isinstance(preconditions, Precondition)
 
 
 def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_degraded_conditions(
@@ -411,23 +419,10 @@ def test_detect_linear_dependent_features_when_given_only_one_sample_returns_tha
     }
     linear_dependant_matrix = DataFrame(pre_state_data)
     output_matrix, linear_dependent_fluents, remained_fluents = \
-        detect_linear_dependent_features(linear_dependant_matrix, column_to_ignore="(fuel-cost )")
-    assert list(output_matrix.columns) == ["(fuel-cost )"]
-    assert linear_dependent_fluents == ['(= (current_load ?z) 1.0)']
-    assert remained_fluents == {}
-
-
-def test_detect_linear_dependent_features_when_given_only_one_sample_and_no_ignored_coulm_returns_constant_values():
-    pre_state_data = {
-        "(fuel-cost )": [1.0],
-        "(current_load ?z)": [1.0],
-    }
-    linear_dependant_matrix = DataFrame(pre_state_data)
-    output_matrix, linear_dependent_fluents, remained_fluents = \
         detect_linear_dependent_features(linear_dependant_matrix)
-    assert list(output_matrix.columns) == []
-    assert set(linear_dependent_fluents) == {"(= (current_load ?z) 1.0)", "(= (fuel-cost ) 1.0)"}
-    assert remained_fluents == {}
+    assert list(output_matrix.columns) == ["(fuel-cost )"]
+    assert linear_dependent_fluents == ["(= (current_load ?z) (* 1.0 (fuel-cost )))"]
+    assert remained_fluents == {"(current_load ?z)": "(fuel-cost )"}
 
 
 def test_detect_linear_dependent_features_detects_that_two_equal_features_are_linear_dependant():
