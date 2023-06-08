@@ -244,7 +244,7 @@ def test_construct_assignment_equations_with_an_increase_change_results_in_corre
     print(assignment_equations)
 
 
-def test_construct_assignment_equations_with_fewer_equations_than_needed_to_create_single_solution_should_return_conditional_effects_and_preconditions(
+def test_construct_assignment_equations_with_fewer_equations_than_needed_to_create_single_solution_should_numeric_effect_and_preconditions(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     # Note the function that we are trying to calculate is y[i+1] = y[i] + 10 * x[i]
     # In this setting we create an observation where x[i] = 2 constantly but y[i] = 1, 2, 3, 4
@@ -267,7 +267,7 @@ def test_construct_assignment_equations_with_fewer_equations_than_needed_to_crea
     assert result is not None
     conditional_effects, preconditions = result
     for conditional_effect in conditional_effects:
-        assert isinstance(conditional_effect, ConditionalEffect)
+        assert isinstance(conditional_effect, NumericalExpressionTree)
 
     assert isinstance(preconditions, Precondition)
 

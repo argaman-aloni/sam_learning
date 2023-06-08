@@ -115,21 +115,22 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
     return linear_coeff
 
 
-def filter_constant_features(input_df: DataFrame, column_to_ignore: Optional[str] = None) -> Tuple[
+def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[
     DataFrame, List[str], List[str]]:
     """Filters out fluents that contain only constant values since they do not contribute to the convex hull.
 
     :param input_df: the matrix of the previous state values.
-    :param column_to_ignore:
+    :param columns_to_ignore: the list of columns that should be ignored.
     :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal.
     """
     equal_fluent_strs, removed_fluents = [], []
     result_ft = input_df.copy()
-    for col in [col for col in input_df.columns if col != column_to_ignore]:
+    relevant_columns = [col for col in input_df.columns if col not in columns_to_ignore]
+    for col in relevant_columns:
         if len(input_df[col].unique()) == 1:
             equal_fluent_strs.append(f"(= {col} {input_df[col].unique()[0]})")
             removed_fluents.append(col)
-            result_ft.drop(col, inplace=True, axis=1)
+            result_ft.drop(columns=col, inplace=True)
 
     return result_ft, equal_fluent_strs, removed_fluents
 

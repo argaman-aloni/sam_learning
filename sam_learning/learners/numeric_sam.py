@@ -66,7 +66,14 @@ class NumericSAMLearner(SAMLearner):
 
         effects, additional_preconditions = result
         if additional_preconditions is not None:
-            action.preconditions.add_condition(additional_preconditions)
+            if additional_preconditions.binary_operator == "and":
+                self.logger.debug("The learned additional preconditions are a conjunction. "
+                                  "Adding the internal conditions.")
+                for condition in additional_preconditions.operands:
+                    action.preconditions.add_condition(condition)
+
+            else:
+                action.preconditions.add_condition(additional_preconditions)
 
         if effects is None:
             self.logger.debug(f"This happned since the action does not have enough data to learn its effects.")
@@ -169,8 +176,8 @@ class PolynomialSAMLearning(NumericSAMLearner):
     polynom_degree: int
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-                 polynomial_degree: int = 1):
-        super().__init__(partial_domain, preconditions_fluent_map)
+                 polynomial_degree: int = 1, **kwargs):
+        super().__init__(partial_domain, preconditions_fluent_map, **kwargs)
         self.polynom_degree = polynomial_degree
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -188,7 +195,7 @@ class PolynomialSAMLearning(NumericSAMLearner):
         next_state_lifted_matches = self.function_matcher.match_state_functions(
             grounded_action, next_state.state_fluents)
         self.storage[grounded_action.name] = PolynomialFluentsLearningAlgorithm(
-            grounded_action.name, self.polynom_degree, is_verbose=True)
+            grounded_action.name, self.polynom_degree, self.partial_domain.functions, is_verbose=True)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")

@@ -96,3 +96,13 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
             stats_writer.writeheader()
             for data_line in self.combined_stats:
                 stats_writer.writerow(data_line)
+
+    def export_combined_semantic_performance(self) -> None:
+        """Export the numeric learning statistics to a CSV report file."""
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" \
+                                                  "combined_numeric_performance.csv"
+        with open(statistics_path, "wt", newline='') as statistics_file:
+            stats_writer = csv.DictWriter(statistics_file, fieldnames=NUMERIC_PERFORMANCE_STATS)
+            stats_writer.writeheader()
+            for data_line in self.combined_stats:
+                stats_writer.writerow(data_line)

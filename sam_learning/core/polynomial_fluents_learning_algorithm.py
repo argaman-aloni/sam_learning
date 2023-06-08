@@ -3,7 +3,7 @@ import itertools
 from typing import Dict, List, Optional, Tuple
 
 import numpy
-from pddl_plus_parser.models import PDDLFunction
+from pddl_plus_parser.models import PDDLFunction, Precondition
 
 from sam_learning.core import ConditionType
 from sam_learning.core.numeric_fluent_learner_algorithm import NumericFluentStateStorage
@@ -20,8 +20,9 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
     polynom_degree: int
     is_verbose: bool
 
-    def __init__(self, action_name: str, polynom_degree: int, is_verbose: bool = False):
-        super().__init__(action_name)
+    def __init__(self, action_name: str, polynom_degree: int,
+                 domain_functions: Dict[str, PDDLFunction], is_verbose: bool = False):
+        super().__init__(action_name, domain_functions)
         self.polynom_degree = polynom_degree
         self.is_verbose = is_verbose
 
@@ -91,7 +92,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
                 self.previous_state_storage[fluent].append(0)
 
     def construct_safe_linear_inequalities(
-            self, relevant_fluents: Optional[List[str]] = None) -> Tuple[List[str], ConditionType]:
+            self, relevant_fluents: Optional[List[str]] = None) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)

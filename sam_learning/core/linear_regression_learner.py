@@ -13,7 +13,7 @@ from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
 from sam_learning.core.numeric_utils import detect_linear_dependent_features, construct_linear_equation_string, \
     construct_non_circular_assignment, construct_multiplication_strings, prettify_coefficients, \
-    construct_numeric_conditions, construct_numeric_effects
+    construct_numeric_conditions, construct_numeric_effects, filter_constant_features
 
 LABEL_COLUMN = "label"
 NEXT_STATE_PREFIX = "next_state_"  # prefix for the next state variables.
@@ -42,29 +42,6 @@ class LinearRegressionLearner:
         dataframe = DataFrame(combined_data).fillna(0)
         dataframe.drop_duplicates(inplace=True)
         return dataframe
-
-    @staticmethod
-    def _remove_constant_zero_fluents(combined_data: DataFrame) -> Tuple[DataFrame, List[str], List[str]]:
-        """Removes the fluents that have a constant value of zero from the combined data.
-
-        :param combined_data: the combined data to remove the fluents from.
-        :return: the combined data without the zero fluents and the list of the removed fluents as additional
-            preconditions to the action.
-        """
-        zero_fluents = []
-        removed_fluents = []
-        filtered_data_df = combined_data.copy()
-        for fluent in filtered_data_df.columns:
-            if fluent.startswith(NEXT_STATE_PREFIX):
-                continue
-
-            column_values = filtered_data_df[fluent]
-            if all(value == 0 for value in column_values):
-                zero_fluents.append(f"(= {fluent} 0)")
-                filtered_data_df.drop(columns=[fluent], inplace=True)
-                removed_fluents.append(fluent)
-
-        return filtered_data_df, zero_fluents, removed_fluents
 
     def _validate_legal_equations(self, values_df: DataFrame) -> bool:
         """Validates that there are enough independent equations which enable for a single solution for the equation.
@@ -280,7 +257,9 @@ class LinearRegressionLearner:
 
         # The dataset contains more than one observation.
         self.logger.debug("Removing fluents that are constant zero...")
-        filtered_df, zero_fluent_conditions, zero_fluents = self._remove_constant_zero_fluents(combined_data)
+        tagged_next_state_fluents = [f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in next_state_data.keys()]
+        filtered_df, zero_fluent_conditions, zero_fluents = filter_constant_features(
+            combined_data, columns_to_ignore=tagged_next_state_fluents)
         features_df = filtered_df.copy()[[k for k in previous_state_data.keys() if k in filtered_df.columns]]
         regression_df, linear_dep_conditions, dependent_columns = detect_linear_dependent_features(features_df)
 
@@ -290,7 +269,6 @@ class LinearRegressionLearner:
             return self._construct_multiple_safe_conditional_effects(combined_data)
 
         self.logger.debug("The action is safe to learn, constructing the assignment equations...")
-        tagged_next_state_fluents = [f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in next_state_data.keys()]
         tested_fluents_names = [fluent_name for fluent_name in next_state_data.keys()]
         for feature_fluent, tagged_fluent in zip(tested_fluents_names, tagged_next_state_fluents):
             change_df = combined_data.copy()[[feature_fluent, tagged_fluent]]

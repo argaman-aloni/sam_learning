@@ -5,15 +5,24 @@ from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, \
     CURRENT_LOAD_TRAJECTORY_FUNCTION
 
 
+TEST_DOMAIN_FUNCTIONS = {
+    "load_limit": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+    "current_load": CURRENT_LOAD_TRAJECTORY_FUNCTION,
+    "fuel-cost": FUEL_COST_FUNCTION
+}
+
+
 def test_create_polynomial_string_returns_correct_string():
-    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(action_name="load", polynom_degree=1)
+    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(
+        action_name="load", domain_functions=TEST_DOMAIN_FUNCTIONS, polynom_degree=1)
     test_fluents_names = ["(fuel-cost)", "(load_limit ?z)", "(current_load ?z)"]
     polynomial_str = polynomial_fluent_storage.create_polynomial_string(test_fluents_names)
     assert polynomial_str == "(* (fuel-cost) (* (load_limit ?z) (current_load ?z)))"
 
 
 def test_add_to_previous_state_storage_reverts_to_super_when_polynom_degree_is_zero():
-    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(action_name="load", polynom_degree=0)
+    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(
+        action_name="load", polynom_degree=0, domain_functions=TEST_DOMAIN_FUNCTIONS)
     FUEL_COST_FUNCTION.set_value(2.0)
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(3.0)
     simple_state_fluents = {
@@ -28,7 +37,8 @@ def test_add_to_previous_state_storage_reverts_to_super_when_polynom_degree_is_z
 
 
 def test_add_to_previous_state_storage_adds_correct_keys_combinations_with_polynom_degree_one():
-    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(action_name="load", polynom_degree=1)
+    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(
+        action_name="load", polynom_degree=1, domain_functions=TEST_DOMAIN_FUNCTIONS)
     FUEL_COST_FUNCTION.set_value(2.0)
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(3.0)
     simple_state_fluents = {
@@ -41,7 +51,8 @@ def test_add_to_previous_state_storage_adds_correct_keys_combinations_with_polyn
 
 
 def test_add_to_previous_state_storage_adds_correct_values_combinations_with_polynom_degree_one():
-    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(action_name="load", polynom_degree=1)
+    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(
+        action_name="load", polynom_degree=1, domain_functions=TEST_DOMAIN_FUNCTIONS)
     FUEL_COST_FUNCTION.set_value(2.0)
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(3.0)
     simple_state_fluents = {
@@ -54,7 +65,8 @@ def test_add_to_previous_state_storage_adds_correct_values_combinations_with_pol
 
 
 def test_add_to_previous_state_storage_adds_correct_values_combinations_with_polynom_degree_one_with_complex_setting():
-    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(action_name="load", polynom_degree=1)
+    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(
+        action_name="load", polynom_degree=1, domain_functions=TEST_DOMAIN_FUNCTIONS)
     FUEL_COST_FUNCTION.set_value(2.0)
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(3.0)
     CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(4.0)
@@ -74,7 +86,8 @@ def test_add_to_previous_state_storage_adds_correct_values_combinations_with_pol
 
 
 def test_add_to_previous_state_storage_adds_correct_values_combinations_with_polynom_degree_two():
-    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(action_name="load", polynom_degree=2)
+    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(
+        action_name="load", polynom_degree=2, domain_functions=TEST_DOMAIN_FUNCTIONS)
     FUEL_COST_FUNCTION.set_value(2.0)
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(3.0)
     CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(4.0)
@@ -94,7 +107,8 @@ def test_add_to_previous_state_storage_adds_correct_values_combinations_with_pol
 
 
 def test_add_to_previous_state_storage_adds_correct_values_combinations_with_polynom_degree_three():
-    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(action_name="load", polynom_degree=3)
+    polynomial_fluent_storage = PolynomialFluentsLearningAlgorithm(
+        action_name="load", polynom_degree=3, domain_functions=TEST_DOMAIN_FUNCTIONS)
     FUEL_COST_FUNCTION.set_value(2.0)
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(3.0)
     CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(4.0)
