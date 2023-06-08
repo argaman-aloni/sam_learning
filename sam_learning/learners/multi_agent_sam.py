@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
-    GroundedPredicate, JointActionCall
+    GroundedPredicate, JointActionCall, CompoundPrecondition
 
 from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners import SAMLearner
@@ -182,13 +182,14 @@ class MultiAgentSAM(SAMLearner):
         else:
             super()._update_action_preconditions(executed_action)
 
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state,
-                                                                     add_predicates_sign=True)
+        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         self.logger.debug("Updating the literals that must be effects of the action.")
         self.add_must_be_effect_to_cnf(executed_action, grounded_add_effects.union(grounded_del_effects))
         not_effects = self._extract_relevant_not_effects(
-            in_state_predicates=self.triplet_snapshot.next_state_positive_predicates,
-            removed_state_predicates=self.triplet_snapshot.next_state_negative_predicates,
+            in_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                 if predicate.is_positive},
+            removed_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                      if not predicate.is_positive},
             executing_actions=[executed_action],
             relevant_action=executed_action)
         self.add_not_effect_to_cnf(executed_action, not_effects)
@@ -215,12 +216,13 @@ class MultiAgentSAM(SAMLearner):
             else:
                 super()._update_action_preconditions(executed_action)
 
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state,
-                                                                     add_predicates_sign=True)
+        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
         for executed_action in executing_actions:
             not_effects = self._extract_relevant_not_effects(
-                in_state_predicates=self.triplet_snapshot.next_state_positive_predicates,
-                removed_state_predicates=self.triplet_snapshot.next_state_negative_predicates,
+                in_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                     if predicate.is_positive},
+                removed_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                          if not predicate.is_positive},
                 executing_actions=[executed_action],
                 relevant_action=executed_action)
             self.add_not_effect_to_cnf(executed_action, not_effects)
@@ -253,11 +255,11 @@ class MultiAgentSAM(SAMLearner):
         super()._remove_unobserved_actions_from_partial_domain()
         for action in self.partial_domain.actions.values():
             self.logger.debug("Constructing safe action for %s", action.name)
-            action_preconditions = action.positive_preconditions.union(action.negative_preconditions)
+            action_preconditions = {precondition for precondition in
+                                    action.preconditions if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                action.positive_preconditions = set()
-                action.negative_preconditions = set()
+                action.preconditions = CompoundPrecondition()
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)
