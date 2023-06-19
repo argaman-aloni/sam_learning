@@ -227,8 +227,8 @@ class MultiAgentSAM(SAMLearner):
                 relevant_action=executed_action)
             self.add_not_effect_to_cnf(executed_action, not_effects)
 
-        for grounded_add_effect in grounded_add_effects.union(grounded_del_effects):
-            self.handle_concurrent_execution(grounded_add_effect, executing_actions)
+        for grounded_effect in grounded_add_effects.union(grounded_del_effects):
+            self.handle_concurrent_execution(grounded_effect, executing_actions)
 
     def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:
         """Handles a single multi-agent triplet in the observed trajectory.

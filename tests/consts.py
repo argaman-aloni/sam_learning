@@ -61,6 +61,11 @@ MINECRAFT_PROBLEM_PATH = EXAMPLES_DIR_PATH / "minecraft_pfile0.pddl"
 MINECRAFT_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "minecraft_pfile0.trajectory"
 MINECRAFT_FLUENTS_MAP_PATH = EXAMPLES_DIR_PATH / "minecraft_fluents_map.json"
 
+
+STAR_CRAFT_DOMAIN_PATH = EXAMPLES_DIR_PATH / "starcraft_domain.pddl"
+STAR_CRAFT_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "starcraft_trajectory.trajectory"
+STAR_CRAFT_FLUENTS_MAP_PATH = EXAMPLES_DIR_PATH / "starcraft_fluents_map.json"
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)
