@@ -1,9 +1,9 @@
 """basic version of the combination of MA-SAM an N-SAM together."""
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from pddl_plus_parser.models import MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
-    JointActionCall
+    JointActionCall, Domain
 
 from sam_learning.core import LearnerDomain, NotSafeActionError
 from sam_learning.learners import PolynomialSAMLearning
@@ -13,12 +13,18 @@ class NumericMultiAgentSAM(PolynomialSAMLearning):
     """Class designated to learning action models from multi-agent trajectories with joint actions."""
     logger: logging.Logger
     safe_actions: List[str]
+    agent_names: List[str]
+
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 polynomial_degree: int = 1, agent_names: List[str] = None, **kwargs):
+        super().__init__(partial_domain, preconditions_fluent_map, polynomial_degree, **kwargs)
+        self.agent_names = agent_names if agent_names else []
 
     def are_actions_independent(self, executing_actions: List[ActionCall]) -> bool:
-        """Computes the set of actions that interact with a certain predicate.
+        """Determines whether the actions in a joint action are independent.
 
         :param executing_actions: the actions that are being executed in the joint action.
-        :return: the actions that interact with the predicate.
+        :return: whether the actions are independent.
         """
         self.logger.debug("Computing the set of actions can possibly interact with one another.")
         for action in executing_actions:
@@ -62,10 +68,18 @@ class NumericMultiAgentSAM(PolynomialSAMLearning):
         if not self.are_actions_independent(executing_actions):
             return
 
-        for executed_action in executing_actions:
+        for index, executed_action in enumerate(executing_actions):
             self.triplet_snapshot.create_snapshot(
                 previous_state=previous_state, next_state=next_state, current_action=executed_action,
                 observation_objects=self.current_trajectory_objects)
+
+            observed_action = self.partial_domain.actions[executed_action.name]
+            if executed_action.name not in self.observed_actions:
+                super().add_new_action(executed_action, previous_state, next_state)
+                self.observed_actions.append(observed_action.name)
+
+            else:
+                super().update_action(executed_action, previous_state, next_state)
 
     def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:
         """Handles a single multi-agent triplet in the observed trajectory.

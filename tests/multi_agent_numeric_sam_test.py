@@ -34,7 +34,7 @@ def starcraft_sam(starcraft_domain: Domain,
                   starcraft_preconditions_fluents_map: Dict[str, List[str]]) -> NumericMultiAgentSAM:
     return NumericMultiAgentSAM(
         starcraft_domain,
-        polynomial_degree=0)
+        polynomial_degree=2)
 
 
 def test_learn_ma_domain_with_numeric_actions_works_on_starcraft_domain(
