@@ -1,11 +1,27 @@
 """Runs the experiments for the starcrft domain."""
 import csv
+import datetime
 from pathlib import Path
 from typing import Dict, List, Union
 
 from pddl_plus_parser.lisp_parsers import TrajectoryParser, DomainParser
 
+from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericMultiAgentSAM
+
+
+def export_learned_domain(workdir_path: Path, learned_domain: LearnerDomain) -> Path:
+    """Exports the learned domain into a file so that it will be used to solve the test set problems.
+
+    :param workdir_path: the directory containing the trajectories from the starcraft experiments.
+    :param learned_domain: the domain that was learned by the action model learning algorithm.
+    """
+    domain_file_name = learned_domain.name + f"_{datetime.date.today()}.pddl"
+    domain_path = workdir_path / domain_file_name
+    with open(domain_path, "wt") as domain_file:
+        domain_file.write(learned_domain.to_pddl())
+
+    return domain_path
 
 
 def output_results(model_stats: List[Dict[str, Union[int, str]]], workdir_path: Path) -> None:
@@ -35,8 +51,7 @@ def run_experiments(workdir_path: Path, startcraft_agent_names: List[str]) -> No
             trajectory_path, executing_agents=startcraft_agent_names))
         starcraft_sam = NumericMultiAgentSAM(starcraft_domain, polynomial_degree=2)
         learned_model, statistics = starcraft_sam.learn_action_model(observations)
-        print(learned_model.to_pddl())
-        print(statistics)
+        export_learned_domain(workdir_path, learned_model)
         model_stats.append({"num_trajectories": len(observations),
                             "num_actions": len(learned_model.actions),
                             "runtime": statistics["learning_time"]})
