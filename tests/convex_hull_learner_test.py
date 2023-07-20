@@ -73,11 +73,11 @@ def test_create_disjunctive_preconditions_with_input_dataframe_of_size_one_and_e
         "(y)": [3],
         "(z)": [-1]
     }
-    test_equality_conditions = ["(= (x ) 2)", "(= (y ) 3)"]
+    test_equality_conditions = ["(= (x ) 2)", "(= (y ) 3)", "(= (z ) -1)"]
     dataframe = DataFrame(pre_state_data)
     equality_condition = convex_hull_learner._create_disjunctive_preconditions(
         dataframe, equality_conditions=test_equality_conditions)
-    assert len(equality_condition.operands) == 5
+    assert len(equality_condition.operands) == len(test_equality_conditions)
     assert equality_condition.binary_operator == "and"
     for operand in equality_condition.operands:
         assert operand.to_pddl().startswith("(=")

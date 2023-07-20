@@ -17,10 +17,14 @@ from sam_learning.core.numeric_utils import construct_multiplication_strings, co
 
 
 class ConvexHullLearner:
+    """Class that learns the convex hull of the preconditions of an action."""
+    logger: logging.Logger
+    action_name: str
+    domain_functions: Dict[str, PDDLFunction]
+    convex_hull_error_file_path: Path
 
     def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
         self.logger = logging.getLogger(__name__)
-        self.previous_state_df = None
         self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
         self.action_name = action_name
         self.domain_functions = domain_functions
