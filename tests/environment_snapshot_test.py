@@ -57,13 +57,13 @@ def test_create_snapshot_when_should_not_include_all_objects_creates_lower_numbe
     next_state = observation_component.next_state
     current_action = observation_component.grounded_action_call
     observed_objects = elevators_observation.grounded_objects
-    elevators_environment_snapshot.create_snapshot(
+    elevators_environment_snapshot.create_triplet_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=current_action,
         observation_objects=observed_objects)
     num_predicates_without_all_objects = len(elevators_environment_snapshot.previous_state_predicates)
 
     all_types = [pddl_type for pddl_type in elevators_domain.types if pddl_type != "object"]
-    elevators_environment_snapshot.create_snapshot(
+    elevators_environment_snapshot.create_triplet_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=current_action,
         observation_objects=observed_objects, specific_types=all_types)
     num_predicates_with_all_objects = len(elevators_environment_snapshot.previous_state_predicates)

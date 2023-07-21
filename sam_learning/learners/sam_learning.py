@@ -3,7 +3,7 @@ import logging
 import time
 from collections import defaultdict
 from itertools import combinations
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Set
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
     GroundedPredicate
@@ -27,7 +27,7 @@ class SAMLearner:
     current_trajectory_objects: Dict[str, PDDLObject]
     learning_start_time: float
     learning_end_time: float
-    cannot_be_effect: Dict[str, List[Predicate]]
+    cannot_be_effect: Dict[str, Set[Predicate]]
 
     def __init__(self, partial_domain: Domain):
         self.logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class SAMLearner:
         self.current_trajectory_objects = {}
         self.learning_start_time = 0
         self.learning_end_time = 0
-        self.cannot_be_effect = {action: [] for action in self.partial_domain.actions}
+        self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
 
     def _remove_unobserved_actions_from_partial_domain(self):
         """Removes the actions that were not observed from the partial domain."""
@@ -54,31 +54,19 @@ class SAMLearner:
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
         """
-        current_action = self.partial_domain.actions[grounded_action.name]
-        next_state_predicates = set(self.matcher.get_possible_literal_matches(
-            grounded_action, list(self.triplet_snapshot.next_state_predicates)))
-
-        self.logger.debug("Removing literals that cannot be effects from the action's effects.")
-        current_action.discrete_effects = current_action.discrete_effects.difference(
-            self.cannot_be_effect[grounded_action.name])
-
-        possible_lifted_effects = current_action.discrete_effects
-        possible_grounded_effect = []
-        for lifted_effect in possible_lifted_effects:
-            grounded_objects_and_consts = grounded_action.parameters + list(self.partial_domain.constants)
-            lifted_params_and_consts = list(lifted_effect.signature.keys()) + list(self.partial_domain.constants)
-            object_mapping = {param_name: grounded_objects_and_consts[lifted_params_and_consts.index(param_name)] for
-                              param_name in lifted_effect.signature.keys()}
-            possible_grounded_effect.append((lifted_effect, GroundedPredicate(
-                lifted_effect.name, lifted_effect.signature, object_mapping, lifted_effect.is_positive)))
-
-        relevant_serialized_state = [predicate.untyped_representation for predicate in next_state_predicates]
-        for lifted_effect, grounded_effect in possible_grounded_effect:
-            if grounded_effect.is_positive and grounded_effect.untyped_representation not in relevant_serialized_state \
-                    or not grounded_effect.is_positive and grounded_effect.untyped_representation in \
-                    relevant_serialized_state:
-                self.cannot_be_effect[grounded_action.name].append(lifted_effect)
-                current_action.discrete_effects.remove(lifted_effect)
+        action_predicate_vocabulary = self.vocabulary_creator.create_lifted_vocabulary(
+            self.partial_domain, self.partial_domain.actions[grounded_action.name].signature)
+        lifted_next_state_predicates = self.matcher.get_possible_literal_matches(
+            grounded_action, list(self.triplet_snapshot.next_state_predicates))
+        lifted_next_state_predicates_str = {
+            predicate.untyped_representation for predicate in lifted_next_state_predicates}
+        for predicate in action_predicate_vocabulary:
+            if predicate.untyped_representation not in lifted_next_state_predicates_str:
+                self.cannot_be_effect[grounded_action.name].add(predicate)
+                discrete_effects_str = {effect.untyped_representation for effect in
+                                        self.partial_domain.actions[grounded_action.name].discrete_effects}
+                if predicate.untyped_representation in discrete_effects_str:
+                    self.partial_domain.actions[grounded_action.name].discrete_effects.remove(predicate)
 
     def _handle_action_effects(self, grounded_action: ActionCall, previous_state: State,
                                next_state: State) -> Tuple[List[Predicate], List[Predicate]]:
@@ -212,7 +200,7 @@ class SAMLearner:
             self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM.")
             return
 
-        self.triplet_snapshot.create_snapshot(
+        self.triplet_snapshot.create_triplet_snapshot(
             previous_state=previous_state, next_state=next_state, current_action=grounded_action,
             observation_objects=self.current_trajectory_objects)
         if grounded_action.name not in self.observed_actions:

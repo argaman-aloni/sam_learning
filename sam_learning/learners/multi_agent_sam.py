@@ -206,7 +206,7 @@ class MultiAgentSAM(SAMLearner):
         executing_actions = joint_action.operational_actions
         for executed_action in executing_actions:
             observed_action = self.partial_domain.actions[executed_action.name]
-            self.triplet_snapshot.create_snapshot(
+            self.triplet_snapshot.create_triplet_snapshot(
                 previous_state=previous_state, next_state=next_state, current_action=executed_action,
                 observation_objects=self.current_trajectory_objects)
             if executed_action.name not in self.observed_actions:
@@ -241,7 +241,7 @@ class MultiAgentSAM(SAMLearner):
 
         if joint_action.action_count == 1:
             executing_action = joint_action.operational_actions[0]
-            self.triplet_snapshot.create_snapshot(
+            self.triplet_snapshot.create_triplet_snapshot(
                 previous_state=previous_state, next_state=next_state, current_action=executing_action,
                 observation_objects=self.current_trajectory_objects)
             self.update_single_agent_executed_action(executing_action, previous_state, next_state)

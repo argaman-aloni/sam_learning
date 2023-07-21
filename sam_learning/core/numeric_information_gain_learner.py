@@ -9,7 +9,7 @@ from scipy.spatial import Delaunay, QhullError
 
 
 class NumericInformationGainLearner:
-    """Online information gain learning algorithm."""
+    """Information gain calculation of the numeric part of an action."""
 
     logger: logging.Logger
     action_name: str
@@ -84,16 +84,16 @@ class NumericInformationGainLearner:
             self.negative_samples_df.query(' & '.join([f'{col} == {val}' for col, val in
                                                        false_negative_sample.items()])).index)
 
-    def calculate_sample_information_gain(self, new_sample: Dict[str, PDDLFunction]) -> float:
+    def calculate_sample_information_gain(self, new_lifted_sample: Dict[str, PDDLFunction]) -> float:
         """Calculates the information gain of a new sample.
 
-        :param new_sample: the new sample to calculate the information gain for.
+        :param new_lifted_sample: the new sample to calculate the information gain for.
         :return: the information gain of the new sample.
         """
         positive_points = self.positive_samples_df.to_numpy()
         negative_points = self.negative_samples_df.to_numpy()
         # this way we maintain the order of the columns in the data frame.
-        new_point = np.array([new_sample[col].value for col in self.positive_samples_df.columns])
+        new_point = np.array([new_lifted_sample[col].value for col in self.positive_samples_df.columns])
         points_combined = np.vstack((positive_points, new_point))
         try:
             is_non_informative = self._in_hull(negative_points, points_combined) or \

@@ -2,14 +2,14 @@
 import json
 from typing import Dict, List
 
-from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
+from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser, DomainParser
 from pddl_plus_parser.models import Domain, Problem, Observation, Predicate
 from pytest import fixture
 
 from sam_learning.learners.numeric_sam import NumericSAMLearner
 from tests.consts import DEPOT_FLUENTS_MAP_PATH, SATELLITE_FLUENTS_MAP_PATH, \
     SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH, MINECRAFT_FLUENTS_MAP_PATH, \
-    sync_snapshot
+    sync_snapshot, MINECRAFT_MEDIUM_DOMAIN_PATH, MINECRAFT_MEDIUM_TRAJECTORY_PATH, MINECRAFT_MEDIUM_FLUENTS_MAP_PATH
 
 
 @fixture()
@@ -23,6 +23,27 @@ def satellite_observation_problematic(satellite_numeric_domain: Domain,
                                       satellite_problem_problematic: Problem) -> Observation:
     return TrajectoryParser(satellite_numeric_domain, satellite_problem_problematic). \
         parse_trajectory(SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH)
+
+
+@fixture()
+def minecraft_medium_preconditions_fluents_map() -> Dict[str, List[str]]:
+    return json.load(open(MINECRAFT_MEDIUM_FLUENTS_MAP_PATH, "rt"))
+
+
+@fixture()
+def minecraft_medium_domain() -> Domain:
+    return DomainParser(MINECRAFT_MEDIUM_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def minecraft_medium_observation(minecraft_medium_domain: Domain) -> Observation:
+    return TrajectoryParser(minecraft_medium_domain).parse_trajectory(MINECRAFT_MEDIUM_TRAJECTORY_PATH)
+
+
+@fixture()
+def minecraft_medium_sam(minecraft_medium_domain: Domain,
+                         minecraft_medium_preconditions_fluents_map: Dict[str, List[str]]) -> NumericSAMLearner:
+    return NumericSAMLearner(minecraft_medium_domain, minecraft_medium_preconditions_fluents_map)
 
 
 @fixture()
@@ -176,6 +197,14 @@ def test_learn_action_model_for_satellite_with_problematic_trajectory_domain_ret
 def test_learn_action_model_with_minecraft_domain_creates_domain_with_correct_preconditions_and_effects(
         minecraft_nsam: NumericSAMLearner, minecraft_observation: Observation):
     learned_model, learning_metadata = minecraft_nsam.learn_action_model([minecraft_observation])
+    print()
+    print(learning_metadata)
+    print(learned_model.to_pddl())
+
+
+def test_learn_action_model_with_minecraft_medium_domain_creates_domain_with_correct_preconditions_and_effects(
+        minecraft_medium_sam: NumericSAMLearner, minecraft_medium_observation: Observation):
+    learned_model, learning_metadata = minecraft_medium_sam.learn_action_model([minecraft_medium_observation])
     print()
     print(learning_metadata)
     print(learned_model.to_pddl())

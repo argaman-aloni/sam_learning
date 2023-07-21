@@ -66,6 +66,12 @@ STAR_CRAFT_DOMAIN_PATH = EXAMPLES_DIR_PATH / "starcraft_domain.pddl"
 STAR_CRAFT_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "starcraft_trajectory.trajectory"
 STAR_CRAFT_FLUENTS_MAP_PATH = EXAMPLES_DIR_PATH / "starcraft_fluents_map.json"
 
+
+MINECRAFT_MEDIUM_DOMAIN_PATH = EXAMPLES_DIR_PATH / "domain_minecraft_medium.pddl"
+MINECRAFT_MEDIUM_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "trajectory_minecraft_medium.trajectory"
+MINECRAFT_MEDIUM_FLUENTS_MAP_PATH = EXAMPLES_DIR_PATH / "fluents_map_minecraft_medium.json"
+
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)
@@ -104,7 +110,7 @@ def sync_snapshot(sam_learning: SAMLearner, component: ObservedComponent,
     else:
         all_types = []
 
-    sam_learning.triplet_snapshot.create_snapshot(
+    sam_learning.triplet_snapshot.create_triplet_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=test_action_call,
         observation_objects=trajectory_objects, specific_types=all_types)
 
@@ -114,7 +120,7 @@ def sync_ma_snapshot(ma_sam: MultiAgentSAM, component: MultiAgentComponent, acti
     previous_state = component.previous_state
     next_state = component.next_state
     ma_sam.current_trajectory_objects = trajectory_objects
-    ma_sam.triplet_snapshot.create_snapshot(
+    ma_sam.triplet_snapshot.create_triplet_snapshot(
         previous_state=previous_state, next_state=next_state, current_action=action_call,
         observation_objects=trajectory_objects)
 

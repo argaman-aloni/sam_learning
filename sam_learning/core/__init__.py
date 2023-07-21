@@ -19,3 +19,5 @@ from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgo
 from .predicates_matcher import PredicatesMatcher
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
+from .numeric_information_gain_learner import NumericInformationGainLearner
+from .propositional_information_gain_learner import PropositionalInformationGainLearner

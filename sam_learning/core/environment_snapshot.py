@@ -78,7 +78,35 @@ class EnvironmentSnapshot:
 
         return result
 
-    def create_snapshot(
+    def create_propositional_state_snapshot(self, state: State, current_action: ActionCall,
+                                            observation_objects: Dict[str, PDDLObject]) -> Set[GroundedPredicate]:
+        """Creates a propositional snapshot of the current state.
+
+        :param state: the state of the environment.
+        :param current_action: the current action that is to be executed.
+        :param observation_objects: the objects in the observation.
+        """
+        self.logger.debug("Creating a snapshot of the environment.")
+        parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
+        relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
+                            if object_name in parameters_including_consts}
+        return self._create_state_discrete_snapshot(state, relevant_objects)
+
+    def create_numeric_state_snapshot(self, state: State, current_action: ActionCall,
+                                      observation_objects: Dict[str, PDDLObject]) -> Dict[str, PDDLFunction]:
+        """Creates a numeric snapshot of the current state.
+
+        :param state: the state of the environment.
+        :param current_action: the current action that is to be executed.
+        :param observation_objects: the objects in the observation.
+        """
+        self.logger.debug("Creating a snapshot of the environment.")
+        parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
+        relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
+                            if object_name in parameters_including_consts}
+        return self._create_state_numeric_snapshot(state, relevant_objects)
+
+    def create_triplet_snapshot(
             self, previous_state: State, next_state: State, current_action: ActionCall,
             observation_objects: Dict[str, PDDLObject], specific_types: Optional[List[str]] = []) -> None:
         """Creates a snapshot of the environment.

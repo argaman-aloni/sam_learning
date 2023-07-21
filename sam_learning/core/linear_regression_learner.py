@@ -84,6 +84,7 @@ class LinearRegressionLearner:
 
         coefficients = list(regressor.coef_) + [regressor.intercept_]
         coefficients = prettify_coefficients(coefficients)
+        self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
         return coefficients, learning_score
 
     def _solve_safe_independent_equations(
@@ -102,7 +103,11 @@ class LinearRegressionLearner:
         function_post_values = np.array(regression_df[LABEL_COLUMN])
         coefficient_vector, learning_score = self._solve_regression_problem(
             regression_array, function_post_values, allow_unsafe_learning)
-        self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
+
+        if all([coef == 0 for coef in coefficient_vector]) and len(regression_df[LABEL_COLUMN].unique()) == 1:
+            self.logger.debug("The algorithm designated a vector of zeros to the equation "
+                              "which means that there are not coefficients. Assuming assignment function.")
+            return f"(assign {lifted_function} {regression_df[LABEL_COLUMN].unique()[0]})"
 
         functions_and_dummy = list(regression_df.columns[:-1]) + ["(dummy)"]
         if lifted_function in regression_df.columns and coefficient_vector[
