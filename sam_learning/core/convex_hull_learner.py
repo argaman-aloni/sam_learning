@@ -52,7 +52,8 @@ class ConvexHullLearner:
             with open(self.convex_hull_error_file_path, "at") as error_file:
                 error_file.write(f"{e}\n")
 
-            failure_reason = "Convex hull encountered an error condition and no solution was found"
+            failure_reason = f"Convex hull encountered an error condition and no solution was found " \
+                             f"for action {self.action_name}"
             self.logger.warning(failure_reason)
             raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.convex_hull_not_found)
 
@@ -157,7 +158,7 @@ class ConvexHullLearner:
         if len(filtered_matrix.columns) <= 1:
             return equality_conditions, filtered_matrix
 
-        filtered_matrix, linear_dependency_conditions, _ = detect_linear_dependent_features(previous_state_matrix)
+        filtered_matrix, linear_dependency_conditions, _ = detect_linear_dependent_features(filtered_matrix)
         combined_conditions = equality_conditions + linear_dependency_conditions
         return combined_conditions, filtered_matrix
 

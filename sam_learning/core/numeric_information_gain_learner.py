@@ -78,6 +78,7 @@ class NumericInformationGainLearner:
 
         :param lifted_negative_sample: the numeric functions representing the falsely negative sample.
         """
+        # TODO: verify the point exists in the data frame.
         false_negative_sample = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
                                  lifted_negative_sample.items()}
         self.negative_samples_df = self.negative_samples_df.drop(

@@ -57,7 +57,7 @@ class LinearRegressionLearner:
             return True
 
         failure_reason = f"There are too few independent rows of data! " \
-                         f"cannot solve linear equations for action - {self.action_name}!"
+                         f"cannot create a linear equation from the current data for action - {self.action_name}!"
         self.logger.warning(failure_reason)
 
         return False
@@ -77,7 +77,9 @@ class LinearRegressionLearner:
         regressor.fit(values_matrix, function_post_values)
         learning_score = regressor.score(values_matrix, function_post_values)
         if learning_score < LEGAL_LEARNING_SCORE:
-            reason = "The learned effects are not safe since the R^2 is not high enough."
+            reason = f"The learned effects are not safe since the R^2 is not high enough. " \
+                     f"Got R^2 of {learning_score} and expected {LEGAL_LEARNING_SCORE}! " \
+                     f"Action {self.action_name} is not safe!"
             self.logger.warning(reason)
             if not allow_unsafe_learning:
                 raise NotSafeActionError(self.action_name, reason, EquationSolutionType.no_solution_found)
@@ -104,10 +106,12 @@ class LinearRegressionLearner:
         coefficient_vector, learning_score = self._solve_regression_problem(
             regression_array, function_post_values, allow_unsafe_learning)
 
-        if all([coef == 0 for coef in coefficient_vector]) and len(regression_df[LABEL_COLUMN].unique()) == 1:
+        if all([coef == 0 for coef in coefficient_vector]) and len(regression_df[LABEL_COLUMN].unique()) == 1 \
+                and regression_df[LABEL_COLUMN].unique() == 0:
             self.logger.debug("The algorithm designated a vector of zeros to the equation "
-                              "which means that there are not coefficients. Assuming assignment function.")
-            return f"(assign {lifted_function} {regression_df[LABEL_COLUMN].unique()[0]})"
+                              "which means that there are not coefficients and the label itself is also zero. "
+                              "Assuming assignment function of the value 0.0.")
+            return f"(assign {lifted_function} {0.0})"
 
         functions_and_dummy = list(regression_df.columns[:-1]) + ["(dummy)"]
         if lifted_function in regression_df.columns and coefficient_vector[
