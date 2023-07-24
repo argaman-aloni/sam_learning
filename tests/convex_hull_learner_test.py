@@ -19,6 +19,28 @@ def convex_hull_learner() -> ConvexHullLearner:
     return ConvexHullLearner(TEST_ACTION_NAME, domain_functions)
 
 
+def test_filter_all_convex_hull_inconsistencies_does_not_maintain_columns_with_constant_values(
+        convex_hull_learner: ConvexHullLearner):
+    previous_state_df = DataFrame({
+        "(x)": [1, 1, 1],
+        "(y)": [1, 2, 3],
+        "(z)": [12, 233, 23]
+    })
+    _, filtered_df = convex_hull_learner._filter_all_convex_hull_inconsistencies(previous_state_df)
+    assert len(filtered_df.columns) == 2
+
+
+def test_filter_all_convex_hull_inconsistencies_does_not_maintain_columns_with_linear_dependency(
+        convex_hull_learner: ConvexHullLearner):
+    previous_state_df = DataFrame({
+        "(x)": [1, 1, 1],
+        "(y)": [1, 2, 3],
+        "(z)": [2, 2, 2]
+    })
+    _, filtered_df = convex_hull_learner._filter_all_convex_hull_inconsistencies(previous_state_df)
+    assert len(filtered_df.columns) == 1
+
+
 def test_construct_pddl_inequality_scheme_with_simple_2d_four_equations_returns_correct_representation(
         convex_hull_learner: ConvexHullLearner):
     np.random.seed(42)
