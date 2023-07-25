@@ -1,28 +1,30 @@
 """A module containing the algorithm to calculate the information gain of new samples."""
 import logging
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import numpy as np
 from pandas import DataFrame
-from pddl_plus_parser.models import PDDLFunction
+from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError
 
 
-class NumericInformationGainLearner:
+class InformationGainLearner:
     """Information gain calculation of the numeric part of an action."""
 
     logger: logging.Logger
     action_name: str
-    domain_functions: Dict[str, PDDLFunction]
+    lifted_functions: List[str]
+    lifted_predicates: List[str]
     positive_samples_df: DataFrame
     negative_samples_df: DataFrame
 
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
+    def __init__(self, action_name: str, lifted_functions: List[str], lifted_predicates: List[str]):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
-        self.domain_functions = domain_functions
-        self.positive_samples_df = DataFrame()
-        self.negative_samples_df = DataFrame()
+        self.lifted_functions = lifted_functions
+        self.lifted_predicates = lifted_predicates
+        self.positive_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
+        self.negative_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
 
     def _locate_sample_in_df(self, sample_to_locate: List[float], df: DataFrame) -> int:
         """Locates the sample in the data frame.
@@ -60,50 +62,81 @@ class NumericInformationGainLearner:
 
         return any(result)
 
-    def add_positive_sample(self, lifted_positive_sample: Dict[str, PDDLFunction]) -> None:
+    def _remove_redundant_features(self, positive_propositional_sample: Set[Predicate]) -> List[str]:
+        """Removes features that are not needed for the calculation of the information gain.
+
+        :param positive_propositional_sample: the propositional predicates representing the positive sample.
+        :return: the list of the propositional predicates that are needed for the calculation.
+        """
+        self.logger.info("Removing propositional features that are not needed for the calculation.")
+        state_predicates_names = [predicate.untyped_representation for predicate in positive_propositional_sample]
+        columns_to_drop = [predicate for predicate in self.lifted_predicates if predicate not in state_predicates_names]
+        self.positive_samples_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
+        self.negative_samples_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
+        for column in columns_to_drop:
+            if column in self.lifted_predicates:
+                self.lifted_predicates.remove(column)
+
+        return self.lifted_predicates
+
+    def add_positive_sample(self, positive_numeric_sample: Dict[str, PDDLFunction],
+                            positive_propositional_sample: Set[Predicate]) -> None:
         """Adds a positive sample to the samples list used to create the action's precondition.
 
-        :param lifted_positive_sample: the numeric functions representing the positive sample.
+        :param positive_numeric_sample: the numeric functions representing the positive sample.
+        :param positive_propositional_sample: the propositional predicates representing the positive sample.
         """
+        filtered_predicates_names = self._remove_redundant_features(positive_propositional_sample)
+
         self.logger.info(f"Adding a new positive sample for the action {self.action_name}.")
         new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
-                           lifted_positive_sample.items()}
+                           positive_numeric_sample.items()}
+        for predicate in filtered_predicates_names:
+            new_sample_data[predicate] = 1.0
+
         self.positive_samples_df.loc[len(self.positive_samples_df)] = new_sample_data
 
-    def add_negative_sample(self, lifted_negative_sample: Dict[str, PDDLFunction]) -> None:
+    def add_negative_sample(self, lifted_negative_sample: Dict[str, PDDLFunction],
+                            negative_propositional_sample: Set[Predicate]) -> None:
         """Adds a negative sample that represent a state in which an action .
 
         :param lifted_negative_sample: the numeric functions representing the negative sample.
+        :param negative_propositional_sample: the propositional predicates representing the negative sample.
         """
-        self.logger.info(f"Adding a new (possibly) negative sample for the action {self.action_name}.")
+        self.logger.info(f"Adding a new negative sample for the action {self.action_name}.")
         new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
                            lifted_negative_sample.items()}
+        relevant_predicates = [predicate.untyped_representation for predicate in negative_propositional_sample if
+                               predicate.untyped_representation in self.lifted_predicates]
+        for predicate in self.lifted_predicates:
+            if predicate not in relevant_predicates:
+                new_sample_data[predicate] = 0.0
+            else:
+                new_sample_data[predicate] = 1.0
+
         self.negative_samples_df.loc[len(self.negative_samples_df)] = new_sample_data
 
-    def remove_false_negative_sample(self, lifted_negative_sample: Dict[str, PDDLFunction]) -> None:
-        """Removes a sample that was considered as negative after it was observed in an applicable state.
-
-        :param lifted_negative_sample: the numeric functions representing the falsely negative sample.
-        """
-        self.logger.info(f"Removing a false negative sample for the action {self.action_name}.")
-        sample_values = [lifted_negative_sample[fluent].value for fluent in self.negative_samples_df.columns]
-        matching_row_index = self._locate_sample_in_df(sample_values, self.negative_samples_df)
-        if matching_row_index == -1:
-            return
-
-        self.negative_samples_df.drop(index=matching_row_index, axis=0, inplace=True)
-
-    def calculate_sample_information_gain(self, new_lifted_sample: Dict[str, PDDLFunction]) -> float:
+    def calculate_sample_information_gain(
+            self, new_numeric_sample: Dict[str, PDDLFunction],
+            new_propositional_sample: Set[Predicate]) -> float:
         """Calculates the information gain of a new sample.
 
-        :param new_lifted_sample: the new sample to calculate the information gain for.
+        :param new_numeric_sample: the new sample to calculate the information gain for.
+        :param new_propositional_sample: the propositional predicates representing the new sample.
         :return: the information gain of the new sample.
         """
         self.logger.info("Calculating the information gain of a new sample.")
         positive_points = self.positive_samples_df.to_numpy()
         negative_points = self.negative_samples_df.to_numpy()
         # this way we maintain the order of the columns in the data frame.
-        new_point_data = [new_lifted_sample[col].value for col in self.positive_samples_df.columns]
+        new_point_data = [new_numeric_sample[col].value for col in self.lifted_functions]
+        lifted_predicate_names = [predicate.untyped_representation for predicate in new_propositional_sample]
+        for predicate in self.lifted_predicates:
+            if predicate in lifted_predicate_names:
+                new_point_data.append(1.0)
+            else:
+                new_point_data.append(0.0)
+
         new_point_array = np.array(new_point_data)
         points_combined = np.vstack((positive_points, new_point_array))
         try:

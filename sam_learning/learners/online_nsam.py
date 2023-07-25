@@ -2,14 +2,14 @@
 from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject
 from typing import Dict
 
-from sam_learning.core import NumericInformationGainLearner, PropositionalInformationGainLearner
+from sam_learning.core import InformationGainLearner, PropositionalInformationGainLearner
 from sam_learning.learners import PolynomialSAMLearning
 
 
 class OnlineNSAMLearner(PolynomialSAMLearning):
     """"An online version of the Numeric SAM learner."""
 
-    numeric_ig_learner: Dict[str, NumericInformationGainLearner]
+    numeric_ig_learner: Dict[str, InformationGainLearner]
     propositional_ig_learner: Dict[str, PropositionalInformationGainLearner]
 
     def __init__(self, partial_domain: Domain, polynomial_degree: int = 1):
@@ -36,8 +36,8 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
     def init_online_learning(self) -> None:
         """Initializes the online learning algorithm."""
         for action_name, action_data in self.partial_domain.actions.items():
-            self.numeric_ig_learner[action_name] = NumericInformationGainLearner(
-                action_name=action_name, domain_functions=self.partial_domain.functions)
+            self.numeric_ig_learner[action_name] = InformationGainLearner(
+                action_name=action_name, lifted_functions=self.partial_domain.functions)
             self.propositional_ig_learner[action_name] = PropositionalInformationGainLearner(action_name=action_name)
 
     def calculate_state_information_gain(self, state: State, action: ActionCall) -> float:
