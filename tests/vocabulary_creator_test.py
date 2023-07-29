@@ -1,11 +1,8 @@
 """Module test for the vocabulary_creator module."""
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import Domain, Problem
 from pytest import fixture
 
 from sam_learning.core import VocabularyCreator
-from tests.consts import WOODWORKING_DOMAIN_PATH, ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, \
-    WOODWORKING_PROBLEM_PATH
 
 
 @fixture()
@@ -47,3 +44,11 @@ def test_create_lifted_vocabulary_creates_lifted_predicates_only_for_those_with_
         domain=woodworking_domain,
         possible_parameters=woodworking_domain.actions["do-grind"].signature)
     assert vocabulary_predicates is not None
+
+
+def test_create_lifted_functions_vocabulary_creates_correct_functions(
+        depot_domain: Domain, vocabulary_creator: VocabularyCreator):
+    vocabulary_functions = vocabulary_creator.create_lifted_functions_vocabulary(
+        domain=depot_domain,
+        possible_parameters=depot_domain.actions["unload"].signature)
+    assert vocabulary_functions is not None

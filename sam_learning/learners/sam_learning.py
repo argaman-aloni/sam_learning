@@ -63,10 +63,9 @@ class SAMLearner:
         for predicate in action_predicate_vocabulary:
             if predicate.untyped_representation not in lifted_next_state_predicates_str:
                 self.cannot_be_effect[grounded_action.name].add(predicate)
-                discrete_effects_str = {effect.untyped_representation for effect in
-                                        self.partial_domain.actions[grounded_action.name].discrete_effects}
-                if predicate.untyped_representation in discrete_effects_str:
-                    self.partial_domain.actions[grounded_action.name].discrete_effects.remove(predicate)
+
+        for predicate in self.cannot_be_effect[grounded_action.name]:
+            self.partial_domain.actions[grounded_action.name].discrete_effects.discard(predicate)
 
     def _handle_action_effects(self, grounded_action: ActionCall, previous_state: State,
                                next_state: State) -> Tuple[List[Predicate], List[Predicate]]:

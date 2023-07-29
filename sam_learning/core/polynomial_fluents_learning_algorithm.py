@@ -1,11 +1,10 @@
 """Module that learns polynomial preconditions and effects from a domain."""
 import itertools
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy
 from pddl_plus_parser.models import PDDLFunction, Precondition
 
-from sam_learning.core import ConditionType
 from sam_learning.core.numeric_fluent_learner_algorithm import NumericFluentStateStorage
 
 
@@ -27,10 +26,10 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
         self.is_verbose = is_verbose
 
     def _create_polynomial_string_recursive(self, fluents: List[str]) -> str:
-        """
+        """Creates the polynomial string representing the equation recursively.
 
-        :param fluents:
-        :return:
+        :param fluents: the numeric fluents to create the polynomial string from.
+        :return: the polynomial string representing the equation.
         """
         if len(fluents) == 1:
             return fluents[0]
@@ -38,10 +37,10 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
         return f"(* {fluents[0]} {self._create_polynomial_string_recursive(fluents[1:])})"
 
     def create_polynomial_string(self, fluents: List[str]) -> str:
-        """
+        """The auxiliary function that creates the polynomial string representing the equation.
 
-        :param fluents:
-        :return:
+        :param fluents: the numeric fluents to create the polynomial string from.
+        :return: the polynomial string representing the equation.
         """
         return self._create_polynomial_string_recursive(fluents)
 
