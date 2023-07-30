@@ -3,9 +3,10 @@ import logging
 from typing import Dict, List
 
 import numpy as np
+from matplotlib import pyplot as plt
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
-from scipy.spatial import Delaunay, QhullError
+from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
 
 
 class InformationGainLearner:
@@ -40,8 +41,18 @@ class InformationGainLearner:
 
         return -1
 
-    @staticmethod
-    def _in_hull(points_to_test: np.ndarray, hull: np.ndarray) -> bool:
+    def _display_delaunay_graph(self, hull: Delaunay, num_dimensions: int) -> None:
+        """Displays the convex hull in as a plot.
+
+        :param hull: the convex hull to display.
+        :param num_dimensions: the number of dimensions of the original data.
+        """
+        if num_dimensions == 2:
+            _ = delaunay_plot_2d(hull)
+            plt.title(f"{self.action_name} - delaunay graph")
+            plt.show()
+
+    def _in_hull(self, points_to_test: np.ndarray, hull: np.ndarray, debug_mode: bool = True) -> bool:
         """
         Test if the points are in `hull`
 
@@ -52,14 +63,19 @@ class InformationGainLearner:
 
         It returns true if any of the points lies inside the hull.
 
+        :param points_to_test: the points to test whether they are inside the convex hull.
         :param hull: the points composing the positive samples convex hull.
+        :param debug_mode: whether to display the convex hull.
         :return: whether any of the negative samples is inside the convex hull.
         """
         if hull.shape[1] == 1:
             return all([hull.min() <= point <= hull.max() for point in points_to_test])
 
-        hull = Delaunay(hull)
-        result = hull.find_simplex(points_to_test) >= 0
+        delaunay_hull = Delaunay(hull)
+        if debug_mode:
+            self._display_delaunay_graph(delaunay_hull, hull.shape[1])
+
+        result = delaunay_hull.find_simplex(points_to_test) >= 0
         if isinstance(result, np.bool_):
             return result
 
@@ -190,6 +206,7 @@ class InformationGainLearner:
         """
         self.logger.info("Removing functions that do not exist in the state.")
         columns_to_drop = self._remove_features(functions_to_keep, self.lifted_functions)
+        self.logger.debug(f"Found the following columns to drop - {columns_to_drop}")
         for column in columns_to_drop:
             if column in self.lifted_functions:
                 self.lifted_functions.remove(column)
@@ -241,6 +258,9 @@ class InformationGainLearner:
         """
         self.logger.info("Calculating the information gain of a new sample.")
         # this way we maintain the order of the columns in the data frame.
+        if len(self.positive_samples_df) == 0 and len(self.negative_samples_df) == 0:
+            return 1  # TODO: calculate the information gain.
+
         is_non_informative_safe = self._is_non_informative_safe(new_numeric_sample, new_propositional_sample)
         is_non_informative_unsafe = self._is_non_informative_unsafe(new_numeric_sample, new_propositional_sample)
         if is_non_informative_safe or is_non_informative_unsafe:

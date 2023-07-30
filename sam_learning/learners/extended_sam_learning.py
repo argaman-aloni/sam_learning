@@ -6,7 +6,7 @@ from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, D
     GroundedPredicate
 
 from sam_learning.core import extract_effects, LearnerDomain, LiteralCNF
-from sam_learning.learners import SAMLearner
+from sam_learning.learners.sam_learning import SAMLearner
 
 
 class ExtendedSAM(SAMLearner):

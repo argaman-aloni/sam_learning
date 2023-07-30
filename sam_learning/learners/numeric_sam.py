@@ -6,7 +6,7 @@ from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Cond
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm, LearnerAction
-from sam_learning.learners import SAMLearner
+from sam_learning.learners.sam_learning import SAMLearner
 
 
 class NumericSAMLearner(SAMLearner):

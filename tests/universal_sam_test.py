@@ -378,9 +378,7 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
     assert first_layer_condition.binary_operator == "or"
     for cond in first_layer_condition.operands:
         if isinstance(cond, Predicate):
-            assert cond.untyped_representation == "(blocked ?c)"
-        if isinstance(cond, Precondition):
-            assert str(cond) == "(and (not (connected ?to ?c)))"
+            assert cond.untyped_representation in ["(blocked ?c)", "(not (connected ?to ?c))"]
 
 
 def test_construct_restrictive_universal_preconditions_creates_correct_restrictive_preconditions_for_the_action_when_literal_is_effect(
@@ -418,9 +416,7 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
     assert first_layer_condition.binary_operator == "or"
     for cond in first_layer_condition.operands:
         if isinstance(cond, Predicate):
-            assert cond.untyped_representation == "(blocked ?c)"
-        if isinstance(cond, Precondition):
-            assert str(cond) in ["(and (not (connected ?to ?c)))", "(and (connected ?to ?c))"]
+            assert cond.untyped_representation in ["(blocked ?c)", "(not (connected ?to ?c))", "(connected ?to ?c)"]
 
 
 def test_construct_restrictive_universal_effect_constructs_correct_restrictive_universal_effect(

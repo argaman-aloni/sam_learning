@@ -107,6 +107,7 @@ class SAMLearner:
 
         :param grounded_action: the action that is currently being executed.
         """
+        self.logger.debug(f"Adding the preconditions of {grounded_action.name} to the action model.")
         current_action = self.partial_domain.actions[grounded_action.name]
         previous_state_predicates = set(self.matcher.get_possible_literal_matches(
             grounded_action, list(self.triplet_snapshot.previous_state_predicates)))

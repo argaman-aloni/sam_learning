@@ -6,7 +6,7 @@ from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, Mult
     GroundedPredicate, JointActionCall, CompoundPrecondition
 
 from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
-from sam_learning.learners import SAMLearner
+from sam_learning.learners.sam_learning import SAMLearner
 
 
 class MultiAgentSAM(SAMLearner):

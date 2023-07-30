@@ -5,11 +5,10 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall, Observation, \
     ObservedComponent, ConditionalEffect, PDDLObject, PDDLType
-from sympy import Predicate
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
     extract_predicate_data
-from sam_learning.learners import SAMLearner
+from sam_learning.learners.sam_learning import SAMLearner
 
 
 class ConditionalSAM(SAMLearner):

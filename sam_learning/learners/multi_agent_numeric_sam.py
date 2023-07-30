@@ -6,7 +6,7 @@ from pddl_plus_parser.models import MultiAgentComponent, MultiAgentObservation, 
     JointActionCall, Domain
 
 from sam_learning.core import LearnerDomain, NotSafeActionError
-from sam_learning.learners import PolynomialSAMLearning
+from sam_learning.learners.numeric_sam import PolynomialSAMLearning
 
 
 class NumericMultiAgentSAM(PolynomialSAMLearning):
