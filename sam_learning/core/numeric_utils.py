@@ -167,7 +167,7 @@ def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame,
 
 def construct_numeric_conditions(
         conditions: List[str], condition_type: ConditionType,
-        domain_functions: Dict[str, PDDLFunction]) -> Precondition:
+        domain_functions: Dict[str, PDDLFunction]) -> Optional[Precondition]:
     """Construct the numeric conditions from the given equality conditions.
 
     :param conditions: the condition strings to create the preconditions from.
@@ -175,6 +175,9 @@ def construct_numeric_conditions(
     :param domain_functions: the domain functions to use for the numeric conditions.
     :return: the constructed numeric precondition.
     """
+    if len(conditions) == 0:
+        return None
+
     precondition_type = "and" if condition_type == ConditionType.conjunctive else "or"
     constructed_precondition = Precondition(precondition_type)
     for condition in conditions:
@@ -194,6 +197,9 @@ def construct_numeric_effects(
     :param domain_functions: the domain functions to use for the numeric effects.
     :return: the constructed numeric precondition.
     """
+    if len(effects) == 0:
+        return set()
+
     numeric_effects = []
     for condition in effects:
         numeric_tokenizer = PDDLTokenizer(pddl_str=condition)

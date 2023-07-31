@@ -52,7 +52,7 @@ class InformationGainLearner:
             plt.title(f"{self.action_name} - delaunay graph")
             plt.show()
 
-    def _in_hull(self, points_to_test: np.ndarray, hull: np.ndarray, debug_mode: bool = True) -> bool:
+    def _in_hull(self, points_to_test: np.ndarray, hull: np.ndarray, debug_mode: bool = False) -> bool:
         """
         Test if the points are in `hull`
 

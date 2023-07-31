@@ -2,7 +2,8 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, ConditionalEffect, NumericalExpressionTree
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, ConditionalEffect, NumericalExpressionTree, \
+    Precondition, Predicate
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm, LearnerAction
@@ -55,37 +56,27 @@ class NumericSAMLearner(SAMLearner):
 
         :param action: the action that its effects are constructed for.
         """
-        result = self.storage[action.name].construct_assignment_equations()
-        if isinstance(result, set):
-            if len(result) == 0:
-                self.logger.debug(f"The action {action.name} has no numeric effects.")
-                return
+        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations()
+        if learned_perfectly:
+            if numeric_preconditions is not None:
+                action.preconditions.add_condition(numeric_preconditions)
 
-            action.numeric_effects = result
-            return
+            if effects is not None and len(effects) > 0:
+                action.numeric_effects = effects
 
-        effects, additional_preconditions = result
-        if additional_preconditions is not None:
-            if additional_preconditions.binary_operator == "and":
-                self.logger.debug("The learned additional preconditions are a conjunction. "
-                                  "Adding the internal conditions.")
-                for condition in additional_preconditions.operands:
-                    action.preconditions.add_condition(condition)
+        else:
+            self.logger.debug(f"The action {action.name} was not learned perfectly. ")
+            if numeric_preconditions is not None:
+                restrictive_preconditions = Precondition("and")
+                for precondition in action.preconditions.root.operands:
+                    if isinstance(precondition, Predicate):
+                        restrictive_preconditions.add_condition(precondition)
 
-            else:
-                action.preconditions.add_condition(additional_preconditions)
+                restrictive_preconditions.add_condition(numeric_preconditions)
+                action.preconditions.root = restrictive_preconditions
 
-        if effects is None:
-            self.logger.debug(f"This happned since the action does not have enough data to learn its effects.")
-            return
-
-        if all([isinstance(effect, ConditionalEffect) for effect in effects]):
-            self.logger.debug("The learned effects are all conditional effects. Adding them as such.")
-            action.conditional_effects = effects
-
-        elif all([isinstance(effect, NumericalExpressionTree) for effect in effects]):
-            self.logger.debug("The learned effects are non conditional effects. Adding them as numeric effects.")
-            action.numeric_effects = effects
+            if effects is not None and len(effects) > 0:
+                action.numeric_effects = effects
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.

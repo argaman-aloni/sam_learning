@@ -15,6 +15,7 @@ class LearningAlgorithmType(Enum):
     # learning algorithms relating to fault repair not to be used for POL
     oblique_tree = 11
     extended_svc = 12
+    online_nsam = 13
 
 
 class SolverType(Enum):

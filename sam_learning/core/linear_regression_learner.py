@@ -48,6 +48,9 @@ class LinearRegressionLearner:
 
         :param values_df: the matrix constructed based on the observations.
         """
+        if len(values_df) == 1:
+            return False
+
         values_matrix = values_df.to_numpy()
         num_dimensions = values_matrix.shape[1] + 1  # +1 for the bias.
         num_rows = values_matrix.shape[0]
@@ -89,7 +92,7 @@ class LinearRegressionLearner:
         self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
         return coefficients, learning_score
 
-    def _solve_safe_independent_equations(
+    def _solve_linear_equations(
             self, lifted_function: str, regression_df: DataFrame, allow_unsafe_learning: bool = False) -> Optional[
         str]:
         """Computes the change in the function value based on the previous values of the function.
@@ -114,16 +117,32 @@ class LinearRegressionLearner:
             return f"(assign {lifted_function} {0.0})"
 
         functions_and_dummy = list(regression_df.columns[:-1]) + ["(dummy)"]
+        if lifted_function in regression_df.columns and \
+                coefficient_vector[list(regression_df.columns).index(lifted_function)] == 1 and \
+                all([coefficient_vector[list(regression_df.columns).index(function)] == 0
+                     for function in regression_df.columns if function != lifted_function]):
+            self.logger.info(f"The value of the {lifted_function} is the same before and "
+                             f"after the application of the action. The action does not affect {lifted_function}!")
+            return None
+
         if lifted_function in regression_df.columns and coefficient_vector[
             list(regression_df.columns).index(lifted_function)] != 0:
             self.logger.debug("the assigned party is a part of the equation, "
                               "cannot use circular dependency so changing the format!")
             coefficients_map = {lifted_func: coef for lifted_func, coef in
                                 zip(functions_and_dummy, coefficient_vector)}
+
+            previous_value = next_value = 0.0
+            for i in range(len(regression_df)):
+                previous_value = regression_df.iloc[i][lifted_function]
+                next_value = regression_df.iloc[i][LABEL_COLUMN]
+                if previous_value != next_value:
+                    break
+
             return construct_non_circular_assignment(lifted_function,
                                                      coefficients_map,
-                                                     regression_df[lifted_function][0],
-                                                     regression_df[LABEL_COLUMN][0])
+                                                     previous_value,
+                                                     next_value)
 
         multiplication_functions = construct_multiplication_strings(coefficient_vector, functions_and_dummy)
         if len(multiplication_functions) == 0:
@@ -134,122 +153,59 @@ class LinearRegressionLearner:
         constructed_right_side = construct_linear_equation_string(multiplication_functions)
         return f"(assign {lifted_function} {constructed_right_side})"
 
-    def _construct_restrictive_effect_from_textual_data(
-            self, additional_conditions: List[str],
-            assignment_statements: List[str]) -> Optional[Tuple[Optional[ConditionalEffect], Precondition]]:
-        """Constructs a conditional effect from the textual data.
+    def _construct_restrictive_numeric_preconditions(self, combined_data: DataFrame) -> Precondition:
+        """Constructs the restrictive numeric preconditions for the action.
 
-        :param additional_conditions: the added preconditions and the antecedents to the conditional effects.
-        :param assignment_statements: the assignment statements to add to the conditional effect.
-        :return: the conditional effect and the restrictive precondition.
+        Note:
+            if there is only one sample we create an AND condition, otherwise we create an OR condition.
+
+        :param combined_data: the combined data of the previous and next states.
+        :return: the restrictive numeric preconditions.
         """
-        if len(assignment_statements) == 0:
-            self.logger.debug("The algorithm could not find any changes in the state variables. Continuing.")
-            return None, construct_numeric_conditions(
-                additional_conditions, ConditionType.conjunctive, self.domain_functions)
-
-        conditional_effect = ConditionalEffect()
-        conditional_effect.antecedents.root = construct_numeric_conditions(
-            additional_conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
-        conditional_effect.numeric_effects = construct_numeric_effects(assignment_statements, self.domain_functions)
-        restrictive_precondition = construct_numeric_conditions(
-            additional_conditions, ConditionType.conjunctive, self.domain_functions)
-        return conditional_effect, restrictive_precondition
-
-    @dispatch(Series)
-    def _construct_safe_conditional_effect_for_single_sample(
-            self, sample_data: Series) -> Optional[Tuple[Optional[ConditionalEffect], Precondition]]:
-        """Constructs a conditional effect for a single sample.
-
-        :param sample_data: the sample to construct the conditional effect for.
-        :return: the conditional effect and the precondition for the conditional effect.
-        """
-        assignment_statements = []
-        additional_conditions = []
-        for fluent in sample_data.index.tolist():
-            if fluent.startswith(NEXT_STATE_PREFIX):
-                if sample_data[fluent[POST_NEXT_STATE_PREFIX_INDEX:]] != sample_data[fluent]:
-                    self.logger.debug("The value of the fluent changed by applying the action on the previous state.")
-                    assignment_statements.append(
-                        f"(assign {fluent[POST_NEXT_STATE_PREFIX_INDEX:]} {sample_data[fluent]})")
-
-            else:  # the fluent is belongs to the previous state
-                additional_conditions.append(f"(= {fluent} {sample_data[fluent]})")
-
-        self.logger.debug("Constructing a restrictive effect from the input samples.")
-        return self._construct_restrictive_effect_from_textual_data(additional_conditions, assignment_statements)
-
-    @dispatch(DataFrame)
-    def _construct_safe_conditional_effect_for_single_sample(
-            self, sample_data: DataFrame) -> Optional[Tuple[Optional[ConditionalEffect], Precondition]]:
-        """Constructs a conditional effect for a single sample.
-
-        :param sample_data: the sample to construct the conditional effect for.
-        :return: the conditional effect and the precondition for the conditional effect.
-        """
-        assignment_statements = []
-        additional_conditions = []
-        for fluent in sample_data.columns:
-            if fluent.startswith(NEXT_STATE_PREFIX):
-                if sample_data[fluent[POST_NEXT_STATE_PREFIX_INDEX:]].iloc[0] != sample_data[fluent].iloc[0]:
-                    self.logger.debug("The value of the fluent changed by applying the action on the previous state.")
-                    assignment_statements.append(
-                        f"(assign {fluent[POST_NEXT_STATE_PREFIX_INDEX:]} {sample_data[fluent].iloc[0]})")
-
-            else:  # the fluent is belongs to the previous state
-                additional_conditions.append(f"(= {fluent} {sample_data[fluent].iloc[0]})")
-
-        return self._construct_restrictive_effect_from_textual_data(additional_conditions, assignment_statements)
-
-    def _construct_multiple_safe_conditional_effects(
-            self, combined_data: DataFrame) -> Tuple[List[ConditionalEffect], Precondition]:
-        """Constructs a safe conditional effect and the additional preconditions needed for the action
-            when the there is not enough data to learn the effect.
-
-        :param combined_data: the data frame containing the previous and next state values.
-        :return: the conditional effects combined with the disjunctive precondition that we need to add.
-        """
-        disjunctive_precondition = Precondition("or")
-        conditional_effects = []
-        if combined_data.shape[0] == 1:
-            conditional_effect, restrictive_precondition = \
-                self._construct_safe_conditional_effect_for_single_sample(combined_data)
-            return [conditional_effect], restrictive_precondition
-
+        precondition_statements = []
         for index, row in combined_data.iterrows():
-            single_row_result = self._construct_safe_conditional_effect_for_single_sample(row)
-            if single_row_result is None:
+            additional_conditions = []
+            for fluent in row.index.tolist():
+                if fluent.startswith(NEXT_STATE_PREFIX):
+                    continue
+
+                else:  # the fluent is belongs to the previous state
+                    additional_conditions.append(f"(= {fluent} {row[fluent]})")
+
+            single_precondition = construct_numeric_conditions(
+                additional_conditions, ConditionType.conjunctive, self.domain_functions)
+            precondition_statements.append(single_precondition)
+
+        if len(precondition_statements) == 1:
+            return precondition_statements[0]
+
+        disjunctive_precondition = Precondition("or")
+        for precondition_statement in precondition_statements:
+            disjunctive_precondition.add_condition(precondition_statement)
+
+        return disjunctive_precondition
+
+    def _construct_effect_from_single_sample(self, sample_data: DataFrame) -> Set[NumericalExpressionTree]:
+        """constructs the effect from a single sample.
+
+        :return: the constructed numeric effect.
+        """
+        assignment_statements = []
+        for fluent in sample_data.columns:
+            if not fluent.startswith(NEXT_STATE_PREFIX):
                 continue
 
-            conditional_effect, restrictive_precondition = single_row_result
-            disjunctive_precondition.add_condition(restrictive_precondition)
-            if conditional_effect is not None:
-                conditional_effects.append(conditional_effect)
+            if sample_data[fluent[POST_NEXT_STATE_PREFIX_INDEX:]].iloc[0] != sample_data[fluent].iloc[0]:
+                self.logger.debug("The value of the fluent changed by applying the action on the previous state.")
+                assignment_statements.append(
+                    f"(assign {fluent[POST_NEXT_STATE_PREFIX_INDEX:]} {sample_data[fluent].iloc[0]})")
 
-        if len(conditional_effects) == 0:
-            self.logger.debug("The algorithm could not find any changes in the state variables. Continuing.")
-            return [], disjunctive_precondition
-
-        return conditional_effects, disjunctive_precondition
-
-    def _action_not_affects_fluent(self, lifted_function: str, testing_dataframe: DataFrame) -> bool:
-        """Validates that the action affects the given lifted function.
-
-        :param lifted_function: the name of the lifted function to check.
-        :param testing_dataframe: the dataframe containing the previous and next state values of the relevant feature.
-        :return: Whether the action affects the given lifted function.
-        """
-        self.logger.debug("Checking if the action affects the given lifted function...")
-        subtraction_df = testing_dataframe[LABEL_COLUMN] - testing_dataframe[lifted_function]
-        unique_values = subtraction_df.unique()
-        return len(unique_values) == 1 and unique_values[0] == 0
+        return construct_numeric_effects(assignment_statements, self.domain_functions)
 
     def construct_assignment_equations(
             self, previous_state_data: Dict[str, List[float]],
             next_state_data: Dict[str, List[float]],
-            allow_unsafe_learning: bool = False) -> Union[
-        Tuple[List[ConditionalEffect], Precondition], Set[NumericalExpressionTree],
-        Tuple[Set[NumericalExpressionTree], Precondition]]:
+            allow_unsafe_learning: bool = False) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
         :param previous_state_data: the data of the previous state.
@@ -262,7 +218,8 @@ class LinearRegressionLearner:
         combined_data = self._combine_states_data(previous_state_data, next_state_data)
         if combined_data.shape[0] == 1:
             self.logger.info(f"The action {self.action_name} contains a single unique observation!")
-            return self._construct_multiple_safe_conditional_effects(combined_data)
+            return self._construct_effect_from_single_sample(combined_data), \
+                self._construct_restrictive_numeric_preconditions(combined_data), False
 
         # The dataset contains more than one observation.
         self.logger.debug("Removing fluents that are constant zero...")
@@ -271,34 +228,21 @@ class LinearRegressionLearner:
             combined_data, columns_to_ignore=tagged_next_state_fluents)
         features_df = filtered_df.copy()[[k for k in previous_state_data.keys() if k in filtered_df.columns]]
         regression_df, linear_dep_conditions, dependent_columns = detect_linear_dependent_features(features_df)
-
         combined_conditions = linear_dep_conditions + zero_fluent_conditions
-        if not self._validate_legal_equations(regression_df):
-            self.logger.info(f"The action is not safe to learn, creating a restrictive representation!")
-            return self._construct_multiple_safe_conditional_effects(combined_data)
-
-        self.logger.debug("The action is safe to learn, constructing the assignment equations...")
         tested_fluents_names = [fluent_name for fluent_name in next_state_data.keys()]
+        is_safe_to_learn = self._validate_legal_equations(regression_df)
         for feature_fluent, tagged_fluent in zip(tested_fluents_names, tagged_next_state_fluents):
-            change_df = combined_data.copy()[[feature_fluent, tagged_fluent]]
-            change_df.rename(columns={tagged_fluent: LABEL_COLUMN}, inplace=True)
-            if self._action_not_affects_fluent(feature_fluent, change_df):
-                self.logger.info(f"The action {self.action_name} does not affect the fluent - {feature_fluent}")
-                continue
-
             regression_df[LABEL_COLUMN] = combined_data[tagged_fluent]
-            polynomial_equation = self._solve_safe_independent_equations(
+            polynomial_equation = self._solve_linear_equations(
                 feature_fluent, regression_df, allow_unsafe_learning=allow_unsafe_learning)
 
             if polynomial_equation is not None:
                 assignment_statements.append(polynomial_equation)
 
-        if len(assignment_statements) == 0:
-            self.logger.debug("The algorithm could not find any effects by the action.")
-            return set()
-
-        if len(combined_conditions) == 0:
-            return construct_numeric_effects(assignment_statements, self.domain_functions)
+        if not is_safe_to_learn:
+            return construct_numeric_effects(assignment_statements, self.domain_functions), \
+                self._construct_restrictive_numeric_preconditions(combined_data), False
 
         return construct_numeric_effects(assignment_statements, self.domain_functions), \
-            construct_numeric_conditions(combined_conditions, ConditionType.conjunctive, self.domain_functions)
+            construct_numeric_conditions(combined_conditions, ConditionType.conjunctive,
+                                         self.domain_functions), True
