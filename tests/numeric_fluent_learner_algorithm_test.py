@@ -2,7 +2,7 @@
 import random
 
 from pandas import DataFrame
-from pddl_plus_parser.models import NumericalExpressionTree, Precondition, ConditionalEffect
+from pddl_plus_parser.models import NumericalExpressionTree, Precondition
 from pytest import fixture
 
 from sam_learning.core import NumericFluentStateStorage, construct_non_circular_assignment
@@ -133,9 +133,11 @@ def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_prev_state_fluents)
         load_action_state_fluent_storage.add_to_next_state_storage(simple_prev_state_fluents)
 
-    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
-    assert isinstance(assignment_equations, set)
-    assert len(assignment_equations) == 0
+    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations()
+    assert learned_perfectly
+    assert isinstance(effects, set)
+    assert len(effects) == 0
+    assert numeric_preconditions is None
 
 
 def test_construct_assignment_equations_when_change_is_caused_by_constant_returns_correct_value(
@@ -158,9 +160,12 @@ def test_construct_assignment_equations_when_change_is_caused_by_constant_return
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
-    assert isinstance(assignment_equations, set)
-    assert assignment_equations.pop().to_pddl() == "(assign (current_load ?z) 10.0)"
+    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations()
+    assert learned_perfectly
+    assert isinstance(effects, set)
+    assert len(effects) == 1
+    assert numeric_preconditions is None
+    assert effects.pop().to_pddl() == "(assign (current_load ?z) 10.0)"
 
 
 def test_construct_assignment_equations_with_simple_2d_equations_returns_correct_string_representation(
@@ -182,10 +187,12 @@ def test_construct_assignment_equations_with_simple_2d_equations_returns_correct
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_equations = load_action_state_fluent_storage.construct_assignment_equations()
-    assert isinstance(assignment_equations, set)
-    assert len(assignment_equations) == 1
-    assert assignment_equations.pop().to_pddl() == "(assign (current_load ?z) (* (load_limit ?z) 9.0))"
+    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations()
+    assert learned_perfectly
+    assert isinstance(effects, set)
+    assert len(effects) == 1
+    assert numeric_preconditions is None
+    assert effects.pop().to_pddl() == "(assign (current_load ?z) (* (load_limit ?z) 9.0))"
 
 
 def test_construct_assignment_equations_with_two_equations_result_in_multiple_changes(
@@ -208,11 +215,13 @@ def test_construct_assignment_equations_with_two_equations_result_in_multiple_ch
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_numeric_expressions = load_action_state_fluent_storage.construct_assignment_equations()
-    assert isinstance(assignment_numeric_expressions, set)
-    assignment_equations = {expression.to_pddl() for expression in assignment_numeric_expressions}
+    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations()
+    assert learned_perfectly
+    assert isinstance(effects, set)
+    assert numeric_preconditions is None
+    assignment_equations = {expression.to_pddl() for expression in effects}
     assert len(assignment_equations) == 2
-    assert set(assignment_equations) == {
+    assert assignment_equations == {
         "(increase (load_limit ?z) (* (current_load ?z) 0.29))",
         "(assign (current_load ?z) (* (load_limit ?z) 9.0))"}
 
@@ -237,10 +246,11 @@ def test_construct_assignment_equations_with_an_increase_change_results_in_corre
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    assignment_numeric_expressions = load_action_state_fluent_storage.construct_assignment_equations()
-    assert isinstance(assignment_numeric_expressions, set)
-    assignment_equations = {expression.to_pddl() for expression in assignment_numeric_expressions}
-    assert len(assignment_equations) == 1
+    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations()
+    assert learned_perfectly
+    assert isinstance(effects, set)
+    assert numeric_preconditions is None
+    assignment_equations = {expression.to_pddl() for expression in effects}
     print(assignment_equations)
 
 
@@ -263,16 +273,15 @@ def test_construct_assignment_equations_with_fewer_equations_than_needed_to_crea
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    result = load_action_state_fluent_storage.construct_assignment_equations(allow_unsafe_learning=False)
-    assert result is not None
-    conditional_effects, preconditions = result
-    for conditional_effect in conditional_effects:
-        assert isinstance(conditional_effect, NumericalExpressionTree)
+    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations(
+        allow_unsafe_learning=False)
+    assert learned_perfectly
+    assert numeric_preconditions is not None
+    assert isinstance(numeric_preconditions, Precondition)
+    assert effects is not None
 
-    assert isinstance(preconditions, Precondition)
 
-
-def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_degraded_conditions(
+def test_construct_safe_linear_inequalities_when_given_only_one_state_retsurns_degraded_conditions(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
     CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(121.0)
