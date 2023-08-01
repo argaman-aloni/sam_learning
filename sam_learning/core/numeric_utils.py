@@ -14,6 +14,20 @@ from sam_learning.core.learning_types import ConditionType
 EPSILON = 1e-10
 
 
+
+def get_num_independent_equations(data_matrix: DataFrame) -> int:
+    """Calculates the number of independent equations in the given matrix.
+
+    :param data_matrix: the matrix of the previous state values.
+    :return: the number of independent equations.
+    """
+    values_matrix = data_matrix.to_numpy()
+    num_rows = values_matrix.shape[0]
+    values_matrix_with_bias = np.c_[values_matrix, np.ones(num_rows)]
+    _, pivot_cols = sympy.Matrix(values_matrix_with_bias).rref()
+    return len(pivot_cols)
+
+
 def prettify_floating_point_number(number: float) -> float:
     """Converts the floating point number into a prettier form so that the created equations would be more presentable.
 

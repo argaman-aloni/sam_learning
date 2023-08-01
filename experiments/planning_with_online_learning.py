@@ -14,7 +14,7 @@ from experiments.learning_statistics_manager import LearningStatisticsManager
 from experiments.numeric_performance_calculator import NumericPerformanceCalculator
 from experiments.semantic_performance_calculator import SemanticPerformanceCalculator
 from experiments.utils import init_semantic_performance_calculator
-from sam_learning.core import LearnerDomain
+from sam_learning.core import LearnerDomain, VocabularyCreator
 from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM, \
     UniversallyConditionalSAM, OnlineNSAMLearner
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
@@ -71,8 +71,10 @@ class PIL:
         :param possible_grounded_actions:
         :return:
         """
+        step_num = 0
         tried_actions_in_state = 0
         while tried_actions_in_state < len(possible_grounded_actions):
+            self.logger.debug(f"Starting step number {step_num + 1}!")
             op_to_execute: Operator = random.choice(possible_grounded_actions)
             op_action_call = ActionCall(op_to_execute.name, op_to_execute.grounded_call_objects)
 
@@ -80,22 +82,28 @@ class PIL:
                 if tried_actions_in_state == len(possible_grounded_actions):
                     return
 
+                self.logger.debug(f"The action {op_action_call.name} is non-informative, "
+                                  f"trying a new action on the state.")
                 tried_actions_in_state += 1
+                step_num += 1
                 op_to_execute = random.choice(possible_grounded_actions)
                 op_action_call = ActionCall(op_to_execute.name, op_to_execute.grounded_call_objects)
 
             try:
                 next_state = op_to_execute.apply(current_state)
+                step_num += 1
                 tried_actions_in_state = 0
 
             except ValueError:
                 self.logger.debug(f"Could not apply the action {op_to_execute.name} to the state.")
                 next_state = current_state.copy()
+                step_num += 1
                 tried_actions_in_state += 1
 
             online_learner.execute_action(
                 action_to_execute=op_action_call, previous_state=current_state, next_state=next_state)
-            yield online_learner.create_safe_model()
+            if len(online_learner.observed_actions) > 0:
+                yield online_learner.create_safe_model()
 
         return
 
@@ -111,12 +119,15 @@ class PIL:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
+        ground_action_creator = VocabularyCreator()
         online_learner = OnlineNSAMLearner(partial_domain=partial_domain)
         online_learner.init_online_learning()
-        for index, problem_path in enumerate(train_set_dir_path.glob("pfile*.pddl")):
+        for problem_index, problem_path in enumerate(train_set_dir_path.glob("pfile*.pddl")):
+            self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
             observed_objects = problem.objects
-            all_ground_actions = self.create_all_grounded_actions(complete_domain, observed_objects)
+            all_ground_actions = self.create_all_grounded_actions(
+                complete_domain, observed_objects, ground_action_creator)
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
             for domain in self.calculate_information_gain_and_execute(init_state, online_learner, all_ground_actions):
                 solved_all_test_problems = self.validate_learned_domain(domain, test_set_dir_path)
@@ -160,13 +171,31 @@ class PIL:
 
         self.domain_validator.write_complete_joint_statistics()
 
-    def create_all_grounded_actions(self, complete_domain: Domain,
-                                    observed_objects: Dict[str, PDDLObject]) -> List[Operator]:
-        pass
+    def create_all_grounded_actions(
+            self, complete_domain: Domain, observed_objects: Dict[str, PDDLObject],
+            ground_action_creator: VocabularyCreator) -> List[Operator]:
+        """
+
+        :param complete_domain:
+        :param observed_objects:
+        :param ground_action_creator:
+        :return:
+        """
+        self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
+        grounded_action_calls = ground_action_creator.create_grounded_actions_vocabulary(
+            domain=complete_domain, observed_objects=observed_objects)
+        all_ground_actions = []
+        for grounded_action_call in grounded_action_calls:
+            op = Operator(action=complete_domain.actions[grounded_action_call.name],
+                          domain=complete_domain,
+                          grounded_action_call=grounded_action_call.parameters)
+            all_ground_actions.append(op)
+
+        return all_ground_actions
 
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Runs the POL algorithm on the input domain.")
+    parser = argparse.ArgumentParser(description="Runs the PIL algorithm on the input domain.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],

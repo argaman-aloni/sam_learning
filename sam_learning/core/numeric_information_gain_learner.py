@@ -8,6 +8,8 @@ from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
 
+from sam_learning.core.numeric_utils import get_num_independent_equations
+
 
 class InformationGainLearner:
     """Information gain calculation of the numeric part of an action."""
@@ -37,7 +39,7 @@ class InformationGainLearner:
         for index, row in df.iterrows():
             if row.values.tolist() == sample_to_locate:
                 self.logger.debug("Found the matching row.")
-                return index
+                return int(index)
 
         return -1
 
@@ -51,6 +53,21 @@ class InformationGainLearner:
             _ = delaunay_plot_2d(hull)
             plt.title(f"{self.action_name} - delaunay graph")
             plt.show()
+
+    def _can_determine_effects_perfectly(self) -> bool:
+        """Determines whether the effects of the action can be predicted perfectly.
+
+        :return: whether the effects of the action can be predicted perfectly.
+        """
+        if len(self.positive_samples_df) == 1:
+            return False
+
+        num_dimensions = len(self.positive_samples_df.columns.tolist()) + 1  # +1 for the bias.
+        num_independent_rows = get_num_independent_equations(self.positive_samples_df)
+        if num_independent_rows >= num_dimensions:
+            return True
+
+        return False
 
     def _in_hull(self, points_to_test: np.ndarray, hull: np.ndarray, debug_mode: bool = False) -> bool:
         """
@@ -147,7 +164,7 @@ class InformationGainLearner:
         new_point_data = [new_numeric_sample[col].value for col in self.lifted_functions]
         new_point_array = np.array(new_point_data)
         try:
-            return self._in_hull(new_point_array, positive_points)
+            return self._in_hull(new_point_array, positive_points) and self._can_determine_effects_perfectly()
 
         except (QhullError, ValueError):
             return self._locate_sample_in_df(new_point_data, positive_points_data) != -1

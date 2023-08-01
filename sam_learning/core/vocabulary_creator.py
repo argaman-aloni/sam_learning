@@ -3,7 +3,8 @@ from collections import defaultdict
 from itertools import permutations
 from typing import List, Tuple, Dict, Set, Union, Optional
 
-from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction
+from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, \
+    ActionCall, Action
 
 from sam_learning.core.learner_domain import LearnerDomain
 
@@ -25,7 +26,7 @@ class VocabularyCreator:
         self.logger = logging.getLogger(__name__)
 
     def _validate_type_matching(self, grounded_signatures: Dict[str, PDDLType],
-                                lifted_variable_to_match: Union[Predicate, PDDLFunction]) -> bool:
+                                lifted_variable_to_match: Union[Predicate, PDDLFunction, Action]) -> bool:
         """Validates that the types of the grounded signature match the types of the predicate signature.
 
         :param grounded_signatures: the grounded predicate signature.
@@ -136,4 +137,29 @@ class VocabularyCreator:
                 vocabulary.update({lifted_predicate, negative_lifted_predicate})
 
         self.logger.debug(f"Created vocabulary of size {len(vocabulary)}")
+        return vocabulary
+
+    def create_grounded_actions_vocabulary(self, domain: Domain,
+                                           observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
+        """"Create a vocabulary of random combinations of the actions parameters and objects.
+
+        :param domain: the domain containing the actions and the action signatures.
+        :param observed_objects: the objects that were observed in the trajectory.
+        :return: list containing all the actions with the different combinations of parameters.
+        """
+        vocabulary = set()
+        possible_objects_str = list(observed_objects.keys()) + list(domain.constants.keys())
+        objects_and_consts = list(observed_objects.values()) + list(domain.constants.values())
+        for action_name, action in domain.actions.items():
+            signature_permutations = choose_objects_subset(possible_objects_str, len(action.signature))
+            for signature_permutation in signature_permutations:
+                grounded_signature = {object_name: objects_and_consts[possible_objects_str.index(object_name)].type
+                                      for object_name in signature_permutation}
+                if not self._validate_type_matching(grounded_signature, action):
+                    continue
+
+                grounded_predicate = ActionCall(
+                    name=action_name, grounded_parameters=list(grounded_signature.keys()))
+                vocabulary.add(grounded_predicate)
+
         return vocabulary

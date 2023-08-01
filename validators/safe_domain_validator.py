@@ -119,6 +119,9 @@ class DomainValidator:
         :param used_observations: the observations used to generate the plans.
         :return: the number of trajectory triplets in the used observations.
         """
+        if not used_observations:
+            return 0
+
         for observation in used_observations:
             if isinstance(observation, Path):
                 with open(observation, "r") as observation_file:
@@ -163,9 +166,10 @@ class DomainValidator:
             solving_stats[entry] += 1
             solving_stats[f"problems_{entry}"].append(problem_file_name)
 
+        num_trajectories = len(used_observations) if used_observations else 0
         self.solving_stats.append({
             "learning_algorithm": self.learning_algorithm.name,
-            "num_trajectories": len(used_observations),
+            "num_trajectories": num_trajectories,
             "num_trajectory_triplets": num_triplets,
             **solving_stats
         })

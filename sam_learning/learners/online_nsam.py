@@ -121,7 +121,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
     def create_safe_model(self) -> LearnerDomain:
         """Creates a safe model from the currently learned data."""
-        allowed_actions = {}
         for action_name, action in self.partial_domain.actions.items():
             if action_name not in self.storage:
                 self.logger.debug(f"The action - {action_name} has not been observed in the trajectories!")
@@ -131,11 +130,9 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             try:
                 self._construct_safe_numeric_preconditions(action)
                 self._construct_safe_numeric_effects(action)
-                allowed_actions[action_name] = action
                 self.logger.info(f"Done learning the action - {action_name}!")
 
             except NotSafeActionError as e:
                 self.logger.debug(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")
 
-        self.partial_domain.actions = allowed_actions
         return self.partial_domain

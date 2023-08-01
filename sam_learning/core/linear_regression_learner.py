@@ -1,19 +1,18 @@
 """This module contains the LinearRegressionLearner class."""
 import logging
-from typing import Optional, List, Dict, Tuple, Union, Set
+from typing import Optional, List, Dict, Tuple, Set
 
 import numpy as np
 import sympy
-from multipledispatch import dispatch
-from pandas import DataFrame, Series
-from pddl_plus_parser.models import Precondition, NumericalExpressionTree, PDDLFunction, ConditionalEffect
+from pandas import DataFrame
+from pddl_plus_parser.models import Precondition, NumericalExpressionTree, PDDLFunction
 from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
 from sam_learning.core.numeric_utils import detect_linear_dependent_features, construct_linear_equation_string, \
     construct_non_circular_assignment, construct_multiplication_strings, prettify_coefficients, \
-    construct_numeric_conditions, construct_numeric_effects, filter_constant_features
+    construct_numeric_conditions, construct_numeric_effects, filter_constant_features, get_num_independent_equations
 
 LABEL_COLUMN = "label"
 NEXT_STATE_PREFIX = "next_state_"  # prefix for the next state variables.
@@ -51,12 +50,9 @@ class LinearRegressionLearner:
         if len(values_df) == 1:
             return False
 
-        values_matrix = values_df.to_numpy()
-        num_dimensions = values_matrix.shape[1] + 1  # +1 for the bias.
-        num_rows = values_matrix.shape[0]
-        values_matrix_with_bias = np.c_[values_matrix, np.ones(num_rows)]
-        _, pivot_cols = sympy.Matrix(values_matrix_with_bias).rref()
-        if len(pivot_cols) >= num_dimensions:
+        num_dimensions = len(values_df.columns.tolist()) + 1  # +1 for the bias.
+        num_independent_rows = get_num_independent_equations(values_df)
+        if num_independent_rows >= num_dimensions:
             return True
 
         failure_reason = f"There are too few independent rows of data! " \
