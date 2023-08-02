@@ -40,18 +40,17 @@ def output_results(model_stats: List[Dict[str, Union[int, str]]], workdir_path: 
 
 
 def run_experiments(workdir_path: Path) -> None:
-    """Runs the experiments for the starcrft domain.
+    """Runs the experiments for the minecraft domain.
 
     :param workdir_path: the directory containing the trajectories from the minecraft experiments.
     """
     minecraft_domain = DomainParser(workdir_path / "domain.pddl", partial_parsing=True).parse_domain()
     observations = []
     model_stats = []
-    fluents_map = json.load(open(workdir_path / "fluents_map.json", "rt"))
     for trajectory_path in workdir_path.glob("*.trajectory"):
         print(f"Processing trajectory {trajectory_path}")
         observations.append(TrajectoryParser(minecraft_domain).parse_trajectory(trajectory_path))
-        minecraft_sam = NumericSAMLearner(minecraft_domain, preconditions_fluent_map=fluents_map)
+        minecraft_sam = NumericSAMLearner(minecraft_domain)
         learned_model, statistics = minecraft_sam.learn_action_model(observations)
         export_learned_domain(workdir_path, learned_model, len(observations))
         model_stats.append({"num_trajectories": len(observations),

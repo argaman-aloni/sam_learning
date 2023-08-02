@@ -13,7 +13,8 @@ from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
 from sam_learning.core.numeric_utils import construct_multiplication_strings, construct_linear_equation_string, \
-    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features
+    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features, \
+    get_num_independent_equations
 
 
 class ConvexHullLearner:
@@ -189,7 +190,7 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(
                 filtered_pre_state_df.loc[:, filtered_pre_state_df.columns[0]], equality_conditions)
 
-        if filtered_pre_state_df.shape[0] < needed_dimensions:
+        if get_num_independent_equations(filtered_pre_state_df) < needed_dimensions:
             return self._create_disjunctive_preconditions(filtered_pre_state_df, equality_conditions)
 
         A, b = self._create_convex_hull_linear_inequalities(filtered_pre_state_df, display_mode=False)

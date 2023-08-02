@@ -20,6 +20,20 @@ def linear_regression_learner() -> LinearRegressionLearner:
     return LinearRegressionLearner(TEST_ACTION_NAME, domain_functions)
 
 
+def test_extract_const_conditions_extract_preconditions_that_appear_in_all_samples_as_constant_a_single_time(
+        linear_regression_learner: LinearRegressionLearner):
+    precondition_statements = [
+        ["(> (x) 0)", "(> (y) 0)", "(> (z) 0)"],
+        ["(> (x) 0)", "(> (y) 1)", "(> (z) 2)"],
+        ["(> (x) 0)", "(> (y) 2)", "(> (z) 4)"],
+    ]
+    const_conditions = linear_regression_learner._extract_const_conditions(precondition_statements)
+    assert len(const_conditions) == 1
+    assert const_conditions[0] == "(> (x) 0)"
+    for precond in precondition_statements:
+        assert len(precond) == 2
+
+
 def test_validate_legal_equations_returns_true_when_the_number_of_equations_is_valid_and_the_matrix_has_one_solution(
         linear_regression_learner: LinearRegressionLearner):
     pre_state_data = {

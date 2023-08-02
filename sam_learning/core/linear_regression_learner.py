@@ -3,7 +3,6 @@ import logging
 from typing import Optional, List, Dict, Tuple, Set
 
 import numpy as np
-import sympy
 from pandas import DataFrame
 from pddl_plus_parser.models import Precondition, NumericalExpressionTree, PDDLFunction
 from sklearn.linear_model import LinearRegression
@@ -149,7 +148,34 @@ class LinearRegressionLearner:
         constructed_right_side = construct_linear_equation_string(multiplication_functions)
         return f"(assign {lifted_function} {constructed_right_side})"
 
-    def _construct_restrictive_numeric_preconditions(self, combined_data: DataFrame) -> Precondition:
+    @staticmethod
+    def _extract_const_conditions(
+            precondition_statements: List[List[str]], additional_conditions: List[str] = None) -> List[str]:
+        """Extract conditions that are constant for all the samples.
+
+        Note:
+            These preconditions that appear in all samples will be considered axioms and will be added the
+            general preconditions to create a more compact version of the action's preconditions.
+
+        :param precondition_statements: the precondition statements.
+        :return: the extracted constant conditions.
+        """
+        const_preconditions = set(additional_conditions) if additional_conditions else set()
+        for conjunction_statement in precondition_statements:
+            for condition in conjunction_statement:
+                if all([condition in other_conjunction for other_conjunction in precondition_statements]):
+                    const_preconditions.add(condition)
+                    continue
+
+        for conjunction_statement in precondition_statements:
+            for const_condition in const_preconditions:
+                if const_condition in conjunction_statement:
+                    conjunction_statement.remove(const_condition)
+
+        return list(const_preconditions)
+
+    def _construct_restrictive_numeric_preconditions(
+            self, combined_data: DataFrame, additional_conditions: List[str] = None) -> Precondition:
         """Constructs the restrictive numeric preconditions for the action.
 
         Note:
@@ -158,6 +184,7 @@ class LinearRegressionLearner:
         :param combined_data: the combined data of the previous and next states.
         :return: the restrictive numeric preconditions.
         """
+        self.logger.debug(f"Constructing the restrictive numeric preconditions for the action {self.action_name}.")
         precondition_statements = []
         for index, row in combined_data.iterrows():
             additional_conditions = []
@@ -168,18 +195,28 @@ class LinearRegressionLearner:
                 else:  # the fluent is belongs to the previous state
                     additional_conditions.append(f"(= {fluent} {row[fluent]})")
 
-            single_precondition = construct_numeric_conditions(
-                additional_conditions, ConditionType.conjunctive, self.domain_functions)
-            precondition_statements.append(single_precondition)
+            precondition_statements.append(additional_conditions)
 
         if len(precondition_statements) == 1:
-            return precondition_statements[0]
+            return construct_numeric_conditions(
+                precondition_statements[0], ConditionType.conjunctive, self.domain_functions)
 
-        disjunctive_precondition = Precondition("or")
+        const_preconditions = self._extract_const_conditions(precondition_statements, additional_conditions)
+        combined_preconditions = None
+        if len(const_preconditions) > 0:
+            combined_preconditions = construct_numeric_conditions(
+                const_preconditions, ConditionType.conjunctive, self.domain_functions)
+
+        dijsunctive_preconditions = Precondition("or")
         for precondition_statement in precondition_statements:
-            disjunctive_precondition.add_condition(precondition_statement)
+            dijsunctive_preconditions.add_condition(construct_numeric_conditions(
+                precondition_statement, ConditionType.conjunctive, self.domain_functions))
 
-        return disjunctive_precondition
+        if combined_preconditions is not None:
+            combined_preconditions.add_condition(dijsunctive_preconditions)
+            return combined_preconditions
+
+        return dijsunctive_preconditions
 
     def _construct_effect_from_single_sample(self, sample_data: DataFrame) -> Set[NumericalExpressionTree]:
         """constructs the effect from a single sample.
@@ -197,6 +234,25 @@ class LinearRegressionLearner:
                     f"(assign {fluent[POST_NEXT_STATE_PREFIX_INDEX:]} {sample_data[fluent].iloc[0]})")
 
         return construct_numeric_effects(assignment_statements, self.domain_functions)
+
+    def _filter_out_constant_effects(
+            self, constant_features: List[str], combined_data_df: DataFrame, filtered_df: DataFrame) -> List[str]:
+        """
+
+        :param constant_features:
+        :param combined_data_df:
+        :param filtered_df:
+        :return:
+        """
+        removed_next_state_variables = []
+        for constant_feature in constant_features:
+            if combined_data_df[constant_feature].equals(combined_data_df[f"{NEXT_STATE_PREFIX}{constant_feature}"]):
+                self.logger.info(f"The value of the {constant_feature} is the same before and "
+                                 f"after the application of the action. The value is constant so it is not needed!")
+                filtered_df.drop(f"{NEXT_STATE_PREFIX}{constant_feature}", axis=1, inplace=True)
+                removed_next_state_variables.append(constant_feature)
+
+        return removed_next_state_variables
 
     def construct_assignment_equations(
             self, previous_state_data: Dict[str, List[float]],
@@ -220,11 +276,11 @@ class LinearRegressionLearner:
         # The dataset contains more than one observation.
         self.logger.debug("Removing fluents that are constant zero...")
         tagged_next_state_fluents = [f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in next_state_data.keys()]
-        filtered_df, zero_fluent_conditions, zero_fluents = filter_constant_features(
+        filtered_df, constant_features_conditions, constant_features = filter_constant_features(
             combined_data, columns_to_ignore=tagged_next_state_fluents)
         features_df = filtered_df.copy()[[k for k in previous_state_data.keys() if k in filtered_df.columns]]
         regression_df, linear_dep_conditions, dependent_columns = detect_linear_dependent_features(features_df)
-        combined_conditions = linear_dep_conditions + zero_fluent_conditions
+        combined_conditions = linear_dep_conditions + constant_features_conditions
         tested_fluents_names = [fluent_name for fluent_name in next_state_data.keys()]
         is_safe_to_learn = self._validate_legal_equations(regression_df)
         for feature_fluent, tagged_fluent in zip(tested_fluents_names, tagged_next_state_fluents):
@@ -237,8 +293,6 @@ class LinearRegressionLearner:
 
         if not is_safe_to_learn:
             return construct_numeric_effects(assignment_statements, self.domain_functions), \
-                self._construct_restrictive_numeric_preconditions(combined_data), False
+                self._construct_restrictive_numeric_preconditions(features_df, combined_conditions), False
 
-        return construct_numeric_effects(assignment_statements, self.domain_functions), \
-            construct_numeric_conditions(combined_conditions, ConditionType.conjunctive,
-                                         self.domain_functions), True
+        return construct_numeric_effects(assignment_statements, self.domain_functions), None, True

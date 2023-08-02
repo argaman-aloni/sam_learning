@@ -62,17 +62,18 @@ class PIL:
         return domain_path
 
     def calculate_information_gain_and_execute(
-            self, current_state: State, online_learner: OnlineNSAMLearner,
+            self, initial_state: State, online_learner: OnlineNSAMLearner,
             possible_grounded_actions: List[Operator]) -> Generator[LearnerDomain, None, None]:
         """
 
-        :param current_state:
+        :param initial_state:
         :param online_learner:
         :param possible_grounded_actions:
         :return:
         """
         step_num = 0
         tried_actions_in_state = 0
+        current_state = initial_state
         while tried_actions_in_state < len(possible_grounded_actions):
             self.logger.debug(f"Starting step number {step_num + 1}!")
             op_to_execute: Operator = random.choice(possible_grounded_actions)
@@ -102,6 +103,7 @@ class PIL:
 
             online_learner.execute_action(
                 action_to_execute=op_action_call, previous_state=current_state, next_state=next_state)
+            current_state = next_state
             if len(online_learner.observed_actions) > 0:
                 yield online_learner.create_safe_model()
 

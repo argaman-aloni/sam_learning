@@ -9,7 +9,8 @@ from pytest import fixture
 from sam_learning.learners.numeric_sam import NumericSAMLearner
 from tests.consts import DEPOT_FLUENTS_MAP_PATH, SATELLITE_FLUENTS_MAP_PATH, \
     SATELLITE_PROBLEMATIC_PROBLEM_PATH, SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH, MINECRAFT_FLUENTS_MAP_PATH, \
-    sync_snapshot, MINECRAFT_MEDIUM_DOMAIN_PATH, MINECRAFT_MEDIUM_TRAJECTORY_PATH, MINECRAFT_MEDIUM_FLUENTS_MAP_PATH
+    sync_snapshot, MINECRAFT_MEDIUM_DOMAIN_PATH, MINECRAFT_MEDIUM_TRAJECTORY_PATH, MINECRAFT_MEDIUM_FLUENTS_MAP_PATH, \
+    MINECRAFT_SMALL_DOMAIN_PATH, MINECRAFT_SMALL_TRAJECTORY_PATH
 
 
 @fixture()
@@ -44,6 +45,21 @@ def minecraft_medium_observation(minecraft_medium_domain: Domain) -> Observation
 def minecraft_medium_sam(minecraft_medium_domain: Domain,
                          minecraft_medium_preconditions_fluents_map: Dict[str, List[str]]) -> NumericSAMLearner:
     return NumericSAMLearner(minecraft_medium_domain, minecraft_medium_preconditions_fluents_map)
+
+
+@fixture()
+def minecraft_small_domain() -> Domain:
+    return DomainParser(MINECRAFT_SMALL_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def minecraft_small_observation(minecraft_small_domain: Domain) -> Observation:
+    return TrajectoryParser(minecraft_small_domain).parse_trajectory(MINECRAFT_SMALL_TRAJECTORY_PATH)
+
+
+@fixture()
+def minecraft_small_sam(minecraft_small_domain: Domain) -> NumericSAMLearner:
+    return NumericSAMLearner(minecraft_small_domain)
 
 
 @fixture()
@@ -205,6 +221,14 @@ def test_learn_action_model_with_minecraft_domain_creates_domain_with_correct_pr
 def test_learn_action_model_with_minecraft_medium_domain_creates_domain_with_correct_preconditions_and_effects(
         minecraft_medium_sam: NumericSAMLearner, minecraft_medium_observation: Observation):
     learned_model, learning_metadata = minecraft_medium_sam.learn_action_model([minecraft_medium_observation])
+    print()
+    print(learning_metadata)
+    print(learned_model.to_pddl())
+
+
+def test_learn_action_model_with_minecraft_small_domain_creates_domain_with_correct_preconditions_and_effects(
+        minecraft_small_sam: NumericSAMLearner, minecraft_small_observation: Observation):
+    learned_model, learning_metadata = minecraft_small_sam.learn_action_model([minecraft_small_observation])
     print()
     print(learning_metadata)
     print(learned_model.to_pddl())

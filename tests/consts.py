@@ -72,6 +72,10 @@ MINECRAFT_MEDIUM_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "trajectory_minecraft_med
 MINECRAFT_MEDIUM_FLUENTS_MAP_PATH = EXAMPLES_DIR_PATH / "fluents_map_minecraft_medium.json"
 
 
+MINECRAFT_SMALL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "minecraft_domain_small.pddl"
+MINECRAFT_SMALL_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "minecraft_problem_small.trajectory"
+
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)

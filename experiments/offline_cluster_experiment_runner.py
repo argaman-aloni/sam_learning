@@ -8,4 +8,4 @@ if __name__ == '__main__':
         f"nohup bash -c '{sys.executable} planning_with_offline_learning.py "
         f"--working_directory_path {args[1]} --domain_file_name {args[2]} "
         f"--learning_algorithm {args[3]} "
-        f"--solver_type {args[4]} --max_antecedent_size {args[5]} --universals_map {args[6]} > results-{args[2]}.txt ' &")
+        f"--solver_type {args[4]} --fluents_map_path {args[5]}  > results-{args[2]}.txt ' &")

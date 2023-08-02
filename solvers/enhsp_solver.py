@@ -28,12 +28,13 @@ class ENHSPSolver:
         self.logger = logging.getLogger(__name__)
 
     def _run_enhsp_process(self, run_command: str, problem_file_path: Path,
-                           solving_stats: Dict[str, str]) -> None:
+                           solving_stats: Dict[str, str]) -> bool:
         """Runs the ENHSP process and monitors its execution time.
 
         :param run_command: the command to run the ENHSP process.
         :param problem_file_path: the path to the problem file.
         :param solving_stats: the statistics of the solving process.
+        :return: whether or not the process finished successfully.
         """
         self.logger.info(f"Starting to run ENHSP process for the problem - {problem_file_path.stem}")
         process = subprocess.Popen(run_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -46,12 +47,13 @@ class ENHSPSolver:
             solving_stats[problem_file_path.stem] = "timeout"
             os.kill(process.pid, signal.SIGTERM)
             os.system("pkill -f enhsp.jar")
-            return
+            return True
 
         if process.returncode is None:
             solving_stats[problem_file_path.stem] = "timeout"
-            self.logger.warning(f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
-            return
+            self.logger.warning(
+                f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
+            return True
 
         self.logger.info("ENHSP finished its execution!")
         stdout = process.stdout.read()
@@ -60,19 +62,22 @@ class ENHSPSolver:
         if PROBLEM_SOLVED in stdout:
             self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "ok"
+            return True
 
         elif NO_SOLUTION_FOR_PROBLEM in stdout or OTHER_NO_SOLUTION_TYPE in stdout:
             self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "no_solution"
+            return True
 
         elif GOAL_NOT_REACHABLE in stderr:
             self.logger.warning("Solver declared goal unreachable!")
             solving_stats[problem_file_path.stem] = "no_solution"
+            return True
 
         else:
             self.logger.critical(f"While solving problem encountered unknown error! STDOUT - {stdout}")
             self.logger.critical(f"While solving problem encountered unknown error! STDERR - {stderr}")
-            solving_stats[problem_file_path.stem] = "solver_error"
+            return False
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
@@ -83,14 +88,18 @@ class ENHSPSolver:
         solving_stats = {}
         self.logger.info("Starting to solve the input problems using ENHSP solver.")
         for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
+            num_retries = 0
             self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
             running_options = ["-o", str(domain_file_path.absolute()),
                                "-f", str(problem_file_path.absolute()),
-                               "-planner", "sat-hmrphj",
+                               "-planner", "sat-aibr",
                                "-sp", str(solution_path.absolute())]
             run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
-            self._run_enhsp_process(run_command, problem_file_path, solving_stats)
+            solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats)
+            while not solver_output_ok and num_retries < 3:
+                solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats)
+                solving_stats[problem_file_path.stem] = "solver_error"
 
         return solving_stats
 
