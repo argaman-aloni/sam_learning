@@ -93,7 +93,7 @@ class ENHSPSolver:
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
             running_options = ["-o", str(domain_file_path.absolute()),
                                "-f", str(problem_file_path.absolute()),
-                               "-planner", "sat-aibr",
+                               "-planner", "sat-hmrphj",
                                "-sp", str(solution_path.absolute())]
             run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
             solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats)

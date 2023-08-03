@@ -87,9 +87,42 @@ class LinearRegressionLearner:
         self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
         return coefficients, learning_score
 
+    def _calculate_scale_factor(
+            self, coefficient_vector: List[float], regression_df: DataFrame, lifted_function: str) -> Optional[float]:
+        """
+
+        :param coefficient_vector:
+        :param regression_df:
+        :param lifted_function:
+        :return:
+        """
+        if lifted_function in regression_df.columns and \
+                coefficient_vector[list(regression_df.columns).index(lifted_function)] != 0 and \
+                all([coefficient_vector[list(regression_df.columns).index(function)] == 0
+                     for function in regression_df.columns if function != lifted_function]):
+            self.logger.debug(f"The value of the {lifted_function} is being scaled by a constant factor!")
+            return coefficient_vector[list(regression_df.columns).index(lifted_function)]
+
+        return None
+
+    def _extract_non_zero_change(self, lifted_function: str, regression_df: DataFrame) -> Tuple[float, float]:
+        """
+
+        :param lifted_function:
+        :param regression_df:
+        :return:
+        """
+        previous_value = next_value = 0.0
+        for i in range(len(regression_df)):
+            previous_value = regression_df.iloc[i][lifted_function]
+            next_value = regression_df.iloc[i][LABEL_COLUMN]
+            if previous_value != next_value:
+                break
+        return next_value, previous_value
+
     def _solve_linear_equations(
-            self, lifted_function: str, regression_df: DataFrame, allow_unsafe_learning: bool = False) -> Optional[
-        str]:
+            self, lifted_function: str, regression_df: DataFrame,
+            allow_unsafe_learning: bool = False) -> Optional[str]:
         """Computes the change in the function value based on the previous values of the function.
 
         Note: We assume in this stage that the change results from a polynomial function of the previous values.
@@ -104,40 +137,28 @@ class LinearRegressionLearner:
         coefficient_vector, learning_score = self._solve_regression_problem(
             regression_array, function_post_values, allow_unsafe_learning)
 
-        if all([coef == 0 for coef in coefficient_vector]) and len(regression_df[LABEL_COLUMN].unique()) == 1 \
-                and regression_df[LABEL_COLUMN].unique() == 0:
+        if all([coef == 0 for coef in coefficient_vector]) and len(regression_df[LABEL_COLUMN].unique()) == 1:
             self.logger.debug("The algorithm designated a vector of zeros to the equation "
-                              "which means that there are not coefficients and the label itself is also zero. "
-                              "Assuming assignment function of the value 0.0.")
-            return f"(assign {lifted_function} {0.0})"
+                              "which means that there are no coefficients and the label is also constant value.")
+            return f"(assign {lifted_function} {regression_df[LABEL_COLUMN].unique()[0]})"
 
         functions_and_dummy = list(regression_df.columns[:-1]) + ["(dummy)"]
-        if lifted_function in regression_df.columns and \
-                coefficient_vector[list(regression_df.columns).index(lifted_function)] == 1 and \
-                all([coefficient_vector[list(regression_df.columns).index(function)] == 0
-                     for function in regression_df.columns if function != lifted_function]):
-            self.logger.info(f"The value of the {lifted_function} is the same before and "
-                             f"after the application of the action. The action does not affect {lifted_function}!")
-            return None
+        scale_factor = self._calculate_scale_factor(coefficient_vector, regression_df, lifted_function)
+        if scale_factor is not None:
+            if scale_factor == 1:
+                self.logger.debug("The scale factor is 1, there is no change in the function value.")
+                return None
+
+            scale = "scale-up" if scale_factor > 1 else "scale-down"
+            self.logger.debug("Currently supporting only scaling of the function by a constant value.")
+            return f"({scale} {lifted_function} {scale_factor})"
 
         if lifted_function in regression_df.columns and coefficient_vector[
             list(regression_df.columns).index(lifted_function)] != 0:
-            self.logger.debug("the assigned party is a part of the equation, "
-                              "cannot use circular dependency so changing the format!")
-            coefficients_map = {lifted_func: coef for lifted_func, coef in
-                                zip(functions_and_dummy, coefficient_vector)}
-
-            previous_value = next_value = 0.0
-            for i in range(len(regression_df)):
-                previous_value = regression_df.iloc[i][lifted_function]
-                next_value = regression_df.iloc[i][LABEL_COLUMN]
-                if previous_value != next_value:
-                    break
-
-            return construct_non_circular_assignment(lifted_function,
-                                                     coefficients_map,
-                                                     previous_value,
-                                                     next_value)
+            self.logger.debug("the function is a part of the equation, cannot use circular format!")
+            coefficients_map = {lifted_func: coef for lifted_func, coef in zip(functions_and_dummy, coefficient_vector)}
+            next_value, previous_value = self._extract_non_zero_change(lifted_function, regression_df)
+            return construct_non_circular_assignment(lifted_function, coefficients_map, previous_value, next_value)
 
         multiplication_functions = construct_multiplication_strings(coefficient_vector, functions_and_dummy)
         if len(multiplication_functions) == 0:
@@ -187,15 +208,9 @@ class LinearRegressionLearner:
         self.logger.debug(f"Constructing the restrictive numeric preconditions for the action {self.action_name}.")
         precondition_statements = []
         for index, row in combined_data.iterrows():
-            additional_conditions = []
-            for fluent in row.index.tolist():
-                if fluent.startswith(NEXT_STATE_PREFIX):
-                    continue
-
-                else:  # the fluent is belongs to the previous state
-                    additional_conditions.append(f"(= {fluent} {row[fluent]})")
-
-            precondition_statements.append(additional_conditions)
+            current_data_conditions = [f"(= {fluent} {row[fluent]})" for fluent in
+                                       combined_data.columns if not fluent.startswith(NEXT_STATE_PREFIX)]
+            precondition_statements.append(current_data_conditions)
 
         if len(precondition_statements) == 1:
             return construct_numeric_conditions(
