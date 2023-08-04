@@ -38,6 +38,11 @@ def _calculate_precision_recall(
         if tp_rate == 0 and num_false_negatives[action_name] == 0:
             precision_dict[action_name] = 1
 
+        if tp_rate == 0:
+            precision_dict[action_name] = 0
+            recall_dict[action_name] = 0
+            continue
+
         precision_dict[action_name] = tp_rate / (tp_rate + num_false_positives[action_name])
         recall_dict[action_name] = tp_rate / (tp_rate + num_false_negatives[action_name])
     return precision_dict, recall_dict

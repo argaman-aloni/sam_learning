@@ -79,7 +79,8 @@ class ENHSPSolver:
             self.logger.critical(f"While solving problem encountered unknown error! STDERR - {stderr}")
             return False
 
-    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
+    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
+                       default_tolerance: float = 0.1) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
@@ -94,6 +95,7 @@ class ENHSPSolver:
             running_options = ["-o", str(domain_file_path.absolute()),
                                "-f", str(problem_file_path.absolute()),
                                "-planner", "sat-hmrphj",
+                               "-tolerance", f"{default_tolerance}",
                                "-sp", str(solution_path.absolute())]
             run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
             solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats)

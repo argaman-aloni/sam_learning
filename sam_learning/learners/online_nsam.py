@@ -1,7 +1,7 @@
 """An online version of the Numeric SAM learner."""
 from typing import Dict
 
-from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject
+from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject, Precondition, Predicate
 
 from sam_learning.core import InformationGainLearner, NotSafeActionError, LearnerDomain
 from sam_learning.learners.numeric_sam import PolynomialSAMLearning
@@ -116,7 +116,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             super().update_action(action_to_execute, previous_state, next_state)
             return
 
-        self.observed_actions.append(action_to_execute.name)
         super().add_new_action(action_to_execute, previous_state, next_state)
 
     def create_safe_model(self) -> LearnerDomain:
@@ -136,3 +135,13 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                 self.logger.debug(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")
 
         return self.partial_domain
+
+    def reset_numeric_domain_data(self) -> None:
+        """Resets the numeric part of the domain's data."""
+        for action in self.partial_domain.actions.values():
+            discrete_preconditions = {op for op in action.preconditions.root.operands if isinstance(op, Predicate)}
+            action.preconditions.root = Precondition("and")
+            for discrete_precondition in discrete_preconditions:
+                action.preconditions.add_condition(discrete_precondition)
+
+            action.numeric_effects = set()

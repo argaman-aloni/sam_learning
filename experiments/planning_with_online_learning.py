@@ -3,6 +3,7 @@ import argparse
 import json
 import logging
 import random
+from collections import defaultdict
 from pathlib import Path
 from typing import List, Optional, Dict, Union, Tuple, Generator
 
@@ -37,10 +38,6 @@ class PIL:
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                                  n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
-        self.learning_statistics_manager = LearningStatisticsManager(
-            working_directory_path=working_directory_path, domain_path=self.working_directory_path / domain_file_name,
-            learning_algorithm=LearningAlgorithmType.online_nsam)
-
         self.domain_validator = DomainValidator(
             self.working_directory_path, LearningAlgorithmType.online_nsam,
             self.working_directory_path / domain_file_name,
@@ -61,9 +58,35 @@ class PIL:
 
         return domain_path
 
+    def select_action(self, possible_grounded_actions: Dict[str, List[Operator]]) -> Optional[Operator]:
+        """
+
+        :param possible_grounded_actions:
+        :return:
+        """
+        operator_name = random.choice(list(possible_grounded_actions.keys()))
+        while len(possible_grounded_actions[operator_name]) == 0 and len(possible_grounded_actions) > 0:
+            possible_grounded_actions.pop(operator_name)
+            operator_name = random.choice(list(possible_grounded_actions.keys()))
+
+        if len(possible_grounded_actions) == 0:
+            return None
+
+        return random.choice(possible_grounded_actions[operator_name])
+
+    def can_select_actions(self, actions_to_try: Dict[str, List[Operator]]) -> bool:
+        """
+
+        :param possible_grounded_actions:
+        :param num_executed_actions:
+        :return:
+        """
+        num_actions = sum([len(actions) for actions in actions_to_try.values()])
+        return num_actions > 0
+
     def calculate_information_gain_and_execute(
             self, initial_state: State, online_learner: OnlineNSAMLearner,
-            possible_grounded_actions: List[Operator]) -> Generator[LearnerDomain, None, None]:
+            possible_grounded_actions: Dict[str, List[Operator]]) -> Generator[LearnerDomain, None, None]:
         """
 
         :param initial_state:
@@ -71,43 +94,38 @@ class PIL:
         :param possible_grounded_actions:
         :return:
         """
-        step_num = 0
-        tried_actions_in_state = 0
         current_state = initial_state
-        while tried_actions_in_state < len(possible_grounded_actions):
-            self.logger.debug(f"Starting step number {step_num + 1}!")
-            op_to_execute: Operator = random.choice(possible_grounded_actions)
+        actions_to_try = {action_name: actions for action_name, actions in possible_grounded_actions.items()}
+        while self.can_select_actions(actions_to_try):
+            op_to_execute = self.select_action(possible_grounded_actions=actions_to_try)
+            if op_to_execute is None:
+                return
+
             op_action_call = ActionCall(op_to_execute.name, op_to_execute.grounded_call_objects)
-
             while online_learner.calculate_state_information_gain(state=current_state, action=op_action_call) == 0:
-                if tried_actions_in_state == len(possible_grounded_actions):
-                    return
-
                 self.logger.debug(f"The action {op_action_call.name} is non-informative, "
                                   f"trying a new action on the state.")
-                tried_actions_in_state += 1
-                step_num += 1
-                op_to_execute = random.choice(possible_grounded_actions)
+                actions_to_try[op_action_call.name].remove(op_to_execute)
+                op_to_execute = self.select_action(possible_grounded_actions=actions_to_try)
+                if op_to_execute is None:
+                    return
+
                 op_action_call = ActionCall(op_to_execute.name, op_to_execute.grounded_call_objects)
 
             try:
                 next_state = op_to_execute.apply(current_state)
-                step_num += 1
-                tried_actions_in_state = 0
 
             except ValueError:
                 self.logger.debug(f"Could not apply the action {op_to_execute.name} to the state.")
                 next_state = current_state.copy()
-                step_num += 1
-                tried_actions_in_state += 1
 
             online_learner.execute_action(
                 action_to_execute=op_action_call, previous_state=current_state, next_state=next_state)
             current_state = next_state
-            if len(online_learner.observed_actions) > 0:
+            actions_to_try = {action_name: actions for action_name, actions in possible_grounded_actions.items()}
+            if set(online_learner.observed_actions) == set(online_learner.partial_domain.actions):
                 yield online_learner.create_safe_model()
-
-        return
+                online_learner.reset_numeric_domain_data()
 
     def learn_model_online(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
         """Learns the model of the environment by learning from the input trajectories.
@@ -164,7 +182,6 @@ class PIL:
 
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
-        self.learning_statistics_manager.create_results_directory()
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_model_online(fold_num, train_dir_path, test_dir_path)
@@ -175,7 +192,7 @@ class PIL:
 
     def create_all_grounded_actions(
             self, complete_domain: Domain, observed_objects: Dict[str, PDDLObject],
-            ground_action_creator: VocabularyCreator) -> List[Operator]:
+            ground_action_creator: VocabularyCreator) -> Dict[str, List[Operator]]:
         """
 
         :param complete_domain:
@@ -186,12 +203,12 @@ class PIL:
         self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
         grounded_action_calls = ground_action_creator.create_grounded_actions_vocabulary(
             domain=complete_domain, observed_objects=observed_objects)
-        all_ground_actions = []
+        all_ground_actions = defaultdict(list)
         for grounded_action_call in grounded_action_calls:
             op = Operator(action=complete_domain.actions[grounded_action_call.name],
                           domain=complete_domain,
                           grounded_action_call=grounded_action_call.parameters)
-            all_ground_actions.append(op)
+            all_ground_actions[op.name].append(op)
 
         return all_ground_actions
 
