@@ -51,7 +51,8 @@ class POL:
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
-                 solver_type: SolverType, max_num_antecedents: int, universals_map_path: Optional[Path]):
+                 solver_type: SolverType, max_num_antecedents: int, universals_map_path: Optional[Path],
+                 problem_prefix: str = "pfile"):
         self.logger = logging.getLogger(__name__)
         self.max_num_antecedents = max_num_antecedents
         self.working_directory_path = working_directory_path
@@ -78,7 +79,7 @@ class POL:
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
-            solver_type=solver_type)
+            solver_type=solver_type, preoblem_prefix=problem_prefix)
 
     def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
         """Initializes the algorithm of the semantic precision / recall calculator."""
@@ -139,8 +140,9 @@ class POL:
 
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
+            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, train_set_dir_path)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
-            self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+            # self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
@@ -199,7 +201,8 @@ def parse_arguments() -> argparse.Namespace:
                         default=3)
     parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size",
                         default=1)
-
+    parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
+                        type=str, default="pfile")
     args = parser.parse_args()
     return args
 
@@ -212,7 +215,8 @@ def main():
                           fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
                           universals_map_path=Path(args.universals_map) if args.universals_map else None,
                           solver_type=SolverType(args.solver_type),
-                          max_num_antecedents=args.max_antecedent_size or 0)
+                          max_num_antecedents=args.max_antecedent_size or 0,
+                          problem_prefix=args.problems_prefix)
     offline_learner.run_cross_validation()
 
 

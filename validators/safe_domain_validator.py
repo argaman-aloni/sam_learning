@@ -64,9 +64,11 @@ class DomainValidator:
     learning_algorithm: LearningAlgorithmType
     reference_domain_path: Path
     results_dir_path: Path
+    problem_prefix: str
 
     def __init__(self, working_directory_path: Path,
-                 learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, solver_type: SolverType):
+                 learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, solver_type: SolverType,
+                 preoblem_prefix: str = "pfile"):
         self.logger = logging.getLogger(__name__)
         self.solver = SOLVER_TYPES[solver_type]()
         self.solving_stats = []
@@ -74,6 +76,7 @@ class DomainValidator:
         self.learning_algorithm = learning_algorithm
         self.results_dir_path = working_directory_path / "results_directory"
         self.reference_domain_path = reference_domain_path
+        self.problem_prefix = preoblem_prefix
 
     @staticmethod
     def _clear_plans(test_set_directory: Path) -> NoReturn:
@@ -148,7 +151,8 @@ class DomainValidator:
         self.logger.info("Solving the test set problems using the learned domain!")
         solving_report = self.solver.execute_solver(
             problems_directory_path=test_set_directory_path,
-            domain_file_path=tested_domain_file_path
+            domain_file_path=tested_domain_file_path,
+            problems_prefix=self.problem_prefix,
         )
         solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
         for debug_statistic in DEBUG_STATISTICS:

@@ -34,7 +34,7 @@ class ENHSPSolver:
         :param run_command: the command to run the ENHSP process.
         :param problem_file_path: the path to the problem file.
         :param solving_stats: the statistics of the solving process.
-        :return: whether or not the process finished successfully.
+        :return: whether the process finished successfully.
         """
         self.logger.info(f"Starting to run ENHSP process for the problem - {problem_file_path.stem}")
         process = subprocess.Popen(run_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -75,20 +75,24 @@ class ENHSPSolver:
             return True
 
         else:
-            self.logger.critical(f"While solving problem encountered unknown error! STDOUT - {stdout}")
-            self.logger.critical(f"While solving problem encountered unknown error! STDERR - {stderr}")
+            self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! "
+                                 f"STDOUT - {stdout}")
+            self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! "
+                                 f"STDERR - {stderr}")
             return False
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
-                       default_tolerance: float = 0.1) -> Dict[str, str]:
+                       default_tolerance: float = 0.9, problems_prefix: str = "pfile") -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
         :param domain_file_path: the path to the domain file.
+        :param default_tolerance: the numeric tolerance to use.
+        :param problems_prefix: the prefix of the problems to solve.
         """
         solving_stats = {}
         self.logger.info("Starting to solve the input problems using ENHSP solver.")
-        for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
+        for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             num_retries = 0
             self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
@@ -102,6 +106,7 @@ class ENHSPSolver:
             while not solver_output_ok and num_retries < 3:
                 solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats)
                 solving_stats[problem_file_path.stem] = "solver_error"
+                num_retries += 1
 
         return solving_stats
 
@@ -114,4 +119,6 @@ if __name__ == '__main__':
         level=logging.DEBUG)
     solver = ENHSPSolver()
     solver.execute_solver(problems_directory_path=Path(args[1]),
-                          domain_file_path=Path(args[2]))
+                          domain_file_path=Path(args[2]),
+                          default_tolerance=0.9,
+                          problems_prefix="advanced_map_instance")

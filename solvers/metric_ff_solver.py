@@ -22,6 +22,17 @@ class MetricFFSolver:
         self.logger = logging.getLogger(__name__)
         self.parser = MetricFFParser()
 
+    @staticmethod
+    def _extract_solver_error(solution_path: Path) -> str:
+        """Extracts the error from the solution file.
+
+        :param solution_path: the path to the solution file.
+        :return: the error message.
+        """
+        with open(solution_path, "r") as solution_file:
+            solution_content = solution_file.read()
+            return solution_content
+
     def _run_metric_ff_process(self, run_command: str, solution_path: Path,
                                problem_file_path: Path, solving_stats: Dict[str, str]) -> None:
         """Runs the metric-ff process."""
@@ -43,12 +54,21 @@ class MetricFFSolver:
             return
 
         if process.returncode != 0:
-            self.logger.warning(f"Solver returned status code {process.returncode}.")
-            solving_stats[problem_file_path.stem] = "solver_error"
-            solution_path.unlink(missing_ok=True)
-            return
+            self.logger.warning(f"Metric FF Solver returned status code {process.returncode}.")
+            if not solution_path.exists():
+                solving_stats[problem_file_path.stem] = "solver_error"
+                return
 
-        self.logger.info("Solver finished its execution!")
+            solving_status = self.parser.get_solving_status(solution_path)[0]
+            if solving_status != "ok" and solving_status != "no-solution":
+                solving_stats[problem_file_path.stem] = "solver_error"
+                error = self._extract_solver_error(solution_path)
+                self.logger.warning(f"Metric FF Solver encountered an error - {problem_file_path.stem}")
+                self.logger.warning(error)
+                solution_path.unlink(missing_ok=True)
+                return
+
+        self.logger.info("Metric FF Solver finished its execution!")
         solving_status = self.parser.get_solving_status(solution_path)[0]
         if solving_status == "ok":
             self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
@@ -56,22 +76,25 @@ class MetricFFSolver:
             self.parser.parse_plan(solution_path, solution_path)
 
         elif solving_status == "no-solution":
-            self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
+            self.logger.warning(f"Metric FF Solver could not solve problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "no_solution"
+            solution_path.unlink(missing_ok=True)
 
-    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
+    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
+                       problems_prefix: str = "pfile") -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the Metric-FF algorithm and outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
         :param domain_file_path: the path to the domain file.
+        :param problems_prefix: the prefix of the problems files.
         """
         solving_stats = {}
         os.chdir(METRIC_FF_DIRECTORY)
         self.logger.info("Starting to solve the input problems using Metic-FF solver.")
-        for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
+        for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 0 > {solution_path}"
+            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 2 > {solution_path}"
             self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_stats)
 
         return solving_stats
@@ -84,4 +107,5 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.INFO)
     solver = MetricFFSolver()
-    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]))
+    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]),
+                          problems_prefix=args[3])
