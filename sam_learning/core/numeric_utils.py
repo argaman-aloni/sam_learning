@@ -14,7 +14,6 @@ from sam_learning.core.learning_types import ConditionType
 EPSILON = 1e-10
 
 
-
 def get_num_independent_equations(data_matrix: DataFrame) -> int:
     """Calculates the number of independent equations in the given matrix.
 
@@ -34,7 +33,7 @@ def prettify_floating_point_number(number: float) -> float:
     :param number: the RAW number received from the learning process.
     :return: the prettified version of the number.
     """
-    return round(number, 2)
+    return 0.0 if abs(number) < EPSILON else number
 
 
 def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List[float]],
@@ -66,7 +65,7 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     :return: the prettified version of the coefficients.
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = [round(value, 2) for value in coefficients]
+    prettified_coefficients = [round(value, 10) for value in coefficients]
     return prettified_coefficients
 
 
@@ -97,13 +96,15 @@ def construct_non_circular_assignment(lifted_function: str, coefficients_map: Di
     :param next_value: the numeric value of the function after the action's execution.
     :return: the formatted string without circular dependencies.
     """
-    normalized_coefficients = {k: v / coefficients_map[lifted_function] for k, v in
-                               coefficients_map.items() if k != lifted_function and v != 0}
-    if len(normalized_coefficients) == 1:
-        normalized_coefficients = {k: abs(v) for k, v in normalized_coefficients.items()}
+    if previous_value < next_value:
+        coefficients_map[lifted_function] = coefficients_map[lifted_function] - 1
+
+    else:
+        coefficients_map = {k: -v for k, v in coefficients_map.items()}
+        coefficients_map[lifted_function] = coefficients_map[lifted_function] + 1
 
     multiplication_functions = construct_multiplication_strings(
-        list(normalized_coefficients.values()), list(normalized_coefficients.keys()))
+        list(coefficients_map.values()), list(coefficients_map.keys()))
     constructed_right_side = construct_linear_equation_string(multiplication_functions)
 
     if previous_value < next_value:

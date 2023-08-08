@@ -101,7 +101,7 @@ class LinearRegressionLearner:
                 all([coefficient_vector[list(regression_df.columns).index(function)] == 0
                      for function in regression_df.columns if function != lifted_function]):
             self.logger.debug(f"The value of the {lifted_function} is being scaled by a constant factor!")
-            return coefficient_vector[list(regression_df.columns).index(lifted_function)]
+            return round(coefficient_vector[list(regression_df.columns).index(lifted_function)], 10)
 
         return None
 

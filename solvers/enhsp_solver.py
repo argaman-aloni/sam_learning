@@ -121,4 +121,4 @@ if __name__ == '__main__':
     solver.execute_solver(problems_directory_path=Path(args[1]),
                           domain_file_path=Path(args[2]),
                           default_tolerance=0.9,
-                          problems_prefix="advanced_map_instance")
+                          problems_prefix=args[3])

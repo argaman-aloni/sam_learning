@@ -222,7 +222,7 @@ def test_construct_assignment_equations_with_two_equations_result_in_multiple_ch
     assignment_equations = {expression.to_pddl() for expression in effects}
     assert len(assignment_equations) == 2
     assert assignment_equations == {
-        "(increase (load_limit ?z) (* (current_load ?z) 0.29))",
+        "(increase (load_limit ?z) (+ (* (load_limit ?z) -8.0) (* (current_load ?z) 2.0)))",
         "(assign (current_load ?z) (* (load_limit ?z) 9.0))"}
 
 
@@ -276,8 +276,7 @@ def test_construct_assignment_equations_with_fewer_equations_than_needed_to_crea
     effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations(
         allow_unsafe_learning=False)
     assert learned_perfectly
-    assert numeric_preconditions is not None
-    assert isinstance(numeric_preconditions, Precondition)
+    assert numeric_preconditions is None
     assert effects is not None
 
 
@@ -354,7 +353,7 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
 
     expected_conditions = ["(<= (* (fuel-cost ) -1.0) 0.0)",
                            "(<= (* (current_load ?z) -1.0) 0.0)",
-                           "(<= (+ (* (fuel-cost ) 0.71) (* (current_load ?z) 0.71)) 0.71)"]
+                           "(<= (+ (* (fuel-cost ) 0.7071067812) (* (current_load ?z) 0.7071067812)) 0.7071067812)"]
     for _, precondition in output_conditions:
         assert precondition.to_pddl() in expected_conditions
 
