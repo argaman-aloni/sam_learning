@@ -53,7 +53,7 @@ def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List
             product_components.append(f"{prettify_floating_point_number(coefficient)}")
 
         else:
-            product_components.append(f"(* {func} {prettify_floating_point_number(coefficient)})")
+            product_components.append(f"(* {func} {prettify_floating_point_number(coefficient):.4f})")
 
     return product_components
 
@@ -65,7 +65,7 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     :return: the prettified version of the coefficients.
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = [round(value, 10) for value in coefficients]
+    prettified_coefficients = [round(value, 4) for value in coefficients]
     return prettified_coefficients
 
 
@@ -127,7 +127,7 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
             linear_coeff = value
             break
 
-    return linear_coeff
+    return round(linear_coeff, 4)
 
 
 def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[

@@ -124,7 +124,7 @@ class POL:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if index != 0 and (index + 1) % 10 != 0:
+            if index != 0 and (index + 1) % 100 != 0:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
@@ -140,7 +140,6 @@ class POL:
 
             learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, train_set_dir_path)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
             # self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
@@ -158,12 +157,11 @@ class POL:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
+                                   f"{self._learning_algorithm.name}_{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
                                               used_observations=allowed_observations)
-
         return domain_file_path
 
     def run_cross_validation(self) -> None:

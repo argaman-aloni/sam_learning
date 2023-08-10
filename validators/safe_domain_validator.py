@@ -3,7 +3,7 @@ import csv
 import logging
 import re
 from pathlib import Path
-from typing import NoReturn, Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union
 
 from pddl_plus_parser.models import Observation, MultiAgentObservation
 
@@ -22,6 +22,7 @@ SOLVING_STATISTICS = [
     "learning_algorithm",
     "num_trajectories",
     "num_trajectory_triplets",
+    "solver",
     "ok",
     "no_solution",
     "timeout",
@@ -33,7 +34,13 @@ SOLVING_STATISTICS = [
     "problems_timeout",
     "problems_solver_error",
     "problems_not_applicable",
-    "problems_goal_not_achieved"
+    "problems_goal_not_achieved",
+    "percent_ok",
+    "percent_no_solution",
+    "percent_timeout",
+    "percent_solver_error",
+    "percent_not_applicable",
+    "percent_goal_not_achieved",
 ]
 
 DEBUG_STATISTICS = [
@@ -43,6 +50,15 @@ DEBUG_STATISTICS = [
     "problems_solver_error",
     "problems_not_applicable",
     "problems_goal_not_achieved"
+]
+
+AGGREGATED_SOLVING_FIELDS = [
+    "ok",
+    "no_solution",
+    "timeout",
+    "solver_error",
+    "not_applicable",
+    "goal_not_achieved"
 ]
 
 MAX_RUNNING_TIME = 60
@@ -65,12 +81,14 @@ class DomainValidator:
     reference_domain_path: Path
     results_dir_path: Path
     problem_prefix: str
+    _solver_name: str
 
     def __init__(self, working_directory_path: Path,
                  learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, solver_type: SolverType,
                  preoblem_prefix: str = "pfile"):
         self.logger = logging.getLogger(__name__)
         self.solver = SOLVER_TYPES[solver_type]()
+        self._solver_name = solver_type.name
         self.solving_stats = []
         self.aggregated_solving_stats = []
         self.learning_algorithm = learning_algorithm
@@ -79,7 +97,7 @@ class DomainValidator:
         self.problem_prefix = preoblem_prefix
 
     @staticmethod
-    def _clear_plans(test_set_directory: Path) -> NoReturn:
+    def _clear_plans(test_set_directory: Path) -> None:
         """Clears the plan filed from the directory.
 
         :param test_set_directory: the path to the directory containing the plans.
@@ -88,7 +106,7 @@ class DomainValidator:
             solver_output_path.unlink(missing_ok=True)
 
     def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
-                                   iteration_statistics: Dict[str, Union[int, List[str]]]) -> NoReturn:
+                                   iteration_statistics: Dict[str, Union[int, List[str]]]) -> None:
         """Validates that the solution file contains a valid plan.
 
         :param solution_file_path: the path to the solution file.
@@ -138,9 +156,18 @@ class DomainValidator:
         num_triplets = sum([len(observation.components) for observation in used_observations])
         return num_triplets
 
+    def _calculate_solving_percentages(self, solving_stats: Dict[str, Any]) -> None:
+        """Calculates the percentage of solved problems.
+
+        :param solving_stats:  the solving statistics.
+        """
+        total_problems = sum([solving_stats[statistic] for statistic in AGGREGATED_SOLVING_FIELDS])
+        for statistic in AGGREGATED_SOLVING_FIELDS:
+            solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_problems)
+
     def validate_domain(
             self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
-            used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None) -> NoReturn:
+            used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None) -> None:
         """Validates that using the input domain problems can be solved.
 
         :param tested_domain_file_path: the path of the domain that was learned using POL.
@@ -170,16 +197,18 @@ class DomainValidator:
             solving_stats[entry] += 1
             solving_stats[f"problems_{entry}"].append(problem_file_name)
 
+        self._calculate_solving_percentages(solving_stats)
         num_trajectories = len(used_observations) if used_observations else 0
         self.solving_stats.append({
             "learning_algorithm": self.learning_algorithm.name,
             "num_trajectories": num_trajectories,
             "num_trajectory_triplets": num_triplets,
+            "solver": self._solver_name,
             **solving_stats
         })
         self._clear_plans(test_set_directory_path)
 
-    def write_statistics(self, fold_num: int) -> NoReturn:
+    def write_statistics(self, fold_num: int) -> None:
         """Writes the statistics of the learned model into a CSV file.
 
         :param fold_num: the index of the fold that is currently being tested.
@@ -191,7 +220,7 @@ class DomainValidator:
             test_set_writer.writeheader()
             test_set_writer.writerows(self.solving_stats)
 
-    def write_complete_joint_statistics(self) -> NoReturn:
+    def write_complete_joint_statistics(self) -> None:
         """Writes a statistics file containing all the folds combined data."""
         output_path = self.results_dir_path / f"{self.learning_algorithm.name}_all_folds_solving_stats.csv"
         with open(output_path, 'wt', newline='') as csv_file:
@@ -199,7 +228,7 @@ class DomainValidator:
             writer.writeheader()
             writer.writerows(self.aggregated_solving_stats)
 
-    def clear_statistics(self) -> NoReturn:
+    def clear_statistics(self) -> None:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
         self.aggregated_solving_stats.extend(self.solving_stats)
         self.solving_stats.clear()

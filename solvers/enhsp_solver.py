@@ -17,6 +17,7 @@ PROBLEM_SOLVED = b"Problem Solved"
 NO_SOLUTION_FOR_PROBLEM = b"Problem Detected as Unsolvable"
 OTHER_NO_SOLUTION_TYPE = b"Problem unsolvable"
 GOAL_NOT_REACHABLE = b"Goal is not reachable"
+ERROR_TYPE_NO_SOLUTION = b"\"this.plan\" is null"
 
 
 class ENHSPSolver:
@@ -64,7 +65,7 @@ class ENHSPSolver:
             solving_stats[problem_file_path.stem] = "ok"
             return True
 
-        elif NO_SOLUTION_FOR_PROBLEM in stdout or OTHER_NO_SOLUTION_TYPE in stdout:
+        elif NO_SOLUTION_FOR_PROBLEM in stdout or OTHER_NO_SOLUTION_TYPE in stdout or ERROR_TYPE_NO_SOLUTION in stderr:
             self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "no_solution"
             return True
@@ -82,7 +83,7 @@ class ENHSPSolver:
             return False
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
-                       default_tolerance: float = 0.9, problems_prefix: str = "pfile") -> Dict[str, str]:
+                       default_tolerance: float = 0.1, problems_prefix: str = "pfile") -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
@@ -120,5 +121,5 @@ if __name__ == '__main__':
     solver = ENHSPSolver()
     solver.execute_solver(problems_directory_path=Path(args[1]),
                           domain_file_path=Path(args[2]),
-                          default_tolerance=0.9,
+                          default_tolerance=0.1,
                           problems_prefix=args[3])

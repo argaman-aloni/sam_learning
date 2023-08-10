@@ -2,7 +2,6 @@
 import logging
 import sys
 from pathlib import Path
-from typing import NoReturn
 
 from pddl_plus_parser.exporters import MetricFFParser, TrajectoryExporter, ENHSPParser
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
@@ -21,7 +20,7 @@ class ExperimentTrajectoriesCreator:
         self.working_directory_path = working_directory_path
         self.logger = logging.getLogger(__name__)
 
-    def fix_solution_files(self, solver_algorithm: SolverType = SolverType.enhsp) -> NoReturn:
+    def fix_solution_files(self, solver_algorithm: SolverType = SolverType.enhsp) -> None:
         """Fix the solution files created by the solvers so that the learning algorithms will be able to use.
 
         :param solver_algorithm: the solver that was used to create the plans.
@@ -38,7 +37,7 @@ class ExperimentTrajectoriesCreator:
                 self.logger.debug(f"Lowering the case for all actions in - {solution_file_path.stem}")
                 solution_parser.parse_plan(solution_file_path)
 
-    def create_domain_trajectories(self) -> NoReturn:
+    def create_domain_trajectories(self) -> None:
         """Creates the domain trajectory files."""
         domain_file_path = self.working_directory_path / self.domain_file_name
         domain = DomainParser(domain_file_path).parse_domain()
