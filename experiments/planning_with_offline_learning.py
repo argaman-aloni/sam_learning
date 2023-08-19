@@ -16,6 +16,7 @@ from experiments.utils import init_semantic_performance_calculator
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM, \
     UniversallyConditionalSAM
+from solvers import ENHSPSolver, MetricFFSolver
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
@@ -158,10 +159,22 @@ class POL:
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
                                    f"{self._learning_algorithm.name}_{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
+
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
-        self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                              test_set_directory_path=test_set_dir_path,
-                                              used_observations=allowed_observations)
+        if self._learning_algorithm in NUMERIC_ALGORITHMS:
+            self.domain_validator.solver = MetricFFSolver()
+            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                                  test_set_directory_path=test_set_dir_path,
+                                                  used_observations=allowed_observations)
+
+            self.domain_validator.solver = ENHSPSolver()
+            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                                  test_set_directory_path=test_set_dir_path,
+                                                  used_observations=allowed_observations)
+        else:
+            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                                  test_set_directory_path=test_set_dir_path,
+                                                  used_observations=allowed_observations)
         return domain_file_path
 
     def run_cross_validation(self) -> None:

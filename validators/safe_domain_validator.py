@@ -29,18 +29,24 @@ SOLVING_STATISTICS = [
     "solver_error",
     "not_applicable",
     "goal_not_achieved",
+    "validated_against_expert_plan",
+    "not_validated_against_expert_plan",
     "problems_ok",
     "problems_no_solution",
     "problems_timeout",
     "problems_solver_error",
     "problems_not_applicable",
     "problems_goal_not_achieved",
+    "problems_validated_against_expert_plan",
+    "problems_not_validated_against_expert_plan",
     "percent_ok",
     "percent_no_solution",
     "percent_timeout",
     "percent_solver_error",
     "percent_not_applicable",
     "percent_goal_not_achieved",
+    "percent_validated_against_expert_plan",
+    "percent_not_validated_against_expert_plan",
 ]
 
 DEBUG_STATISTICS = [
@@ -49,7 +55,9 @@ DEBUG_STATISTICS = [
     "problems_timeout",
     "problems_solver_error",
     "problems_not_applicable",
-    "problems_goal_not_achieved"
+    "problems_goal_not_achieved",
+    "problems_validated_against_expert_plan",
+    "problems_not_validated_against_expert_plan"
 ]
 
 AGGREGATED_SOLVING_FIELDS = [
@@ -61,7 +69,8 @@ AGGREGATED_SOLVING_FIELDS = [
     "goal_not_achieved"
 ]
 
-MAX_RUNNING_TIME = 60
+VALIDATED_AGAINST_EXPERT_PLAN = "validated_against_expert_plan"
+NOT_VALIDATED_AGAINST_EXPERT_PLAN = "not_validated_against_expert_plan"
 
 ACTION_LINE_REGEX = r"(\[\d+, \d+\]): \(.*\)"
 
@@ -78,6 +87,7 @@ class DomainValidator:
     solving_stats: List[Dict[str, Any]]
     aggregated_solving_stats: List[Dict[str, Any]]
     learning_algorithm: LearningAlgorithmType
+    working_directory_path: Path
     reference_domain_path: Path
     results_dir_path: Path
     problem_prefix: str
@@ -95,6 +105,7 @@ class DomainValidator:
         self.results_dir_path = working_directory_path / "results_directory"
         self.reference_domain_path = reference_domain_path
         self.problem_prefix = preoblem_prefix
+        self.working_directory_path = working_directory_path
 
     @staticmethod
     def _clear_plans(test_set_directory: Path) -> None:
@@ -105,11 +116,39 @@ class DomainValidator:
         for solver_output_path in test_set_directory.glob("*.solution"):
             solver_output_path.unlink(missing_ok=True)
 
+    def _validate_against_expert_plan(
+            self, solution_file_path: Path, problem_file_path: Path,
+            iteration_statistics: Dict[str, Union[int, List[str]]],
+            tested_domain_path: Path) -> None:
+        """Validates that the expert solution can be used against the learned domain.
+
+        :param solution_file_path: the path to the solution file.
+        :param problem_file_path: the path to the problem file.
+        :param iteration_statistics: the statistics of the current iteration.
+        :param tested_domain_path: the path to the domain file to validate against.
+        """
+        validation_file_path = run_validate_script(domain_file_path=tested_domain_path,
+                                                   problem_file_path=problem_file_path,
+                                                   solution_file_path=solution_file_path)
+        with open(validation_file_path, "r") as validation_file:
+            validation_file_content = validation_file.read()
+            if VALID_PLAN in validation_file_content:
+                self.logger.info("The expert plan is valid on the learned domain.")
+                iteration_statistics[VALIDATED_AGAINST_EXPERT_PLAN] += 1
+                iteration_statistics[f"problems_{VALIDATED_AGAINST_EXPERT_PLAN}"].append(problem_file_path.name)
+
+            else:
+                self.logger.info("The expert plan is not valid on the learned domain.")
+                iteration_statistics[NOT_VALIDATED_AGAINST_EXPERT_PLAN] += 1
+                iteration_statistics[f"problems_{NOT_VALIDATED_AGAINST_EXPERT_PLAN}"].append(problem_file_path.name)
+
     def _validate_solution_content(self, solution_file_path: Path, problem_file_path: Path,
                                    iteration_statistics: Dict[str, Union[int, List[str]]]) -> None:
         """Validates that the solution file contains a valid plan.
 
         :param solution_file_path: the path to the solution file.
+        :param problem_file_path: the path to the problem file.
+        :param iteration_statistics: the statistics of the current iteration.
         """
         validation_file_path = run_validate_script(domain_file_path=self.reference_domain_path,
                                                    problem_file_path=problem_file_path,
@@ -165,6 +204,11 @@ class DomainValidator:
         for statistic in AGGREGATED_SOLVING_FIELDS:
             solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_problems)
 
+        total_validated = sum([solving_stats[statistic] for statistic in [
+            VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]])
+        for statistic in [VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]:
+            solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_validated)
+
     def validate_domain(
             self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
             used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None) -> None:
@@ -181,18 +225,29 @@ class DomainValidator:
             domain_file_path=tested_domain_file_path,
             problems_prefix=self.problem_prefix,
         )
+
         solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
+        solving_stats[VALIDATED_AGAINST_EXPERT_PLAN] = 0
+        solving_stats[NOT_VALIDATED_AGAINST_EXPERT_PLAN] = 0
+
         for debug_statistic in DEBUG_STATISTICS:
             solving_stats[debug_statistic] = []
 
         for problem_file_name, entry in solving_report.items():
+            expert_plan_path = self.working_directory_path / f"{problem_file_name}.solution"
+            problem_file_path = test_set_directory_path / f"{problem_file_name}.pddl"
             if entry == SolutionOutputTypes.ok.name:
                 solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
-                problem_file_path = test_set_directory_path / f"{problem_file_name}.pddl"
                 self._validate_solution_content(solution_file_path=solution_file_path,
                                                 problem_file_path=problem_file_path,
                                                 iteration_statistics=solving_stats)
+
                 continue
+
+            self.logger.debug(f"Validating the domain against the expert plan: {expert_plan_path}")
+            self._validate_against_expert_plan(
+                solution_file_path=expert_plan_path, problem_file_path=problem_file_path,
+                iteration_statistics=solving_stats, tested_domain_path=tested_domain_file_path)
 
             solving_stats[entry] += 1
             solving_stats[f"problems_{entry}"].append(problem_file_name)

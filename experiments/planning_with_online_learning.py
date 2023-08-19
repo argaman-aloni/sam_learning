@@ -1,23 +1,17 @@
 """The PIL main framework - Compile, Learn and Plan."""
 import argparse
-import json
 import logging
 import random
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional, Dict, Union, Tuple, Generator
+from typing import List, Optional, Dict, Generator
 
-from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
-from pddl_plus_parser.models import Observation, ActionCall, PDDLObject, Domain, Operator, State
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
+from pddl_plus_parser.models import ActionCall, PDDLObject, Domain, Operator, State
 
 from experiments.k_fold_split import KFoldSplit
-from experiments.learning_statistics_manager import LearningStatisticsManager
-from experiments.numeric_performance_calculator import NumericPerformanceCalculator
-from experiments.semantic_performance_calculator import SemanticPerformanceCalculator
-from experiments.utils import init_semantic_performance_calculator
 from sam_learning.core import LearnerDomain, VocabularyCreator
-from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM, \
-    UniversallyConditionalSAM, OnlineNSAMLearner
+from sam_learning.learners import OnlineNSAMLearner
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from validators import DomainValidator
 
@@ -31,17 +25,21 @@ class PIL:
     k_fold: KFoldSplit
     domain_file_name: str
     domain_validator: DomainValidator
+    problems_prefix: str
 
-    def __init__(self, working_directory_path: Path, domain_file_name: str, solver_type: SolverType):
+    def __init__(
+            self, working_directory_path: Path, domain_file_name: str, solver_type: SolverType,
+            problem_prefix: str = "pfile"):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                                  n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
+        self.problems_prefix = problem_prefix
         self.domain_validator = DomainValidator(
             self.working_directory_path, LearningAlgorithmType.online_nsam,
             self.working_directory_path / domain_file_name,
-            solver_type=solver_type)
+            solver_type=solver_type, preoblem_prefix=problem_prefix)
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path,
                               file_name: Optional[str] = None) -> Path:
@@ -58,33 +56,52 @@ class PIL:
 
         return domain_path
 
-    def select_action(self, possible_grounded_actions: Dict[str, List[Operator]]) -> Optional[Operator]:
+    def create_all_grounded_actions(
+            self, complete_domain: Domain, observed_objects: Dict[str, PDDLObject],
+            ground_action_creator: VocabularyCreator) -> Dict[str, List[Operator]]:
         """
 
-        :param possible_grounded_actions:
+        :param complete_domain:
+        :param observed_objects:
+        :param ground_action_creator:
         :return:
         """
-        operator_name = random.choice(list(possible_grounded_actions.keys()))
-        while len(possible_grounded_actions[operator_name]) == 0 and len(possible_grounded_actions) > 0:
-            possible_grounded_actions.pop(operator_name)
-            operator_name = random.choice(list(possible_grounded_actions.keys()))
+        self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
+        grounded_action_calls = ground_action_creator.create_grounded_actions_vocabulary(
+            domain=complete_domain, observed_objects=observed_objects)
+        all_ground_actions = defaultdict(list)
+        for grounded_action_call in grounded_action_calls:
+            op = Operator(action=complete_domain.actions[grounded_action_call.name],
+                          domain=complete_domain,
+                          grounded_action_call=grounded_action_call.parameters)
+            all_ground_actions[op.name].append(op)
 
-        if len(possible_grounded_actions) == 0:
-            return None
+        return all_ground_actions
 
-        return random.choice(possible_grounded_actions[operator_name])
-
-    def can_select_actions(self, actions_to_try: Dict[str, List[Operator]]) -> bool:
+    def calculate_valid_neighbors(
+            self, online_learner: OnlineNSAMLearner, grounded_actions: Dict[str, List[Operator]],
+            current_state: State) -> List[Operator]:
         """
 
-        :param possible_grounded_actions:
-        :param num_executed_actions:
+        :param online_learner:
+        :param grounded_actions:
+        :param current_state:
         :return:
         """
-        num_actions = sum([len(actions) for actions in actions_to_try.values()])
-        return num_actions > 0
+        self.logger.info("Calculating the valid neighbors for the current state.")
+        neighbors = []
+        for action_name, grounded_operators in grounded_actions.items():
+            self.logger.debug(f"Checking the action {action_name}.")
+            for op in grounded_operators:
+                op_action_call = ActionCall(op.name, op.grounded_call_objects)
+                if online_learner.calculate_state_information_gain(state=current_state, action=op_action_call) != 0:
+                    self.logger.debug(f"The action {op_action_call.name} is informative, "
+                                      f"adding it to the open list.")
+                    neighbors.append(op)
 
-    def calculate_information_gain_and_execute(
+        return neighbors
+
+    def execute_action_learning_search(
             self, initial_state: State, online_learner: OnlineNSAMLearner,
             possible_grounded_actions: Dict[str, List[Operator]]) -> Generator[LearnerDomain, None, None]:
         """
@@ -95,35 +112,25 @@ class PIL:
         :return:
         """
         current_state = initial_state
-        actions_to_try = {action_name: actions for action_name, actions in possible_grounded_actions.items()}
-        while self.can_select_actions(actions_to_try):
-            op_to_execute = self.select_action(possible_grounded_actions=actions_to_try)
-            if op_to_execute is None:
-                return
-
-            op_action_call = ActionCall(op_to_execute.name, op_to_execute.grounded_call_objects)
-            while online_learner.calculate_state_information_gain(state=current_state, action=op_action_call) == 0:
-                self.logger.debug(f"The action {op_action_call.name} is non-informative, "
-                                  f"trying a new action on the state.")
-                actions_to_try[op_action_call.name].remove(op_to_execute)
-                op_to_execute = self.select_action(possible_grounded_actions=actions_to_try)
-                if op_to_execute is None:
-                    return
-
-                op_action_call = ActionCall(op_to_execute.name, op_to_execute.grounded_call_objects)
-
+        neighbors = self.calculate_valid_neighbors(online_learner, possible_grounded_actions, current_state)
+        while len(neighbors) > 0:
+            action_applicable = False
+            selected_operator = random.choice(neighbors)
+            op_action_call = ActionCall(selected_operator.name, selected_operator.grounded_call_objects)
+            neighbors.pop(neighbors.index(selected_operator))
             try:
-                next_state = op_to_execute.apply(current_state)
+                next_state = selected_operator.apply(current_state)
+                neighbors = self.calculate_valid_neighbors(online_learner, possible_grounded_actions, next_state)
+                action_applicable = True
 
             except ValueError:
-                self.logger.debug(f"Could not apply the action {op_to_execute.name} to the state.")
+                self.logger.debug(f"Could not apply the action {selected_operator.name} to the state.")
                 next_state = current_state.copy()
 
-            online_learner.execute_action(
-                action_to_execute=op_action_call, previous_state=current_state, next_state=next_state)
+            online_learner.execute_action(op_action_call, previous_state=current_state, next_state=next_state)
             current_state = next_state
-            actions_to_try = {action_name: actions for action_name, actions in possible_grounded_actions.items()}
-            if set(online_learner.observed_actions) == set(online_learner.partial_domain.actions):
+
+            if set(online_learner.observed_actions) == set(online_learner.partial_domain.actions) and action_applicable:
                 yield online_learner.create_safe_model()
                 online_learner.reset_numeric_domain_data()
 
@@ -142,14 +149,14 @@ class PIL:
         ground_action_creator = VocabularyCreator()
         online_learner = OnlineNSAMLearner(partial_domain=partial_domain)
         online_learner.init_online_learning()
-        for problem_index, problem_path in enumerate(train_set_dir_path.glob("pfile*.pddl")):
+        for problem_index, problem_path in enumerate(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")):
             self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
             observed_objects = problem.objects
             all_ground_actions = self.create_all_grounded_actions(
                 complete_domain, observed_objects, ground_action_creator)
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
-            for domain in self.calculate_information_gain_and_execute(init_state, online_learner, all_ground_actions):
+            for domain in self.execute_action_learning_search(init_state, online_learner, all_ground_actions):
                 solved_all_test_problems = self.validate_learned_domain(domain, test_set_dir_path)
                 if solved_all_test_problems:
                     return
@@ -190,28 +197,6 @@ class PIL:
 
         self.domain_validator.write_complete_joint_statistics()
 
-    def create_all_grounded_actions(
-            self, complete_domain: Domain, observed_objects: Dict[str, PDDLObject],
-            ground_action_creator: VocabularyCreator) -> Dict[str, List[Operator]]:
-        """
-
-        :param complete_domain:
-        :param observed_objects:
-        :param ground_action_creator:
-        :return:
-        """
-        self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
-        grounded_action_calls = ground_action_creator.create_grounded_actions_vocabulary(
-            domain=complete_domain, observed_objects=observed_objects)
-        all_ground_actions = defaultdict(list)
-        for grounded_action_call in grounded_action_calls:
-            op = Operator(action=complete_domain.actions[grounded_action_call.name],
-                          domain=complete_domain,
-                          grounded_action_call=grounded_action_call.parameters)
-            all_ground_actions[op.name].append(op)
-
-        return all_ground_actions
-
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the PIL algorithm on the input domain.")
@@ -220,6 +205,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
                         help="The solver that should be used for the sake of validation.\n FD - 1, Metric-FF - 2, ENHSP - 3.",
                         default=3)
+    parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
+                        type=str, default="pfile")
 
     args = parser.parse_args()
     return args
@@ -229,7 +216,8 @@ def main():
     args = parse_arguments()
     offline_learner = PIL(working_directory_path=Path(args.working_directory_path),
                           domain_file_name=args.domain_file_name,
-                          solver_type=SolverType(args.solver_type))
+                          solver_type=SolverType(args.solver_type),
+                          problem_prefix=args.problems_prefix)
     offline_learner.run_cross_validation()
 
 
