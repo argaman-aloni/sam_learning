@@ -201,11 +201,14 @@ class DomainValidator:
         :param solving_stats:  the solving statistics.
         """
         total_problems = sum([solving_stats[statistic] for statistic in AGGREGATED_SOLVING_FIELDS])
+        total_problems = total_problems if total_problems > 0 else 1
         for statistic in AGGREGATED_SOLVING_FIELDS:
             solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_problems)
 
         total_validated = sum([solving_stats[statistic] for statistic in [
             VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]])
+        total_validated = total_validated if total_validated > 0 else 1
+
         for statistic in [VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]:
             solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_validated)
 

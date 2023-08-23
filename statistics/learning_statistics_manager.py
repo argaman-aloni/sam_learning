@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, MultiAgentComponent, Predicate
 
-from experiments.discrete_precision_recall_calculator import PrecisionRecallCalculator
+from statistics.discrete_precision_recall_calculator import PrecisionRecallCalculator
 from sam_learning.core import LearnerDomain
 from utilities import LearningAlgorithmType
 

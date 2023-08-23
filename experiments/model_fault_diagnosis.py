@@ -11,8 +11,8 @@ from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Observation, Domain
 
 from experiments import LearningStatisticsManager, NumericPerformanceCalculator
-from experiments.k_fold_split import KFoldSplit
-from experiments.utils import init_semantic_performance_calculator
+from utilities.k_fold_split import KFoldSplit
+from statistics.utils import init_semantic_performance_calculator
 from fault_detection import FaultGenerator, FaultRepair, DefectType, RepairAlgorithmType
 from sam_learning.core import LearnerDomain
 from solvers import ENHSPSolver

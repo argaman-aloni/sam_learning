@@ -1,23 +1,21 @@
 """The POL main framework - Compile, Learn and Plan."""
-import argparse
-import json
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, Tuple
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
-from pddl_plus_parser.models import Observation
+from pddl_plus_parser.models import Observation, Domain
 
-from utilities.k_fold_split import KFoldSplit
-from statistics.learning_statistics_manager import LearningStatisticsManager
-from statistics.numeric_performance_calculator import NumericPerformanceCalculator
-from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
-from statistics.utils import init_semantic_performance_calculator
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM, \
     UniversallyConditionalSAM
 from solvers import ENHSPSolver, MetricFFSolver
+from statistics.learning_statistics_manager import LearningStatisticsManager
+from statistics.numeric_performance_calculator import NumericPerformanceCalculator
+from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
+from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType
+from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
@@ -36,7 +34,7 @@ LEARNING_ALGORITHMS = {
 }
 
 
-class POL:
+class OfflineBasicExperimentRunner:
     """Class that represents the POL framework."""
     logger: logging.Logger
     working_directory_path: Path
@@ -46,37 +44,19 @@ class POL:
     _learning_algorithm: LearningAlgorithmType
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
-    action_to_universals_map: Dict[str, List[str]]
     semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator]
-    max_num_antecedents: int
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 learning_algorithm: LearningAlgorithmType, fluents_map_path: Optional[Path],
-                 solver_type: SolverType, max_num_antecedents: int, universals_map_path: Optional[Path],
-                 problem_prefix: str = "pfile"):
+                 learning_algorithm: LearningAlgorithmType, solver_type: SolverType, problem_prefix: str = "pfile"):
         self.logger = logging.getLogger(__name__)
-        self.max_num_antecedents = max_num_antecedents
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
-                                 n_split=DEFAULT_SPLIT)
+        self.k_fold = KFoldSplit(
+            working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self.learning_statistics_manager = LearningStatisticsManager(
             working_directory_path=working_directory_path, domain_path=self.working_directory_path / domain_file_name,
             learning_algorithm=learning_algorithm)
         self._learning_algorithm = learning_algorithm
-        if fluents_map_path is not None:
-            with open(fluents_map_path, "rt") as json_file:
-                self.fluents_map = json.load(json_file)
-        else:
-            self.fluents_map = None
-
-        if universals_map_path is not None:
-            with open(universals_map_path, "rt") as json_file:
-                self.action_to_universals_map = json.load(json_file)
-
-        else:
-            self.action_to_universals_map = None
-
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
@@ -90,6 +70,11 @@ class POL:
             self._learning_algorithm,
             test_set_dir_path=test_set_path,
             is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS)
+
+    def _apply_learning_algorithm(
+            self, partial_domain: Domain, allowed_observations: List[Observation],
+            test_set_dir_path: Path) -> Tuple[LearnerDomain, Dict[str, str]]:
+        raise NotImplementedError
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path,
                               file_name: Optional[str] = None) -> Path:
@@ -129,20 +114,12 @@ class POL:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            if self._learning_algorithm == LearningAlgorithmType.universal_sam:
-                learner = UniversallyConditionalSAM(partial_domain=partial_domain,
-                                                    preconditions_fluent_map=self.fluents_map,
-                                                    max_antecedents_size=self.max_num_antecedents,
-                                                    universals_map=self.action_to_universals_map)
-            else:
-                learner = LEARNING_ALGORITHMS[self._learning_algorithm](partial_domain=partial_domain,
-                                                                        preconditions_fluent_map=self.fluents_map,
-                                                                        max_antecedents_size=self.max_num_antecedents)
+            learned_model, learning_report = self._apply_learning_algorithm(
+                partial_domain, allowed_observations, test_set_dir_path)
 
-            learned_model, learning_report = learner.learn_action_model(allowed_observations)
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
-            # self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+            self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
@@ -194,48 +171,3 @@ class POL:
         self.domain_validator.write_complete_joint_statistics()
         self.semantic_performance_calc.export_combined_semantic_performance()
         self.learning_statistics_manager.write_complete_joint_statistics()
-
-
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Runs the POL algorithm on the input domain.")
-    parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
-    parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
-    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[1, 2, 3, 4, 6, 9, 10],
-                        help="The type of learning algorithm. "
-                             "\n 1: sam_learning\n2: esam_learning\n3: numeric_sam\n4: raw_numeric_sam\n"
-                             "6: polynomial_sam\n 9: conditional_sam\n 10: universal_sam")
-    parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
-                                                                   "fluents", default=None)
-    parser.add_argument("--universals_map", required=False,
-                        help="The path to the file mapping indicating whether there are universals or not",
-                        default=None)
-    parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
-                        help="The solver that should be used for the sake of validation.\n FD - 1, Metric-FF - 2, ENHSP - 3.",
-                        default=3)
-    parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size",
-                        default=1)
-    parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
-                        type=str, default="pfile")
-    args = parser.parse_args()
-    return args
-
-
-def main():
-    args = parse_arguments()
-    offline_learner = POL(working_directory_path=Path(args.working_directory_path),
-                          domain_file_name=args.domain_file_name,
-                          learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
-                          fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-                          universals_map_path=Path(args.universals_map) if args.universals_map else None,
-                          solver_type=SolverType(args.solver_type),
-                          max_num_antecedents=args.max_antecedent_size or 0,
-                          problem_prefix=args.problems_prefix)
-    offline_learner.run_cross_validation()
-
-
-if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
-    main()

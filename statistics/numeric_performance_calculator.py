@@ -8,8 +8,8 @@ import math
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
 
-from experiments.performance_calculation_utils import _ground_tested_operator
-from experiments.semantic_performance_calculator import SemanticPerformanceCalculator
+from statistics.performance_calculation_utils import _ground_tested_operator
+from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from utilities import LearningAlgorithmType
 
 NUMERIC_PERFORMANCE_STATS = ["action_name", "num_trajectories", "precondition_precision", "precondition_recall",

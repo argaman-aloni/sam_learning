@@ -1,8 +1,9 @@
 """Module tests for the numeric information gaining process."""
+from typing import List
+
 import pandas as pd
 import pytest
 from pddl_plus_parser.models import PDDLFunction, Predicate
-from typing import List
 
 from sam_learning.core import InformationGainLearner
 
@@ -74,7 +75,7 @@ def test_add_positive_sample_adds_new_sample_to_the_existing_positive_dataframe(
         new_func.set_value(4 + index)
         new_sample[function_name] = new_func
 
-    information_gain_learner_no_predicates.add_positive_sample(new_sample, set())
+    information_gain_learner_no_predicates.add_positive_sample(new_sample, [])
     assert len(information_gain_learner_no_predicates.positive_samples_df) == 4
     assert len(information_gain_learner_no_predicates.positive_samples_df.columns) == 4
 
@@ -95,7 +96,7 @@ def test_add_positive_sample_does_not_add_to_negative_samples(
         new_func.set_value(4 + index)
         new_sample[function_name] = new_func
 
-    information_gain_learner_no_predicates.add_positive_sample(new_sample, set())
+    information_gain_learner_no_predicates.add_positive_sample(new_sample, [])
     assert len(information_gain_learner_no_predicates.negative_samples_df) == 0
 
 
@@ -107,10 +108,10 @@ def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_rem
         new_func.set_value(4 + index)
         new_numeric_sample[function_name] = new_func
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
     assert len(information_gain_learner_with_predicates.positive_samples_df.columns.tolist()) == 8 \
@@ -130,10 +131,10 @@ def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_add
         new_func.set_value(4 + index)
         new_numeric_sample[function_name] = new_func
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     assert len(information_gain_learner_with_predicates.positive_samples_df) == 0
     information_gain_learner_with_predicates.add_positive_sample(new_numeric_sample, new_discrete_sample)
@@ -154,10 +155,10 @@ def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_doe
         new_func.set_value(4 + index)
         new_numeric_sample[function_name] = new_func
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
     assert len(information_gain_learner_with_predicates.positive_samples_df.columns.tolist()) == 8 \
@@ -181,10 +182,10 @@ def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_doe
         new_func.set_value(4 + index)
         new_numeric_sample[function_name] = new_func
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     information_gain_learner_with_predicates.add_negative_sample(new_numeric_sample, new_discrete_sample)
     negative_sample = information_gain_learner_with_predicates.negative_samples_df.iloc[0]
@@ -214,7 +215,7 @@ def test_add_negative_sample_adds_new_sample_to_the_existing_negative_dataframe(
         new_func.set_value(4 + index)
         new_sample[function_name] = new_func
 
-    information_gain_learner_no_predicates.add_negative_sample(new_sample, set())
+    information_gain_learner_no_predicates.add_negative_sample(new_sample, [])
     assert len(information_gain_learner_no_predicates.negative_samples_df) == 4
     assert len(information_gain_learner_no_predicates.negative_samples_df.columns) == 4
 
@@ -235,7 +236,7 @@ def test_add_negative_sample_does_not_add_to_positive_samples(
         new_func.set_value(4 + index)
         new_sample[function_name] = new_func
 
-    information_gain_learner_no_predicates.add_negative_sample(new_sample, set())
+    information_gain_learner_no_predicates.add_negative_sample(new_sample, [])
     assert len(information_gain_learner_no_predicates.positive_samples_df) == 0
 
 
@@ -326,7 +327,7 @@ def test_is_non_informative_safe_returns_true_when_the_point_is_in_the_positive_
         new_sample[function_name] = new_func
 
     assert information_gain_learner_no_predicates._is_non_informative_safe(
-        new_numeric_sample=new_sample, new_propositional_sample=set())
+        new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
 def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_the_ch(
@@ -345,7 +346,7 @@ def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_the_ch(
         new_sample[function_name] = new_func
 
     assert not information_gain_learner_no_predicates._is_non_informative_safe(
-        new_numeric_sample=new_sample, new_propositional_sample=set())
+        new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
 def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_range_when_only_one_function_exists(
@@ -363,7 +364,7 @@ def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_range_wh
         new_sample[function_name] = new_func
 
     assert not information_gain_learner_no_predicates._is_non_informative_safe(
-        new_numeric_sample=new_sample, new_propositional_sample=set())
+        new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
 def test_is_non_informative_safe_returns_true_when_the_point_is_in_range_when_only_one_function_exists(
@@ -381,7 +382,7 @@ def test_is_non_informative_safe_returns_true_when_the_point_is_in_range_when_on
         new_sample[function_name] = new_func
 
     assert information_gain_learner_no_predicates._is_non_informative_safe(
-        new_numeric_sample=new_sample, new_propositional_sample=set())
+        new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
 def test_is_non_informative_safe_returns_true_when_the_predicates_in_the_state_are_superset_of_existing_predicates(
@@ -392,10 +393,10 @@ def test_is_non_informative_safe_returns_true_when_the_predicates_in_the_state_a
         new_func.set_value(0.5)
         new_numeric_sample[function_name] = new_func
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 1, 0, 1],
@@ -442,10 +443,10 @@ def test_is_non_informative_safe_returns_false_when_some_predicates_are_missing_
         new_func.set_value(0.5)
         new_numeric_sample[function_name] = new_func
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 1, 0, 1],
@@ -483,7 +484,7 @@ def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_
     new_sample[new_func.name] = new_func
 
     assert information_gain_learner_no_predicates._is_non_informative_unsafe(
-        new_numeric_sample=new_sample, new_propositional_sample=set())
+        new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
 def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_ch_created_from_the_combined_model_and_the_discrete_model_is_correct(
@@ -494,10 +495,10 @@ def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_
 
     })
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     negative_discrete_data = {p.untyped_representation: [1] for p in new_discrete_sample}
 
@@ -531,10 +532,10 @@ def test_is_non_informative_unsafe_returns_true_when_a_non_of_the_negative_sampl
 
     })
 
-    new_discrete_sample = set()
+    new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
         if index % 2 != 0:
-            new_discrete_sample.add(predicate.copy())
+            new_discrete_sample.append(predicate.copy())
 
     negative_discrete_data = {p.untyped_representation: [int(index % 2 == 0)] for index, p in
                               enumerate(new_discrete_sample)}
@@ -585,7 +586,7 @@ def test_is_non_informative_unsafe_returns_false_when_no_negative_point_is_in_th
     new_sample[new_func.name] = new_func
 
     assert not information_gain_learner_no_predicates._is_non_informative_unsafe(
-        new_numeric_sample=new_sample, new_propositional_sample=set())
+        new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
 def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull_verifies_if_the_point_was_already_observed_negative(
@@ -610,7 +611,7 @@ def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull
         new_func.set_value(4)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, set()) == 0
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
 
 
 def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull_verifies_if_the_point_was_already_observed_positive(
@@ -635,7 +636,7 @@ def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull
         new_func.set_value(1)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, set()) == 0
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
 
 
 def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull_verifies_that_the_point_was_not_observed_in_the_negative_and_positive_samples(
@@ -660,7 +661,7 @@ def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull
         new_func.set_value(index)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, set()) > 0
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) > 0
 
 
 def test_calculate_information_gain_when_can_create_convex_hull_and_point_is_in_ch_returns_that_the_point_is_not_informative(
@@ -682,7 +683,7 @@ def test_calculate_information_gain_when_can_create_convex_hull_and_point_is_in_
         new_func.set_value(0.5)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, set()) == 0
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
 
 
 def test_calculate_information_gain_returns_zero_when_new_point_combined_with_positive_points_creates_a_hull_that_includes_a_negative_sample(
@@ -707,7 +708,7 @@ def test_calculate_information_gain_returns_zero_when_new_point_combined_with_po
     y_function.set_value(2.0)
     new_sample["(y)"] = y_function
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, set()) == 0
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
 
 
 def test_calculate_information_gain_returns_value_greater_than_zero_when_new_point_should_be_informative(
@@ -732,4 +733,4 @@ def test_calculate_information_gain_returns_value_greater_than_zero_when_new_poi
     y_function.set_value(-0.5)
     new_sample["(y)"] = y_function
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, set()) > 0
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) > 0

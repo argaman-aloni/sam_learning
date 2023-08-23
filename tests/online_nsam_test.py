@@ -1,5 +1,5 @@
 """Module test for the online_nsam module."""
-from pddl_plus_parser.models import Domain, Observation
+from pddl_plus_parser.models import Domain, Observation, ActionCall
 from pytest import fixture, fail
 
 from sam_learning.learners import OnlineNSAMLearner
@@ -131,3 +131,29 @@ def test_consecutive_execution_of_informative_actions_creates_a_usable_model(
                 action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
     domain = depot_online_nsam.create_safe_model()
     print(domain.to_pddl())
+
+
+def test_create_all_grounded_actions_create_all_possible_grounded_action_assignments_for_all_actions(
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation, depot_domain: Domain):
+    grounded_actions = depot_online_nsam.create_all_grounded_actions(
+        observed_objects=depot_observation.grounded_objects)
+    assert len({action.name for action in grounded_actions}) == len(depot_domain.actions)
+
+
+def test_calculate_valid_neighbors_returns_a_set_of_actions_containing_the_action_that_was_actually_executed_on_the_state(
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
+    grounded_actions = depot_online_nsam.create_all_grounded_actions(
+        observed_objects=depot_observation.grounded_objects)
+    initial_state = depot_observation.components[0].previous_state
+    observation_action = depot_observation.components[0].grounded_action_call
+
+    depot_online_nsam.init_online_learning()
+    valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
+                                                                  current_state=initial_state)
+    queue_items = set()
+    while not valid_neighbors.empty():
+        node_data = valid_neighbors.get()
+        assert isinstance(node_data[2], ActionCall)
+        queue_items.add(node_data[1])
+
+    assert str(observation_action) in queue_items

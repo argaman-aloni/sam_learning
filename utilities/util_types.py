@@ -16,6 +16,7 @@ class LearningAlgorithmType(Enum):
     oblique_tree = 11
     extended_svc = 12
     online_nsam = 13
+    raw_polynomial_nam = 14
 
 
 class SolverType(Enum):

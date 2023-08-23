@@ -3,7 +3,7 @@ import logging
 import random
 import shutil
 from pathlib import Path
-from typing import Tuple, List, NoReturn, Iterator
+from typing import Tuple, List, Iterator, Generator
 
 from sklearn.model_selection import train_test_split, KFold
 
@@ -52,19 +52,20 @@ class KFoldSplit:
         self.domain_file_path = working_directory_path / domain_file_name
         self.only_train_test = only_train_test
 
-    def _copy_domain(self) -> NoReturn:
+    def _copy_domain(self) -> None:
         """Copies the domain to the train set directory so that it'd be used in the learning process."""
         self.logger.debug("Copying the domain to the train set directory.")
         shutil.copy(self.domain_file_path, self.train_set_dir_path / self.domain_file_path.name)
 
-    def remove_created_directories(self) -> NoReturn:
+    def remove_created_directories(self) -> None:
         """Deletes the train and test directories."""
         self.logger.debug("Deleting the train set directory!")
         shutil.rmtree(self.train_set_dir_path)
         self.logger.debug("Deleting the test set directory!")
         shutil.rmtree(self.test_set_dir_path)
 
-    def create_k_fold(self, trajectory_suffix: str = "*.trajectory", max_items: int = 0) -> Iterator[Tuple[Path, Path]]:
+    def create_k_fold(self, trajectory_suffix: str = "*.trajectory",
+                      max_items: int = 0) -> Generator[Tuple[Path, Path], None, None]:
         """Creates a generator that will be used for the next algorithm to know where the train and test set
             directories reside.
 
@@ -75,8 +76,8 @@ class KFoldSplit:
         self.logger.info("Starting to create the folds for the cross validation process.")
         problem_paths = []
         trajectory_paths = list(self.working_directory_path.glob(trajectory_suffix))
-        trajectory_paths.sort() # sort the trajectories so that the same order is used each time the algorithm runs
-        items_per_fold = max_items if (max_items > 0 and max_items <= len(trajectory_paths)) else len(trajectory_paths)
+        trajectory_paths.sort()  # sort the trajectories so that the same order is used each time the algorithm runs
+        items_per_fold = max_items if (0 < max_items <= len(trajectory_paths)) else len(trajectory_paths)
         trajectory_paths = random.sample(trajectory_paths, k=items_per_fold)
         for trajectory_file_path in trajectory_paths:
             problem_paths.append(self.working_directory_path / f"{trajectory_file_path.stem}.pddl")

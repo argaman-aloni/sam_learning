@@ -14,7 +14,7 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     DEPOT_NUMERIC_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH, MINECRAFT_DOMAIN_PATH, MINECRAFT_PROBLEM_PATH, \
     MINECRAFT_TRAJECTORY_PATH, SATELLITE_DOMAIN_PATH, SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, \
     NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
-    ADL_SATELLITE_TRAJECTORY_PATH
+    ADL_SATELLITE_TRAJECTORY_PATH, DEPOTS_DISCRETE_DOMAIN_PATH, DEPOTS_DISCRETE_PROBLEM_PATH
 from tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
 
 os.environ["CONVEX_HULL_ERROR_PATH"] = "tests\\convex_hull_error.txt"
@@ -126,6 +126,17 @@ def depot_domain() -> Domain:
 @fixture()
 def depot_problem(depot_domain: Domain) -> Problem:
     return ProblemParser(problem_path=DEPOTS_NUMERIC_PROBLEM_PATH, domain=depot_domain).parse_problem()
+
+
+@fixture()
+def depot_discrete_domain() -> Domain:
+    domain_parser = DomainParser(DEPOTS_DISCRETE_DOMAIN_PATH, partial_parsing=False)
+    return domain_parser.parse_domain()
+
+
+@fixture()
+def depot_discrete_problem(depot_discrete_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=DEPOTS_DISCRETE_PROBLEM_PATH, domain=depot_discrete_domain).parse_problem()
 
 
 @fixture()

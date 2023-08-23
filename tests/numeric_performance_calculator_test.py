@@ -8,7 +8,7 @@ from pddl_plus_parser.models import Domain, Problem, Observation, ActionCall
 from pytest import fixture
 
 from experiments import NumericPerformanceCalculator
-from experiments.performance_calculation_utils import _ground_tested_operator
+from statistics.performance_calculation_utils import _ground_tested_operator
 from tests.consts import SAILING_EXPECTED_DOMAIN_PATH, SAILING_PROBLEM_PATH, SAILING_TRAJECTORY_PATH, \
     SAILING_LEARNED_DOMAIN_PATH
 from utilities import LearningAlgorithmType

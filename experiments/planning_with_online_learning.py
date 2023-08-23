@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Generator
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import ActionCall, PDDLObject, Domain, Operator, State
 
-from experiments.k_fold_split import KFoldSplit
+from utilities.k_fold_split import KFoldSplit
 from sam_learning.core import LearnerDomain, VocabularyCreator
 from sam_learning.learners import OnlineNSAMLearner
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
@@ -132,7 +132,7 @@ class PIL:
 
             if set(online_learner.observed_actions) == set(online_learner.partial_domain.actions) and action_applicable:
                 yield online_learner.create_safe_model()
-                online_learner.reset_numeric_domain_data()
+                online_learner._reset_numeric_domain_data()
 
     def learn_model_online(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
         """Learns the model of the environment by learning from the input trajectories.

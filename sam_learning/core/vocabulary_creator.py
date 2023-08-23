@@ -6,7 +6,7 @@ from typing import List, Tuple, Dict, Set, Union, Optional
 from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, \
     ActionCall, Action
 
-from sam_learning.core.learner_domain import LearnerDomain
+from sam_learning.core.learner_domain import LearnerDomain, LearnerAction
 
 
 def choose_objects_subset(array: List[str], subset_size: int) -> List[Tuple[str]]:
@@ -26,7 +26,8 @@ class VocabularyCreator:
         self.logger = logging.getLogger(__name__)
 
     def _validate_type_matching(self, grounded_signatures: Dict[str, PDDLType],
-                                lifted_variable_to_match: Union[Predicate, PDDLFunction, Action]) -> bool:
+                                lifted_variable_to_match: Union[
+                                    Predicate, PDDLFunction, Action, LearnerAction]) -> bool:
         """Validates that the types of the grounded signature match the types of the predicate signature.
 
         :param grounded_signatures: the grounded predicate signature.
@@ -139,7 +140,7 @@ class VocabularyCreator:
         self.logger.debug(f"Created vocabulary of size {len(vocabulary)}")
         return vocabulary
 
-    def create_grounded_actions_vocabulary(self, domain: Domain,
+    def create_grounded_actions_vocabulary(self, domain: Union[LearnerDomain, Domain],
                                            observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
         """"Create a vocabulary of random combinations of the actions parameters and objects.
 
@@ -158,8 +159,9 @@ class VocabularyCreator:
                 if not self._validate_type_matching(grounded_signature, action):
                     continue
 
-                grounded_predicate = ActionCall(
+                grounded_action = ActionCall(
                     name=action_name, grounded_parameters=list(grounded_signature.keys()))
-                vocabulary.add(grounded_predicate)
+                self.logger.debug(f"Created grounded action {str(grounded_action)}")
+                vocabulary.add(grounded_action)
 
         return vocabulary

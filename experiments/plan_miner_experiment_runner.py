@@ -10,7 +10,7 @@ from typing import NoReturn, List
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain
 
-from experiments.k_fold_split import KFoldSplit
+from utilities.k_fold_split import KFoldSplit
 from sam_learning.core import LearnerDomain, ConditionType
 from utilities import LearningAlgorithmType
 from validators import DomainValidator

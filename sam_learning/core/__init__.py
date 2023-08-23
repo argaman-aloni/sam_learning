@@ -21,3 +21,4 @@ from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
 from .numeric_information_gain_learner import InformationGainLearner
 from .propositional_information_gain_learner import PropositionalInformationGainLearner
+from .abstract_agent import AbstractAgent

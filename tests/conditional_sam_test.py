@@ -1,15 +1,14 @@
 """Module test for Conditional SAM."""
 from typing import Set
 
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Domain, Problem, Observation, GroundedPredicate, Predicate, ConditionalEffect, \
+from pddl_plus_parser.models import Domain, Observation, Predicate, ConditionalEffect, \
     PDDLType, State, ActionCall, Precondition, CompoundPrecondition
 from pytest import fixture
 
 from sam_learning.core import DependencySet
 from sam_learning.learners import ConditionalSAM
 from sam_learning.learners.conditional_sam import extract_predicate_data
-from tests.consts import SPIDER_DOMAIN_PATH, SPIDER_PROBLEM_PATH, SPIDER_TRAJECTORY_PATH, sync_snapshot
+from tests.consts import sync_snapshot
 
 
 @fixture()
@@ -456,9 +455,10 @@ def test_construct_restrictive_preconditions_constructs_correct_restrictive_prec
     or_condition = restrictive_precondition.root.operands.pop()
     assert or_condition.binary_operator == "or"
     assert len(or_condition.operands) == 3
-    assert all([isinstance(operand, Predicate) for operand in or_condition.operands])
-    assert {p.untyped_representation for p in or_condition.operands} == {
-        "(can-continue-group ?c ?to)", "(make-unmovable ?to)", "(not (can-continue-group ?c ?to))"}
+    assert {p.untyped_representation for p in or_condition.operands if isinstance(p, Predicate)} == {
+        "(can-continue-group ?c ?to)", "(make-unmovable ?to)"}
+    and_condition = {p for p in or_condition.operands if isinstance(p, Precondition)}.pop()
+    assert str(and_condition) == "(and (not (can-continue-group ?c ?to)))"
 
 
 def test_construct_restrictive_conditional_effects_constructs_the_correct_conditional_effect_in_the_action(

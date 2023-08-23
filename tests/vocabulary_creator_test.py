@@ -52,3 +52,22 @@ def test_create_lifted_functions_vocabulary_creates_correct_functions(
         domain=depot_domain,
         possible_parameters=depot_domain.actions["unload"].signature)
     assert vocabulary_functions is not None
+
+
+def test_create_grounded_actions_vocabulary_creates_all_possible_assignments_of_actions(
+        depot_domain: Domain, vocabulary_creator: VocabularyCreator, depot_problem: Problem):
+    observed_objects = depot_problem.objects
+    vocabulary_actions = vocabulary_creator.create_grounded_actions_vocabulary(
+        domain=depot_domain,
+        observed_objects=observed_objects)
+    assert vocabulary_actions is not None
+    assert len({action.name for action in vocabulary_actions}) == len(depot_domain.actions)
+
+
+def test_create_grounded_actions_vocabulary_creates_only_unique_actions(
+        depot_domain: Domain, vocabulary_creator: VocabularyCreator, depot_problem: Problem):
+    observed_objects = depot_problem.objects
+    vocabulary_actions = vocabulary_creator.create_grounded_actions_vocabulary(
+        domain=depot_domain,
+        observed_objects=observed_objects)
+    assert len({str(action) for action in vocabulary_actions}) == len([action for action in vocabulary_actions])

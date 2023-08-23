@@ -7,8 +7,8 @@ from typing import Optional
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 
-from experiments.semantic_performance_calculator import SemanticPerformanceCalculator
-from experiments.numeric_performance_calculator import NumericPerformanceCalculator
+from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
+from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from utilities import LearningAlgorithmType
 
 

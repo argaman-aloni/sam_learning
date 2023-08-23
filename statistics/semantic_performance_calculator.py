@@ -11,7 +11,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, ActionCall, State, MultiAgentObservation, \
     JointActionCall, Operator, PDDLObject, PDDLType, Action
 
-from experiments.performance_calculation_utils import _calculate_single_action_applicability_rate
+from statistics.performance_calculation_utils import _calculate_single_action_applicability_rate
 from utilities import LearningAlgorithmType
 
 SEMANTIC_PRECISION_STATS = ["action_name", "num_trajectories", "precondition_precision", "precondition_recall",

@@ -1,20 +1,25 @@
 """An online version of the Numeric SAM learner."""
-from typing import Dict
+from queue import PriorityQueue
+from typing import Dict, Set, Generator
 
 from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject, Precondition, Predicate
 
-from sam_learning.core import InformationGainLearner, NotSafeActionError, LearnerDomain
+from sam_learning.core import InformationGainLearner, NotSafeActionError, LearnerDomain, AbstractAgent
 from sam_learning.learners.numeric_sam import PolynomialSAMLearning
+
+NON_INFORMATIVE_IG = 0
 
 
 class OnlineNSAMLearner(PolynomialSAMLearning):
     """"An online version of the Numeric SAM learner."""
 
     ig_learner: Dict[str, InformationGainLearner]
+    agent: AbstractAgent
 
-    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0):
+    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, agent: AbstractAgent = None):
         super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree)
         self.ig_learner = {}
+        self.agent = agent
 
     def _extract_objects_from_state(self, state: State) -> Dict[str, PDDLObject]:
         """Extracts the objects from the state.
@@ -46,6 +51,17 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """
         self.logger.debug("Checking whether or not the action was successful.")
         return self.are_states_different(previous_state, next_state)
+
+    def _reset_numeric_domain_data(self) -> None:
+        """Resets the numeric part of the domain's data."""
+        self.logger.debug("Resetting the numeric part of the domain's data.")
+        for action in self.partial_domain.actions.values():
+            discrete_preconditions = {op for op in action.preconditions.root.operands if isinstance(op, Predicate)}
+            action.preconditions.root = Precondition("and")
+            for discrete_precondition in discrete_preconditions:
+                action.preconditions.add_condition(discrete_precondition)
+
+            action.numeric_effects = set()
 
     def init_online_learning(self) -> None:
         """Initializes the online learning algorithm."""
@@ -79,6 +95,37 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         numeric_ig = self.ig_learner[action.name].calculate_sample_information_gain(
             lifted_state_functions, lifted_state_propositions)
         return numeric_ig
+
+    def create_all_grounded_actions(self, observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
+        """Creates all the grounded actions for the domain given the current possible objects.
+
+        :param observed_objects: the objects that the learner has observed so far.
+        :return: a set of all the possible grounded actions.
+        """
+        self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
+        grounded_action_calls = self.vocabulary_creator.create_grounded_actions_vocabulary(
+            domain=self.partial_domain, observed_objects=observed_objects)
+        return grounded_action_calls
+
+    def calculate_valid_neighbors(
+            self, grounded_actions: Set[ActionCall], current_state: State) -> PriorityQueue[ActionCall]:
+        """Calculates the valid action neighbors for the current state that the learner is in.
+
+        :param grounded_actions: all possible grounded actions.
+        :param current_state: the current state that the learner is in.
+        :return: a priority queue of the valid neighbors for the current state, the priority of the action is based
+            on their IG.
+        """
+        self.logger.info("Calculating the valid neighbors for the current state.")
+        neighbors = PriorityQueue()
+        for grounded_action in grounded_actions:
+            self.logger.debug(f"Checking the action {grounded_action.name}.")
+            action_IG = self.calculate_state_information_gain(state=current_state, action=grounded_action)
+            if action_IG > NON_INFORMATIVE_IG:
+                self.logger.info(f"The action {grounded_action.name} is informative, adding it to the priority queue.")
+                neighbors.put((action_IG, str(grounded_action), grounded_action))
+
+        return neighbors
 
     def execute_action(
             self, action_to_execute: ActionCall, previous_state: State, next_state: State) -> None:
@@ -136,12 +183,32 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
         return self.partial_domain
 
-    def reset_numeric_domain_data(self) -> None:
-        """Resets the numeric part of the domain's data."""
-        for action in self.partial_domain.actions.values():
-            discrete_preconditions = {op for op in action.preconditions.root.operands if isinstance(op, Predicate)}
-            action.preconditions.root = Precondition("and")
-            for discrete_precondition in discrete_preconditions:
-                action.preconditions.add_condition(discrete_precondition)
+    def search_for_informative_actions(self, init_state: State) -> Generator[LearnerDomain, None, None]:
+        """Searches for informative actions given the current state.
 
-            action.numeric_effects = set()
+        :param init_state: the current state of the environment.
+        :return: the set of informative actions.
+        """
+        self.logger.info("Searching for informative actions given the current state.")
+        observed_objects = self._extract_objects_from_state(init_state)
+        grounded_actions = self.create_all_grounded_actions(observed_objects=observed_objects)
+        neighbors = self.calculate_valid_neighbors(grounded_actions, init_state)
+        current_state = init_state.copy()
+        while not neighbors.empty():
+            _, _, action = neighbors.get()
+            next_state = self.agent.observe(state=current_state, action=action)
+            self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
+
+            while not self._is_successful_action(current_state, next_state):
+                self.logger.debug("The action was not successful, trying again.")
+                _, _, action = neighbors.get()
+                next_state = self.agent.observe(state=current_state, action=action)
+                self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
+
+            self.logger.debug("The action changed the state of the environment, updating the possible neighbors.")
+            neighbors = self.calculate_valid_neighbors(grounded_actions, next_state)
+
+            current_state = next_state
+            self._reset_numeric_domain_data()
+            if self.agent.get_reward(current_state) == 1:
+                yield self.create_safe_model()
