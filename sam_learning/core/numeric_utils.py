@@ -33,7 +33,7 @@ def prettify_floating_point_number(number: float) -> float:
     :param number: the RAW number received from the learning process.
     :return: the prettified version of the number.
     """
-    return 0.0 if abs(number) < EPSILON else number
+    return int(number) if abs(number - int(number)) < EPSILON else number
 
 
 def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List[float]],
@@ -50,10 +50,10 @@ def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List
             continue
 
         if func == "(dummy)":
-            product_components.append(f"{prettify_floating_point_number(coefficient)}")
+            product_components.append(f"{prettify_floating_point_number(round(coefficient, 4))}")
 
         else:
-            product_components.append(f"(* {func} {prettify_floating_point_number(coefficient):.4f})")
+            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 4))})")
 
     return product_components
 
@@ -127,7 +127,7 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
             linear_coeff = value
             break
 
-    return round(linear_coeff, 4)
+    return prettify_floating_point_number(round(linear_coeff, 4))
 
 
 def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[

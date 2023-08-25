@@ -102,7 +102,7 @@ def test_construct_non_circular_assignment_constructs_correct_equation_with_corr
     previous_value = 0.0
     next_value = 1.0
     increase_statement = construct_non_circular_assignment(lifted_function, coefficient_map, previous_value, next_value)
-    assert increase_statement == "(increase (current_load ?z) (* (weight ?y) 1.0))"
+    assert increase_statement == "(increase (current_load ?z) (* (weight ?y) 1))"
 
 
 def test_construct_non_circular_assignment_constructs_correct_equation_with_correct_coefficient_sign_on_decrease(
@@ -116,7 +116,7 @@ def test_construct_non_circular_assignment_constructs_correct_equation_with_corr
     previous_value = 1.0
     next_value = 0.0
     increase_statement = construct_non_circular_assignment(lifted_function, coefficient_map, previous_value, next_value)
-    assert increase_statement == "(decrease (current_load ?z) (* (weight ?y) 1.0))"
+    assert increase_statement == "(decrease (current_load ?z) (* (weight ?y) 1))"
 
 
 def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_in_variables_returns_empty_set(
@@ -276,7 +276,7 @@ def test_construct_assignment_equations_with_fewer_equations_than_needed_to_crea
     effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations(
         allow_unsafe_learning=False)
     assert learned_perfectly
-    assert numeric_preconditions is None
+    assert numeric_preconditions is not None
     assert effects is not None
 
 
@@ -353,7 +353,7 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
 
     expected_conditions = ["(<= (* (fuel-cost ) -1.0) 0.0)",
                            "(<= (* (current_load ?z) -1.0) 0.0)",
-                           "(<= (+ (* (fuel-cost ) 0.7071067812) (* (current_load ?z) 0.7071067812)) 0.7071067812)"]
+                           "(<= (+ (* (fuel-cost ) 0.7071) (* (current_load ?z) 0.7071)) 0.7071)"]
     for _, precondition in output_conditions:
         assert precondition.to_pddl() in expected_conditions
 
@@ -429,7 +429,7 @@ def test_detect_linear_dependent_features_when_given_only_one_sample_returns_tha
     output_matrix, linear_dependent_fluents, remained_fluents = \
         detect_linear_dependent_features(linear_dependant_matrix)
     assert list(output_matrix.columns) == ["(fuel-cost )"]
-    assert linear_dependent_fluents == ["(= (current_load ?z) (* 1.0 (fuel-cost )))"]
+    assert linear_dependent_fluents == ["(= (current_load ?z) (* 1 (fuel-cost )))"]
     assert remained_fluents == {"(current_load ?z)": "(fuel-cost )"}
 
 
@@ -443,7 +443,7 @@ def test_detect_linear_dependent_features_detects_that_two_equal_features_are_li
     output_matrix, linear_dependent_fluent_strs, removed_fluents = \
         detect_linear_dependent_features(linear_dependant_matrix)
 
-    assert linear_dependent_fluent_strs == ["(= (current_load ?z) (* 1.0 (fuel-cost )))"]
+    assert linear_dependent_fluent_strs == ["(= (current_load ?z) (* 1 (fuel-cost )))"]
     assert list(output_matrix.columns) == ["(fuel-cost )"]
     assert removed_fluents == {"(current_load ?z)": "(fuel-cost )"}
 
@@ -458,7 +458,7 @@ def test_detect_linear_dependent_features_detects_that_two_linear_dependent_feat
     output_matrix, linear_dependent_fluent_strs, removed_fluents = \
         detect_linear_dependent_features(linear_dependant_matrix)
 
-    assert linear_dependent_fluent_strs == ["(= (current_load ?z) (* 2.0 (fuel-cost )))"]
+    assert linear_dependent_fluent_strs == ["(= (current_load ?z) (* 2 (fuel-cost )))"]
     assert removed_fluents == {"(current_load ?z)": "(fuel-cost )"}
     assert output_matrix.shape[1] == 1
 

@@ -310,4 +310,6 @@ class LinearRegressionLearner:
             return construct_numeric_effects(assignment_statements, self.domain_functions), \
                 self._construct_restrictive_numeric_preconditions(features_df, combined_conditions), False
 
-        return construct_numeric_effects(assignment_statements, self.domain_functions), None, True
+        return (construct_numeric_effects(assignment_statements, self.domain_functions),
+                construct_numeric_conditions(combined_conditions, ConditionType.conjunctive, self.domain_functions),
+                True)

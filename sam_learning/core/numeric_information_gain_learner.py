@@ -103,7 +103,7 @@ class InformationGainLearner:
 
         :param features_to_keep: the features to keep.
         :param features_list: the features list to remove the features from.
-        :return:
+        :return: the list of the removed features.
         """
         columns_to_drop = [feature for feature in features_list if feature not in features_to_keep]
         self.positive_samples_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
@@ -146,15 +146,17 @@ class InformationGainLearner:
                                  new_propositional_sample: List[Predicate]) -> bool:
         """Validate whether a new sample is non-informative according to the safe model.
 
+        Note:
+            To validate if the new sample is non-informative, we first check if all of the discrete preconditions hold
+            if so we continue to validate whether the new sample is inside the convex hull of the positive samples.
+            If both of the conditions hold, the new sample is non-informative.
+
         :param new_numeric_sample: the numeric functions representing the new sample.
         :param new_propositional_sample: the propositional predicates representing the new sample.
         :return: whether the new sample is non-informative according to the safe model.
         """
-        state_predicates_names = [predicate.untyped_representation for predicate in new_propositional_sample]
-        # checking if the state contains the predicates appearing in the preconditions.
-        if len(self.lifted_predicates) > 0 and \
-                not all([precondition_predicate in state_predicates_names for precondition_predicate
-                         in self.lifted_predicates]):
+        state_predicates_names = {predicate.untyped_representation for predicate in new_propositional_sample}
+        if len(self.lifted_predicates) > 0 and not set(state_predicates_names).issuperset(self.lifted_predicates):
             self.logger.debug("Not all of the discrete preconditions hold in the new sample. "
                               "It is not applicable according to the safe model")
             return False
@@ -185,10 +187,8 @@ class InformationGainLearner:
         :param new_propositional_sample: the propositional predicates representing the new sample.
         :return: whether the new sample is non-informative according to the unsafe model.
         """
-        state_predicates_names = [predicate.untyped_representation for predicate in new_propositional_sample]
-        if len(self.lifted_predicates) > 0 and \
-                not any([precondition_predicate in state_predicates_names for precondition_predicate
-                         in self.lifted_predicates]):
+        new_sample_predicates = {predicate.untyped_representation for predicate in new_propositional_sample}
+        if len(self.lifted_predicates) > 0 and len(new_sample_predicates.intersection(self.lifted_predicates)) == 0:
             self.logger.debug("None of the existing preconditions hold in the new sample. "
                               "It is not informative since it will never be applicable.")
             return True
@@ -201,7 +201,7 @@ class InformationGainLearner:
         new_model_data.loc[len(new_model_data)] = new_sample_data
 
         for _, negative_sample in self.negative_samples_df.iterrows():
-            if not self._validate_negative_sample_in_state_predicates(negative_sample, state_predicates_names):
+            if not self._validate_negative_sample_in_state_predicates(negative_sample, new_sample_predicates):
                 continue
 
             try:
@@ -211,7 +211,10 @@ class InformationGainLearner:
                     return True
 
             except (QhullError, ValueError):
-                if self._locate_sample_in_df(negative_sample.values.tolist(), new_model_data) != -1:
+                sample_dataframe = DataFrame(columns=list(new_sample_data.keys()))
+                sample_dataframe.loc[0] = list(new_sample_data.values())
+                if self._locate_sample_in_df(negative_sample[self.lifted_functions].values.tolist(),
+                                             sample_dataframe) != -1:
                     return True
 
         return False

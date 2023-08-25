@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Generator
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import ActionCall, PDDLObject, Domain, Operator, State
 
+from experiments.ipc_agent import IPCAgent
 from utilities.k_fold_split import KFoldSplit
 from sam_learning.core import LearnerDomain, VocabularyCreator
 from sam_learning.learners import OnlineNSAMLearner
@@ -56,84 +57,6 @@ class PIL:
 
         return domain_path
 
-    def create_all_grounded_actions(
-            self, complete_domain: Domain, observed_objects: Dict[str, PDDLObject],
-            ground_action_creator: VocabularyCreator) -> Dict[str, List[Operator]]:
-        """
-
-        :param complete_domain:
-        :param observed_objects:
-        :param ground_action_creator:
-        :return:
-        """
-        self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
-        grounded_action_calls = ground_action_creator.create_grounded_actions_vocabulary(
-            domain=complete_domain, observed_objects=observed_objects)
-        all_ground_actions = defaultdict(list)
-        for grounded_action_call in grounded_action_calls:
-            op = Operator(action=complete_domain.actions[grounded_action_call.name],
-                          domain=complete_domain,
-                          grounded_action_call=grounded_action_call.parameters)
-            all_ground_actions[op.name].append(op)
-
-        return all_ground_actions
-
-    def calculate_valid_neighbors(
-            self, online_learner: OnlineNSAMLearner, grounded_actions: Dict[str, List[Operator]],
-            current_state: State) -> List[Operator]:
-        """
-
-        :param online_learner:
-        :param grounded_actions:
-        :param current_state:
-        :return:
-        """
-        self.logger.info("Calculating the valid neighbors for the current state.")
-        neighbors = []
-        for action_name, grounded_operators in grounded_actions.items():
-            self.logger.debug(f"Checking the action {action_name}.")
-            for op in grounded_operators:
-                op_action_call = ActionCall(op.name, op.grounded_call_objects)
-                if online_learner.calculate_state_information_gain(state=current_state, action=op_action_call) != 0:
-                    self.logger.debug(f"The action {op_action_call.name} is informative, "
-                                      f"adding it to the open list.")
-                    neighbors.append(op)
-
-        return neighbors
-
-    def execute_action_learning_search(
-            self, initial_state: State, online_learner: OnlineNSAMLearner,
-            possible_grounded_actions: Dict[str, List[Operator]]) -> Generator[LearnerDomain, None, None]:
-        """
-
-        :param initial_state:
-        :param online_learner:
-        :param possible_grounded_actions:
-        :return:
-        """
-        current_state = initial_state
-        neighbors = self.calculate_valid_neighbors(online_learner, possible_grounded_actions, current_state)
-        while len(neighbors) > 0:
-            action_applicable = False
-            selected_operator = random.choice(neighbors)
-            op_action_call = ActionCall(selected_operator.name, selected_operator.grounded_call_objects)
-            neighbors.pop(neighbors.index(selected_operator))
-            try:
-                next_state = selected_operator.apply(current_state)
-                neighbors = self.calculate_valid_neighbors(online_learner, possible_grounded_actions, next_state)
-                action_applicable = True
-
-            except ValueError:
-                self.logger.debug(f"Could not apply the action {selected_operator.name} to the state.")
-                next_state = current_state.copy()
-
-            online_learner.execute_action(op_action_call, previous_state=current_state, next_state=next_state)
-            current_state = next_state
-
-            if set(online_learner.observed_actions) == set(online_learner.partial_domain.actions) and action_applicable:
-                yield online_learner.create_safe_model()
-                online_learner._reset_numeric_domain_data()
-
     def learn_model_online(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
@@ -146,22 +69,21 @@ class PIL:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        ground_action_creator = VocabularyCreator()
         online_learner = OnlineNSAMLearner(partial_domain=partial_domain)
         online_learner.init_online_learning()
         for problem_index, problem_path in enumerate(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")):
             self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
-            observed_objects = problem.objects
-            all_ground_actions = self.create_all_grounded_actions(
-                complete_domain, observed_objects, ground_action_creator)
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
-            for domain in self.execute_action_learning_search(init_state, online_learner, all_ground_actions):
-                solved_all_test_problems = self.validate_learned_domain(domain, test_set_dir_path)
-                if solved_all_test_problems:
-                    return
+            agent = IPCAgent(domain=complete_domain, problem=problem)
+            online_learner.update_agent(agent)
+            learned_model = online_learner.search_for_informative_actions(init_state)
+            solved_all_test_problems = self.validate_learned_domain(learned_model, test_set_dir_path)
+            if solved_all_test_problems:
+                self.domain_validator.write_statistics(fold_num)
+                return
 
-        self.domain_validator.write_statistics(fold_num)
+            self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, learned_model: LearnerDomain,
                                 test_set_dir_path: Path) -> bool:

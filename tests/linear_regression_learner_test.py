@@ -160,7 +160,7 @@ def test_action_not_affects_fluent_returns_false_when_action_does_affect_fluent(
     dataframe = DataFrame(equation_matrix)
     result = linear_regression_learner._solve_linear_equations("(x)", dataframe)
     assert result is not None
-    assert result == "(increase (x) 2.0)"
+    assert result == "(increase (x) 2)"
 
 
 def test_combine_states_data_creates_correct_dataframe_with_correct_values(
@@ -190,7 +190,7 @@ def test_solve_safe_independent_equations_returns_correct_pddl_equation_form_for
     dataframe = DataFrame(equation_matrix)
     constant_change = linear_regression_learner._solve_linear_equations("(x)", dataframe)
     assert constant_change is not None
-    assert constant_change == "(increase (x) 19.0)"
+    assert constant_change == "(increase (x) 19)"
 
 
 def test_solve_safe_independent_equations_equation_form_when_linear_equations_are_solvable(

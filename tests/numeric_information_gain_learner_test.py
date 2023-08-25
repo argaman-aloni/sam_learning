@@ -3,7 +3,7 @@ from typing import List
 
 import pandas as pd
 import pytest
-from pddl_plus_parser.models import PDDLFunction, Predicate
+from pddl_plus_parser.models import PDDLFunction, Predicate, Domain, Observation
 
 from sam_learning.core import InformationGainLearner
 
@@ -33,6 +33,13 @@ def information_gain_learner_with_predicates(test_predicates: List[Predicate]) -
     return InformationGainLearner(
         action_name=TEST_ACTION_NAME, lifted_functions=TEST_FUNCTION_NAMES,
         lifted_predicates=[p.untyped_representation for p in test_predicates])
+
+
+@pytest.fixture
+def depot_numeric_information_gain_learner(depot_domain: Domain) -> InformationGainLearner:
+    return InformationGainLearner(
+        action_name="drive", lifted_functions=list(depot_domain.functions.keys()),
+        lifted_predicates=[p.untyped_representation for p in depot_domain.predicates.values()])
 
 
 def test_locate_sample_in_df_locates_that_samples_exists_in_the_dataframe_and_returns_its_index(
@@ -458,6 +465,17 @@ def test_is_non_informative_safe_returns_false_when_some_predicates_are_missing_
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in test_predicates]
     assert not information_gain_learner_with_predicates._is_non_informative_safe(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=new_discrete_sample)
+
+
+def test_is_non_informative_safe_returns_action_informative_when_not_observed_before(
+        depot_numeric_information_gain_learner: InformationGainLearner, depot_observation: Observation):
+    initial_state = depot_observation.components[0].previous_state
+    state_predicates = []
+    for predicate_set in initial_state.state_predicates.values():
+        state_predicates.extend(predicate_set)
+
+    assert not depot_numeric_information_gain_learner._is_non_informative_safe(
+        new_numeric_sample=initial_state.state_fluents, new_propositional_sample=state_predicates)
 
 
 def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_ch_created_from_the_combined_model(

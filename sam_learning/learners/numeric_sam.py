@@ -57,23 +57,20 @@ class NumericSAMLearner(SAMLearner):
         """
         effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations()
         if learned_perfectly:
-            self.logger.debug(f"The effect of action - {action.name} were learned perfectly. ")
-            if effects is not None and len(effects) > 0:
-                action.numeric_effects = effects
+            self.logger.debug(f"The effect of action - {action.name} were learned perfectly.")
 
-        else:
-            self.logger.debug(f"The action {action.name} was not learned perfectly. ")
-            if numeric_preconditions is not None:
-                restrictive_preconditions = Precondition("and")
-                for precondition in action.preconditions.root.operands:
-                    if isinstance(precondition, Predicate):
-                        restrictive_preconditions.add_condition(precondition)
+        if effects is not None and len(effects) > 0:
+            action.numeric_effects = effects
 
-                restrictive_preconditions.add_condition(numeric_preconditions)
-                action.preconditions.root = restrictive_preconditions
+        self.logger.debug(f"The action {action.name} was not learned perfectly. ")
+        if numeric_preconditions is not None:
+            restrictive_preconditions = Precondition("and")
+            for precondition in action.preconditions.root.operands:
+                if isinstance(precondition, Predicate):
+                    restrictive_preconditions.add_condition(precondition)
 
-            if effects is not None and len(effects) > 0:
-                action.numeric_effects = effects
+            restrictive_preconditions.add_condition(numeric_preconditions)
+            action.preconditions.root = restrictive_preconditions
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.

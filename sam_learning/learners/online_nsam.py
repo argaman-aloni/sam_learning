@@ -7,7 +7,11 @@ from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject, Preco
 from sam_learning.core import InformationGainLearner, NotSafeActionError, LearnerDomain, AbstractAgent
 from sam_learning.learners.numeric_sam import PolynomialSAMLearning
 
+LABEL = "label"
+
 NON_INFORMATIVE_IG = 0
+MIN_FEATURES_TO_CONSIDER = 1
+MAX_STEPS_PER_EPOCH = 100
 
 
 class OnlineNSAMLearner(PolynomialSAMLearning):
@@ -52,7 +56,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         self.logger.debug("Checking whether or not the action was successful.")
         return self.are_states_different(previous_state, next_state)
 
-    def _reset_numeric_domain_data(self) -> None:
+    def reset_current_epoch_numeric_data(self) -> None:
         """Resets the numeric part of the domain's data."""
         self.logger.debug("Resetting the numeric part of the domain's data.")
         for action in self.partial_domain.actions.values():
@@ -107,6 +111,11 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             domain=self.partial_domain, observed_objects=observed_objects)
         return grounded_action_calls
 
+    def update_agent(self, new_agent: AbstractAgent) -> None:
+        """Updates the agent that the learner is using."""
+        self.logger.info(f"Updating the agent.")
+        self.agent = new_agent
+
     def calculate_valid_neighbors(
             self, grounded_actions: Set[ActionCall], current_state: State) -> PriorityQueue[ActionCall]:
         """Calculates the valid action neighbors for the current state that the learner is in.
@@ -120,10 +129,10 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         neighbors = PriorityQueue()
         for grounded_action in grounded_actions:
             self.logger.debug(f"Checking the action {grounded_action.name}.")
-            action_IG = self.calculate_state_information_gain(state=current_state, action=grounded_action)
-            if action_IG > NON_INFORMATIVE_IG:
+            action_info_gain = self.calculate_state_information_gain(state=current_state, action=grounded_action)
+            if action_info_gain > NON_INFORMATIVE_IG:
                 self.logger.info(f"The action {grounded_action.name} is informative, adding it to the priority queue.")
-                neighbors.put((action_IG, str(grounded_action), grounded_action))
+                neighbors.put((action_info_gain, str(grounded_action), grounded_action))
 
         return neighbors
 
@@ -183,7 +192,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
         return self.partial_domain
 
-    def search_for_informative_actions(self, init_state: State) -> Generator[LearnerDomain, None, None]:
+    def search_for_informative_actions(self, init_state: State) -> LearnerDomain:
         """Searches for informative actions given the current state.
 
         :param init_state: the current state of the environment.
@@ -194,21 +203,25 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         grounded_actions = self.create_all_grounded_actions(observed_objects=observed_objects)
         neighbors = self.calculate_valid_neighbors(grounded_actions, init_state)
         current_state = init_state.copy()
+        num_steps = 0
         while not neighbors.empty():
             _, _, action = neighbors.get()
             next_state = self.agent.observe(state=current_state, action=action)
             self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
+            num_steps += 1
 
             while not self._is_successful_action(current_state, next_state):
                 self.logger.debug("The action was not successful, trying again.")
                 _, _, action = neighbors.get()
                 next_state = self.agent.observe(state=current_state, action=action)
                 self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
+                num_steps += 1
+                if num_steps == MAX_STEPS_PER_EPOCH:
+                    return self.create_safe_model()
 
             self.logger.debug("The action changed the state of the environment, updating the possible neighbors.")
             neighbors = self.calculate_valid_neighbors(grounded_actions, next_state)
 
             current_state = next_state
-            self._reset_numeric_domain_data()
-            if self.agent.get_reward(current_state) == 1:
-                yield self.create_safe_model()
+            if self.agent.get_reward(current_state) == 1 or num_steps == MAX_STEPS_PER_EPOCH:
+                return self.create_safe_model()

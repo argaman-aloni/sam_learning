@@ -157,3 +157,60 @@ def test_calculate_valid_neighbors_returns_a_set_of_actions_containing_the_actio
         queue_items.add(node_data[1])
 
     assert str(observation_action) in queue_items
+
+
+def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_already_executed_in_state_and_the_action_is_not_applicable(
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
+    grounded_actions = depot_online_nsam.create_all_grounded_actions(
+        observed_objects=depot_observation.grounded_objects)
+    initial_state = depot_observation.components[0].previous_state
+    observation_action = depot_observation.components[0].grounded_action_call
+
+    depot_online_nsam.init_online_learning()
+    valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
+                                                                  current_state=initial_state)
+    num_neighbors = 0
+    while not valid_neighbors.empty():
+        num_neighbors += 1
+        valid_neighbors.get()
+
+    depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=initial_state)
+    valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
+                                                                  current_state=initial_state)
+    new_num_neighbors = 0
+    while not valid_neighbors.empty():
+        new_num_neighbors += 1
+        valid_neighbors.get()
+
+    assert new_num_neighbors == num_neighbors - 2
+
+
+def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_already_executed_in_state_and_the_action_is_applicable(
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
+    grounded_actions = depot_online_nsam.create_all_grounded_actions(
+        observed_objects=depot_observation.grounded_objects)
+    initial_state = depot_observation.components[0].previous_state
+    observation_action = depot_observation.components[0].grounded_action_call
+    next_state = depot_observation.components[0].next_state
+
+    depot_online_nsam.init_online_learning()
+    valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
+                                                                  current_state=initial_state)
+    num_neighbors = 0
+    while not valid_neighbors.empty():
+        num_neighbors += 1
+        valid_neighbors.get()
+
+    # executed action '(drive truck0 depot0 distributor0)'
+    depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=next_state)
+    valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
+                                                                  current_state=initial_state)
+    new_num_neighbors = 0
+    while not valid_neighbors.empty():
+        new_num_neighbors += 1
+        valid_neighbors.get()
+
+    non_informative_actions = ['(drive truck0 depot0 distributor0)', '(drive truck0 depot0 distributor1)',
+                               '(drive truck0 distributor0 depot0)', '(drive truck0 distributor1 depot0)',
+                               '(drive truck1 distributor0 depot0)', '(drive truck1 distributor1 depot0)']
+    assert new_num_neighbors == num_neighbors - len(non_informative_actions)

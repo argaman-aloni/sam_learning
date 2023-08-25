@@ -10,7 +10,7 @@ from pddl_plus_parser.exporters import MetricFFParser
 
 METRIC_FF_DIRECTORY = os.environ["METRIC_FF_DIRECTORY"]
 
-MAX_RUNNING_TIME = 60  # seconds
+MAX_RUNNING_TIME = 5  # seconds
 
 
 class MetricFFSolver:
@@ -94,7 +94,7 @@ class MetricFFSolver:
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 2 > {solution_path}"
+            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 0 > {solution_path}"
             self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_stats)
 
         return solving_stats
