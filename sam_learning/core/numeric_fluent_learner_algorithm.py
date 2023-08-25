@@ -17,6 +17,7 @@ class NumericFluentStateStorage:
 
     logger: logging.Logger
     previous_state_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
+    negative_samples_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
     next_state_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
 
     def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):

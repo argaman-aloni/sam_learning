@@ -2,7 +2,8 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, Predicate
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, Predicate, \
+    NumericalExpressionTree
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm, LearnerAction
@@ -56,11 +57,19 @@ class NumericSAMLearner(SAMLearner):
         :param action: the action that its effects are constructed for.
         """
         effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations()
-        if learned_perfectly:
-            self.logger.debug(f"The effect of action - {action.name} were learned perfectly.")
-
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
+
+        if learned_perfectly:
+            self.logger.debug(f"The effect of action - {action.name} were learned perfectly.")
+            if numeric_preconditions is not None:
+                for cond in numeric_preconditions.operands:
+                    if cond in action.preconditions.root:
+                        continue
+
+                    action.preconditions.add_condition(cond)
+
+            return
 
         self.logger.debug(f"The action {action.name} was not learned perfectly. ")
         if numeric_preconditions is not None:

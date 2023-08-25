@@ -1,19 +1,17 @@
 """The PIL main framework - Compile, Learn and Plan."""
 import argparse
 import logging
-import random
-from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional, Dict, Generator
+from typing import Optional
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import ActionCall, PDDLObject, Domain, Operator, State
+from pddl_plus_parser.models import State
 
 from experiments.ipc_agent import IPCAgent
-from utilities.k_fold_split import KFoldSplit
-from sam_learning.core import LearnerDomain, VocabularyCreator
+from sam_learning.core import LearnerDomain
 from sam_learning.learners import OnlineNSAMLearner
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
+from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
 DEFAULT_SPLIT = 5
