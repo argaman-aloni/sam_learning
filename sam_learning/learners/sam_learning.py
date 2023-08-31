@@ -241,7 +241,7 @@ class SAMLearner:
         """
         self.logger.debug(f"Checking if the previous state {previous_state} "
                           f"is different from the next state {next_state}")
-        if previous_state.serialize() == next_state.serialize():
+        if previous_state == next_state:
             self.logger.warning("The previous state is the same as the next state. "
                                 "This is not supported by the SAFE action model learning algorithm.")
             return False

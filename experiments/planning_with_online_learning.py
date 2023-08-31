@@ -10,6 +10,7 @@ from pddl_plus_parser.models import State
 from experiments.ipc_agent import IPCAgent
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import OnlineNSAMLearner
+from solvers import MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
@@ -75,16 +76,19 @@ class PIL:
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
             agent = IPCAgent(domain=complete_domain, problem=problem)
             online_learner.update_agent(agent)
-            learned_model = online_learner.search_for_informative_actions(init_state)
-            solved_all_test_problems = self.validate_learned_domain(learned_model, test_set_dir_path)
+            learned_model = online_learner.search_for_informative_actions(init_state, problem_objects=problem.objects)
+            solved_all_test_problems = self.validate_learned_domain(learned_model, test_set_dir_path,
+                                                                    epoch_number=problem_index + 1)
             if solved_all_test_problems:
                 self.domain_validator.write_statistics(fold_num)
                 return
 
-            self.domain_validator.write_statistics(fold_num)
+            online_learner.reset_current_epoch_numeric_data()
+
+        self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, learned_model: LearnerDomain,
-                                test_set_dir_path: Path) -> bool:
+                                test_set_dir_path: Path, epoch_number: int) -> bool:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param learned_model: the domain that was learned using POL.
@@ -93,15 +97,27 @@ class PIL:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"{learned_model.name}.pddl")
+                                   f"{learned_model.name}_epoch_{epoch_number}.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
+        all_possible_solution_types = [solution_type.name for solution_type in SolutionOutputTypes]
+
+        self.domain_validator.solver = MetricFFSolver()
+        self.domain_validator._solver_name = "metric_ff"
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path)
-        all_possible_solution_types = [solution_type.name for solution_type in SolutionOutputTypes]
-        sum_problem_types = sum([self.domain_validator.solving_stats[-1][problem_type]
-                                 for problem_type in all_possible_solution_types])
-        solved_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
-        if sum_problem_types == solved_ok_problems:
+        metric_ff_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
+                                         for problem_type in all_possible_solution_types])
+        metric_ff_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
+
+        self.domain_validator.solver = ENHSPSolver()
+        self.domain_validator._solver_name = "enhsp"
+        self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                              test_set_directory_path=test_set_dir_path)
+        enhsp_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
+                                     for problem_type in all_possible_solution_types])
+        enhsp_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
+
+        if metric_ff_solved_problems == metric_ff_ok_problems or enhsp_solved_problems == enhsp_ok_problems:
             self.logger.info("All the test set problems were solved using the learned domain!")
             return True
 

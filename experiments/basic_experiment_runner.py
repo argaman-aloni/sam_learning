@@ -18,7 +18,7 @@ from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
-DEFAULT_SPLIT = 5
+DEFAULT_SPLIT = 10
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
                       LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]

@@ -203,7 +203,9 @@ class DomainValidator:
         total_problems = sum([solving_stats[statistic] for statistic in AGGREGATED_SOLVING_FIELDS])
         total_problems = total_problems if total_problems > 0 else 1
         for statistic in AGGREGATED_SOLVING_FIELDS:
-            solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_problems)
+            percentage_statistic = 100 * (solving_stats[statistic] / total_problems)
+            solving_stats[f"percent_{statistic}"] = percentage_statistic
+            self.logger.info(f"{statistic} percentage: {percentage_statistic:.2f}%")
 
         total_validated = sum([solving_stats[statistic] for statistic in [
             VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]])

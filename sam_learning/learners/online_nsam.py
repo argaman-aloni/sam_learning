@@ -1,6 +1,6 @@
 """An online version of the Numeric SAM learner."""
 from queue import PriorityQueue
-from typing import Dict, Set, Generator
+from typing import Dict, Set, Optional
 
 from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject, Precondition, Predicate
 
@@ -11,7 +11,7 @@ LABEL = "label"
 
 NON_INFORMATIVE_IG = 0
 MIN_FEATURES_TO_CONSIDER = 1
-MAX_STEPS_PER_EPOCH = 100
+MAX_STEPS_PER_EPOCH = 500
 
 
 class OnlineNSAMLearner(PolynomialSAMLearning):
@@ -24,6 +24,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree)
         self.ig_learner = {}
         self.agent = agent
+        self._action_observation_rate = {action: 1 for action in self.partial_domain.actions}
 
     def _extract_objects_from_state(self, state: State) -> Dict[str, PDDLObject]:
         """Extracts the objects from the state.
@@ -80,7 +81,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                 action_name=action_name, lifted_functions=lifted_function_names,
                 lifted_predicates=lifted_predicate_names)
 
-    def calculate_state_information_gain(self, state: State, action: ActionCall) -> float:
+    def calculate_state_action_information_gain(self, state: State, action: ActionCall) -> float:
         """Calculates the information gain of a state.
 
         :param state: the state to calculate the information gain of.
@@ -94,7 +95,9 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         lifted_state_propositions = self.matcher.get_possible_literal_matches(action, list(grounded_state_propositions))
         grounded_state_functions = self.triplet_snapshot.create_numeric_state_snapshot(state, action, state_objects)
         lifted_state_functions = self.function_matcher.match_state_functions(action, grounded_state_functions)
-        self.ig_learner[action.name].remove_non_existing_functions(list(lifted_state_functions.keys()))
+        if self._action_observation_rate[action.name] == 1:
+            self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
+            self.ig_learner[action.name].remove_non_existing_functions(list(lifted_state_functions.keys()))
 
         numeric_ig = self.ig_learner[action.name].calculate_sample_information_gain(
             lifted_state_functions, lifted_state_propositions)
@@ -129,8 +132,12 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         neighbors = PriorityQueue()
         for grounded_action in grounded_actions:
             self.logger.debug(f"Checking the action {grounded_action.name}.")
-            action_info_gain = self.calculate_state_information_gain(state=current_state, action=grounded_action)
-            if action_info_gain > NON_INFORMATIVE_IG:
+            # Setting to a negative value since priority queue is works from smallest to largest.
+            action_info_gain = -self.calculate_state_action_information_gain(
+                state=current_state, action=grounded_action)
+            action_info_gain *= 1 / self._action_observation_rate[grounded_action.name]
+
+            if abs(action_info_gain) > NON_INFORMATIVE_IG:  # IG is a negative number.
                 self.logger.info(f"The action {grounded_action.name} is informative, adding it to the priority queue.")
                 neighbors.put((action_info_gain, str(grounded_action), grounded_action))
 
@@ -154,8 +161,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             action_to_execute, self.triplet_snapshot.previous_state_functions)
         pre_state_lifted_predicates = self.matcher.get_possible_literal_matches(
             action_to_execute, list(self.triplet_snapshot.previous_state_predicates))
-        self.ig_learner[action_to_execute.name].remove_non_existing_functions(
-            list(pre_state_lifted_numeric_functions.keys()))
 
         if not self._is_successful_action(previous_state, next_state):
             self.logger.debug("The action was not successful, adding the negative sample to the learner.")
@@ -188,35 +193,39 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                 self.logger.info(f"Done learning the action - {action_name}!")
 
             except NotSafeActionError as e:
-                self.logger.debug(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")
+                self.logger.warning(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")
 
         return self.partial_domain
 
-    def search_for_informative_actions(self, init_state: State) -> LearnerDomain:
+    def search_for_informative_actions(
+            self, init_state: State, problem_objects: Optional[Dict[str, PDDLObject]] = None) -> LearnerDomain:
         """Searches for informative actions given the current state.
 
         :param init_state: the current state of the environment.
+        :param problem_objects: the objects in the problem - an optional parameter (helps with type hierarchy).
         :return: the set of informative actions.
         """
         self.logger.info("Searching for informative actions given the current state.")
-        observed_objects = self._extract_objects_from_state(init_state)
+        observed_objects = problem_objects or self._extract_objects_from_state(init_state)
         grounded_actions = self.create_all_grounded_actions(observed_objects=observed_objects)
         neighbors = self.calculate_valid_neighbors(grounded_actions, init_state)
         current_state = init_state.copy()
         num_steps = 0
         while not neighbors.empty():
             _, _, action = neighbors.get()
+            self._action_observation_rate[action.name] += 1
             next_state = self.agent.observe(state=current_state, action=action)
             self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
             num_steps += 1
-
             while not self._is_successful_action(current_state, next_state):
                 self.logger.debug("The action was not successful, trying again.")
                 _, _, action = neighbors.get()
+                self._action_observation_rate[action.name] += 1
                 next_state = self.agent.observe(state=current_state, action=action)
                 self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
                 num_steps += 1
                 if num_steps == MAX_STEPS_PER_EPOCH:
+                    self.logger.warning("Reached the maximum number of steps per epoch, returning the safe model.")
                     return self.create_safe_model()
 
             self.logger.debug("The action changed the state of the environment, updating the possible neighbors.")
@@ -225,3 +234,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             current_state = next_state
             if self.agent.get_reward(current_state) == 1 or num_steps == MAX_STEPS_PER_EPOCH:
                 return self.create_safe_model()
+
+        self.logger.info("Reached a state with no neighbors to pull an action from, returning the learned model.")
+        return self.create_safe_model()

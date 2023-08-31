@@ -279,6 +279,7 @@ class InformationGainLearner:
         self.logger.info("Calculating the information gain of a new sample.")
         # this way we maintain the order of the columns in the data frame.
         if len(self.positive_samples_df) == 0 and len(self.negative_samples_df) == 0:
+            self.logger.debug("There are no samples to calculate the information gain from - action not observed yet.")
             return 1  # TODO: calculate the information gain.
 
         is_non_informative_safe = self._is_non_informative_safe(new_numeric_sample, new_propositional_sample)

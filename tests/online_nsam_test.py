@@ -21,7 +21,7 @@ def test_calculate_state_information_gain_returns_value_greater_than_zero_when_a
     depot_online_nsam.init_online_learning()
     tested_state = depot_observation.components[0].previous_state
     tested_action = depot_observation.components[0].grounded_action_call
-    assert depot_online_nsam.calculate_state_information_gain(state=tested_state, action=tested_action) > 0
+    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_state, action=tested_action) > 0
 
 
 def test_execute_action_when_action_is_successful_adds_action_to_positive_samples_in_information_gain_learner(
@@ -94,11 +94,11 @@ def test_calculate_state_information_gain_when_action_is_observed_twice_returns_
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
 
-    assert depot_online_nsam.calculate_state_information_gain(state=tested_previous_state, action=tested_action) > 0
+    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state, action=tested_action) > 0
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
 
-    assert depot_online_nsam.calculate_state_information_gain(state=tested_previous_state, action=tested_action) == 0
+    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state, action=tested_action) == 0
 
 
 def test_consecutive_execution_of_informative_actions_creates_small_convex_hulls_and_does_not_fail(
@@ -109,8 +109,8 @@ def test_consecutive_execution_of_informative_actions_creates_small_convex_hulls
             tested_previous_state = component.previous_state
             tested_action = component.grounded_action_call
             tested_next_state = component.next_state
-            if depot_online_nsam.calculate_state_information_gain(state=tested_previous_state,
-                                                                  action=tested_action) > 0:
+            if depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
+                                                                         action=tested_action) > 0:
                 depot_online_nsam.execute_action(
                     action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
 
@@ -125,8 +125,8 @@ def test_consecutive_execution_of_informative_actions_creates_a_usable_model(
         tested_previous_state = component.previous_state
         tested_action = component.grounded_action_call
         tested_next_state = component.next_state
-        if depot_online_nsam.calculate_state_information_gain(state=tested_previous_state,
-                                                              action=tested_action) > 0:
+        if depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
+                                                                     action=tested_action) > 0:
             depot_online_nsam.execute_action(
                 action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
     domain = depot_online_nsam.create_safe_model()

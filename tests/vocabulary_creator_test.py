@@ -62,6 +62,7 @@ def test_create_grounded_actions_vocabulary_creates_all_possible_assignments_of_
         observed_objects=observed_objects)
     assert vocabulary_actions is not None
     assert len({action.name for action in vocabulary_actions}) == len(depot_domain.actions)
+    print([str(action) for action in vocabulary_actions])
 
 
 def test_create_grounded_actions_vocabulary_creates_only_unique_actions(
@@ -71,3 +72,4 @@ def test_create_grounded_actions_vocabulary_creates_only_unique_actions(
         domain=depot_domain,
         observed_objects=observed_objects)
     assert len({str(action) for action in vocabulary_actions}) == len([action for action in vocabulary_actions])
+    print([str(action) for action in vocabulary_actions])

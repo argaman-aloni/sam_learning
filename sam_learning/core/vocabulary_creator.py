@@ -1,3 +1,4 @@
+import itertools
 import logging
 from collections import defaultdict
 from itertools import permutations
@@ -149,18 +150,15 @@ class VocabularyCreator:
         :return: list containing all the actions with the different combinations of parameters.
         """
         vocabulary = set()
-        possible_objects_str = list(observed_objects.keys()) + list(domain.constants.keys())
         objects_and_consts = list(observed_objects.values()) + list(domain.constants.values())
         for action_name, action in domain.actions.items():
-            signature_permutations = choose_objects_subset(possible_objects_str, len(action.signature))
-            for signature_permutation in signature_permutations:
-                grounded_signature = {object_name: objects_and_consts[possible_objects_str.index(object_name)].type
-                                      for object_name in signature_permutation}
-                if not self._validate_type_matching(grounded_signature, action):
-                    continue
-
+            possible_objects_for_parameters = {
+                parameter_name: [obj for obj in objects_and_consts if obj.type.is_sub_type(parameter_type)]
+                for parameter_name, parameter_type in action.signature.items()}
+            signature_options = list(itertools.product(*possible_objects_for_parameters.values()))
+            for signature_option in signature_options:
                 grounded_action = ActionCall(
-                    name=action_name, grounded_parameters=list(grounded_signature.keys()))
+                    name=action_name, grounded_parameters=[obj.name for obj in signature_option])
                 self.logger.debug(f"Created grounded action {str(grounded_action)}")
                 vocabulary.add(grounded_action)
 

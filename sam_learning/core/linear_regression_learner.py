@@ -233,20 +233,20 @@ class LinearRegressionLearner:
 
         return dijsunctive_preconditions
 
-    def _construct_effect_from_single_sample(self, sample_data: DataFrame) -> Set[NumericalExpressionTree]:
+    def _construct_effect_from_single_sample(
+            self, prev_state_data: Dict[str, List[float]],
+            next_state_data: Dict[str, List[float]]) -> Set[NumericalExpressionTree]:
         """constructs the effect from a single sample.
 
         :return: the constructed numeric effect.
         """
         assignment_statements = []
-        for fluent in sample_data.columns:
-            if not fluent.startswith(NEXT_STATE_PREFIX):
-                continue
+        for fluent in next_state_data:
+            if fluent not in prev_state_data:
+                raise ValueError(f"The fluent {fluent} is not in the previous state data.")
 
-            if sample_data[fluent[POST_NEXT_STATE_PREFIX_INDEX:]].iloc[0] != sample_data[fluent].iloc[0]:
-                self.logger.debug("The value of the fluent changed by applying the action on the previous state.")
-                assignment_statements.append(
-                    f"(assign {fluent[POST_NEXT_STATE_PREFIX_INDEX:]} {sample_data[fluent].iloc[0]})")
+            if prev_state_data[fluent][0] != next_state_data[fluent][0]:
+                assignment_statements.append(f"(assign {fluent} {next_state_data[fluent][0]})")
 
         return construct_numeric_effects(assignment_statements, self.domain_functions)
 
@@ -285,7 +285,7 @@ class LinearRegressionLearner:
         combined_data = self._combine_states_data(previous_state_data, next_state_data)
         if combined_data.shape[0] == 1:
             self.logger.info(f"The action {self.action_name} contains a single unique observation!")
-            return self._construct_effect_from_single_sample(combined_data), \
+            return self._construct_effect_from_single_sample(previous_state_data, next_state_data), \
                 self._construct_restrictive_numeric_preconditions(combined_data), False
 
         # The dataset contains more than one observation.
