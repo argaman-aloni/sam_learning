@@ -1,6 +1,7 @@
 """A module containing the algorithm to calculate the information gain of new samples."""
 import logging
-from typing import Dict, List
+import re
+from typing import Dict, List, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -8,7 +9,8 @@ from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
 
-from sam_learning.core.numeric_utils import get_num_independent_equations
+from sam_learning.core.numeric_utils import get_num_independent_equations, filter_constant_features, \
+    detect_linear_dependent_features
 
 
 class InformationGainLearner:
@@ -20,6 +22,7 @@ class InformationGainLearner:
     lifted_predicates: List[str]
     positive_samples_df: DataFrame
     negative_samples_df: DataFrame
+    _effects_learned_perfectly: bool
 
     def __init__(self, action_name: str, lifted_functions: List[str], lifted_predicates: List[str]):
         self.logger = logging.getLogger(__name__)
@@ -28,6 +31,7 @@ class InformationGainLearner:
         self.lifted_predicates = lifted_predicates
         self.positive_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
         self.negative_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
+        self._effects_learned_perfectly = False
 
     def _locate_sample_in_df(self, sample_to_locate: List[float], df: DataFrame) -> int:
         """Locates the sample in the data frame.
@@ -59,17 +63,40 @@ class InformationGainLearner:
 
         :return: whether the effects of the action can be predicted perfectly.
         """
+        if self._effects_learned_perfectly:
+            # This is to prevent redundant calculations when the effects are already learned perfectly.
+            return True
+
         if len(self.positive_samples_df) == 1:
             return False
 
-        num_dimensions = len(self.positive_samples_df.columns.tolist()) + 1  # +1 for the bias.
-        num_independent_rows = get_num_independent_equations(self.positive_samples_df)
+        filtered_df, _, _ = filter_constant_features(self.positive_samples_df)
+        regression_df, _, _ = detect_linear_dependent_features(filtered_df)
+        num_dimensions = len(regression_df.columns.tolist()) + 1  # +1 for the bias.
+        num_independent_rows = get_num_independent_equations(regression_df)
         if num_independent_rows >= num_dimensions:
+            self._effects_learned_perfectly = True
             return True
 
         return False
 
-    def _in_hull(self, points_to_test: np.ndarray, hull: np.ndarray, debug_mode: bool = False) -> bool:
+    def _validate_consts_match(
+            self, points_to_test: DataFrame, hull_df: DataFrame, constant_features: List[str]) -> bool:
+        """
+
+        :param points_to_test:
+        :param hull_df:
+        :param constant_features:
+        :return:
+        """
+        for constant_feature in constant_features:
+            if len(points_to_test[constant_feature].unique().tolist()) != 1 or \
+                    points_to_test[constant_feature].unique().tolist()[0] != hull_df[constant_feature].iloc[0]:
+                return False
+
+        return True
+
+    def _in_hull(self, points_to_test: DataFrame, hull_df: DataFrame, debug_mode: bool = False) -> bool:
         """
         Test if the points are in `hull`
 
@@ -81,18 +108,35 @@ class InformationGainLearner:
         It returns true if any of the points lies inside the hull.
 
         :param points_to_test: the points to test whether they are inside the convex hull.
-        :param hull: the points composing the positive samples convex hull.
+        :param hull_df: the points composing the positive samples convex hull.
         :param debug_mode: whether to display the convex hull.
         :return: whether any of the negative samples is inside the convex hull.
         """
+        no_consts_df, _, constant_features = filter_constant_features(hull_df)
+        concise_df, linear_dependency_conditions, _ = detect_linear_dependent_features(no_consts_df)
+        hull = concise_df.to_numpy()
+        # validate that the point contains a feature with the same constant values as the hull.
+        consts_match = self._validate_consts_match(points_to_test, hull_df, constant_features)
+        if not consts_match:
+            return False
+
+        # validate that the point contains a feature with the same linear dependency as the hull.
+        _, sample_linear_dependency_conditions, _ = detect_linear_dependent_features(points_to_test)
+        if (len(linear_dependency_conditions) > 0 and
+                not set(sample_linear_dependency_conditions).issuperset(linear_dependency_conditions)):
+            return False
+
+        relevant_sample = points_to_test[concise_df.columns.tolist()] if \
+            len(linear_dependency_conditions) > 0 or len(constant_features) > 0 else points_to_test
+
         if hull.shape[1] == 1:
-            return all([hull.min() <= point <= hull.max() for point in points_to_test])
+            return all([hull.min() <= point <= hull.max() for point in relevant_sample.to_numpy()])
 
         delaunay_hull = Delaunay(hull)
         if debug_mode:
             self._display_delaunay_graph(delaunay_hull, hull.shape[1])
 
-        result = delaunay_hull.find_simplex(points_to_test) >= 0
+        result = delaunay_hull.find_simplex(relevant_sample.to_numpy()) >= 0
         if isinstance(result, np.bool_):
             return result
 
@@ -162,14 +206,14 @@ class InformationGainLearner:
             return False
 
         positive_points_data = self.positive_samples_df[self.lifted_functions]
-        positive_points = positive_points_data.to_numpy()
-        new_point_data = [new_numeric_sample[col].value for col in self.lifted_functions]
-        new_point_array = np.array(new_point_data)
+        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in self.lifted_functions})
         try:
-            return self._in_hull(new_point_array, positive_points) and self._can_determine_effects_perfectly()
+            return self._in_hull(new_point_data, self.positive_samples_df[
+                self.lifted_functions]) and self._can_determine_effects_perfectly()
 
         except (QhullError, ValueError):
-            return self._locate_sample_in_df(new_point_data, positive_points_data) != -1
+            sample_values = [new_numeric_sample[col].value for col in self.lifted_functions]
+            return self._locate_sample_in_df(sample_values, positive_points_data) != -1
 
     def _is_non_informative_unsafe(self, new_numeric_sample: Dict[str, PDDLFunction],
                                    new_propositional_sample: List[Predicate]) -> bool:
@@ -201,20 +245,17 @@ class InformationGainLearner:
         new_model_data.loc[len(new_model_data)] = new_sample_data
 
         for _, negative_sample in self.negative_samples_df.iterrows():
-            if not self._validate_negative_sample_in_state_predicates(negative_sample, new_sample_predicates):
+            if not self._validate_negative_sample_in_state_predicates(negative_sample, list(new_sample_predicates)):
                 continue
 
             try:
-                if self._in_hull(negative_sample[self.lifted_functions].to_numpy(),
-                                 new_model_data.to_numpy()):
+                if self._in_hull(negative_sample[self.lifted_functions].to_frame().T, new_model_data):
                     self.logger.debug("The new sample is not informative since it contains a negative sample.")
                     return True
 
             except (QhullError, ValueError):
-                sample_dataframe = DataFrame(columns=list(new_sample_data.keys()))
-                sample_dataframe.loc[0] = list(new_sample_data.values())
-                if self._locate_sample_in_df(negative_sample[self.lifted_functions].values.tolist(),
-                                             sample_dataframe) != -1:
+                if self._locate_sample_in_df(list(new_sample_data.values()),
+                                             negative_sample[self.lifted_functions].to_frame().T) != -1:
                     return True
 
         return False

@@ -11,7 +11,7 @@ LABEL = "label"
 
 NON_INFORMATIVE_IG = 0
 MIN_FEATURES_TO_CONSIDER = 1
-MAX_STEPS_PER_EPOCH = 500
+MAX_STEPS_PER_EPOCH = 100
 
 
 class OnlineNSAMLearner(PolynomialSAMLearning):
@@ -19,6 +19,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
     ig_learner: Dict[str, InformationGainLearner]
     agent: AbstractAgent
+    _action_observation_rate: Dict[str, float]
 
     def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, agent: AbstractAgent = None):
         super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree)
@@ -164,6 +165,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
         if not self._is_successful_action(previous_state, next_state):
             self.logger.debug("The action was not successful, adding the negative sample to the learner.")
+            self._action_observation_rate[action_to_execute.name] += 0.1
             self.ig_learner[action_to_execute.name].add_negative_sample(
                 numeric_negative_sample=pre_state_lifted_numeric_functions,
                 negative_propositional_sample=pre_state_lifted_predicates)
@@ -175,9 +177,11 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             positive_propositional_sample=pre_state_lifted_predicates)
         if action_to_execute.name in self.observed_actions:
             super().update_action(action_to_execute, previous_state, next_state)
+            self._action_observation_rate[action_to_execute.name] += 0.5
             return
 
         super().add_new_action(action_to_execute, previous_state, next_state)
+        self._action_observation_rate[action_to_execute.name] += 1
 
     def create_safe_model(self) -> LearnerDomain:
         """Creates a safe model from the currently learned data."""
@@ -213,14 +217,12 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         num_steps = 0
         while not neighbors.empty():
             _, _, action = neighbors.get()
-            self._action_observation_rate[action.name] += 1
             next_state = self.agent.observe(state=current_state, action=action)
             self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
             num_steps += 1
             while not self._is_successful_action(current_state, next_state):
                 self.logger.debug("The action was not successful, trying again.")
                 _, _, action = neighbors.get()
-                self._action_observation_rate[action.name] += 1
                 next_state = self.agent.observe(state=current_state, action=action)
                 self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
                 num_steps += 1

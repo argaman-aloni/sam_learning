@@ -257,9 +257,7 @@ def test_in_hull_captures_that_a_point_is_in_a_convex_hull_in_a_2d_plane(
         "(x)": [0.5],
         "(y)": [0.5]
     })
-    convex_hull_array = hull_df.to_numpy()
-    point_to_test_array = point_to_test.to_numpy()
-    assert information_gain_learner_no_predicates._in_hull(point_to_test_array, convex_hull_array)
+    assert information_gain_learner_no_predicates._in_hull(point_to_test, hull_df)
 
 
 def test_in_hull_captures_that_a_point_is_not_in_a_convex_hull_in_a_2d_plane(
@@ -272,9 +270,7 @@ def test_in_hull_captures_that_a_point_is_not_in_a_convex_hull_in_a_2d_plane(
         "(x)": [2],
         "(y)": [2]
     })
-    convex_hull_array = hull_df.to_numpy()
-    point_to_test_array = point_to_test.to_numpy()
-    assert not information_gain_learner_no_predicates._in_hull(point_to_test_array, convex_hull_array)
+    assert not information_gain_learner_no_predicates._in_hull(point_to_test, hull_df)
 
 
 def test_in_hull_captures_that_more_than_one_point_is_in_2d_convex_hull(
@@ -287,9 +283,7 @@ def test_in_hull_captures_that_more_than_one_point_is_in_2d_convex_hull(
         "(x)": [0.5, 0.6, 0.7, 2, 10],
         "(y)": [0.5, 0.6, 0.7, 2, 10]
     })
-    convex_hull_array = hull_df.to_numpy()
-    points_to_test_array = points_to_test.to_numpy()
-    assert information_gain_learner_no_predicates._in_hull(points_to_test_array, convex_hull_array)
+    assert information_gain_learner_no_predicates._in_hull(points_to_test, hull_df)
 
 
 def test_in_hull_captures_that_more_than_one_point_is_in_1d_convex_hull(
@@ -300,9 +294,7 @@ def test_in_hull_captures_that_more_than_one_point_is_in_1d_convex_hull(
     points_to_test = pd.DataFrame({
         "(x)": [0.5, 0.6, 0.7],
     })
-    convex_hull_array = hull_df.to_numpy()
-    points_to_test_array = points_to_test.to_numpy()
-    assert information_gain_learner_no_predicates._in_hull(points_to_test_array, convex_hull_array)
+    assert information_gain_learner_no_predicates._in_hull(points_to_test, hull_df)
 
 
 def test_in_hull_captures_that_point_is_in_1d_hull_when_given_only_one_test_point(
@@ -313,9 +305,7 @@ def test_in_hull_captures_that_point_is_in_1d_hull_when_given_only_one_test_poin
     points_to_test = pd.DataFrame({
         "(x)": [0.5],
     })
-    convex_hull_array = hull_df.to_numpy()
-    points_to_test_array = points_to_test.to_numpy()
-    assert information_gain_learner_no_predicates._in_hull(points_to_test_array, convex_hull_array)
+    assert information_gain_learner_no_predicates._in_hull(points_to_test, hull_df)
 
 
 def test_is_non_informative_safe_returns_true_when_the_point_is_in_the_positive_samples(
@@ -750,5 +740,110 @@ def test_calculate_information_gain_returns_value_greater_than_zero_when_new_poi
     y_function = PDDLFunction(name="(y)", signature={})
     y_function.set_value(-0.5)
     new_sample["(y)"] = y_function
+
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) > 0
+
+
+def test_calculate_when_there_are_constant_features_in_the_dataset_checks_the_convex_hull_only_on_the_relevant_part_when_consts_are_equal(
+        information_gain_learner_no_predicates: InformationGainLearner):
+    positive_samples_df = pd.DataFrame({
+        "(x)": [0, 0, 1, 1],
+        "(y)": [0, 1, 0, 1],
+        "(z)": [0, 0, 0, 0],
+        "(w)": [1, 1, 1, 1]
+    })
+    negative_samples_df = pd.DataFrame({
+        "(x)": [2.5],
+        "(y)": [1.5],
+        "(z)": [1.0],
+        "(w)": [1.1]
+    })
+    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
+    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    new_sample = {}
+
+    x_function = PDDLFunction(name="(x)", signature={})
+    x_function.set_value(0.5)
+    new_sample["(x)"] = x_function
+    y_function = PDDLFunction(name="(y)", signature={})
+    y_function.set_value(0.5)
+    new_sample["(y)"] = y_function
+    z_function = PDDLFunction(name="(z)", signature={})
+    z_function.set_value(0.0)
+    new_sample["(z)"] = z_function
+    w_function = PDDLFunction(name="(w)", signature={})
+    w_function.set_value(1.0)
+    new_sample["(w)"] = w_function
+
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+
+
+def test_calculate_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal(
+        information_gain_learner_no_predicates: InformationGainLearner):
+    positive_samples_df = pd.DataFrame({
+        "(x)": [0, 0, 1, 1],
+        "(y)": [0, 0, 2, 2],
+        "(z)": [0, 0, 0, 0],
+        "(w)": [1, 1, 1, 1]
+    })
+    negative_samples_df = pd.DataFrame({
+        "(x)": [2.5],
+        "(y)": [1.5],
+        "(z)": [1.0],
+        "(w)": [1.1]
+    })
+    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
+    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    new_sample = {}
+
+    x_function = PDDLFunction(name="(x)", signature={})
+    x_function.set_value(0.75)
+    new_sample["(x)"] = x_function
+    y_function = PDDLFunction(name="(y)", signature={})
+    y_function.set_value(1.5)
+    new_sample["(y)"] = y_function
+    z_function = PDDLFunction(name="(z)", signature={})
+    z_function.set_value(0.0)
+    new_sample["(z)"] = z_function
+    w_function = PDDLFunction(name="(w)", signature={})
+    w_function.set_value(1.0)
+    new_sample["(w)"] = w_function
+
+    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+
+
+def test_calculate_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal_and_value_out_of_range(
+        information_gain_learner_no_predicates: InformationGainLearner):
+    positive_samples_df = pd.DataFrame({
+        "(x)": [0, 0, 1, 1],
+        "(y)": [0, 0, 2, 2],
+        "(z)": [0, 0, 0, 0],
+        "(w)": [1, 1, 1, 1]
+    })
+    negative_samples_df = pd.DataFrame({
+        "(x)": [2.5],
+        "(y)": [1.5],
+        "(z)": [1.0],
+        "(w)": [1.1]
+    })
+    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
+    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    new_sample = {}
+
+    x_function = PDDLFunction(name="(x)", signature={})
+    x_function.set_value(1.5)
+    new_sample["(x)"] = x_function
+    y_function = PDDLFunction(name="(y)", signature={})
+    y_function.set_value(3)
+    new_sample["(y)"] = y_function
+    z_function = PDDLFunction(name="(z)", signature={})
+    z_function.set_value(0.0)
+    new_sample["(z)"] = z_function
+    w_function = PDDLFunction(name="(w)", signature={})
+    w_function.set_value(1.0)
+    new_sample["(w)"] = w_function
 
     assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) > 0
