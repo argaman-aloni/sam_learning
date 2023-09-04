@@ -1,3 +1,5 @@
+from .abstract_agent import AbstractAgent
+from .action_priority_queue import PriorityQueue
 from .convex_hull_learner import ConvexHullLearner
 from .dependency_set import DependencySet
 from .discrete_utilities import extract_predicate_data, create_additional_parameter_name, \
@@ -12,13 +14,12 @@ from .matching_utils import extract_effects, contains_duplicates, create_signatu
     create_fully_observable_predicates
 from .numeric_fluent_learner_algorithm import NumericFluentStateStorage
 from .numeric_function_matcher import NumericFunctionMatcher
+from .numeric_information_gain_learner import InformationGainLearner
 from .numeric_utils import construct_multiplication_strings, prettify_coefficients, prettify_floating_point_number, \
     construct_linear_equation_string, construct_non_circular_assignment
 from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
 from .predicates_matcher import PredicatesMatcher
+from .propositional_information_gain_learner import PropositionalInformationGainLearner
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
-from .numeric_information_gain_learner import InformationGainLearner
-from .propositional_information_gain_learner import PropositionalInformationGainLearner
-from .abstract_agent import AbstractAgent

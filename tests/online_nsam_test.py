@@ -2,6 +2,7 @@
 from pddl_plus_parser.models import Domain, Observation, ActionCall
 from pytest import fixture, fail
 
+from sam_learning.core import PriorityQueue
 from sam_learning.learners import OnlineNSAMLearner
 
 
@@ -14,6 +15,34 @@ def test_init_online_learning_creates_an_information_gain_learner_for_each_actio
         depot_online_nsam: OnlineNSAMLearner, depot_domain: Domain):
     depot_online_nsam.init_online_learning()
     assert len(depot_online_nsam.ig_learner) == len(depot_domain.actions)
+
+
+def test_select_next_action_to_execute_when_failure_rate_is_large_selects_from_executable_actions(
+        depot_online_nsam: OnlineNSAMLearner, depot_domain: Domain, depot_observation: Observation):
+    depot_online_nsam.init_online_learning()
+    depot_online_nsam._state_failure_rate = 1000
+    depot_online_nsam._state_applicable_actions = PriorityQueue()
+    applicable_action = depot_observation.components[0].grounded_action_call
+    depot_online_nsam._state_applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
+    frontier = PriorityQueue()
+    not_applicable_action = depot_observation.components[1].grounded_action_call
+    frontier.insert(item=not_applicable_action, priority=1.0, selection_probability=1.0)
+    next_action = depot_online_nsam._select_next_action_to_execute(frontier_actions=frontier)
+    assert next_action == applicable_action
+
+
+def test_select_next_action_to_execute_when_failure_rate_is_zero_will_select_from_the_frontier(
+        depot_online_nsam: OnlineNSAMLearner, depot_domain: Domain, depot_observation: Observation):
+    depot_online_nsam.init_online_learning()
+    depot_online_nsam._state_failure_rate = 0
+    depot_online_nsam._state_applicable_actions = PriorityQueue()
+    applicable_action = depot_observation.components[0].grounded_action_call
+    depot_online_nsam._state_applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
+    frontier = PriorityQueue()
+    not_applicable_action = depot_observation.components[1].grounded_action_call
+    frontier.insert(item=not_applicable_action, priority=1.0, selection_probability=1.0)
+    next_action = depot_online_nsam._select_next_action_to_execute(frontier_actions=frontier)
+    assert next_action == not_applicable_action
 
 
 def test_calculate_state_information_gain_returns_value_greater_than_zero_when_action_is_observed_for_the_first_time(
@@ -94,11 +123,13 @@ def test_calculate_state_information_gain_when_action_is_observed_twice_returns_
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
 
-    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state, action=tested_action) > 0
+    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
+                                                                     action=tested_action) > 0
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
 
-    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state, action=tested_action) == 0
+    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
+                                                                     action=tested_action) == 0
 
 
 def test_consecutive_execution_of_informative_actions_creates_small_convex_hulls_and_does_not_fail(
@@ -151,10 +182,10 @@ def test_calculate_valid_neighbors_returns_a_set_of_actions_containing_the_actio
     valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
                                                                   current_state=initial_state)
     queue_items = set()
-    while not valid_neighbors.empty():
-        node_data = valid_neighbors.get()
-        assert isinstance(node_data[2], ActionCall)
-        queue_items.add(node_data[1])
+    while len(valid_neighbors) > 0:
+        action = valid_neighbors.get_item()
+        assert isinstance(action, ActionCall)
+        queue_items.add(str(action))
 
     assert str(observation_action) in queue_items
 
@@ -170,17 +201,17 @@ def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_a
     valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
                                                                   current_state=initial_state)
     num_neighbors = 0
-    while not valid_neighbors.empty():
+    while len(valid_neighbors) > 0:
         num_neighbors += 1
-        valid_neighbors.get()
+        valid_neighbors.get_item()
 
     depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=initial_state)
     valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
                                                                   current_state=initial_state)
     new_num_neighbors = 0
-    while not valid_neighbors.empty():
+    while len(valid_neighbors) > 0:
         new_num_neighbors += 1
-        valid_neighbors.get()
+        valid_neighbors.get_item()
 
     assert new_num_neighbors == num_neighbors - 2
 
@@ -197,18 +228,18 @@ def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_a
     valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
                                                                   current_state=initial_state)
     num_neighbors = 0
-    while not valid_neighbors.empty():
+    while len(valid_neighbors) > 0:
         num_neighbors += 1
-        valid_neighbors.get()
+        valid_neighbors.get_item()
 
     # executed action '(drive truck0 depot0 distributor0)'
     depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=next_state)
     valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
                                                                   current_state=initial_state)
     new_num_neighbors = 0
-    while not valid_neighbors.empty():
+    while len(valid_neighbors) > 0:
         new_num_neighbors += 1
-        valid_neighbors.get()
+        valid_neighbors.get_item()
 
     non_informative_actions = ['(drive truck0 depot0 distributor0)', '(drive truck0 depot0 distributor1)',
                                '(drive truck0 distributor0 depot0)', '(drive truck0 distributor1 depot0)',

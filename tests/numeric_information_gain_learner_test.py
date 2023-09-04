@@ -297,6 +297,22 @@ def test_in_hull_captures_that_more_than_one_point_is_in_1d_convex_hull(
     assert information_gain_learner_no_predicates._in_hull(points_to_test, hull_df)
 
 
+def test_validate_action_discrete_preconditions_hold_in_state_when_predicates_are_valid_returns_true(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    information_gain_learner_with_predicates.lifted_predicates = [
+        p.untyped_representation for p in test_predicates[:-1]]
+    assert information_gain_learner_with_predicates._validate_action_discrete_preconditions_hold_in_state(
+        test_predicates)
+
+
+def test_validate_action_discrete_preconditions_hold_in_state_when_predicates_are_are_partial_from_required_returns_false(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    information_gain_learner_with_predicates.lifted_predicates = [
+        p.untyped_representation for p in test_predicates]
+    assert not information_gain_learner_with_predicates._validate_action_discrete_preconditions_hold_in_state(
+        test_predicates[:-1])
+
+
 def test_in_hull_captures_that_point_is_in_1d_hull_when_given_only_one_test_point(
         information_gain_learner_no_predicates: InformationGainLearner):
     hull_df = pd.DataFrame({
@@ -597,7 +613,7 @@ def test_is_non_informative_unsafe_returns_false_when_no_negative_point_is_in_th
         new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
-def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull_verifies_if_the_point_was_already_observed_negative(
+def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_verifies_if_the_point_was_already_observed_negative(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [1, 2],
@@ -619,10 +635,10 @@ def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull
         new_func.set_value(4)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull_verifies_if_the_point_was_already_observed_positive(
+def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_verifies_if_the_point_was_already_observed_positive(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [1, 2],
@@ -644,10 +660,10 @@ def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull
         new_func.set_value(1)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull_verifies_that_the_point_was_not_observed_in_the_negative_and_positive_samples(
+def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_verifies_that_the_point_was_not_observed_in_the_negative_and_positive_samples(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [1, 2],
@@ -669,10 +685,10 @@ def test_calculate_information_gain_when_not_enough_points_to_create_convex_hull
         new_func.set_value(index)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) > 0
+    assert information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_information_gain_when_can_create_convex_hull_and_point_is_in_ch_returns_that_the_point_is_not_informative(
+def test_is_sample_informative_when_can_create_convex_hull_and_point_is_in_ch_returns_that_the_point_is_not_informative(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 0, 1, 1],
@@ -691,10 +707,10 @@ def test_calculate_information_gain_when_can_create_convex_hull_and_point_is_in_
         new_func.set_value(0.5)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_information_gain_returns_zero_when_new_point_combined_with_positive_points_creates_a_hull_that_includes_a_negative_sample(
+def test_is_sample_informative_returns_zero_when_new_point_combined_with_positive_points_creates_a_hull_that_includes_a_negative_sample(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 0, 1, 1],
@@ -716,10 +732,10 @@ def test_calculate_information_gain_returns_zero_when_new_point_combined_with_po
     y_function.set_value(2.0)
     new_sample["(y)"] = y_function
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_information_gain_returns_value_greater_than_zero_when_new_point_should_be_informative(
+def test_is_sample_informative_returns_value_greater_than_zero_when_new_point_should_be_informative(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 0, 1, 1],
@@ -741,10 +757,10 @@ def test_calculate_information_gain_returns_value_greater_than_zero_when_new_poi
     y_function.set_value(-0.5)
     new_sample["(y)"] = y_function
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) > 0
+    assert information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_when_there_are_constant_features_in_the_dataset_checks_the_convex_hull_only_on_the_relevant_part_when_consts_are_equal(
+def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_checks_the_convex_hull_only_on_the_relevant_part_when_consts_are_equal(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 0, 1, 1],
@@ -776,10 +792,10 @@ def test_calculate_when_there_are_constant_features_in_the_dataset_checks_the_co
     w_function.set_value(1.0)
     new_sample["(w)"] = w_function
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal(
+def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 0, 1, 1],
@@ -811,10 +827,10 @@ def test_calculate_when_there_are_constant_features_in_the_dataset_checks_min_ma
     w_function.set_value(1.0)
     new_sample["(w)"] = w_function
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) == 0
+    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
 
 
-def test_calculate_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal_and_value_out_of_range(
+def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal_and_value_out_of_range(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
         "(x)": [0, 0, 1, 1],
@@ -846,4 +862,4 @@ def test_calculate_when_there_are_constant_features_in_the_dataset_checks_min_ma
     w_function.set_value(1.0)
     new_sample["(w)"] = w_function
 
-    assert information_gain_learner_no_predicates.calculate_sample_information_gain(new_sample, []) > 0
+    assert information_gain_learner_no_predicates.is_sample_informative(new_sample, [])

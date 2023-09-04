@@ -263,7 +263,7 @@ def test_construct_assignment_equations_restrictive_preconditions_when_not_enoug
     assert not learned_correctly
     assert preconditions is not None
     assert len(preconditions.operands) == 2
-    assert len(numeric_effects) == 3
+    assert len(numeric_effects) == 2
     for effect in numeric_effects:
         print(effect.to_pddl())
 

@@ -216,14 +216,15 @@ class DomainValidator:
 
     def validate_domain(
             self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
-            used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None) -> None:
+            used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None,
+            num_episodes: Optional[int] = None, num_steps: Optional[int] = None) -> None:
         """Validates that using the input domain problems can be solved.
 
         :param tested_domain_file_path: the path of the domain that was learned using POL.
         :param test_set_directory_path: the path to the directory containing the test set problems.
         :param used_observations: the observations that were used to learn the domain.
         """
-        num_triplets = self._extract_num_triplets(used_observations)
+        num_triplets = self._extract_num_triplets(used_observations) if num_steps is None else num_steps
         self.logger.info("Solving the test set problems using the learned domain!")
         solving_report = self.solver.execute_solver(
             problems_directory_path=test_set_directory_path,
@@ -258,7 +259,7 @@ class DomainValidator:
             solving_stats[f"problems_{entry}"].append(problem_file_name)
 
         self._calculate_solving_percentages(solving_stats)
-        num_trajectories = len(used_observations) if used_observations else 0
+        num_trajectories = len(used_observations) if used_observations else num_episodes
         self.solving_stats.append({
             "learning_algorithm": self.learning_algorithm.name,
             "num_trajectories": num_trajectories,
