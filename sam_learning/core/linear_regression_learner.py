@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Tuple, Set
 import numpy as np
 from pandas import DataFrame
 from pddl_plus_parser.models import Precondition, NumericalExpressionTree, PDDLFunction
-from sklearn.linear_model import Lars
+from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
@@ -71,7 +71,7 @@ class LinearRegressionLearner:
         :param allow_unsafe_learning: whether to allow unsafe learning.
         :return: the vector representing the coefficients for the function variables and the learning score (R^2).
         """
-        regressor = Lars()
+        regressor = LinearRegression()
         regressor.fit(values_matrix, function_post_values)
         learning_score = regressor.score(values_matrix, function_post_values)
         if learning_score < LEGAL_LEARNING_SCORE:
@@ -222,16 +222,16 @@ class LinearRegressionLearner:
             combined_preconditions = construct_numeric_conditions(
                 const_preconditions, ConditionType.conjunctive, self.domain_functions)
 
-        dijsunctive_preconditions = Precondition("or")
+        disjunctive_preconditions = Precondition("or")
         for precondition_statement in precondition_statements:
-            dijsunctive_preconditions.add_condition(construct_numeric_conditions(
+            disjunctive_preconditions.add_condition(construct_numeric_conditions(
                 precondition_statement, ConditionType.conjunctive, self.domain_functions))
 
         if combined_preconditions is not None:
-            combined_preconditions.add_condition(dijsunctive_preconditions)
+            combined_preconditions.add_condition(disjunctive_preconditions)
             return combined_preconditions
 
-        return dijsunctive_preconditions
+        return disjunctive_preconditions
 
     def _construct_effect_from_single_sample(
             self, prev_state_data: Dict[str, List[float]],
@@ -285,8 +285,7 @@ class LinearRegressionLearner:
         combined_data = self._combine_states_data(previous_state_data, next_state_data)
         if combined_data.shape[0] == 1:
             self.logger.info(f"The action {self.action_name} contains a single unique observation!")
-            return self._construct_effect_from_single_sample(previous_state_data, next_state_data), \
-                self._construct_restrictive_numeric_preconditions(combined_data), False
+            return self._construct_effect_from_single_sample(previous_state_data, next_state_data), None, False
 
         # The dataset contains more than one observation.
         self.logger.debug("Removing fluents that are constant zero...")
@@ -307,8 +306,7 @@ class LinearRegressionLearner:
                 assignment_statements.append(polynomial_equation)
 
         if not is_safe_to_learn:
-            return construct_numeric_effects(assignment_statements, self.domain_functions), \
-                self._construct_restrictive_numeric_preconditions(features_df, combined_conditions), False
+            return construct_numeric_effects(assignment_statements, self.domain_functions), None, False
 
         return (construct_numeric_effects(assignment_statements, self.domain_functions),
                 construct_numeric_conditions(combined_conditions, ConditionType.conjunctive, self.domain_functions),

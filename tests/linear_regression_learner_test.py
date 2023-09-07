@@ -261,13 +261,10 @@ def test_construct_assignment_equations_restrictive_preconditions_when_not_enoug
     numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations(
         pre_state_matrix, next_state_matrix)
     assert not learned_correctly
-    assert preconditions is not None
-    assert len(preconditions.operands) == 2
-    assert len(numeric_effects) == 2
+    assert preconditions is None  # The preconditions will be learned in externally to maintain safety.
+    assert len(numeric_effects) == 3
     for effect in numeric_effects:
         print(effect.to_pddl())
-
-    print(str(preconditions))
 
 
 def test_construct_assignment_equations_restrictive_preconditions_given_only_one_sample(
@@ -285,11 +282,7 @@ def test_construct_assignment_equations_restrictive_preconditions_given_only_one
     numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations(
         pre_state_matrix, next_state_matrix)
     assert not learned_correctly
-    assert preconditions is not None
-    assert len(preconditions.operands) == 3
-    assert all([isinstance(operand, NumericalExpressionTree) for operand in preconditions.operands])
+    assert preconditions is None
     assert len(numeric_effects) == 2
     for effect in numeric_effects:
         print(effect.to_pddl())
-
-    print(str(preconditions))

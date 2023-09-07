@@ -171,13 +171,35 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             action_info_gain = self.calculate_state_action_information_gain(state=current_state, action=grounded_action)
             selection_prob = (1 - self._action_observation_rate[grounded_action.name] /
                               sum([observation_rate for observation_rate in self._action_observation_rate.values()]))
-            action_info_gain *= 1 / self._action_observation_rate[grounded_action.name]
 
             if abs(action_info_gain) > NON_INFORMATIVE_IG:  # IG is a negative number.
                 self.logger.info(f"The action {grounded_action.name} is informative, adding it to the priority queue.")
                 neighbors.insert(item=grounded_action, priority=action_info_gain, selection_probability=selection_prob)
 
         return neighbors
+
+    def update_failed_action_neighbors(
+            self, neighbors: PriorityQueue, current_state: State, action: ActionCall) -> PriorityQueue:
+        """Calculates the new neighbor queue based on the new information of the failed action.
+
+        :param neighbors: the previously calculated neighbors queue.
+        :param current_state: the state in which the action had failed.
+        :param action: the failed grounded action.
+        :return: the new neighbors queue with the failed lifted action updated.
+        """
+        self.logger.info("Updating the failed action's frontier with the new data.")
+        new_neighbors = PriorityQueue()
+        while len(neighbors) > 0:
+            neighbor, information_gain, probability = neighbors.get_queue_item_data()
+            if neighbor.name != action.name:
+                new_neighbors.insert(item=neighbor, priority=information_gain, selection_probability=probability)
+            else:
+                new_ig = self.calculate_state_action_information_gain(state=current_state, action=neighbor)
+                selection_prob = (1 - self._action_observation_rate[neighbor.name] /
+                                  sum([rate for rate in self._action_observation_rate.values()]))
+                new_neighbors.insert(item=neighbor, priority=new_ig, selection_probability=selection_prob)
+
+        return new_neighbors
 
     def execute_action(
             self, action_to_execute: ActionCall, previous_state: State, next_state: State) -> None:
@@ -257,6 +279,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             while not self._is_successful_action(current_state, next_state) and len(neighbors) > 0:
                 self._state_failure_rate += 1
                 self.logger.debug("The action was not successful, trying again.")
+                neighbors = self.update_failed_action_neighbors(neighbors, current_state, action)
                 action = self._select_next_action_to_execute(neighbors)
                 next_state = self.agent.observe(state=current_state, action=action)
                 self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)

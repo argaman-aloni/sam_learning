@@ -133,7 +133,8 @@ def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_prev_state_fluents)
         load_action_state_fluent_storage.add_to_next_state_storage(simple_prev_state_fluents)
 
-    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations()
+    effects, numeric_preconditions, learned_perfectly = \
+        load_action_state_fluent_storage.construct_assignment_equations()
     assert learned_perfectly
     assert isinstance(effects, set)
     assert len(effects) == 0
@@ -505,3 +506,21 @@ def test_filter_constant_features_with_two_constant_detects_both_and_removes_the
     assert filtered_matrix.shape[1] == 2
     assert set(equal_fluent_strs) == {"(= (load_limit ?z) 33.0)", "(= (weight ?z) 5.0)"}
     assert set(removed_fluents) == {"(load_limit ?z)", "(weight ?z)"}
+
+
+def test_filter_constant_features_with_all_features_being_constant_returns_correct_empty_df_and_correct_conditions(
+        load_action_state_fluent_storage: NumericFluentStateStorage):
+    pre_state_data = {
+        "(fuel-cost )": [1.0, 1.0, 1.0],
+        "(current_load ?z)": [15.0, 15.0, 15.0],
+        "(load_limit ?z)": [33.0, 33.0, 33.0],
+        "(weight ?z)": [5.0, 5.0, 5.0]
+    }
+    matrix_with_constant_column = DataFrame(pre_state_data)
+    filtered_matrix, equal_fluent_strs, removed_fluents = filter_constant_features(matrix_with_constant_column)
+    assert filtered_matrix.shape[1] == 0
+    assert filtered_matrix.shape[0] == 0
+
+    assert set(equal_fluent_strs) == {"(= (load_limit ?z) 33.0)", "(= (weight ?z) 5.0)", "(= (fuel-cost ) 1.0)",
+                                      "(= (current_load ?z) 15.0)"}
+    assert set(removed_fluents) == {"(load_limit ?z)", "(weight ?z)", "(fuel-cost )", "(current_load ?z)"}

@@ -25,15 +25,35 @@ class PriorityQueue:
         highest_priority = max(list(self._prioritized_queue.keys()))
         highest_priority_queue = self._prioritized_queue[highest_priority]
         if len(highest_priority_queue) == 1:
-            selected_action = highest_priority_queue[0][0]
+            selected_item = highest_priority_queue[0][0]
             self._prioritized_queue.pop(highest_priority)
-            return selected_action
+            return selected_item
 
-        action_probabilities = [queue_item[1] for queue_item in highest_priority_queue]
-        selected_queue_item = random.choices(highest_priority_queue, weights=action_probabilities, k=1)[0]
-        selected_action = selected_queue_item[0]
+        probabilities = [queue_item[1] for queue_item in highest_priority_queue]
+        selected_queue_item = random.choices(highest_priority_queue, weights=probabilities, k=1)[0]
+        selected_item = selected_queue_item[0]
         highest_priority_queue.pop(highest_priority_queue.index(selected_queue_item))
-        return selected_action
+        return selected_item
+
+    def get_queue_item_data(self) -> Tuple[Any, float, float]:
+        """Returns the item with the highest priority (including the priority and the probability).
+
+        Note:
+            This action removes the selected item from the priority queue.
+
+        :return: the item with the highest priority. If there are multiple items with the same priority,
+            returns the first one.
+        """
+        highest_priority = max(list(self._prioritized_queue.keys()))
+        highest_priority_queue = self._prioritized_queue[highest_priority]
+        item, probability = highest_priority_queue[0]
+        if len(highest_priority_queue) == 1:
+            self._prioritized_queue.pop(highest_priority)
+
+        else:
+            highest_priority_queue.pop(highest_priority_queue.index(highest_priority_queue[0]))
+
+        return item, highest_priority, probability
 
     def insert(self, item: Any, priority: float, selection_probability: float) -> None:
         """Adds an action to the priority queue.

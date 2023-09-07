@@ -1,11 +1,15 @@
 import numpy as np
 import pytest
+import random
+
 from pandas import DataFrame
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 
 from sam_learning.core.convex_hull_learner import ConvexHullLearner
 
 TEST_ACTION_NAME = 'test_action'
+
+random.seed(42)
 
 
 @pytest.fixture
@@ -150,3 +154,50 @@ def test_construct_single_dimension_inequalities_with_input_lower_bound_equal_to
     assert len(inequality_precondition.operands) == 1
     equality = inequality_precondition.operands.pop()
     assert "(= (x ) 2.0)" == equality.to_pddl()
+
+
+def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_creates_a_single_condition(
+        convex_hull_learner: ConvexHullLearner):
+    pre_state_data = {
+        "(x)": [2],
+        "(y)": [3],
+        "(z)": [-1]
+    }
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(pre_state_data, None)
+    assert inequality_precondition.binary_operator == "and"
+    assert len(inequality_precondition.operands) == 3
+    assert {op.to_pddl() for op in inequality_precondition.operands} == {"(= (x ) 2.0)", "(= (y ) 3.0)",
+                                                                         "(= (z ) -1.0)"}
+
+
+def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_two_creates_a_two_conditions_in_or_statement(
+        convex_hull_learner: ConvexHullLearner):
+    pre_state_data = {
+        "(x)": [2, 3],
+        "(y)": [3, 5],
+        "(z)": [-1, 7]
+    }
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(pre_state_data, None)
+    assert inequality_precondition.binary_operator == "or"
+    assert len(inequality_precondition.operands) == 2
+    assert all([isinstance(op, Precondition) for op in inequality_precondition.operands])
+    combined_conditions = set()
+    for op in inequality_precondition.operands:
+        assert op.binary_operator == "and"
+        combined_conditions.update({cond.to_pddl() for cond in op.operands})
+    assert combined_conditions == {"(= (x ) 2.0)", "(= (x ) 3.0)", "(= (y ) 3.0)", "(= (y ) 5.0)",
+                                   "(= (z ) -1.0)", "(= (z ) 7.0)"}
+
+
+def test_construct_safe_linear_inequalities_when_the_number_of_is_smaller_than_needed_dimensions_but_larger_than_two_creates_a_convex_hull_from_the_samples(
+        convex_hull_learner: ConvexHullLearner):
+    pre_state_data = {
+        "(x)": random.sample(range(100), 3),
+        "(y)": random.sample(range(100), 3),
+        "(z)": random.sample(range(100), 3)
+    }
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(pre_state_data, None)
+    assert inequality_precondition.binary_operator == "and"
+    assert len(inequality_precondition.operands) == 3
+    assert all([isinstance(op, NumericalExpressionTree) for op in inequality_precondition.operands])
+    print(str(inequality_precondition))

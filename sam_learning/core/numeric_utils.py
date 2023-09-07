@@ -8,6 +8,7 @@ import sympy
 from pandas import DataFrame, Series
 from pddl_plus_parser.lisp_parsers import PDDLTokenizer
 from pddl_plus_parser.models import Precondition, PDDLFunction, construct_expression_tree, NumericalExpressionTree
+from sklearn.feature_selection import VarianceThreshold
 
 from sam_learning.core.learning_types import ConditionType
 
@@ -139,15 +140,23 @@ def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[Li
     :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal.
     """
     equal_fluent_strs, removed_fluents = [], []
-    result_ft = input_df.copy()
     relevant_columns = [col for col in input_df.columns if col not in columns_to_ignore]
-    for col in relevant_columns:
-        if len(input_df[col].unique()) == 1:
+    try:
+        selector = VarianceThreshold().set_output(transform="pandas")
+        result_df = selector.fit_transform(input_df[relevant_columns])
+        filtered_columns = [column for column in relevant_columns if column not in result_df.columns]
+        for col in filtered_columns:
             equal_fluent_strs.append(f"(= {col} {input_df[col].unique()[0]})")
             removed_fluents.append(col)
-            result_ft.drop(columns=col, inplace=True)
 
-    return result_ft, equal_fluent_strs, removed_fluents
+        return result_df, equal_fluent_strs, removed_fluents
+
+    except ValueError:
+        # no feature in X meets the variance threshold 0.0 (i.e. all features are constant)
+        for col in input_df.columns:
+            equal_fluent_strs.append(f"(= {col} {input_df[col].unique()[0]})")
+
+        return DataFrame(), equal_fluent_strs, input_df.columns
 
 
 def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame, List[str], Dict[str, str]]:

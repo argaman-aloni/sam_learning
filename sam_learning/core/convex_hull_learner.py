@@ -9,12 +9,11 @@ import numpy as np
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
+from sklearn.decomposition import PCA
 
-from sam_learning.core.exceptions import NotSafeActionError
-from sam_learning.core.learning_types import EquationSolutionType, ConditionType
+from sam_learning.core.learning_types import ConditionType
 from sam_learning.core.numeric_utils import construct_multiplication_strings, construct_linear_equation_string, \
-    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features, \
-    get_num_independent_equations
+    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features
 
 
 class ConvexHullLearner:
@@ -30,8 +29,8 @@ class ConvexHullLearner:
         self.action_name = action_name
         self.domain_functions = domain_functions
 
-    def _create_convex_hull_linear_inequalities(self, points_df: DataFrame,
-                                                display_mode: bool = False) -> Tuple[List[List[float]], List[float]]:
+    def _create_convex_hull_linear_inequalities(
+            self, points_df: DataFrame, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :param points_df: the dataframe containing the points that represent the values of the function in the states
@@ -40,6 +39,7 @@ class ConvexHullLearner:
 
         Note: the returned values represents the linear inequalities of the convex hull, i.e.,  Ax <= b.
         """
+        self.logger.debug(f"Creating convex hull for action {self.action_name}.")
         points = points_df.to_numpy()
         try:
             hull = ConvexHull(points)
@@ -49,14 +49,16 @@ class ConvexHullLearner:
             b = -hull.equations[:, num_dimensions]
             return [prettify_coefficients(row) for row in A], prettify_coefficients(b)
 
-        except (QhullError, ValueError) as e:
-            with open(self.convex_hull_error_file_path, "at") as error_file:
-                error_file.write(f"{e}\n")
-
-            failure_reason = f"Convex hull encountered an error condition and no solution was found " \
-                             f"for action {self.action_name}"
-            self.logger.warning(failure_reason)
-            raise NotSafeActionError(self.action_name, failure_reason, EquationSolutionType.convex_hull_not_found)
+        except (QhullError, ValueError):
+            self.logger.debug("Convex hull failed to create a convex hull, using PCA to reduce the dimensionality.")
+            rank = np.linalg.matrix_rank(points)
+            model = PCA(n_components=rank - 1).fit(points)
+            pred_points = model.transform(points)
+            hull = ConvexHull(pred_points)
+            PCA_A = hull.equations[:, :pred_points.shape[1]]
+            b = -hull.equations[:, pred_points.shape[1]]
+            convex_hull_pca_points = model.inverse_transform(PCA_A)
+            return [prettify_coefficients(row) for row in convex_hull_pca_points], prettify_coefficients(b)
 
     @staticmethod
     def _construct_pddl_inequality_scheme(
@@ -117,8 +119,18 @@ class ConvexHullLearner:
         :param hull: the convex hull to display.
         :param num_dimensions: the number of dimensions of the original data.
         """
-        if num_dimensions == 2 and display_mode:
+        if not display_mode:
+            return
+
+        if num_dimensions == 2:
             _ = convex_hull_plot_2d(hull)
+            plt.title(f"{self.action_name} - convex hull")
+            plt.show()
+
+        elif num_dimensions == 3:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection="3d")
+            ax.plot_trisurf(hull.points[:, 0], hull.points[:, 1], hull.points[:, 2], triangles=hull.simplices)
             plt.title(f"{self.action_name} - convex hull")
             plt.show()
 
@@ -183,14 +195,13 @@ class ConvexHullLearner:
             return construct_numeric_conditions(
                 equality_conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
-        needed_dimensions = len(filtered_pre_state_df.columns) + 1
-
         if filtered_pre_state_df.shape[1] < 2:
             self.logger.debug("After filtering, only one dimension remained in the preconditions!")
             return self._construct_single_dimension_inequalities(
                 filtered_pre_state_df.loc[:, filtered_pre_state_df.columns[0]], equality_conditions)
 
-        if get_num_independent_equations(filtered_pre_state_df) < needed_dimensions:
+        if filtered_pre_state_df.shape[0] <= 2 and filtered_pre_state_df.shape[1] >= 2:
+            self.logger.debug("After filtering we have a line equation. Cannot compute linear line equation.'")
             return self._create_disjunctive_preconditions(filtered_pre_state_df, equality_conditions)
 
         A, b = self._create_convex_hull_linear_inequalities(filtered_pre_state_df, display_mode=False)

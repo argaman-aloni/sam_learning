@@ -71,15 +71,22 @@ class NumericSAMLearner(SAMLearner):
 
             return
 
-        self.logger.debug(f"The action {action.name} was not learned perfectly. ")
-        if numeric_preconditions is not None:
-            restrictive_preconditions = Precondition("and")
-            for precondition in action.preconditions.root.operands:
-                if isinstance(precondition, Predicate):
-                    restrictive_preconditions.add_condition(precondition)
+        self.logger.debug(f"The action {action.name} was not learned perfectly.")
+        if self.preconditions_fluent_map[action.name] is None:
+            self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
+            return
 
-            restrictive_preconditions.add_condition(numeric_preconditions)
-            action.preconditions.root = restrictive_preconditions
+        self.logger.debug(f"Creating restrictive numeric preconditions for the action.")
+        restrictive_preconditions = Precondition("and")
+        for precondition in action.preconditions.root.operands:
+            if isinstance(precondition, Predicate):
+                restrictive_preconditions.add_condition(precondition)
+
+        action.preconditions.root = restrictive_preconditions
+        fluents_map_backup = self.preconditions_fluent_map
+        self.preconditions_fluent_map = None
+        self._construct_safe_numeric_preconditions(action)
+        self.preconditions_fluent_map = fluents_map_backup
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.

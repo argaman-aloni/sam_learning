@@ -1,6 +1,7 @@
 """The PIL main framework - Compile, Learn and Plan."""
 import argparse
 import logging
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -15,7 +16,7 @@ from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
-DEFAULT_SPLIT = 5
+DEFAULT_SPLIT = 10
 
 
 class PIL:
@@ -80,6 +81,8 @@ class PIL:
                 online_learner.search_to_learn_action_model(init_state, problem_objects=problem.objects)
             self.logger.info(f"Finished episode number {problem_index + 1}! "
                              f"The current goal was {'achieved' if goal_achieved else 'not achieved'}.")
+            if goal_achieved:
+                time.sleep(5)
             solved_all_test_problems = self.validate_learned_domain(
                 learned_model, test_set_dir_path, episode_number=problem_index + 1,
                 num_steps_in_episode=num_steps_in_episode)
@@ -103,7 +106,7 @@ class PIL:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"{learned_model.name}_epoch_{episode_number}.pddl")
+                                   f"online_nsam_{learned_model.name}_epoch_{episode_number}.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         all_possible_solution_types = [solution_type.name for solution_type in SolutionOutputTypes]
 
