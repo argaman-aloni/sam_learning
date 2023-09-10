@@ -10,7 +10,7 @@ from typing import Dict
 from jdk4py import JAVA
 
 ENHSP_FILE_PATH = os.environ["ENHSP_FILE_PATH"]
-MAX_RUNNING_TIME = 60  # seconds
+MAX_RUNNING_TIME = 5  # seconds
 
 TIMEOUT_ERROR_CODE = b"Timeout has been reached"
 PROBLEM_SOLVED = b"Problem Solved"

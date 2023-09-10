@@ -51,8 +51,9 @@ class ConvexHullLearner:
 
         except (QhullError, ValueError):
             self.logger.debug("Convex hull failed to create a convex hull, using PCA to reduce the dimensionality.")
-            rank = np.linalg.matrix_rank(points)
-            model = PCA(n_components=rank - 1).fit(points)
+            rank = np.linalg.matrix_rank(
+                points)  # Rank of the array is the number of singular values of the array that are greater than tol.
+            model = PCA(n_components=rank - 1).fit(points)  # need rank -1 since to create CH we need rank + 1 samples.
             pred_points = model.transform(points)
             hull = ConvexHull(pred_points)
             PCA_A = hull.equations[:, :pred_points.shape[1]]
@@ -200,12 +201,19 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(
                 filtered_pre_state_df.loc[:, filtered_pre_state_df.columns[0]], equality_conditions)
 
-        if filtered_pre_state_df.shape[0] <= 2 and filtered_pre_state_df.shape[1] >= 2:
+        if filtered_pre_state_df.shape[0] <= 2 <= filtered_pre_state_df.shape[1]:
             self.logger.debug("After filtering we have a line equation. Cannot compute linear line equation.'")
             return self._create_disjunctive_preconditions(filtered_pre_state_df, equality_conditions)
 
-        A, b = self._create_convex_hull_linear_inequalities(filtered_pre_state_df, display_mode=False)
-        inequalities_strs = self._construct_pddl_inequality_scheme(A, b, filtered_pre_state_df.columns)
-        inequalities_strs.extend(equality_conditions)
-        return construct_numeric_conditions(
-            inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
+        try:
+            A, b = self._create_convex_hull_linear_inequalities(filtered_pre_state_df, display_mode=False)
+            inequalities_strs = self._construct_pddl_inequality_scheme(A, b, filtered_pre_state_df.columns)
+            inequalities_strs.extend(equality_conditions)
+            return construct_numeric_conditions(
+                inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
+
+        except (QhullError, ValueError):
+            self.logger.warning("Convex hull failed to create a convex hull, using disjunctive preconditions "
+                                "(probably since the rank of the matrix is 2 and it cannot create a degraded "
+                                "convex hull).")
+            return self._create_disjunctive_preconditions(filtered_pre_state_df, equality_conditions)

@@ -31,6 +31,7 @@ class InformationGainLearner:
         self.positive_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
         self.negative_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
         self._effects_learned_perfectly = False
+        self._cached_convex_hull = None
 
     def _locate_sample_in_df(self, sample_to_locate: List[float], df: DataFrame) -> int:
         """Locates the sample in the data frame.
@@ -96,7 +97,9 @@ class InformationGainLearner:
 
         return True
 
-    def _in_hull(self, points_to_test: DataFrame, hull_df: DataFrame, debug_mode: bool = False) -> bool:
+    def _in_hull(
+            self, points_to_test: DataFrame, hull_df: DataFrame, debug_mode: bool = False,
+            use_cached_ch: bool = False) -> bool:
         """
         Test if the points are in `hull`
 
@@ -110,6 +113,7 @@ class InformationGainLearner:
         :param points_to_test: the points to test whether they are inside the convex hull.
         :param hull_df: the points composing the positive samples convex hull.
         :param debug_mode: whether to display the convex hull.
+        :param use_cached_ch: whether to use the cached convex hull. This reduces runtime.
         :return: whether any of the negative samples is inside the convex hull.
         """
         self.logger.debug("Validating whether the input samples are inside the convex hull.")
@@ -133,7 +137,12 @@ class InformationGainLearner:
         if hull.shape[1] == 1:
             return all([hull.min() <= point <= hull.max() for point in relevant_sample.to_numpy()])
 
-        delaunay_hull = Delaunay(hull)
+        if use_cached_ch:
+            delaunay_hull = self._cached_convex_hull if self._cached_convex_hull is not None else Delaunay(hull)
+
+        else:
+            delaunay_hull = Delaunay(hull)
+
         if debug_mode:
             self._display_delaunay_graph(delaunay_hull, hull.shape[1])
 
@@ -203,16 +212,18 @@ class InformationGainLearner:
         return True
 
     def _is_non_informative_safe(self, new_numeric_sample: Dict[str, PDDLFunction],
-                                 new_propositional_sample: List[Predicate]) -> bool:
+                                 new_propositional_sample: List[Predicate], use_cache: bool = False) -> bool:
         """Validate whether a new sample is non-informative according to the safe model.
 
         Note:
-            To validate if the new sample is non-informative, we first check if all of the discrete preconditions hold
+            To validate if the new sample is non-informative, we first check if all the discrete preconditions hold
             if so we continue to validate whether the new sample is inside the convex hull of the positive samples.
             If both of the conditions hold, the new sample is non-informative.
 
         :param new_numeric_sample: the numeric functions representing the new sample.
         :param new_propositional_sample: the propositional predicates representing the new sample.
+        :param use_cache: whether to use the cached convex hull. This prevents redundant calculations and reduces
+            runtime.
         :return: whether the new sample is non-informative according to the safe model.
         """
         self.logger.info("Validating whether the new sample is non-informative according to the safe model.")
@@ -223,7 +234,7 @@ class InformationGainLearner:
         new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in self.lifted_functions})
         try:
             return self._in_hull(new_point_data, self.positive_samples_df[
-                self.lifted_functions]) and self._can_determine_effects_perfectly()
+                self.lifted_functions], use_cached_ch=use_cache) and self._can_determine_effects_perfectly()
 
         except (QhullError, ValueError):
             sample_values = [new_numeric_sample[col].value for col in self.lifted_functions]
@@ -273,6 +284,10 @@ class InformationGainLearner:
                     return True
 
         return False
+
+    def clear_convex_hull_cache(self) -> None:
+        """Clears the cached convex hull."""
+        self._cached_convex_hull = None
 
     def remove_non_existing_functions(self, functions_to_keep: List[str]) -> None:
         """Removes functions that do not exist in the state and thus irrelevant to the action.
@@ -345,11 +360,14 @@ class InformationGainLearner:
             return False
 
     def is_sample_informative(
-            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> bool:
+            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
+            use_cache: bool = False) -> bool:
         """Checks whether the sample is informative.
 
         :param new_numeric_sample: the new sample to calculate whether it is informative.
         :param new_propositional_sample: the propositional predicates representing the new sample.
+        :param use_cache: whether to use the cached convex hull. This prevents redundant calculations and reduces
+            runtime.
         :return: whether the sample is informative.
         """
         self.logger.info("Calculating the information gain of a new sample.")
@@ -358,7 +376,8 @@ class InformationGainLearner:
             self.logger.debug("There are no samples to calculate the information gain from - action not observed yet.")
             return True
 
-        is_non_informative_safe = self._is_non_informative_safe(new_numeric_sample, new_propositional_sample)
+        is_non_informative_safe = self._is_non_informative_safe(
+            new_numeric_sample, new_propositional_sample, use_cache=use_cache)
         is_non_informative_unsafe = self._is_non_informative_unsafe(new_numeric_sample, new_propositional_sample)
         if is_non_informative_safe or is_non_informative_unsafe:
             return False

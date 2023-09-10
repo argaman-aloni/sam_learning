@@ -2,8 +2,7 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, Predicate, \
-    NumericalExpressionTree
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, Predicate
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm, LearnerAction
@@ -72,7 +71,7 @@ class NumericSAMLearner(SAMLearner):
             return
 
         self.logger.debug(f"The action {action.name} was not learned perfectly.")
-        if self.preconditions_fluent_map[action.name] is None:
+        if self.preconditions_fluent_map is None:
             self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
             return
 

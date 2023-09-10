@@ -12,7 +12,7 @@ LABEL = "label"
 
 NON_INFORMATIVE_IG = 0
 MIN_FEATURES_TO_CONSIDER = 1
-MAX_STEPS_PER_EPOCH = 300
+MAX_STEPS_PER_EPISODE = 300
 
 
 class OnlineNSAMLearner(PolynomialSAMLearning):
@@ -108,11 +108,14 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                 action_name=action_name, lifted_functions=lifted_function_names,
                 lifted_predicates=lifted_predicate_names)
 
-    def calculate_state_action_information_gain(self, state: State, action: ActionCall) -> float:
+    def calculate_state_action_information_gain(
+            self, state: State, action: ActionCall, action_already_calculated: bool = False) -> float:
         """Calculates the information gain of a state.
 
         :param state: the state to calculate the information gain of.
         :param action: the action that we calculate the information gain of executing in the state.
+        :param action_already_calculated: whether the action's information gain had been calculated already,
+            to reduce calculation efforts.
         :return: the information gain of the state.
         """
         self.logger.info(f"Calculating the information gain of applying {str(action)} on the state.")
@@ -126,7 +129,8 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
             self.ig_learner[action.name].remove_non_existing_functions(list(lifted_functions.keys()))
 
-        is_informative = self.ig_learner[action.name].is_sample_informative(lifted_functions, lifted_predicates)
+        is_informative = self.ig_learner[action.name].is_sample_informative(
+            lifted_functions, lifted_predicates, use_cache=action_already_calculated)
         IG = NON_INFORMATIVE_IG if not is_informative else self.ig_learner[action.name].calculate_information_gain(
             lifted_functions, lifted_predicates)
         if not is_informative:
@@ -165,16 +169,23 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """
         self.logger.info("Calculating the valid neighbors for the current state.")
         neighbors = PriorityQueue()
+        action_calculation_cache = {action_name: 0 for action_name in self.partial_domain.actions}
         for grounded_action in grounded_actions:
             self.logger.debug(f"Checking the action {grounded_action.name}.")
             # Setting to a negative value since priority queue is works from smallest to largest.
-            action_info_gain = self.calculate_state_action_information_gain(state=current_state, action=grounded_action)
+            action_info_gain = self.calculate_state_action_information_gain(
+                state=current_state, action=grounded_action,
+                action_already_calculated=action_calculation_cache[grounded_action.name] > 0)
+            action_calculation_cache[grounded_action.name] += 1
             selection_prob = (1 - self._action_observation_rate[grounded_action.name] /
                               sum([observation_rate for observation_rate in self._action_observation_rate.values()]))
 
             if abs(action_info_gain) > NON_INFORMATIVE_IG:  # IG is a negative number.
                 self.logger.info(f"The action {grounded_action.name} is informative, adding it to the priority queue.")
                 neighbors.insert(item=grounded_action, priority=action_info_gain, selection_probability=selection_prob)
+
+        for action in self.partial_domain.actions:
+            self.ig_learner[action].clear_convex_hull_cache()
 
         return neighbors
 
@@ -189,12 +200,17 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """
         self.logger.info("Updating the failed action's frontier with the new data.")
         new_neighbors = PriorityQueue()
+        failed_action_observed = False
+        self.ig_learner[action.name].clear_convex_hull_cache()
         while len(neighbors) > 0:
             neighbor, information_gain, probability = neighbors.get_queue_item_data()
             if neighbor.name != action.name:
                 new_neighbors.insert(item=neighbor, priority=information_gain, selection_probability=probability)
+
             else:
-                new_ig = self.calculate_state_action_information_gain(state=current_state, action=neighbor)
+                new_ig = self.calculate_state_action_information_gain(
+                    state=current_state, action=neighbor, action_already_calculated=failed_action_observed)
+                failed_action_observed = True
                 selection_prob = (1 - self._action_observation_rate[neighbor.name] /
                                   sum([rate for rate in self._action_observation_rate.values()]))
                 new_neighbors.insert(item=neighbor, priority=new_ig, selection_probability=selection_prob)
@@ -284,7 +300,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                 next_state = self.agent.observe(state=current_state, action=action)
                 self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
                 num_steps += 1
-                if num_steps == MAX_STEPS_PER_EPOCH:
+                if num_steps == MAX_STEPS_PER_EPISODE:
                     self.logger.warning("Reached the maximum number of steps per epoch, returning the safe model.")
                     return self.create_safe_model(), num_steps, False
 
@@ -294,7 +310,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             neighbors = self.calculate_valid_neighbors(grounded_actions, next_state)
 
             current_state = next_state
-            if self.agent.get_reward(current_state) == 1 or num_steps == MAX_STEPS_PER_EPOCH:
+            if self.agent.get_reward(current_state) == 1:
                 return self.create_safe_model(), num_steps, True
 
         self.logger.info("Reached a state with no neighbors to pull an action from, returning the learned model.")
