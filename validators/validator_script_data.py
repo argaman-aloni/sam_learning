@@ -32,7 +32,7 @@ def run_validate_script(domain_file_path: Path, problem_file_path: Path, solutio
         subprocess.check_output(run_command, shell=True)
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"VAL returned status code {e.returncode}.")
+        logger.warning(f"VAL returned status code {e.returncode}.")
 
     logger.info("Finished validating the solution file.")
     return validation_file_path

@@ -154,7 +154,7 @@ class DomainValidator:
                                                    problem_file_path=problem_file_path,
                                                    solution_file_path=solution_file_path)
 
-        with open(validation_file_path, "r") as validation_file:
+        with open(validation_file_path, "r", encoding="utf-8") as validation_file:
             validation_file_content = validation_file.read()
             if VALID_PLAN in validation_file_content:
                 self.logger.info("The plan is valid.")
