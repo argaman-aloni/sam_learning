@@ -13,7 +13,8 @@ from sklearn.decomposition import PCA
 
 from sam_learning.core.learning_types import ConditionType
 from sam_learning.core.numeric_utils import construct_multiplication_strings, construct_linear_equation_string, \
-    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features
+    detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features, \
+    construct_pca_variable_strings
 
 
 class ConvexHullLearner:
@@ -30,12 +31,13 @@ class ConvexHullLearner:
         self.domain_functions = domain_functions
 
     def _create_convex_hull_linear_inequalities(
-            self, points_df: DataFrame, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
+            self, points_df: DataFrame, display_mode: bool = True) -> Tuple[List[List[float]], List[float], List[str]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :param points_df: the dataframe containing the points that represent the values of the function in the states
             of the observations prior to the action's execution.
-        :return: the matrix representing the inequalities of the planes created by the convex hull.
+        :return: the matrix representing the inequalities of the planes created by the convex hull as well as the
+            names of the features that are part of the convex hull.
 
         Note: the returned values represents the linear inequalities of the convex hull, i.e.,  Ax <= b.
         """
@@ -47,7 +49,7 @@ class ConvexHullLearner:
             self._display_convex_hull(display_mode, hull, num_dimensions)
             A = hull.equations[:, :num_dimensions]
             b = -hull.equations[:, num_dimensions]
-            return [prettify_coefficients(row) for row in A], prettify_coefficients(b)
+            return [prettify_coefficients(row) for row in A], prettify_coefficients(b), points_df.columns.tolist()
 
         except (QhullError, ValueError):
             self.logger.debug("Convex hull failed to create a convex hull, using PCA to reduce the dimensionality.")
@@ -58,8 +60,11 @@ class ConvexHullLearner:
             hull = ConvexHull(pred_points)
             PCA_A = hull.equations[:, :pred_points.shape[1]]
             b = -hull.equations[:, pred_points.shape[1]]
-            convex_hull_pca_points = model.inverse_transform(PCA_A)
-            return [prettify_coefficients(row) for row in convex_hull_pca_points], prettify_coefficients(b)
+            coefficients = [prettify_coefficients(row) for row in PCA_A]
+            border_point = prettify_coefficients(b)
+            transformed_variables = construct_pca_variable_strings(
+                points_df.columns.tolist(), model.mean_, model.components_)
+            return coefficients, border_point, transformed_variables
 
     @staticmethod
     def _construct_pddl_inequality_scheme(
@@ -206,8 +211,9 @@ class ConvexHullLearner:
             return self._create_disjunctive_preconditions(filtered_pre_state_df, equality_conditions)
 
         try:
-            A, b = self._create_convex_hull_linear_inequalities(filtered_pre_state_df, display_mode=False)
-            inequalities_strs = self._construct_pddl_inequality_scheme(A, b, filtered_pre_state_df.columns)
+            A, b, column_names = self._create_convex_hull_linear_inequalities(
+                filtered_pre_state_df, display_mode=False)
+            inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             inequalities_strs.extend(equality_conditions)
             return construct_numeric_conditions(
                 inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)

@@ -29,9 +29,9 @@ class MetricFFSolver:
         :param solution_path: the path to the solution file.
         :return: the error message.
         """
-        with open(solution_path, "r") as solution_file:
+        with open(solution_path, "rb") as solution_file:
             solution_content = solution_file.read()
-            return solution_content
+            return solution_content.decode("utf-8", errors="ignore")
 
     def _run_metric_ff_process(self, run_command: str, solution_path: Path,
                                problem_file_path: Path, solving_stats: Dict[str, str]) -> None:

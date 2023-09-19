@@ -47,7 +47,7 @@ class ENHSPSolver:
                 f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "timeout"
             os.kill(process.pid, signal.SIGTERM)
-            os.system("pkill -f enhsp.jar")
+            os.system(f"pkill -f {ENHSP_FILE_PATH}")
             return True
 
         if process.returncode is None:

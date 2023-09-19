@@ -14,7 +14,7 @@ from sam_learning.learners import OnlineNSAMLearner
 from solvers import MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from utilities.k_fold_split import KFoldSplit
-from validators import DomainValidator
+from validators import OnlineLearningDomainValidator
 
 DEFAULT_SPLIT = 10
 
@@ -25,7 +25,7 @@ class PIL:
     working_directory_path: Path
     k_fold: KFoldSplit
     domain_file_name: str
-    domain_validator: DomainValidator
+    domain_validator: OnlineLearningDomainValidator
     problems_prefix: str
 
     def __init__(
@@ -37,7 +37,7 @@ class PIL:
                                  n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self.problems_prefix = problem_prefix
-        self.domain_validator = DomainValidator(
+        self.domain_validator = OnlineLearningDomainValidator(
             self.working_directory_path, LearningAlgorithmType.online_nsam,
             self.working_directory_path / domain_file_name,
             solver_type=solver_type, preoblem_prefix=problem_prefix)
@@ -72,6 +72,9 @@ class PIL:
         online_learner = OnlineNSAMLearner(partial_domain=partial_domain)
         online_learner.init_online_learning()
         for problem_index, problem_path in enumerate(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")):
+            if problem_index == 100:
+                return
+
             self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
@@ -114,7 +117,7 @@ class PIL:
         self.domain_validator._solver_name = "metric_ff"
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
-                                              num_episodes=episode_number,
+                                              episode_number=episode_number,
                                               num_steps=num_steps_in_episode)
         metric_ff_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
                                          for problem_type in all_possible_solution_types])
@@ -124,7 +127,7 @@ class PIL:
         self.domain_validator._solver_name = "enhsp"
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
-                                              num_episodes=episode_number,
+                                              episode_number=episode_number,
                                               num_steps=num_steps_in_episode)
         enhsp_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
                                      for problem_type in all_possible_solution_types])

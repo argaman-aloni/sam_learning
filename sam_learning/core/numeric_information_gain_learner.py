@@ -1,12 +1,13 @@
 """A module containing the algorithm to calculate the information gain of new samples."""
 import logging
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
+from sklearn.decomposition import PCA
 
 from sam_learning.core.numeric_utils import get_num_independent_equations, filter_constant_features, \
     detect_linear_dependent_features
@@ -22,6 +23,8 @@ class InformationGainLearner:
     positive_samples_df: DataFrame
     negative_samples_df: DataFrame
     _effects_learned_perfectly: bool
+    _cached_convex_hull: Delaunay
+    _pca_model: PCA
 
     def __init__(self, action_name: str, lifted_functions: List[str], lifted_predicates: List[str]):
         self.logger = logging.getLogger(__name__)
@@ -32,6 +35,7 @@ class InformationGainLearner:
         self.negative_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
         self._effects_learned_perfectly = False
         self._cached_convex_hull = None
+        self._pca_model = None
 
     def _locate_sample_in_df(self, sample_to_locate: List[float], df: DataFrame) -> int:
         """Locates the sample in the data frame.
@@ -97,6 +101,45 @@ class InformationGainLearner:
 
         return True
 
+    def _calculate_whether_in_delanauy_hull(
+            self, convex_hull_points: np.ndarray,
+            new_point: np.ndarray, debug_mode: bool = False, use_cached_ch: bool = False, ) -> bool:
+        """
+
+        :param convex_hull_points:
+        :param new_point:
+        :param debug_mode:
+        :param use_cached_ch:
+        :return:
+        """
+        if self._cached_convex_hull is not None and use_cached_ch:
+            delaunay_hull = self._cached_convex_hull
+            relevant_sample = new_point if not self._pca_model is None else self._pca_model.transform(new_point)
+
+        else:
+            try:
+                delaunay_hull = Delaunay(convex_hull_points)
+                self._pca_model = None
+                relevant_sample = new_point
+                if use_cached_ch:
+                    self._cached_convex_hull = delaunay_hull
+
+            except (QhullError, ValueError):
+                rank = np.linalg.matrix_rank(convex_hull_points)
+                model = PCA(n_components=rank - 1).fit(convex_hull_points)
+                pred_points = model.transform(convex_hull_points)
+                delaunay_hull = Delaunay(pred_points)
+                relevant_sample = model.transform(new_point)
+
+        if debug_mode:
+            self._display_delaunay_graph(delaunay_hull, convex_hull_points.shape[1])
+
+        result = delaunay_hull.find_simplex(relevant_sample) >= 0
+        if isinstance(result, np.bool_):
+            return result
+
+        return any(result)
+
     def _in_hull(
             self, points_to_test: DataFrame, hull_df: DataFrame, debug_mode: bool = False,
             use_cached_ch: bool = False) -> bool:
@@ -137,20 +180,7 @@ class InformationGainLearner:
         if hull.shape[1] == 1:
             return all([hull.min() <= point <= hull.max() for point in relevant_sample.to_numpy()])
 
-        if use_cached_ch:
-            delaunay_hull = self._cached_convex_hull if self._cached_convex_hull is not None else Delaunay(hull)
-
-        else:
-            delaunay_hull = Delaunay(hull)
-
-        if debug_mode:
-            self._display_delaunay_graph(delaunay_hull, hull.shape[1])
-
-        result = delaunay_hull.find_simplex(relevant_sample.to_numpy()) >= 0
-        if isinstance(result, np.bool_):
-            return result
-
-        return any(result)
+        return self._calculate_whether_in_delanauy_hull(hull, relevant_sample.to_numpy(), debug_mode, use_cached_ch)
 
     def _remove_features(self, features_to_keep: List[str], features_list: List[str]) -> List[str]:
         """Removes features from the data frames.

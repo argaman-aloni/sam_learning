@@ -70,6 +70,31 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     return prettified_coefficients
 
 
+def construct_pca_variable_strings(function_variables: List[str], pca_mean: Union[np.ndarray, List[float]],
+                                   pca_components: Union[np.ndarray, List[List[float]]]) -> List[str]:
+    """Constructs the strings representing the multiplications of the function variables with the coefficient.
+
+    :param function_variables: the name of the numeric fluents that are being used.
+    :param pca_mean: the mean of the PCA model.
+    :param pca_components: the components of the PCA model.
+    :return: the new variable names after applying the PCA model transformation
+    """
+    shifted_by_mean = []
+    for func, mean_val in zip(function_variables, pca_mean):
+        component_function = f"(- {func} {prettify_floating_point_number(round(mean_val, 4))})"
+        shifted_by_mean.append(component_function)
+
+    sum_of_product_by_components = []
+    for row in range(len(pca_components)):
+        product_by_components_row = []
+        for shifted, component in zip(shifted_by_mean, pca_components[row]):
+            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 4))})")
+
+        sum_of_product_by_components.append(construct_linear_equation_string(product_by_components_row))
+
+    return sum_of_product_by_components
+
+
 def construct_linear_equation_string(multiplication_parts: List[str]) -> str:
     """Construct the addition parts of the linear equation string.
 
