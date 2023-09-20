@@ -80,7 +80,7 @@ class POL:
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
-            solver_type=solver_type, preoblem_prefix=problem_prefix)
+            solver_type=solver_type, problem_prefix=problem_prefix)
 
     def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
         """Initializes the algorithm of the semantic precision / recall calculator."""

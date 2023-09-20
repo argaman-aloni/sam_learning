@@ -33,6 +33,8 @@ LEARNING_ALGORITHMS = {
     LearningAlgorithmType.universal_sam: UniversallyConditionalSAM,
 }
 
+DEFAULT_NUMERIC_TOLERANCE = 0.1
+
 
 class OfflineBasicExperimentRunner:
     """Class that represents the POL framework."""
@@ -60,7 +62,7 @@ class OfflineBasicExperimentRunner:
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
-            solver_type=solver_type, preoblem_prefix=problem_prefix)
+            solver_type=solver_type, problem_prefix=problem_prefix)
 
     def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
         """Initializes the algorithm of the semantic precision / recall calculator."""
@@ -143,17 +145,20 @@ class OfflineBasicExperimentRunner:
             self.domain_validator._solver_name = "metric_ff"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations)
+                                                  used_observations=allowed_observations,
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
 
             self.domain_validator.solver = ENHSPSolver()
             self.domain_validator._solver_name = "enhsp"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations)
+                                                  used_observations=allowed_observations,
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
         else:
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations)
+                                                  used_observations=allowed_observations,
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
         return domain_file_path
 
     def run_cross_validation(self) -> None:

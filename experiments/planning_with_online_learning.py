@@ -1,7 +1,6 @@
 """The PIL main framework - Compile, Learn and Plan."""
 import argparse
 import logging
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -17,6 +16,7 @@ from utilities.k_fold_split import KFoldSplit
 from validators import OnlineLearningDomainValidator
 
 DEFAULT_SPLIT = 10
+DEFAULT_NUMERIC_TOLERANCE = 0.1
 
 
 class PIL:
@@ -40,7 +40,7 @@ class PIL:
         self.domain_validator = OnlineLearningDomainValidator(
             self.working_directory_path, LearningAlgorithmType.online_nsam,
             self.working_directory_path / domain_file_name,
-            solver_type=solver_type, preoblem_prefix=problem_prefix)
+            solver_type=solver_type, problem_prefix=problem_prefix)
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path,
                               file_name: Optional[str] = None) -> Path:
@@ -72,9 +72,6 @@ class PIL:
         online_learner = OnlineNSAMLearner(partial_domain=partial_domain)
         online_learner.init_online_learning()
         for problem_index, problem_path in enumerate(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")):
-            if problem_index == 100:
-                return
-
             self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
@@ -85,13 +82,15 @@ class PIL:
             self.logger.info(f"Finished episode number {problem_index + 1}! "
                              f"The current goal was {'achieved' if goal_achieved else 'not achieved'}.")
             if goal_achieved:
-                time.sleep(5)
-            solved_all_test_problems = self.validate_learned_domain(
-                learned_model, test_set_dir_path, episode_number=problem_index + 1,
-                num_steps_in_episode=num_steps_in_episode)
-            if solved_all_test_problems:
-                self.domain_validator.write_statistics(fold_num)
-                return
+                self.logger.info("The agent successfully solved the current task!")
+
+            if problem_index % 10 == 0:
+                solved_all_test_problems = self.validate_learned_domain(
+                    learned_model, test_set_dir_path, episode_number=problem_index + 1,
+                    num_steps_in_episode=num_steps_in_episode)
+                if solved_all_test_problems:
+                    self.domain_validator.write_statistics(fold_num)
+                    return
 
             online_learner.reset_current_epoch_numeric_data()
 
@@ -118,7 +117,8 @@ class PIL:
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
                                               episode_number=episode_number,
-                                              num_steps=num_steps_in_episode)
+                                              num_steps=num_steps_in_episode,
+                                              tolerance=DEFAULT_NUMERIC_TOLERANCE)
         metric_ff_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
                                          for problem_type in all_possible_solution_types])
         metric_ff_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
@@ -128,7 +128,8 @@ class PIL:
         self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                               test_set_directory_path=test_set_dir_path,
                                               episode_number=episode_number,
-                                              num_steps=num_steps_in_episode)
+                                              num_steps=num_steps_in_episode,
+                                              tolerance=DEFAULT_NUMERIC_TOLERANCE)
         enhsp_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
                                      for problem_type in all_possible_solution_types])
         enhsp_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]

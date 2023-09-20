@@ -88,6 +88,9 @@ def construct_pca_variable_strings(function_variables: List[str], pca_mean: Unio
     for row in range(len(pca_components)):
         product_by_components_row = []
         for shifted, component in zip(shifted_by_mean, pca_components[row]):
+            if component == 0.0:
+                continue
+
             product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 4))})")
 
         sum_of_product_by_components.append(construct_linear_equation_string(product_by_components_row))

@@ -39,13 +39,14 @@ class FastDownwardSolver:
             sas_file_path.unlink()
 
     def execute_solver(
-            self, problems_directory_path: Path, domain_file_path: Path, problems_prefix: str = "pfile") -> Dict[
-        str, str]:
+            self, problems_directory_path: Path, domain_file_path: Path, problems_prefix: str = "pfile",
+            tolerance: float = 0.01) -> Dict[str, str]:
         """Runs the Fast Downward solver on all the problems in the given directory.
 
         :param problems_directory_path: the path to the directory containing the problems.
         :param domain_file_path: the path to the domain file.
         :param problems_prefix: the prefix of the problems files.
+        :param tolerance: the tolerance of the solver (added to create a uniform API).
         :return: a dictionary containing the solving status of each problem.
         """
         solving_stats = {}

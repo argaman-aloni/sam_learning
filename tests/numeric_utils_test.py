@@ -40,3 +40,29 @@ def test_construct_pca_variable_strings_returns_correct_strings_representing_the
     pca_variable_strings = construct_pca_variable_strings(function_variables, pca.mean_, pca.components_)
     assert len(pca_variable_strings) == 3  # 3 components
     print(pca_variable_strings)
+
+
+def test_construct_pca_variable_strings_returns_correct_numbers_according_to_construction_calculation_for_simple_case():
+    function_variables = ["(x)", "(y)", "(z)"]
+    mean = np.array([2, 2, 2])
+    pca_components = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+    pca_variable_strings = construct_pca_variable_strings(function_variables, mean, pca_components)
+    assert len(pca_variable_strings) == 3  # 3 components
+    assert pca_variable_strings[0] == "(* (- (x) 2) 1)"
+    assert pca_variable_strings[1] == "(* (- (y) 2) 1)"
+    assert pca_variable_strings[2] == "(* (- (z) 2) 1)"
+    print(pca_variable_strings)
+
+
+def test_construct_pca_variable_strings_returns_correct_numbers_according_to_construction_calculation_for_complex_case():
+    function_variables = ["(x)", "(y)", "(z)"]
+    mean = np.array([2, 2, 2])
+    pca_components = np.array([[1, 8, 32.5], [12, 1, 33], [3, 2, 1]])
+
+    pca_variable_strings = construct_pca_variable_strings(function_variables, mean, pca_components)
+    assert len(pca_variable_strings) == 3  # 3 components
+    assert pca_variable_strings[0] == "(+ (* (- (x) 2) 1) (+ (* (- (y) 2) 8) (* (- (z) 2) 32.5)))"
+    assert pca_variable_strings[1] == "(+ (* (- (x) 2) 12) (+ (* (- (y) 2) 1) (* (- (z) 2) 33)))"
+    assert pca_variable_strings[2] == "(+ (* (- (x) 2) 3) (+ (* (- (y) 2) 2) (* (- (z) 2) 1)))"
+

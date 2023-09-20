@@ -83,12 +83,12 @@ class ENHSPSolver:
             return False
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
-                       default_tolerance: float = 0.1, problems_prefix: str = "pfile") -> Dict[str, str]:
+                       tolerance: float = 0.01, problems_prefix: str = "pfile") -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
         :param domain_file_path: the path to the domain file.
-        :param default_tolerance: the numeric tolerance to use.
+        :param tolerance: the numeric tolerance to use.
         :param problems_prefix: the prefix of the problems to solve.
         """
         solving_stats = {}
@@ -100,7 +100,7 @@ class ENHSPSolver:
             running_options = ["-o", str(domain_file_path.absolute()),
                                "-f", str(problem_file_path.absolute()),
                                "-planner", "sat-hmrphj",
-                               "-tolerance", f"{default_tolerance}",
+                               "-tolerance", f"{tolerance}",
                                "-sp", str(solution_path.absolute())]
             run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
             solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats)
@@ -121,5 +121,5 @@ if __name__ == '__main__':
     solver = ENHSPSolver()
     solver.execute_solver(problems_directory_path=Path(args[1]),
                           domain_file_path=Path(args[2]),
-                          default_tolerance=0.1,
+                          tolerance=0.1,
                           problems_prefix=args[3])

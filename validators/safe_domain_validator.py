@@ -9,6 +9,7 @@ from pddl_plus_parser.models import Observation, MultiAgentObservation
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
+from validators.common import AGGREGATED_SOLVING_FIELDS
 from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, \
     GOAL_NOT_REACHED, run_validate_script
 
@@ -60,15 +61,6 @@ DEBUG_STATISTICS = [
     "problems_not_validated_against_expert_plan"
 ]
 
-AGGREGATED_SOLVING_FIELDS = [
-    "ok",
-    "no_solution",
-    "timeout",
-    "solver_error",
-    "not_applicable",
-    "goal_not_achieved"
-]
-
 VALIDATED_AGAINST_EXPERT_PLAN = "validated_against_expert_plan"
 NOT_VALIDATED_AGAINST_EXPERT_PLAN = "not_validated_against_expert_plan"
 
@@ -95,7 +87,7 @@ class DomainValidator:
 
     def __init__(self, working_directory_path: Path,
                  learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, solver_type: SolverType,
-                 preoblem_prefix: str = "pfile"):
+                 problem_prefix: str = "pfile"):
         self.logger = logging.getLogger(__name__)
         self.solver = SOLVER_TYPES[solver_type]()
         self._solver_name = solver_type.name
@@ -104,7 +96,7 @@ class DomainValidator:
         self.learning_algorithm = learning_algorithm
         self.results_dir_path = working_directory_path / "results_directory"
         self.reference_domain_path = reference_domain_path
-        self.problem_prefix = preoblem_prefix
+        self.problem_prefix = problem_prefix
         self.working_directory_path = working_directory_path
 
     @staticmethod
@@ -195,6 +187,19 @@ class DomainValidator:
         num_triplets = sum([len(observation.components) for observation in used_observations])
         return num_triplets
 
+    @staticmethod
+    def _calculate_expert_validation_statistics(solving_stats: Dict[str, Any]) -> None:
+        """Calculates the expert validation statistics.
+
+        :param solving_stats: the solving statistics.
+        """
+        total_validated = sum([solving_stats[statistic] for statistic in [
+            VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]])
+        total_validated = total_validated if total_validated > 0 else 1
+
+        for statistic in [VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]:
+            solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_validated)
+
     def _calculate_solving_percentages(self, solving_stats: Dict[str, Any]) -> None:
         """Calculates the percentage of solved problems.
 
@@ -207,21 +212,16 @@ class DomainValidator:
             solving_stats[f"percent_{statistic}"] = percentage_statistic
             self.logger.info(f"{statistic} percentage: {percentage_statistic:.2f}%")
 
-        total_validated = sum([solving_stats[statistic] for statistic in [
-            VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]])
-        total_validated = total_validated if total_validated > 0 else 1
-
-        for statistic in [VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]:
-            solving_stats[f"percent_{statistic}"] = 100 * (solving_stats[statistic] / total_validated)
-
     def validate_domain(
             self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
-            used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None) -> None:
+            used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None,
+            tolerance: float = 0.01) -> None:
         """Validates that using the input domain problems can be solved.
 
         :param tested_domain_file_path: the path of the domain that was learned using POL.
         :param test_set_directory_path: the path to the directory containing the test set problems.
         :param used_observations: the observations that were used to learn the domain.
+        :param tolerance: the numeric tolerance to use.
         """
         num_triplets = self._extract_num_triplets(used_observations)
         self.logger.info("Solving the test set problems using the learned domain!")
@@ -229,6 +229,7 @@ class DomainValidator:
             problems_directory_path=test_set_directory_path,
             domain_file_path=tested_domain_file_path,
             problems_prefix=self.problem_prefix,
+            tolerance=tolerance
         )
 
         solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
@@ -258,6 +259,8 @@ class DomainValidator:
             solving_stats[f"problems_{entry}"].append(problem_file_name)
 
         self._calculate_solving_percentages(solving_stats)
+        self._calculate_expert_validation_statistics(solving_stats)
+
         num_trajectories = len(used_observations)
         self.solving_stats.append({
             "learning_algorithm": self.learning_algorithm.name,

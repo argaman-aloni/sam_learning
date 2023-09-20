@@ -44,7 +44,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
-            solver_type=solver_type, preoblem_prefix=problem_prefix)
+            solver_type=solver_type, problem_prefix=problem_prefix)
 
     def _apply_learning_algorithm(
             self, partial_domain: Domain, allowed_observations: List[Observation],

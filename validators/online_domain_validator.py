@@ -41,7 +41,7 @@ class OnlineLearningDomainValidator(DomainValidator):
     def validate_domain(
             self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
             episode_number: Optional[int] = None, num_steps: Optional[int] = None,
-            training_goal_achieved: bool = False) -> None:
+            training_goal_achieved: bool = False, tolerance: float = 0.01) -> None:
         """Validates that using the input domain problems can be solved.
 
         :param tested_domain_file_path: the path of the domain that was learned using POL.
@@ -49,12 +49,14 @@ class OnlineLearningDomainValidator(DomainValidator):
         :param episode_number: the number of the current episode.
         :param num_steps: the number of steps that were taken in the current episode.
         :param training_goal_achieved: whether the training goal was achieved in the current episode.
+        :param tolerance: the tolerance to use when solving the problems.
         """
         self.logger.info("Solving the test set problems using the learned domain!")
         solving_report = self.solver.execute_solver(
             problems_directory_path=test_set_directory_path,
             domain_file_path=tested_domain_file_path,
             problems_prefix=self.problem_prefix,
+            tolerance=tolerance
         )
 
         solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
