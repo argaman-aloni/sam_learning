@@ -1,6 +1,6 @@
 """A module containing the algorithm to calculate the information gain of new samples."""
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -23,8 +23,8 @@ class InformationGainLearner:
     positive_samples_df: DataFrame
     negative_samples_df: DataFrame
     _effects_learned_perfectly: bool
-    _cached_convex_hull: Delaunay
-    _pca_model: PCA
+    _cached_convex_hull: Optional[Delaunay]
+    _pca_model: Optional[PCA]
 
     def __init__(self, action_name: str, lifted_functions: List[str], lifted_predicates: List[str]):
         self.logger = logging.getLogger(__name__)
@@ -241,8 +241,9 @@ class InformationGainLearner:
 
         return True
 
-    def _is_non_informative_safe(self, new_numeric_sample: Dict[str, PDDLFunction],
-                                 new_propositional_sample: List[Predicate], use_cache: bool = False) -> bool:
+    def _is_non_informative_safe(
+            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
+            relevant_numeric_features: Optional[List[str]] = None, use_cache: bool = False) -> bool:
         """Validate whether a new sample is non-informative according to the safe model.
 
         Note:
@@ -252,7 +253,11 @@ class InformationGainLearner:
 
         :param new_numeric_sample: the numeric functions representing the new sample.
         :param new_propositional_sample: the propositional predicates representing the new sample.
+        :param relevant_numeric_features:
         :param use_cache: whether to use the cached convex hull. This prevents redundant calculations and reduces
+        :param relevant_numeric_features: the relevant numeric features to calculate the information gain for. If None,
+            all the numeric features are used. This is used to reduce the runtime and reduce the dimensionality of
+            the calculations.
             runtime.
         :return: whether the new sample is non-informative according to the safe model.
         """
@@ -260,18 +265,23 @@ class InformationGainLearner:
         if not self._validate_action_discrete_preconditions_hold_in_state(new_propositional_sample):
             return False
 
-        positive_points_data = self.positive_samples_df[self.lifted_functions]
-        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in self.lifted_functions})
+        functions_to_explore = self.lifted_functions if relevant_numeric_features is None else relevant_numeric_features
+        if len(functions_to_explore) == 0:
+            return True
+
+        positive_points_data = self.positive_samples_df[functions_to_explore]
+        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in functions_to_explore})
         try:
-            return self._in_hull(new_point_data, self.positive_samples_df[
-                self.lifted_functions], use_cached_ch=use_cache) and self._can_determine_effects_perfectly()
+            return self._in_hull(new_point_data,
+                                 self.positive_samples_df[functions_to_explore], use_cached_ch=use_cache)
 
         except (QhullError, ValueError):
-            sample_values = [new_numeric_sample[col].value for col in self.lifted_functions]
+            sample_values = [new_numeric_sample[col].value for col in functions_to_explore]
             return self._locate_sample_in_df(sample_values, positive_points_data) != -1
 
-    def _is_non_informative_unsafe(self, new_numeric_sample: Dict[str, PDDLFunction],
-                                   new_propositional_sample: List[Predicate]) -> bool:
+    def _is_non_informative_unsafe(
+            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
+            relevant_numeric_features: Optional[List[str]] = None) -> bool:
         """Tests whether a new sample is non-informative according to the unsafe model.
 
         Note:
@@ -284,6 +294,9 @@ class InformationGainLearner:
 
         :param new_numeric_sample: the numeric functions representing the new sample.
         :param new_propositional_sample: the propositional predicates representing the new sample.
+        :param relevant_numeric_features: the relevant numeric features to calculate the information gain for. If None,
+            all the numeric features are used. This is used to reduce the runtime and reduce the dimensionality of
+            the calculations.
         :return: whether the new sample is non-informative according to the unsafe model.
         """
         new_sample_predicates = {predicate.untyped_representation for predicate in new_propositional_sample}
@@ -294,7 +307,11 @@ class InformationGainLearner:
 
         self.logger.debug("Creating a new model from the new sample and validating if the new model "
                           "contains a negative sample.")
-        new_model_data = self.positive_samples_df[self.lifted_functions].copy()
+        functions_to_explore = self.lifted_functions if relevant_numeric_features is None else relevant_numeric_features
+        if len(functions_to_explore) == 0:
+            return True
+
+        new_model_data = self.positive_samples_df[functions_to_explore].copy()
         new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
                            new_numeric_sample.items()}
         new_model_data.loc[len(new_model_data)] = new_sample_data
@@ -304,13 +321,13 @@ class InformationGainLearner:
                 continue
 
             try:
-                if self._in_hull(negative_sample[self.lifted_functions].to_frame().T, new_model_data):
+                if self._in_hull(negative_sample[functions_to_explore].to_frame().T, new_model_data):
                     self.logger.debug("The new sample is not informative since it contains a negative sample.")
                     return True
 
             except (QhullError, ValueError):
                 if self._locate_sample_in_df(list(new_sample_data.values()),
-                                             negative_sample[self.lifted_functions].to_frame().T) != -1:
+                                             negative_sample[functions_to_explore].to_frame().T) != -1:
                     return True
 
         return False
@@ -391,13 +408,16 @@ class InformationGainLearner:
 
     def is_sample_informative(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
-            use_cache: bool = False) -> bool:
+            use_cache: bool = False, relevant_numeric_features: Optional[List[str]] = None) -> bool:
         """Checks whether the sample is informative.
 
         :param new_numeric_sample: the new sample to calculate whether it is informative.
         :param new_propositional_sample: the propositional predicates representing the new sample.
         :param use_cache: whether to use the cached convex hull. This prevents redundant calculations and reduces
             runtime.
+        :param relevant_numeric_features: the relevant numeric features to calculate the information gain for. If None,
+            all the numeric features are used. This is used to reduce the runtime and reduce the dimensionality of
+            the calculations.
         :return: whether the sample is informative.
         """
         self.logger.info("Calculating the information gain of a new sample.")
@@ -407,8 +427,10 @@ class InformationGainLearner:
             return True
 
         is_non_informative_safe = self._is_non_informative_safe(
-            new_numeric_sample, new_propositional_sample, use_cache=use_cache)
-        is_non_informative_unsafe = self._is_non_informative_unsafe(new_numeric_sample, new_propositional_sample)
+            new_numeric_sample, new_propositional_sample, use_cache=use_cache,
+            relevant_numeric_features=relevant_numeric_features)
+        is_non_informative_unsafe = self._is_non_informative_unsafe(
+            new_numeric_sample, new_propositional_sample, relevant_numeric_features=relevant_numeric_features)
         if is_non_informative_safe or is_non_informative_unsafe:
             return False
 

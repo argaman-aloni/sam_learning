@@ -201,3 +201,17 @@ def test_construct_safe_linear_inequalities_when_the_number_of_is_smaller_than_n
     assert len(inequality_precondition.operands) == 3
     assert all([isinstance(op, NumericalExpressionTree) for op in inequality_precondition.operands])
     print(str(inequality_precondition))
+
+
+def test_construct_lower_dimension_convex_hull_returns_correct_conditions_when_constant_is_observed(
+        convex_hull_learner: ConvexHullLearner):
+    pre_state_data = {
+        "(x)": [1, 0, 0],
+        "(y)": [0, 1, 0],
+        "(z)": [0, 0, 0]
+    }
+    pre_state_df = DataFrame(pre_state_data)
+    coefficients, border_point, transformed_vars, span_verification_conditions = (
+        convex_hull_learner._construct_lower_dimension_convex_hull(pre_state_df))
+    assert span_verification_conditions == ["(= (* (* (z) 1) 1) 0.0)"]
+    print(span_verification_conditions)

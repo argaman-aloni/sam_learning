@@ -81,7 +81,7 @@ class MetricFFSolver:
             solution_path.unlink(missing_ok=True)
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
-                       problems_prefix: str = "pfile", tolerance: float = 0.01) -> Dict[str, str]:
+                       problems_prefix: str = "pfile", tolerance: float = 0.1) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the Metric-FF algorithm and outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.

@@ -26,6 +26,8 @@ ONLINE_SOLVING_STATISTICS = [
     "problems_solver_error",
     "problems_not_applicable",
     "problems_goal_not_achieved",
+    "problems_validated_against_expert_plan",
+    "problems_not_validated_against_expert_plan"
     "percent_ok",
     "percent_no_solution",
     "percent_timeout",

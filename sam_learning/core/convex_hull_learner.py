@@ -9,12 +9,13 @@ import numpy as np
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
-from sklearn.decomposition import PCA
 
 from sam_learning.core.learning_types import ConditionType
 from sam_learning.core.numeric_utils import construct_multiplication_strings, construct_linear_equation_string, \
     detect_linear_dependent_features, prettify_coefficients, construct_numeric_conditions, filter_constant_features, \
-    construct_pca_variable_strings
+    construct_projected_variable_strings
+
+EPSILON = 1e-10
 
 
 class ConvexHullLearner:
@@ -30,8 +31,70 @@ class ConvexHullLearner:
         self.action_name = action_name
         self.domain_functions = domain_functions
 
+    @staticmethod
+    def extended_gram_schmidt(
+            input_basis_vectors: List[List[float]], eigen_vectors: Optional[List[List[float]]]) -> [List[List[float]]]:
+        """Runs the extended Gram-Schmidt algorithm on the input basis vectors.
+
+        Note:
+            The algorithm is extended in the that it can handle the additional input eigen vectors and return the
+            orthonormal basis vectors of the input basis vectors and eigen vectors.
+
+        :param input_basis_vectors: The input basis vectors.
+        :param eigen_vectors: The eigen vectors - optional and can be none.
+        :return: The orthonormal basis vectors of the input basis vectors and eigen vectors.
+        """
+        basis = eigen_vectors.copy() if eigen_vectors is not None else []
+        for vector in input_basis_vectors:
+            normal_vector = vector - np.sum([np.dot(vector, b) * np.array(b) for b in basis])
+            if not (normal_vector > EPSILON).any():
+                continue
+
+            orthonormal_vector = normal_vector / np.linalg.norm(normal_vector)
+            if isinstance(orthonormal_vector, np.ndarray):
+                basis.append(orthonormal_vector.tolist())
+            else:
+                basis.append(orthonormal_vector)
+
+        if not eigen_vectors:
+            return basis
+
+        return [b for b in basis if b not in eigen_vectors]
+
+    def _construct_lower_dimension_convex_hull(self, points_df: DataFrame) -> Tuple[
+        List[List[float]], List[float], List[str], Optional[List[str]]]:
+        """
+
+        :param points_df:
+        :return:
+        """
+        points = points_df.to_numpy()
+        shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
+        shifted_points = points - shift_axis
+        point_vectors = [list(vector) for vector in points]
+        self.logger.debug("Finding the basis vectors for the projected CH using the extended Gram-Schmidt method.")
+        projection_basis = self.extended_gram_schmidt(point_vectors, None)
+        projected_points = np.dot(shifted_points, np.array(projection_basis).T)
+        hull = ConvexHull(projected_points)
+        projected_A = hull.equations[:, :projected_points.shape[1]]
+        projected_b = -hull.equations[:, projected_points.shape[1]]
+        coefficients = [prettify_coefficients(row) for row in projected_A]
+        border_point = prettify_coefficients(projected_b)
+        transformed_vars = construct_projected_variable_strings(
+            points_df.columns.tolist(), shift_axis, projection_basis)
+
+        self.logger.debug("Constructing the conditions to verify that points are in the correct span.")
+        diagonal_eye = [list(vector) for vector in np.eye(points.shape[1])]
+        orthnormal_span = self.extended_gram_schmidt(diagonal_eye, projection_basis)
+        transformed_orthonormal_vars = construct_projected_variable_strings(
+            points_df.columns.tolist(), shift_axis, diagonal_eye)
+        span_verification_conditions = self._construct_pddl_inequality_scheme(
+            np.array(orthnormal_span), np.zeros(len(orthnormal_span)), transformed_orthonormal_vars, sign_to_use="=")
+        return coefficients, border_point, transformed_vars, span_verification_conditions
+
     def _create_convex_hull_linear_inequalities(
-            self, points_df: DataFrame, display_mode: bool = True) -> Tuple[List[List[float]], List[float], List[str]]:
+            self, points_df: DataFrame, display_mode: bool = True) -> Tuple[
+        List[List[float]], List[float], List[str], Optional[List[str]]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :param points_df: the dataframe containing the points that represent the values of the function in the states
@@ -49,38 +112,29 @@ class ConvexHullLearner:
             self._display_convex_hull(display_mode, hull, num_dimensions)
             A = hull.equations[:, :num_dimensions]
             b = -hull.equations[:, num_dimensions]
-            return [prettify_coefficients(row) for row in A], prettify_coefficients(b), points_df.columns.tolist()
+            return [prettify_coefficients(row) for row in A], prettify_coefficients(b), points_df.columns.tolist(), None
 
         except (QhullError, ValueError):
             self.logger.debug("Convex hull failed to create a convex hull, using PCA to reduce the dimensionality.")
-            rank = np.linalg.matrix_rank(
-                points)  # Rank of the array is the number of singular values of the array that are greater than tol.
-            model = PCA(n_components=rank - 1).fit(points)  # need rank -1 since to create CH we need rank + 1 samples.
-            pred_points = model.transform(points)
-            hull = ConvexHull(pred_points)
-            PCA_A = hull.equations[:, :pred_points.shape[1]]
-            b = -hull.equations[:, pred_points.shape[1]]
-            coefficients = [prettify_coefficients(row) for row in PCA_A]
-            border_point = prettify_coefficients(b)
-            transformed_variables = construct_pca_variable_strings(
-                points_df.columns.tolist(), model.mean_, model.components_)
-            return coefficients, border_point, transformed_variables
+            return self._construct_lower_dimension_convex_hull(points_df)
 
     @staticmethod
     def _construct_pddl_inequality_scheme(
-            coefficient_matrix: np.ndarray, border_points: np.ndarray, headers: List[str]) -> List[str]:
+            coefficient_matrix: np.ndarray, border_points: np.ndarray, headers: List[str],
+            sign_to_use: str = "<=") -> List[str]:
         """Construct the inequality strings in the appropriate PDDL format.
 
         :param coefficient_matrix: the matrix containing the coefficient vectors for each inequality.
         :param border_points: the convex hull point which ensures that Ax <= b.
         :param headers: the headers of the columns in the coefficient matrix.
+        :param sign_to_use: the sign to use in the inequalities (for cases when we want to use equalities).
         :return: the inequalities PDDL formatted strings.
         """
         inequalities = set()
         for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
             multiplication_functions = construct_multiplication_strings(inequality_coefficients, headers)
             constructed_left_side = construct_linear_equation_string(multiplication_functions)
-            inequalities.add(f"(<= {constructed_left_side} {border_point})")
+            inequalities.add(f"({sign_to_use} {constructed_left_side} {border_point})")
 
         return list(inequalities)
 
@@ -211,10 +265,13 @@ class ConvexHullLearner:
             return self._create_disjunctive_preconditions(filtered_pre_state_df, equality_conditions)
 
         try:
-            A, b, column_names = self._create_convex_hull_linear_inequalities(
+            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(
                 filtered_pre_state_df, display_mode=False)
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             inequalities_strs.extend(equality_conditions)
+            if additional_projection_conditions is not None:
+                inequalities_strs.extend(additional_projection_conditions)
+
             return construct_numeric_conditions(
                 inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 

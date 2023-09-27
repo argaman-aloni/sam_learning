@@ -1,4 +1,5 @@
 """Module tests for the numeric information gaining process."""
+import random
 from typing import List
 
 import pandas as pd
@@ -484,6 +485,29 @@ def test_is_non_informative_safe_returns_action_informative_when_not_observed_be
         new_numeric_sample=initial_state.state_fluents, new_propositional_sample=state_predicates)
 
 
+def test_is_non_informative_safe_returns_true_when_the_relevant_fluents_is_empty_and_the_predicates_are_all_in_the_preconditions(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_discrete_sample = []
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+
+    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
+    information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
+    new_sample = {}
+    new_func = PDDLFunction(name="(x)", signature={})
+    new_func.set_value(0.5)
+    new_sample[new_func.name] = new_func
+    new_func = PDDLFunction(name="(y)", signature={})
+    new_func.set_value(2.0)
+    new_sample[new_func.name] = new_func
+
+    assert information_gain_learner_with_predicates._is_non_informative_safe(
+        new_numeric_sample=new_sample,
+        new_propositional_sample=[p for p in test_predicates if p in new_discrete_sample],
+        relevant_numeric_features=[])
+
+
 def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_ch_created_from_the_combined_model(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
@@ -584,6 +608,52 @@ def test_is_non_informative_unsafe_returns_true_when_a_non_of_the_negative_sampl
 
     assert not information_gain_learner_with_predicates._is_non_informative_unsafe(
         new_numeric_sample=new_sample, new_propositional_sample=new_discrete_sample)
+
+
+def test_is_non_informative_unsafe_returns_true_when_the_relevant_fluents_is_empty_and_the_predicates_are_not_in_the_state(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_discrete_sample = []
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+
+    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
+    information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
+    new_sample = {}
+    new_func = PDDLFunction(name="(x)", signature={})
+    new_func.set_value(0.5)
+    new_sample[new_func.name] = new_func
+    new_func = PDDLFunction(name="(y)", signature={})
+    new_func.set_value(2.0)
+    new_sample[new_func.name] = new_func
+
+    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
+        new_numeric_sample=new_sample,
+        new_propositional_sample=[p for p in test_predicates if p not in new_discrete_sample],
+        relevant_numeric_features=[])
+
+
+def test_is_non_informative_unsafe_returns_true_when_the_relevant_fluents_is_empty_and_some_predicates_are_in_the_state(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_discrete_sample = []
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+
+    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
+    information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
+    new_sample = {}
+    new_func = PDDLFunction(name="(x)", signature={})
+    new_func.set_value(0.5)
+    new_sample[new_func.name] = new_func
+    new_func = PDDLFunction(name="(y)", signature={})
+    new_func.set_value(2.0)
+    new_sample[new_func.name] = new_func
+
+    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
+        new_numeric_sample=new_sample,
+        new_propositional_sample=random.choices(new_discrete_sample, k=2),
+        relevant_numeric_features=[])
 
 
 def test_is_non_informative_unsafe_returns_false_when_no_negative_point_is_in_the_ch_created_from_the_combined_model(
@@ -863,3 +933,39 @@ def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_c
     new_sample["(w)"] = w_function
 
     assert information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+
+
+def test_is_sample_informative_when_using_relevant_features_with_a_single_features_only_examines_only_that_feature_for_the_informative_calculation(
+        information_gain_learner_no_predicates: InformationGainLearner):
+    positive_samples_df = pd.DataFrame({
+        "(x)": [0, 0, 1, 1],
+        "(y)": [0, 0, 2, 2],
+        "(z)": [0, 0, 0, 0],
+        "(w)": [1, 1, 1, 1]
+    })
+    negative_samples_df = pd.DataFrame({
+        "(x)": [2.5],
+        "(y)": [1.5],
+        "(z)": [1.0],
+        "(w)": [1.1]
+    })
+    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
+    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    new_sample = {}
+
+    x_function = PDDLFunction(name="(x)", signature={})
+    x_function.set_value(1.5)
+    new_sample["(x)"] = x_function
+    y_function = PDDLFunction(name="(y)", signature={})
+    y_function.set_value(3)
+    new_sample["(y)"] = y_function
+    z_function = PDDLFunction(name="(z)", signature={})
+    z_function.set_value(0.0)
+    new_sample["(z)"] = z_function
+    w_function = PDDLFunction(name="(w)", signature={})
+    w_function.set_value(1.0)
+    new_sample["(w)"] = w_function
+
+    assert not information_gain_learner_no_predicates.is_sample_informative(
+        new_sample, [], relevant_numeric_features=["(z)"])

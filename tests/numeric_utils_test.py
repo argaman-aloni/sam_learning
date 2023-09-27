@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 
-from sam_learning.core.numeric_utils import extract_numeric_linear_coefficient, construct_pca_variable_strings
+from sam_learning.core.numeric_utils import extract_numeric_linear_coefficient, construct_projected_variable_strings
 
 
 def test_extract_numeric_linear_coefficient_does_not_output_infinity_for_zero_division():
@@ -27,7 +27,7 @@ def test_construct_pca_variable_strings_returns_correct_strings_representing_the
     pca = PCA(n_components=2)
     pca.fit(X)
 
-    pca_variable_strings = construct_pca_variable_strings(function_variables, pca.mean_, pca.components_)
+    pca_variable_strings = construct_projected_variable_strings(function_variables, pca.mean_, pca.components_)
     assert len(pca_variable_strings) == 2  # 2 components
 
 
@@ -37,7 +37,7 @@ def test_construct_pca_variable_strings_returns_correct_strings_representing_the
     pca = PCA(n_components=3)
     pca.fit(X)
 
-    pca_variable_strings = construct_pca_variable_strings(function_variables, pca.mean_, pca.components_)
+    pca_variable_strings = construct_projected_variable_strings(function_variables, pca.mean_, pca.components_)
     assert len(pca_variable_strings) == 3  # 3 components
     print(pca_variable_strings)
 
@@ -47,7 +47,7 @@ def test_construct_pca_variable_strings_returns_correct_numbers_according_to_con
     mean = np.array([2, 2, 2])
     pca_components = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
 
-    pca_variable_strings = construct_pca_variable_strings(function_variables, mean, pca_components)
+    pca_variable_strings = construct_projected_variable_strings(function_variables, mean, pca_components)
     assert len(pca_variable_strings) == 3  # 3 components
     assert pca_variable_strings[0] == "(* (- (x) 2) 1)"
     assert pca_variable_strings[1] == "(* (- (y) 2) 1)"
@@ -60,7 +60,7 @@ def test_construct_pca_variable_strings_returns_correct_numbers_according_to_con
     mean = np.array([2, 2, 2])
     pca_components = np.array([[1, 8, 32.5], [12, 1, 33], [3, 2, 1]])
 
-    pca_variable_strings = construct_pca_variable_strings(function_variables, mean, pca_components)
+    pca_variable_strings = construct_projected_variable_strings(function_variables, mean, pca_components)
     assert len(pca_variable_strings) == 3  # 3 components
     assert pca_variable_strings[0] == "(+ (* (- (x) 2) 1) (+ (* (- (y) 2) 8) (* (- (z) 2) 32.5)))"
     assert pca_variable_strings[1] == "(+ (* (- (x) 2) 12) (+ (* (- (y) 2) 1) (* (- (z) 2) 33)))"

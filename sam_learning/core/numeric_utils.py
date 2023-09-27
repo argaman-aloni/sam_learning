@@ -70,24 +70,25 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     return prettified_coefficients
 
 
-def construct_pca_variable_strings(function_variables: List[str], pca_mean: Union[np.ndarray, List[float]],
-                                   pca_components: Union[np.ndarray, List[List[float]]]) -> List[str]:
+def construct_projected_variable_strings(function_variables: List[str], shift_point: Union[np.ndarray, List[float]],
+                                         projection_basis: Union[np.ndarray, List[List[float]]]) -> List[str]:
     """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
     :param function_variables: the name of the numeric fluents that are being used.
-    :param pca_mean: the mean of the PCA model.
-    :param pca_components: the components of the PCA model.
+    :param shift_point: the point in which the data was shifted according to.
+    :param projection_basis: the basis in which the data was projected to.
     :return: the new variable names after applying the PCA model transformation
     """
     shifted_by_mean = []
-    for func, mean_val in zip(function_variables, pca_mean):
-        component_function = f"(- {func} {prettify_floating_point_number(round(mean_val, 4))})"
+    for func, mean_val in zip(function_variables, shift_point):
+        component_function = func if mean_val == 0.0 else \
+            f"(- {func} {prettify_floating_point_number(round(mean_val, 4))})"
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
-    for row in range(len(pca_components)):
+    for row in range(len(projection_basis)):
         product_by_components_row = []
-        for shifted, component in zip(shifted_by_mean, pca_components[row]):
+        for shifted, component in zip(shifted_by_mean, projection_basis[row]):
             if component == 0.0:
                 continue
 

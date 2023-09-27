@@ -1,5 +1,6 @@
 """The PIL main framework - Compile, Learn and Plan."""
 import argparse
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -18,6 +19,11 @@ from validators import OnlineLearningDomainValidator
 DEFAULT_SPLIT = 10
 DEFAULT_NUMERIC_TOLERANCE = 0.1
 
+NO_INSIGHT_NUMERIC_ALGORITHMS = [
+    LearningAlgorithmType.raw_numeric_sam.value,
+    LearningAlgorithmType.raw_polynomial_nam.value,
+]
+
 
 class PIL:
     """Class that represents the PIL framework."""
@@ -30,7 +36,8 @@ class PIL:
 
     def __init__(
             self, working_directory_path: Path, domain_file_name: str, solver_type: SolverType,
-            problem_prefix: str = "pfile"):
+            learning_algorithm: LearningAlgorithmType, problem_prefix: str = "pfile",
+            polynomial_degree: int = 0, fluents_map_path: Optional[Path] = None, ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
@@ -41,6 +48,14 @@ class PIL:
             self.working_directory_path, LearningAlgorithmType.online_nsam,
             self.working_directory_path / domain_file_name,
             solver_type=solver_type, problem_prefix=problem_prefix)
+        self._learning_algorithm = learning_algorithm
+        self._polynomial_degree = polynomial_degree
+        if learning_algorithm.value in NO_INSIGHT_NUMERIC_ALGORITHMS:
+            self._fluents_map = None
+
+        else:
+            with open(fluents_map_path, "rt") as json_file:
+                self._fluents_map = json.load(json_file)
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path,
                               file_name: Optional[str] = None) -> Path:
@@ -69,7 +84,8 @@ class PIL:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        online_learner = OnlineNSAMLearner(partial_domain=partial_domain)
+        online_learner = OnlineNSAMLearner(partial_domain=partial_domain, fluents_map=self._fluents_map,
+                                           polynomial_degree=self._polynomial_degree)
         online_learner.init_online_learning()
         for problem_index, problem_path in enumerate(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")):
             self.logger.info(f"Starting episode number {problem_index + 1}!")
@@ -84,7 +100,7 @@ class PIL:
             if goal_achieved:
                 self.logger.info("The agent successfully solved the current task!")
 
-            if problem_index % 10 == 0:
+            if (problem_index + 1) % 10 == 0:
                 solved_all_test_problems = self.validate_learned_domain(
                     learned_model, test_set_dir_path, episode_number=problem_index + 1,
                     num_steps_in_episode=num_steps_in_episode)
@@ -158,6 +174,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--solver_type", required=False, type=int, choices=[1, 2, 3],
                         help="The solver that should be used for the sake of validation.\n FD - 1, Metric-FF - 2, ENHSP - 3.",
                         default=3)
+    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[3, 4, 6, 14],
+                        help="The type of learning algorithm. "
+                             "\n3: numeric_sam\n4: raw_numeric_sam\n 6: polynomial_sam\n ")
+    parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
+                                                                   "fluents", default=None)
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
 
@@ -170,6 +191,8 @@ def main():
     offline_learner = PIL(working_directory_path=Path(args.working_directory_path),
                           domain_file_name=args.domain_file_name,
                           solver_type=SolverType(args.solver_type),
+                          learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
+                          fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
                           problem_prefix=args.problems_prefix)
     offline_learner.run_cross_validation()
 

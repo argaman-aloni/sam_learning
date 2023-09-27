@@ -83,7 +83,7 @@ class ENHSPSolver:
             return False
 
     def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
-                       tolerance: float = 0.01, problems_prefix: str = "pfile") -> Dict[str, str]:
+                       tolerance: float = 0.1, problems_prefix: str = "pfile") -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.

@@ -1,6 +1,6 @@
 """An online version of the Numeric SAM learner."""
 import random
-from typing import Dict, Set, Optional, Tuple
+from typing import Dict, Set, Optional, Tuple, List
 
 from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject, Precondition, Predicate
 
@@ -24,8 +24,10 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
     _state_failure_rate: int
     _state_applicable_actions: PriorityQueue
 
-    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, agent: AbstractAgent = None):
-        super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree)
+    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, agent: AbstractAgent = None,
+                 fluents_map: Optional[Dict[str, List[str]]] = None):
+        super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree,
+                         preconditions_fluent_map=fluents_map)
         self.ig_learner = {}
         self.agent = agent
         self._action_observation_rate = {action: 1 for action in self.partial_domain.actions}
@@ -129,8 +131,10 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
             self.ig_learner[action.name].remove_non_existing_functions(list(lifted_functions.keys()))
 
+        features_to_explore = self.preconditions_fluent_map[action.name] if self.preconditions_fluent_map else None
         is_informative = self.ig_learner[action.name].is_sample_informative(
-            lifted_functions, lifted_predicates, use_cache=action_already_calculated)
+            lifted_functions, lifted_predicates, use_cache=action_already_calculated,
+            relevant_numeric_features=features_to_explore)
         IG = NON_INFORMATIVE_IG if not is_informative else self.ig_learner[action.name].calculate_information_gain(
             lifted_functions, lifted_predicates)
         if not is_informative:
