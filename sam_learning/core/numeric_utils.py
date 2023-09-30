@@ -53,6 +53,9 @@ def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List
         if func == "(dummy)":
             product_components.append(f"{prettify_floating_point_number(round(coefficient, 4))}")
 
+        elif coefficient == 1.0:
+            product_components.append(func)
+
         else:
             product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 4))})")
 
@@ -90,6 +93,10 @@ def construct_projected_variable_strings(function_variables: List[str], shift_po
         product_by_components_row = []
         for shifted, component in zip(shifted_by_mean, projection_basis[row]):
             if component == 0.0:
+                continue
+
+            if component == 1.0:
+                product_by_components_row.append(shifted)
                 continue
 
             product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 4))})")

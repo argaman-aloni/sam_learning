@@ -102,7 +102,7 @@ def test_construct_non_circular_assignment_constructs_correct_equation_with_corr
     previous_value = 0.0
     next_value = 1.0
     increase_statement = construct_non_circular_assignment(lifted_function, coefficient_map, previous_value, next_value)
-    assert increase_statement == "(increase (current_load ?z) (* (weight ?y) 1))"
+    assert increase_statement == "(increase (current_load ?z) (weight ?y))"
 
 
 def test_construct_non_circular_assignment_constructs_correct_equation_with_correct_coefficient_sign_on_decrease(
@@ -116,7 +116,7 @@ def test_construct_non_circular_assignment_constructs_correct_equation_with_corr
     previous_value = 1.0
     next_value = 0.0
     increase_statement = construct_non_circular_assignment(lifted_function, coefficient_map, previous_value, next_value)
-    assert increase_statement == "(decrease (current_load ?z) (* (weight ?y) 1))"
+    assert increase_statement == "(decrease (current_load ?z) (weight ?y))"
 
 
 def test_construct_assignment_equations_with_simple_2d_equations_when_no_change_in_variables_returns_empty_set(
@@ -302,7 +302,7 @@ def test_construct_safe_linear_inequalities_when_given_only_one_state_retsurns_d
         assert op.to_pddl() in ["(= (fuel-cost ) 34.0)", "(= (load_limit ?z) 411.0)", "(= (current_load ?z) 121.0)"]
 
 
-def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_two_disjunctive_preconditions(
+def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_smaller_convex_hull_and_const_condition(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
     CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(121.0)
@@ -325,15 +325,12 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_t
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities(
         ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"])
     assert output_conditions.binary_operator == "and"
+    assert len(output_conditions.operands) == 4
     numeric_conditions = \
-        [operand for operand in output_conditions.operands if isinstance(operand, NumericalExpressionTree)]
-    assert len(numeric_conditions) == 1
-    assert numeric_conditions[0].to_pddl() == "(= (current_load ?z) 121.0)"
-
-    or_conditions = [operand for operand in output_conditions.operands if isinstance(operand, Precondition)]
-    assert len(or_conditions) == 1
-    assert or_conditions[0].binary_operator == "or"
-    assert len(or_conditions[0].operands) == 2
+        [operand.to_pddl() for operand in output_conditions.operands if isinstance(operand, NumericalExpressionTree)]
+    assert "(= (- (current_load ?z) 121.0) 0.0)" in numeric_conditions  # the condition is shifted
+    assert len([condition for condition in numeric_conditions if condition.startswith("(<=")]) == 2
+    assert len([condition for condition in numeric_conditions if condition.startswith("(=")]) == 2
     print(str(output_conditions))
 
 
@@ -354,7 +351,7 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
 
     expected_conditions = ["(<= (* (fuel-cost ) -1.0) 0.0)",
                            "(<= (* (current_load ?z) -1.0) 0.0)",
-                           "(<= (+ (* (fuel-cost ) 0.7071) (* (current_load ?z) 0.7071)) 0.7071)"]
+                           "(<= (+ (* (current_load ?z) 0.7071) (* (fuel-cost ) 0.7071)) 0.7071)"]
     for _, precondition in output_conditions:
         assert precondition.to_pddl() in expected_conditions
 
@@ -373,9 +370,9 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
 
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities(
         ["(fuel-cost )", "(current_load ?z)"])
-    expected_conditions = ["(<= (* (current_load ?z) 1.0) 1.0)",
+    expected_conditions = ["(<= (current_load ?z) 1.0)",
                            "(<= (* (fuel-cost ) -1.0) 0.0)",
-                           "(<= (* (fuel-cost ) 1.0) 1.0)",
+                           "(<= (fuel-cost ) 1.0)",
                            "(<= (* (current_load ?z) -1.0) 0.0)"]
 
     for _, precondition in output_conditions:
