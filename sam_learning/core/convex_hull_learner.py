@@ -12,7 +12,7 @@ from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
 
 from sam_learning.core.learning_types import ConditionType
 from sam_learning.core.numeric_utils import construct_multiplication_strings, construct_linear_equation_string, \
-    prettify_coefficients, construct_numeric_conditions, construct_projected_variable_strings
+    prettify_coefficients, construct_numeric_conditions, construct_projected_variable_strings, extended_gram_schmidt
 
 EPSILON = 1e-10
 
@@ -29,36 +29,6 @@ class ConvexHullLearner:
         self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
         self.action_name = action_name
         self.domain_functions = domain_functions
-
-    @staticmethod
-    def _extended_gram_schmidt(
-            input_basis_vectors: List[List[float]], eigen_vectors: Optional[List[List[float]]] = None) -> [
-        List[List[float]]]:
-        """Runs the extended Gram-Schmidt algorithm on the input basis vectors.
-
-        Note:
-            The algorithm is extended in the that it can handle the additional input eigen vectors and return the
-            orthonormal basis vectors of the input basis vectors and eigen vectors.
-
-        :param input_basis_vectors: The input basis vectors.
-        :param eigen_vectors: The eigen vectors - optional and can be none.
-        :return: The orthonormal basis vectors of the input basis vectors and eigen vectors.
-        """
-        non_normal_vectors = eigen_vectors.copy() if eigen_vectors else []
-        normal_vectors = []
-        for vector in input_basis_vectors:
-            # Gram Schmidt magic
-            projected_vector = vector - np.sum([(np.dot(vector, b) / np.linalg.norm(b) ** 2) * np.array(b) for b in non_normal_vectors], axis=0)
-            if not (np.absolute(projected_vector) > EPSILON).any():
-                continue
-
-            non_normal_vectors.append(projected_vector.tolist())
-            normal_vectors.append((projected_vector / np.linalg.norm(projected_vector)).tolist())
-
-        if not eigen_vectors:
-            return normal_vectors
-
-        return [b for b in normal_vectors if b not in eigen_vectors]
 
     def _create_convex_hull_linear_inequalities(
             self, points_df: DataFrame, display_mode: bool = True) -> Tuple[
@@ -77,7 +47,7 @@ class ConvexHullLearner:
         shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
         shifted_points = points - shift_axis
         self.logger.debug("Finding the basis vectors for the projected CH using the extended Gram-Schmidt method.")
-        projection_basis = self._extended_gram_schmidt(shifted_points)
+        projection_basis = extended_gram_schmidt(shifted_points)
         projected_points = np.dot(shifted_points, np.array(projection_basis).T)
         if projected_points.shape[1] == 1:
             self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
@@ -98,7 +68,7 @@ class ConvexHullLearner:
 
         self.logger.debug("Constructing the conditions to verify that points are in the correct span.")
         diagonal_eye = [list(vector) for vector in np.eye(points.shape[1])]
-        orthnormal_span = self._extended_gram_schmidt(diagonal_eye, projection_basis)
+        orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
         transformed_orthonormal_vars = construct_projected_variable_strings(
             points_df.columns.tolist(), shift_axis, diagonal_eye)
         span_verification_conditions = self._construct_pddl_inequality_scheme(

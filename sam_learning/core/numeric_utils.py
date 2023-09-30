@@ -268,3 +268,33 @@ def construct_numeric_effects(
         numeric_effects.append(numeric_expression)
 
     return {NumericalExpressionTree(expr) for expr in numeric_effects}
+
+
+def extended_gram_schmidt(
+        input_basis_vectors: List[List[float]], eigen_vectors: Optional[List[List[float]]] = None) -> List[List[float]]:
+    """Runs the extended Gram-Schmidt algorithm on the input basis vectors.
+
+    Note:
+        The algorithm is extended in the that it can handle the additional input eigen vectors and return the
+        orthonormal basis vectors of the input basis vectors and eigen vectors.
+
+    :param input_basis_vectors: The input basis vectors.
+    :param eigen_vectors: The eigen vectors - optional and can be none.
+    :return: The orthonormal basis vectors of the input basis vectors and eigen vectors.
+    """
+    non_normal_vectors = eigen_vectors.copy() if eigen_vectors else []
+    normal_vectors = []
+    for vector in input_basis_vectors:
+        # Gram Schmidt magic
+        projected_vector = vector - np.sum(
+            [(np.dot(vector, b) / np.linalg.norm(b) ** 2) * np.array(b) for b in non_normal_vectors], axis=0)
+        if not (np.absolute(projected_vector) > EPSILON).any():
+            continue
+
+        non_normal_vectors.append(projected_vector.tolist())
+        normal_vectors.append((projected_vector / np.linalg.norm(projected_vector)).tolist())
+
+    if not eigen_vectors:
+        return normal_vectors
+
+    return [b for b in normal_vectors if b not in eigen_vectors]

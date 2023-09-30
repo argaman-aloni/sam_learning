@@ -10,7 +10,7 @@ from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
 from sklearn.decomposition import PCA
 
 from sam_learning.core.numeric_utils import get_num_independent_equations, filter_constant_features, \
-    detect_linear_dependent_features
+    detect_linear_dependent_features, extended_gram_schmidt
 
 
 class InformationGainLearner:
@@ -104,32 +104,24 @@ class InformationGainLearner:
     def _calculate_whether_in_delanauy_hull(
             self, convex_hull_points: np.ndarray,
             new_point: np.ndarray, debug_mode: bool = False, use_cached_ch: bool = False, ) -> bool:
-        """
+        """Calculates whether the new point is inside the convex hull using the delanauy algorith.
 
-        :param convex_hull_points:
-        :param new_point:
-        :param debug_mode:
-        :param use_cached_ch:
-        :return:
+        :param convex_hull_points: the points composing the convex hull.
+        :param new_point: the new point to test whether it is inside the convex hull.
+        :param debug_mode: whether to display the convex hull.
+        :param use_cached_ch: whether to use the cached convex hull. This reduces runtime.
+        :return: whether the new point is inside the convex hull.
         """
         if self._cached_convex_hull is not None and use_cached_ch:
             delaunay_hull = self._cached_convex_hull
             relevant_sample = new_point if not self._pca_model is None else self._pca_model.transform(new_point)
 
         else:
-            try:
-                delaunay_hull = Delaunay(convex_hull_points)
-                self._pca_model = None
-                relevant_sample = new_point
-                if use_cached_ch:
-                    self._cached_convex_hull = delaunay_hull
-
-            except (QhullError, ValueError):
-                rank = np.linalg.matrix_rank(convex_hull_points)
-                model = PCA(n_components=rank - 1).fit(convex_hull_points)
-                pred_points = model.transform(convex_hull_points)
-                delaunay_hull = Delaunay(pred_points)
-                relevant_sample = model.transform(new_point)
+            delaunay_hull = Delaunay(convex_hull_points)
+            self._pca_model = None
+            relevant_sample = new_point
+            if use_cached_ch:
+                self._cached_convex_hull = delaunay_hull
 
         if debug_mode:
             self._display_delaunay_graph(delaunay_hull, convex_hull_points.shape[1])
@@ -160,27 +152,22 @@ class InformationGainLearner:
         :return: whether any of the negative samples is inside the convex hull.
         """
         self.logger.debug("Validating whether the input samples are inside the convex hull.")
-        no_consts_df, _, constant_features = filter_constant_features(hull_df)
-        concise_df, linear_dependency_conditions, _ = detect_linear_dependent_features(no_consts_df)
-        hull = concise_df.to_numpy()
-        # validate that the point contains a feature with the same constant values as the hull.
-        consts_match = self._validate_consts_match(points_to_test, hull_df, constant_features)
-        if not consts_match:
+        shifted_new_points = points_to_test.to_numpy() - hull_df.to_numpy()[0]
+        shifted_hull_points = hull_df.to_numpy() - hull_df.to_numpy()[0]
+        projection_basis = extended_gram_schmidt(shifted_hull_points)
+        projected_points = np.dot(shifted_hull_points, np.array(projection_basis).T)
+        projected_new_point = np.dot(shifted_new_points, np.array(projection_basis).T)
+        diagonal_eye = [list(vector) for vector in np.eye(shifted_hull_points.shape[1])]
+        orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
+        if len(orthnormal_span) > 0 and np.dot(np.array(projected_new_point), np.array(orthnormal_span)).any() != 0:
+            self.logger.debug("The new points are not in the span of the input points.")
             return False
 
-        # validate that the point contains a feature with the same linear dependency as the hull.
-        _, sample_linear_dependency_conditions, _ = detect_linear_dependent_features(points_to_test)
-        if (len(linear_dependency_conditions) > 0 and
-                not set(sample_linear_dependency_conditions).issuperset(linear_dependency_conditions)):
-            return False
+        if projected_points.shape[1] == 1:
+            return all([projected_points.min() <= point <= projected_points.max() for point in projected_new_point])
 
-        relevant_sample = points_to_test[concise_df.columns.tolist()] if \
-            len(linear_dependency_conditions) > 0 or len(constant_features) > 0 else points_to_test
-
-        if hull.shape[1] == 1:
-            return all([hull.min() <= point <= hull.max() for point in relevant_sample.to_numpy()])
-
-        return self._calculate_whether_in_delanauy_hull(hull, relevant_sample.to_numpy(), debug_mode, use_cached_ch)
+        return self._calculate_whether_in_delanauy_hull(
+            projected_points, projected_new_point, debug_mode, use_cached_ch)
 
     def _remove_features(self, features_to_keep: List[str], features_list: List[str]) -> List[str]:
         """Removes features from the data frames.

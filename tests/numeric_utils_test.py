@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 
-from sam_learning.core.numeric_utils import extract_numeric_linear_coefficient, construct_projected_variable_strings
+from sam_learning.core.numeric_utils import extract_numeric_linear_coefficient, construct_projected_variable_strings, \
+    extended_gram_schmidt
 
 
 def test_extract_numeric_linear_coefficient_does_not_output_infinity_for_zero_division():
@@ -66,3 +67,42 @@ def test_construct_pca_variable_strings_returns_correct_numbers_according_to_con
     assert pca_variable_strings[1] == "(+ (* (- (x) 2) 12) (+ (- (y) 2) (* (- (z) 2) 33)))"
     assert pca_variable_strings[2] == "(+ (* (- (x) 2) 3) (+ (* (- (y) 2) 2) (- (z) 2)))"
 
+
+def test_extended_gram_schmidt_on_no_shift_base_returns_correct_lower_dimensional_points():
+    projections = extended_gram_schmidt([[0, 0, 0], [0, 1, 0], [1, 0, 0]])
+    assert len(projections) == 2
+    assert projections == [[0, 1, 0], [1, 0, 0]]
+
+
+def test_extended_gram_schmidt_on_no_shift_base_returns_correct_lower_dimensional_points_with_correct_rational_values():
+    projections = extended_gram_schmidt([[0, 0, 0], [0, 1, 1], [0, 1, -1]])
+    normalized_projection = []
+    for vector in projections:
+        normalized_projection.append([round(val, 3) for val in vector])
+
+    assert len(projections) == 2
+    assert normalized_projection == [[0, 0.707, 0.707], [0, 0.707, -0.707]]
+
+
+def test_extended_gram_schmidt_on_no_shift_when_given_orthonormal_partial_base_returns_complementary_base_to_points():
+    projections = extended_gram_schmidt(
+        [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[0, 1, 0], [1, 0, 0]])
+    assert len(projections) == 1
+    assert projections == [[0, 0, 1]]
+
+
+def test_extended_gram_schmidt_on_no_shift_with_base_correctly_returns_the_missing_vector():
+    projections = extended_gram_schmidt([[0, 0, 0], [0, 1, 1], [0, 1, -1]])
+    extended_standard_base = np.concatenate((np.eye(3), np.array(projections)), axis=0).tolist()
+    complementary_projection = extended_gram_schmidt(extended_standard_base, projections)
+    assert len(complementary_projection) == 1
+    assert complementary_projection == [[1, 0, 0]]
+
+
+def test_extended_gram_schmidt_on_no_shift_with_base_with_more_rows_than_columns_still_returns_2x2_output():
+    projections = extended_gram_schmidt([[-19.0, 32.0], [14.0, 52.0], [28.0, 12.0], [-7.0, 13.0]])
+    assert len(projections) == 2
+    assert all([len(vector) == 2 for vector in projections])
+    assert np.sum(np.array(projections) - np.array(
+        [[-0.510538754155436, 0.859854743840735], [0.859854743840735, 0.510538754155436]])) < 0.0001
+    print(projections)

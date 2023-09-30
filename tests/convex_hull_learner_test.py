@@ -192,46 +192,4 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_
     print(span_verification_conditions)
 
 
-def test_extended_gram_schmidt_on_no_shift_base_returns_correct_lower_dimensional_points(
-        convex_hull_learner: ConvexHullLearner):
-    projections = convex_hull_learner._extended_gram_schmidt([[0, 0, 0], [0, 1, 0], [1, 0, 0]])
-    assert len(projections) == 2
-    assert projections == [[0, 1, 0], [1, 0, 0]]
 
-
-def test_extended_gram_schmidt_on_no_shift_base_returns_correct_lower_dimensional_points_with_correct_rational_values(
-        convex_hull_learner: ConvexHullLearner):
-    projections = convex_hull_learner._extended_gram_schmidt([[0, 0, 0], [0, 1, 1], [0, 1, -1]])
-    normalized_projection = []
-    for vector in projections:
-        normalized_projection.append([round(val, 3) for val in vector])
-
-    assert len(projections) == 2
-    assert normalized_projection == [[0, 0.707, 0.707], [0, 0.707, -0.707]]
-
-
-def test_extended_gram_schmidt_on_no_shift_when_given_orthonormal_partial_base_returns_complementary_base_to_points(
-        convex_hull_learner: ConvexHullLearner):
-    projections = convex_hull_learner._extended_gram_schmidt(
-        [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[0, 1, 0], [1, 0, 0]])
-    assert len(projections) == 1
-    assert projections == [[0, 0, 1]]
-
-
-def test_extended_gram_schmidt_on_no_shift_with_base_correctly_returns_the_missing_vector(
-        convex_hull_learner: ConvexHullLearner):
-    projections = convex_hull_learner._extended_gram_schmidt([[0, 0, 0], [0, 1, 1], [0, 1, -1]])
-    extended_standard_base = np.concatenate((np.eye(3), np.array(projections)), axis=0).tolist()
-    complementary_projection = convex_hull_learner._extended_gram_schmidt(extended_standard_base, projections)
-    assert len(complementary_projection) == 1
-    assert complementary_projection == [[1, 0, 0]]
-
-
-def test_extended_gram_schmidt_on_no_shift_with_base_with_more_rows_than_columns_still_returns_2x2_output(
-        convex_hull_learner: ConvexHullLearner):
-    projections = convex_hull_learner._extended_gram_schmidt([[-19.0, 32.0], [14.0, 52.0], [28.0, 12.0], [-7.0, 13.0]])
-    assert len(projections) == 2
-    assert all([len(vector) == 2 for vector in projections])
-    assert np.sum(np.array(projections) - np.array(
-        [[-0.510538754155436, 0.859854743840735], [0.859854743840735, 0.510538754155436]])) < 0.0001
-    print(projections)
