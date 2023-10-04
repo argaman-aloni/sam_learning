@@ -270,6 +270,11 @@ class ConditionalSAM(SAMLearner):
         :param action: the action to construct the effect for.
         :param literal: the literal that is the result of the effect.
         """
+        bounded_predicate = extract_predicate_data(action.signature, literal, self.partial_domain.constants)
+        if bounded_predicate in self.cannot_be_effect[action.name]:
+            self.logger.debug("Preventing from literals that cannot be effects to be effects (help with constants).")
+            return
+
         self.logger.debug(f"The literal {literal} is a simple effect of the action.")
         action.discrete_effects.add(extract_predicate_data(action.signature, literal, self.partial_domain.constants))
 

@@ -9,7 +9,7 @@ from pddl_plus_parser.models import Observation, Domain
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM, \
     UniversallyConditionalSAM
-from solvers import ENHSPSolver, MetricFFSolver
+from solvers import ENHSPSolver, MetricFFSolver, FastDownwardSolver
 from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
@@ -140,14 +140,14 @@ class OfflineBasicExperimentRunner:
                                    f"{self._learning_algorithm.name}_{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
-        if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self.domain_validator.solver = MetricFFSolver()
-            self.domain_validator._solver_name = "metric_ff"
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
+        self.domain_validator.solver = MetricFFSolver()
+        self.domain_validator._solver_name = "metric_ff"
+        self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                              test_set_directory_path=test_set_dir_path,
+                                              used_observations=allowed_observations,
+                                              tolerance=DEFAULT_NUMERIC_TOLERANCE)
 
+        if self._learning_algorithm in NUMERIC_ALGORITHMS:
             self.domain_validator.solver = ENHSPSolver()
             self.domain_validator._solver_name = "enhsp"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
@@ -155,6 +155,8 @@ class OfflineBasicExperimentRunner:
                                                   used_observations=allowed_observations,
                                                   tolerance=DEFAULT_NUMERIC_TOLERANCE)
         else:
+            self.domain_validator.solver = FastDownwardSolver()
+            self.domain_validator._solver_name = "fast_downward"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,

@@ -10,7 +10,7 @@ from pddl_plus_parser.exporters import MetricFFParser
 
 METRIC_FF_DIRECTORY = os.environ["METRIC_FF_DIRECTORY"]
 
-MAX_RUNNING_TIME = 5  # seconds
+MAX_RUNNING_TIME = 60  # seconds
 
 
 class MetricFFSolver:

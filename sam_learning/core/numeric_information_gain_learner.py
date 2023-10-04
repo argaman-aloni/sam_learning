@@ -1,6 +1,6 @@
 """A module containing the algorithm to calculate the information gain of new samples."""
 import logging
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -10,7 +10,7 @@ from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
 from sklearn.decomposition import PCA
 
 from sam_learning.core.numeric_utils import get_num_independent_equations, filter_constant_features, \
-    detect_linear_dependent_features, extended_gram_schmidt
+    detect_linear_dependent_features, extended_gram_schmidt, EPSILON
 
 
 class InformationGainLearner:
@@ -159,7 +159,8 @@ class InformationGainLearner:
         projected_new_point = np.dot(shifted_new_points, np.array(projection_basis).T)
         diagonal_eye = [list(vector) for vector in np.eye(shifted_hull_points.shape[1])]
         orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
-        if len(orthnormal_span) > 0 and np.dot(np.array(projected_new_point), np.array(orthnormal_span)).any() != 0:
+        if (len(orthnormal_span) > 0 and
+                (np.absolute(np.dot(np.array(orthnormal_span), np.array(shifted_new_points).T)) > EPSILON).any()):
             self.logger.debug("The new points are not in the span of the input points.")
             return False
 

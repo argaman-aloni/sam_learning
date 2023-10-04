@@ -27,6 +27,7 @@ class SAMLearner:
     current_trajectory_objects: Dict[str, PDDLObject]
     learning_start_time: float
     learning_end_time: float
+    vocabulary_creator: VocabularyCreator
     cannot_be_effect: Dict[str, Set[Predicate]]
 
     def __init__(self, partial_domain: Domain):
