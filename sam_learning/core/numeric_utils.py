@@ -12,7 +12,7 @@ from sklearn.feature_selection import VarianceThreshold
 
 from sam_learning.core.learning_types import ConditionType
 
-EPSILON = 1e-10
+EPSILON = 1e-4
 
 
 def get_num_independent_equations(data_matrix: DataFrame) -> int:
@@ -83,16 +83,16 @@ def construct_projected_variable_strings(function_variables: List[str], shift_po
     :return: the new variable names after applying the PCA model transformation
     """
     shifted_by_mean = []
-    for func, mean_val in zip(function_variables, shift_point):
-        component_function = func if mean_val == 0.0 else \
-            f"(- {func} {prettify_floating_point_number(round(mean_val, 4))})"
+    for func, shift_value in zip(function_variables, shift_point):
+        component_function = func if shift_value == 0.0 else \
+            f"(- {func} {prettify_floating_point_number(round(shift_value, 4))})"
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
     for row in range(len(projection_basis)):
         product_by_components_row = []
         for shifted, component in zip(shifted_by_mean, projection_basis[row]):
-            if component == 0.0:
+            if abs(round(component, 4)) <= EPSILON:
                 continue
 
             if component == 1.0:

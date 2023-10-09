@@ -106,3 +106,13 @@ def test_extended_gram_schmidt_on_no_shift_with_base_with_more_rows_than_columns
     assert np.sum(np.array(projections) - np.array(
         [[-0.510538754155436, 0.859854743840735], [0.859854743840735, 0.510538754155436]])) < 0.0001
     print(projections)
+
+
+def test_extended_gram_schmidt_with_no_base_returns_correct_orthonormal_matrix():
+    projections = extended_gram_schmidt([[1, 1, 1], [2, 1, 0], [5, 1, 3]])
+    assert len(projections) == 3
+    assert np.sum(np.array(projections) - np.array([
+        [0.577350269189626, 0.577350269189626, 0.577350269189626],
+        [0.707106781186548, 0, -0.707106781186548],
+        [0.408248290463863, -0.816496580927726, 0.408248290463863]
+    ])) < 0.0001

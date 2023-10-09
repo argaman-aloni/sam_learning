@@ -59,6 +59,10 @@ class NumericSAMLearner(SAMLearner):
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
 
+        if self.preconditions_fluent_map is None:
+            self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
+            return
+
         if learned_perfectly:
             self.logger.debug(f"The effect of action - {action.name} were learned perfectly.")
             if numeric_preconditions is not None:
@@ -68,11 +72,6 @@ class NumericSAMLearner(SAMLearner):
 
                     action.preconditions.add_condition(cond)
 
-            return
-
-        self.logger.debug(f"The action {action.name} was not learned perfectly.")
-        if self.preconditions_fluent_map is None:
-            self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
             return
 
         self.logger.debug(f"Creating restrictive numeric preconditions for the action.")

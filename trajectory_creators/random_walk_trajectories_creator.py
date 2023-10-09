@@ -13,7 +13,7 @@ from pddl_plus_parser.models import PDDLObject, Domain, ActionCall, Problem, Sta
 from sam_learning.core import VocabularyCreator
 from utilities import SolverType
 
-MAX_NUM_STEPS_IN_TRAJECTORY = 100
+MAX_NUM_STEPS_IN_TRAJECTORY = 1000
 
 
 class RandomWalkTrajectoriesCreator:
