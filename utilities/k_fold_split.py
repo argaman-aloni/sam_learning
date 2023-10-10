@@ -12,7 +12,7 @@ RANDOM_STATE = 42  # it is always good to seed something according to the most i
 DEFAULT_TEST_SIZE = 0.2
 
 FOLDS_CONFIG_FILE_NAME = "folds.json"
-FOLDS_LABEL = "folds"
+FOLDS_LABEL = "fold"
 
 
 def create_test_set_indices(array_size: int, n_split: int,
@@ -57,9 +57,13 @@ def load_fold_settings(workdir_path: Path) -> Dict[str, Dict[str, List[Path]]]:
     folds_configurations = {}
     with open(workdir_path / FOLDS_CONFIG_FILE_NAME, "rt") as folds_file:
         config_data = json.load(folds_file)
-        for fold in config_data[FOLDS_LABEL]:
-            folds_configurations["train"] = [Path(problem) for problem in fold["train"]]
-            folds_configurations["test"] = [Path(problem) for problem in fold["test"]]
+        for fold_name, fold in config_data.items():
+            folds_configurations[fold_name] = {
+                "train": [Path(problem) for problem in fold["train"]],
+                "test": [Path(problem) for problem in fold["test"]]
+            }
+
+    return folds_configurations
 
 
 class KFoldSplit:

@@ -30,6 +30,23 @@ class ConvexHullLearner:
         self.action_name = action_name
         self.domain_functions = domain_functions
 
+    def _execute_convex_hull(
+            self, points: np.ndarray, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
+        """Runs the convex hull algorithm on the given input points.
+
+        :param points: the points to run the convex hull algorithm on.
+        :param display_mode: whether to display the convex hull.
+        :return: the coefficients of the planes that represent the convex hull and the border point.
+        """
+        hull = ConvexHull(points)
+        self._display_convex_hull(display_mode, hull, points.shape[1])
+
+        A = hull.equations[:, :points.shape[1]]
+        b = -hull.equations[:, points.shape[1]]
+        coefficients = [prettify_coefficients(row) for row in A]
+        border_point = prettify_coefficients(b)
+        return coefficients, border_point
+
     def _create_convex_hull_linear_inequalities(
             self, points_df: DataFrame, display_mode: bool = True) -> Tuple[
         List[List[float]], List[float], List[str], Optional[List[str]]]:
@@ -48,6 +65,13 @@ class ConvexHullLearner:
         shifted_points = points - shift_axis
         self.logger.debug("Finding the basis vectors for the projected CH using the extended Gram-Schmidt method.")
         projection_basis = extended_gram_schmidt(shifted_points)
+        if len(shifted_points) > len(points_df.columns.tolist()) and len(projection_basis) == len(
+                points_df.columns.tolist()):
+            self.logger.debug("The points are spanning the original space and the basis is full rank, "
+                              "no need to project the points.")
+            coefficients, border_point = self._execute_convex_hull(points, display_mode)
+            return coefficients, border_point, points_df.columns.tolist(), []
+
         projected_points = np.dot(shifted_points, np.array(projection_basis).T)
         if projected_points.shape[1] == 1:
             self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
@@ -55,13 +79,7 @@ class ConvexHullLearner:
             border_point = prettify_coefficients([projected_points.min(), projected_points.max()])
 
         else:
-            hull = ConvexHull(projected_points)
-            self._display_convex_hull(display_mode, hull, projected_points.shape[1])
-
-            projected_A = hull.equations[:, :projected_points.shape[1]]
-            projected_b = -hull.equations[:, projected_points.shape[1]]
-            coefficients = [prettify_coefficients(row) for row in projected_A]
-            border_point = prettify_coefficients(projected_b)
+            coefficients, border_point = self._execute_convex_hull(projected_points, display_mode)
 
         transformed_vars = construct_projected_variable_strings(
             points_df.columns.tolist(), shift_axis, projection_basis)

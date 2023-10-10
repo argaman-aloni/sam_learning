@@ -192,4 +192,14 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_
     print(span_verification_conditions)
 
 
-
+def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_constant_is_observed_and_there_is_enough_data_to_create_convex_hull(
+        convex_hull_learner: ConvexHullLearner):
+    pre_state_data = {
+        "(x)": [1, 0, 0, 1],
+        "(y)": [0, 1, 0, 1],
+        "(z)": [0, 0, 1, 1]
+    }
+    pre_state_df = DataFrame(pre_state_data)
+    coefficients, border_point, transformed_vars, span_verification_conditions = (
+        convex_hull_learner._create_convex_hull_linear_inequalities(pre_state_df, display_mode=False))
+    assert span_verification_conditions == []
