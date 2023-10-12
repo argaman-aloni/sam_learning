@@ -539,6 +539,9 @@ def test_verify_and_construct_safe_conditional_effects_creates_conditional_effec
         "(make-unmovable ?to)": [{"(not (can-continue-group ?c ?to))"}, {"(currently-dealing )"},
                                  {"(not (currently-updating-movable ))"}]
     }
+    dependecy_set.possible_disjunctive_antecedents = {
+        "(make-unmovable ?to)": []
+    }
     spider_conditional_sam.observed_effects[test_action.name].add("(make-unmovable ?to)")
     spider_conditional_sam.conditional_antecedents[test_action.name] = dependecy_set
     spider_conditional_sam._verify_and_construct_safe_conditional_effects(test_action)
@@ -553,6 +556,9 @@ def test_verify_and_construct_safe_conditional_effects_creates_simple_discrete_e
                                   action_signature=test_action.signature,
                                   domain_constants=spider_domain.constants)
     dependecy_set.possible_antecedents = {
+        "(make-unmovable ?to)": []
+    }
+    dependecy_set.possible_disjunctive_antecedents = {
         "(make-unmovable ?to)": []
     }
     spider_conditional_sam.observed_effects[test_action.name].add("(make-unmovable ?to)")

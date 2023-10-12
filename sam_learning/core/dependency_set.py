@@ -1,144 +1,23 @@
 """Module representing the dependency set of an action."""
-import itertools
 import logging
 from typing import Set, Dict, List, Optional, Union
 
+import math
 from pddl_plus_parser.models import Predicate, Precondition, SignatureType, PDDLConstant
 
 from sam_learning.core.discrete_utilities import extract_predicate_data
+from sam_learning.core.logical_expression_operations import create_cnf_combination, create_dnf_combinations, \
+    minimize_cnf_clauses, _flip_single_predicate, check_complementary_literals
 
 NOT_PREFIX = "(not"
 AFTER_NOT_PREFIX_INDEX = 5
 RIGHT_BRACKET_INDEX = -1
 
 
-def check_complementary_literals(clause: Set[str]) -> bool:
-    """Checks if any two literals in the clause are complementary.
-
-    :param clause: the clause to check.
-    :return: True if any two literals in the clause are complementary, False otherwise.
-    """
-    for first_literal, second_literal in itertools.combinations(clause, 2):
-        if first_literal.startswith(NOT_PREFIX) and not second_literal.startswith(NOT_PREFIX) and \
-                first_literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX] == second_literal:
-            # Complementary literals
-            return True
-
-        if not first_literal.startswith(NOT_PREFIX) and second_literal.startswith(NOT_PREFIX) and \
-                first_literal == second_literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]:
-            # Complementary literals
-            return True
-
-    return False
-
-
-def minimize_cnf_clauses(clauses: List[Set[str]], assumptions: Set[str] = None) -> List[Set[str]]:
-    """Minimizes the CNF clauses based on unit clauses and complementary literals.
-
-    :param clauses: the CNF clauses to minimize.
-    :param assumptions: the assumptions to use for the minimization.
-    :return: the minimized CNF clauses.
-    """
-    used_assumptions = assumptions or set()
-    minimized_clauses = [clause for clause in clauses.copy() if len(clause) == 1 if
-                         not clause.intersection(used_assumptions)]
-    unit_clauses = {literal for clause in minimized_clauses for literal in clause}
-    if check_complementary_literals(unit_clauses):
-        raise ValueError("The unit clauses are contradicting one another!")
-
-    used_assumptions.update(unit_clauses)
-    non_unit_clauses = [clause for clause in clauses if len(clause) > 1]
-    for clause in non_unit_clauses:
-        # Checking if there are complementary literals in the clause - if so, the clause is always true
-        if check_complementary_literals(clause) or any([assumption in clause for assumption in used_assumptions]):
-            continue
-
-        for assumption in used_assumptions:
-            if assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})):
-                # We can remove the complementary literal
-                clause.remove(assumption[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX])
-
-            elif not assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})):
-                # We can remove the complementary literal
-                clause.remove(f"{NOT_PREFIX} {assumption})")
-
-        # There are no assumptions in the clause
-        if len(clause) > 0:
-            minimized_clauses.append(clause)
-
-    return minimized_clauses
-
-
-def minimize_dnf_clauses(clauses: List[Set[str]], assumptions: Set[str] = frozenset()) -> List[Set[str]]:
-    """Minimizes the DNF clauses based on unit clauses and complementary literals.
-
-    :param clauses: the DNF clauses to minimize.
-    :param assumptions: the assumptions to use for the minimization.
-    :return: the minimized DNF clauses.
-    """
-    if any([clause.issubset(assumptions) for clause in clauses]):
-        # There is a clause that is a subset of the assumptions, so we don't need to add it
-        return []
-
-    unit_clauses = {next(iter(clause)) for clause in clauses if len(clause) == 1}
-    if check_complementary_literals(unit_clauses):
-        # since this is a DNF and wwe have a literal and its negation combined with OR - the clause is always true
-        return []
-
-    minimized_clauses = [clause for clause in clauses if len(clause) == 1]
-    non_unit_clauses = [clause for clause in clauses if len(clause) > 1]
-    found_contradiction = len(minimized_clauses) == 0
-    for clause in non_unit_clauses:
-        # Checking if there are complementary literals in the clause, if so, the clause is always false (don't add it)
-        if check_complementary_literals(clause):
-            continue
-
-        # if there is a clause with an assumption negation, then this clause is always False
-        is_contradicting_assumptions = False
-        for assumption in assumptions:
-            if assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})) or \
-                    not assumption.startswith(NOT_PREFIX) and check_complementary_literals(clause.union({assumption})):
-                is_contradicting_assumptions = True
-                break
-
-        if is_contradicting_assumptions:
-            continue
-
-        # There are no complementary literals in the clause and the assumptions are not contradicting the clause
-        current_minimized_clause = clause.difference(assumptions)
-        if len(current_minimized_clause) > 0:
-            minimized_clauses.append(clause.difference(assumptions))
-            found_contradiction = False
-
-    if found_contradiction:
-        raise ValueError("The clauses are contradicting themselves!")
-
-    return minimized_clauses
-
-
-def create_antecedents_combination(antecedents: Set[str], max_antecedents_size: int,
-                                   exclude_literals: Optional[Set[str]] = None) -> List[Set[str]]:
-    """Creates all possible subset combinations of antecedents.
-
-    :param antecedents: the list of antecedents that may be trigger for conditional effects.
-    :param max_antecedents_size: the maximal size of the antecedents' combination.
-    :param exclude_literals: the literals to exclude from the antecedents combinations.
-    :return: all possible subsets of the antecedents up to the given size.
-    """
-    antecedents_combinations = []
-    antecedents_to_use = antecedents - exclude_literals if exclude_literals is not None else antecedents
-    for subset_size in range(1, max_antecedents_size + 1):
-        possible_combinations = [set(combination) for combination in itertools.combinations(
-            antecedents_to_use, subset_size)]
-        for combination in possible_combinations:
-            antecedents_combinations.append(combination)
-
-    return antecedents_combinations
-
-
 class DependencySet:
     """Class representing the dependency set of an action."""
     possible_antecedents: Dict[str, List[Set[str]]]
+    possible_disjunctive_antecedents: Dict[str, List[List[List[str]]]]
     max_antecedents: int
     action_signature: SignatureType
     domain_constants: Dict[str, PDDLConstant]
@@ -147,6 +26,7 @@ class DependencySet:
     def __init__(self, max_size_antecedents: int, action_signature: SignatureType,
                  domain_constants: Dict[str, PDDLConstant]):
         self.possible_antecedents = {}
+        self.possible_disjunctive_antecedents = {}
         self.max_antecedents = max_size_antecedents
         self.action_signature = action_signature
         self.domain_constants = domain_constants
@@ -168,34 +48,29 @@ class DependencySet:
 
         return superset_dependencies
 
-    @staticmethod
-    def _flip_single_predicate(predicate: str) -> str:
-        """Flips the sign of the given predicate.
-
-        :param predicate: the predicate to flip.
-        :return: the flipped predicate.
-        """
-        if predicate.startswith(NOT_PREFIX):
-            return predicate[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]
-
-        return f"(not {predicate})"
-
     def _extract_negated_minimized_antecedents(
             self, unsafe_antecedents: List[Set[str]], preconditions: Set[str]) -> Union[List[Set[str]], bool]:
-        """
+        """Tries to minimize the negated antecedents' size to a more compact representation.
 
-        :param unsafe_antecedents:
-        :param preconditions:
-        :return:
+        :param unsafe_antecedents: the unsafe antecedents to minimize.
+        :param preconditions: the preconditions of the action to remove from the CNFs
+        :return: the minimized CNFs.
         """
         negated_conditions_statement = []
         for conjunction in unsafe_antecedents:
-            negated_conditions_statement.append({self._flip_single_predicate(predicate) for predicate in conjunction})
+            negated_conditions_statement.append({_flip_single_predicate(predicate) for predicate in conjunction})
 
         try:
-            minimized_clauses = minimize_cnf_clauses(negated_conditions_statement, preconditions.copy())
-            if len(minimized_clauses) == 0:
-                return True
+            minimized_clauses = negated_conditions_statement
+            previous_size = math.inf
+            new_size = sum([len(clause) for clause in minimized_clauses])
+            while previous_size > new_size:
+                minimized_clauses = minimize_cnf_clauses(minimized_clauses, preconditions.copy())
+                if len(minimized_clauses) == 0:
+                    return True
+
+                previous_size = new_size
+                new_size = sum([len(clause) for clause in minimized_clauses])
 
             return minimized_clauses
 
@@ -328,13 +203,12 @@ class DependencySet:
         """
         literals_str = {literal.untyped_representation for literal in lifted_literals}
         for literal in literals_str:
-            if antecedents is not None:
-                antecedents_literals = {antecedent.untyped_representation for antecedent in antecedents}
-                self.possible_antecedents[literal] = create_antecedents_combination(
-                    antecedents_literals, self.max_antecedents)
-
-            else:
-                self.possible_antecedents[literal] = create_antecedents_combination(literals_str, self.max_antecedents)
+            antecedents_literals = {antecedent.untyped_representation for antecedent in antecedents} \
+                if antecedents is not None else literals_str
+            self.possible_antecedents[literal] = create_cnf_combination(
+                antecedents_literals, self.max_antecedents)
+            self.possible_disjunctive_antecedents[literal] = [] if self.max_antecedents == 1 else (
+                create_dnf_combinations(antecedents_literals, self.max_antecedents))
 
     def remove_dependencies(self, literal: str, literals_to_remove: Set[str], include_supersets: bool = False) -> None:
         """Remove a dependency from the dependency set.
@@ -344,13 +218,34 @@ class DependencySet:
         :param include_supersets: whether to include supersets of the dependencies to remove.
         """
         self.logger.debug(f"Removing dependencies {literals_to_remove} for literal {literal}")
-        dependencies_to_remove = create_antecedents_combination(literals_to_remove, self.max_antecedents)
+        conjunctions_to_remove = create_cnf_combination(literals_to_remove, self.max_antecedents)
+        disjunctions_to_remove = create_dnf_combinations(literals_to_remove, self.max_antecedents)
         if include_supersets:
-            dependencies_to_remove = self._extract_superset_dependencies(literal, literals_to_remove)
+            conjunctions_to_remove = self._extract_superset_dependencies(literal, literals_to_remove)
 
-        for dependency in dependencies_to_remove:
+        for dependency in conjunctions_to_remove:
             if dependency in self.possible_antecedents[literal]:
                 self.possible_antecedents[literal].remove(dependency)
+
+        for dependency in disjunctions_to_remove:
+            if dependency in self.possible_disjunctive_antecedents[literal]:
+                self.possible_disjunctive_antecedents[literal].remove(dependency)
+
+    def _remove_preconditions_supersets_from_disjunctive_antecedents(self, preconditions_literals: Set[str]) -> None:
+        """Removes all disjunctions that contain the preconditions as part of them.
+
+        :param preconditions_literals: the preconditions that should not be part of the antecedents.
+        """
+        for literal in self.possible_disjunctive_antecedents:
+            disjunctions_to_remove = []
+            for precondition in preconditions_literals:
+                for disjunctive_ante in self.possible_disjunctive_antecedents[literal]:
+                    if (any([precondition in ante for ante in disjunctive_ante]) and
+                            disjunctive_ante not in disjunctions_to_remove):
+                        disjunctions_to_remove.append(disjunctive_ante)
+
+            for clause in disjunctions_to_remove:
+                self.possible_disjunctive_antecedents[literal].remove(clause)
 
     def remove_preconditions_literals(self, preconditions_literals: Set[str]) -> None:
         """Removes the preconditions literals from the dependency set (from both the antecedents and the results).
@@ -359,9 +254,13 @@ class DependencySet:
         """
         for literal in preconditions_literals:
             self.possible_antecedents.pop(literal, None)
+            self.possible_disjunctive_antecedents.pop(literal, None)
 
         for literal in self.possible_antecedents:
             self.remove_dependencies(literal, preconditions_literals, include_supersets=True)
+
+        # removing supersets of the preconditions literals from the disjunctive antecedents
+        self._remove_preconditions_supersets_from_disjunctive_antecedents(preconditions_literals)
 
     def is_safe_literal(self, literal: str, preconditions_literals: Optional[Set[str]] = None) -> bool:
         """Determines whether the literal is safe in terms of number of antecedents.
@@ -373,7 +272,7 @@ class DependencySet:
         if preconditions_literals is not None:
             self.remove_dependencies(literal, preconditions_literals, include_supersets=True)
 
-        return len(self.possible_antecedents[literal]) <= 1
+        return len(self.possible_antecedents[literal]) + len(self.possible_disjunctive_antecedents[literal]) <= 1
 
     def is_safe_conditional_effect(self, literal: str) -> bool:
         """Determines whether the literal is a conditional effect with safe number of antecedents.
@@ -383,7 +282,7 @@ class DependencySet:
         """
         self.logger.info(f"Determining whether the literal {literal} is a conditional effect "
                          f"with safe number of antecedents")
-        return len(self.possible_antecedents[literal]) == 1 and self.possible_antecedents[literal][0] != {literal}
+        return len(self.possible_antecedents[literal]) + len(self.possible_disjunctive_antecedents[literal]) == 1
 
     def is_possible_result(self, literal: str) -> bool:
         """Determines whether the literal is a possible result.
@@ -393,15 +292,23 @@ class DependencySet:
         """
         return literal in self.possible_antecedents
 
-    def extract_safe_antecedents(self, literal: str) -> Set[str]:
+    def extract_safe_antecedents(self, literal: str) -> Union[Set[str], List[List[str]]]:
         """Extracts the safe conditional effects from the dependency set.
 
         :return: the safe antecedents for the literals which is the result of the conditional effect.
         """
         self.logger.info("Extracting the tuple of the safe antecedents for the literal %s", literal)
         antecedents_copy = self.possible_antecedents[literal].copy()
-        if len(antecedents_copy) == 0:
+        disjunctive_antecedents_copy = self.possible_disjunctive_antecedents[
+            literal].copy() if literal in self.possible_disjunctive_antecedents else []
+        if len(antecedents_copy) > 1 or len(disjunctive_antecedents_copy) > 1:
+            raise ValueError("The literal has more than one antecedent so it is unsafe!")
+
+        if len(antecedents_copy) == 0 and len(disjunctive_antecedents_copy) == 0:
             return set()
+
+        if len(antecedents_copy) == 0:
+            return disjunctive_antecedents_copy[0]
 
         safe_antecedents = antecedents_copy.pop()
         return safe_antecedents
@@ -427,8 +334,8 @@ class DependencySet:
             positive_minimized_antecedents.update(disjunction)
 
         if isinstance(negated_minimized_antecedents, bool) and negated_minimized_antecedents:
-            self.logger.debug(f"The negation of the antecedents for {literal} is the same as the preconditions"
-                              f" so it can never be triggered!")
+            self.logger.debug(f"The negation of the antecedents for {literal} is the same as the preconditions "
+                              f"so it can never be triggered!")
             return None
 
         if isinstance(negated_minimized_antecedents, bool) and not negated_minimized_antecedents:

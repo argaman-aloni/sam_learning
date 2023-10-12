@@ -92,11 +92,13 @@ class UniversallyConditionalSAM(ConditionalSAM):
         self.logger.debug("adding observed universal effects.")
         action_parameters = grounded_action.parameters
         universal_effects = [eff for eff in grounded_effects if
-                             len(set(eff.grounded_objects).difference(action_parameters)) > 0]
+                             len(set(eff.grounded_objects).difference(
+                                 set(self.partial_domain.constants.keys()).union(action_parameters))) > 0]
         for effect in universal_effects:
             # we assume that there can only be one additional parameter per effect
             additional_object = [obj for obj in effect.grounded_objects if obj not in action_parameters][0]
-            pddl_object = self.current_trajectory_objects[additional_object]
+            possible_object = {**self.current_trajectory_objects, **self.partial_domain.constants}
+            pddl_object = possible_object[additional_object]
             additional_parameter = self.additional_parameters[grounded_action.name][pddl_object.type.name]
             lifted_effect = self.matcher.match_predicate_to_action_literals(
                 effect, grounded_action, pddl_object.name, additional_parameter)[0]
@@ -165,7 +167,8 @@ class UniversallyConditionalSAM(ConditionalSAM):
         grounded_effects = list(grounded_add_effects.union(grounded_del_effects))
         action_parameters = grounded_action.parameters
         universal_effects = [eff for eff in grounded_effects if
-                             len(set(eff.grounded_objects).difference(action_parameters)) > 0]
+                             len(set(eff.grounded_objects).difference(
+                                 set(self.partial_domain.constants.keys()).union(action_parameters))) > 0]
 
         for effect in universal_effects:
             # we assume that there can only be one additional parameter per effect
@@ -299,6 +302,10 @@ class UniversallyConditionalSAM(ConditionalSAM):
         :param next_state: the state following the action's execution.
         :param previous_state: the state prior to the action's execution.
         """
+        if len(self.universals_map[grounded_action.name]) == 0:
+            super()._apply_inductive_rules(grounded_action, previous_state, next_state)
+            return
+
         self._update_observed_effects(grounded_action, previous_state, next_state)
         self._remove_not_antecedents(grounded_action, previous_state, next_state)
 

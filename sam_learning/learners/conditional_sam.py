@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall, Observation, \
-    ObservedComponent, ConditionalEffect, PDDLObject, PDDLType
+    ObservedComponent, ConditionalEffect, PDDLObject, PDDLType, Precondition
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
     extract_predicate_data
@@ -206,6 +206,21 @@ class ConditionalSAM(SAMLearner):
         :param additional_parameter_type: the type of the additional parameter (if exists).
         """
         antecedents = action_dependency_set.extract_safe_antecedents(literal)
+        if isinstance(antecedents, list):
+            self.logger.debug("The antecedents are disjunctions!")
+            disjunctive_precondition = Precondition("or")
+            for clause in antecedents:
+                if len(clause) > 1:
+                    self.logger.debug("Reached an internal conjunction clause")
+                    conjunction_precondition = Precondition("and")
+                    for predicate in clause:
+                        conjunction_precondition.add_condition(extract_predicate_data(
+                            action.signature, predicate, self.partial_domain.constants, additional_parameter,
+                            additional_parameter_type))
+                    disjunctive_precondition.add_condition(conjunction_precondition)
+            return
+
+        self.logger.debug("The antecedents are conjunctions!")
         for antecedent in antecedents:
             conditional_effect.antecedents.add_condition(extract_predicate_data(
                 action.signature, antecedent, self.partial_domain.constants, additional_parameter,

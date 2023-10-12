@@ -3,11 +3,10 @@ from typing import List, Set
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Predicate, PDDLType
-from pytest import fixture, raises
+from pytest import fixture
 
-from sam_learning.core import VocabularyCreator
-from sam_learning.core.dependency_set import create_antecedents_combination, DependencySet, minimize_cnf_clauses, \
-    minimize_dnf_clauses
+from sam_learning.core import VocabularyCreator, DependencySet
+from sam_learning.core.logical_expression_operations import create_dnf_combinations, create_cnf_combination
 from tests.consts import WOODWORKING_COMBINED_DOMAIN_PATH
 
 TOTAL_NUMBER_OF_WOODWORKING_COMBINATIONS = 378 + 28
@@ -38,139 +37,11 @@ def do_saw_predicates(woodworking_domain: Domain) -> Set[Predicate]:
     return vocabulary
 
 
-def test_minimize_cnf_clauses_empty_clauses():
-    clauses = []
-    minimized_clauses = minimize_cnf_clauses(clauses)
-    assert minimized_clauses == []
-
-
-def test_minimize_cnf_clauses_single_clause():
-    clauses = [{'(p)', '(q)', '(r)'}]
-    minimized_clauses = minimize_cnf_clauses(clauses)
-    assert minimized_clauses == [{'(p)', '(q)', '(r)'}]
-
-
-def test_minimize_cnf_clauses_single_unit_clause():
-    clauses = [{'(p)'}]
-    minimized_clauses = minimize_cnf_clauses(clauses)
-    assert minimized_clauses == [{'(p)'}]
-
-
-def test_minimize_cnf_clauses_single_unit_clause_and_single_non_unit_clause():
-    clauses = [{'(p)'}, {'(p)', '(q)'}]
-    minimized_clauses = minimize_cnf_clauses(clauses)
-    assert minimized_clauses == [{'(p)'}]
-
-
-def test_minimize_cnf_clauses_multiple_non_unit_clauses():
-    clauses = [{'(p)', '(q)'}, {'(p)', '(r)'}, {'(q)', '(r)'}]
-    minimized_clauses = minimize_cnf_clauses(clauses)
-    assert minimized_clauses == [{'(p)', '(q)'}, {'(p)', '(r)'}, {'(q)', '(r)'}]
-
-
-def test_minimize_cnf_clauses_unit_clause_and_complementary_literals():
-    clauses = [{'(p)'}, {'(not (q))', '(r)'}, {'(not (p))', '(q)'}, {'(s)'}]
-    minimized_clauses = minimize_cnf_clauses(clauses)
-    assert len(minimized_clauses) == 4
-    expected_clauses = [{'(p)'}, {'(not (q))', '(r)'}, {'(q)'}, {'(s)'}]
-    for clause in expected_clauses:
-        assert clause in minimized_clauses
-
-
-def test_minimize_cnf_clauses_non_unit_clause_and_complementary_literals():
-    clauses = [{'(p)', '(q)'}, {'(not (p))'}, {'(r)'}, {'(not (q))'}, {'(s)'}, {'(t)'}]
-    minimized_clauses = minimize_cnf_clauses(clauses)
-    assert minimized_clauses == [{'(not (p))'}, {'(r)'}, {'(not (q))'}, {'(s)'}, {'(t)'}]
-
-
-def test_minimize_cnf_clauses_multiple_complementary_literals():
-    clauses = [{'(not (p))'}, {'(not q)', 'r'}, {'(not (r))', 'p'}, {'(p)'}]
-    with raises(ValueError):
-        minimize_cnf_clauses(clauses)
-
-
-def test_minimize_cnf_clauses_assumptions():
-    clauses = [{'(p)', '(not (q))', '(r)'}, {'(not (p))', '(s)'}, {'(q)', '(r)', '(t)'}, {'(not (t))', '(u)', '(v)'}]
-    assumptions = {'(p)', '(t)', '(v)'}
-    minimized_clauses = minimize_cnf_clauses(clauses, assumptions)
-    assert minimized_clauses == [{'(s)'}]
-
-
-def test_minimize_dnf_clauses_pddl_format_1():
-    # Test with one clause, no simplification possible
-    clauses = [{"(on table block1)"}]
-    expected_minimized_clauses = [{"(on table block1)"}]
-    assert minimize_dnf_clauses(clauses) == expected_minimized_clauses
-
-
-def test_minimize_dnf_clauses_pddl_format_2():
-    # Test with one clause, negation of assumption leads to contradiction
-    clauses = [{"(on table block1)", "(not (on table block1))"}]
-    with raises(ValueError):
-        minimize_dnf_clauses(clauses, {"(not (on table block1))"})
-
-
-def test_minimize_dnf_clauses_pddl_format_3():
-    # Test with two clauses, the assumption is part of one clause and its negation is part of the other clause
-    clauses = [{"(on table block1)", "(not (on table block2))"}, {"(not (on table block1))", "(on table block2)"}]
-    expected_minimized_clauses = [{"(not (on table block2))"}]
-    assert minimize_dnf_clauses(clauses, {"(on table block1)"}) == expected_minimized_clauses
-
-
-def test_minimize_dnf_clauses_pddl_format_4():
-    # Test with two clauses, one of them is always false
-    clauses = [{"(on table block1)"}, {"(not (on table block1))", "(not (on table block2))"}]
-    expected_minimized_clauses = [{"(on table block1)"}, {"(not (on table block1))"}]
-    assert minimize_dnf_clauses(clauses, {"(not (on table block2))"}) == expected_minimized_clauses
-
-
-def test_minimize_dnf_clauses_pddl_format_5():
-    # Test with three clauses, with multiple simplifications possible
-    clauses = [{"(on table block1)"}, {"(on table block2)"}, {"(not (on table block1))", "(not (on table block2))"}]
-    assert minimize_dnf_clauses(clauses) == clauses
-
-
-def test_minimize_dnf_clauses_no_minimization_needed():
-    clauses = [{'(on ?x ?y)'}]
-    minimized = minimize_dnf_clauses(clauses)
-    assert minimized == clauses
-
-
-def test_minimize_dnf_clauses_contain_unit_clauses_only():
-    clauses = [{'(on ?x ?y)'}, {'(above ?x ?y)'}, {'(near ?x ?y)'}]
-    minimized = minimize_dnf_clauses(clauses)
-    assert minimized == clauses
-
-
-def test_minimize_dnf_clauses_returns_empty_list():
-    clauses = [{'(on ?x ?y)'}, {'(not (on ?x ?y))'}]
-    assert minimize_dnf_clauses(clauses) == []
-
-
-def test_create_antecedents_combination_with_max_size_1():
-    """Test the creation of antecedents combinations with max size 1."""
-    antecedents = {"a", "b", "c"}
-    expected_antecedents_combinations = [{"a"}, {"b"}, {"c"}]
-    antecedents_combinations = create_antecedents_combination(antecedents, 1)
-    assert len(antecedents_combinations) == 3
-    for expected_combination in expected_antecedents_combinations:
-        assert expected_combination in antecedents_combinations
-
-
-def test_create_antecedents_combination_with_max_size_2():
-    """Test the creation of antecedents combinations with max size 2."""
-    antecedents = {"a", "b", "c"}
-    expected_antecedents_combinations = [{"a"}, {"b"}, {"c"}, {"a", "b"}, {"a", "c"}, {"b", "c"}]
-    antecedents_combinations = create_antecedents_combination(antecedents, 2)
-    assert len(antecedents_combinations) == 6
-    for expected_combination in expected_antecedents_combinations:
-        assert expected_combination in antecedents_combinations
-
 
 def test_create_antecedents_with_real_domain_predicates(woodworking_predicates: List[Predicate]):
     """Test the creation of antecedents combinations with real domain predicates."""
     antecedents = {predicate.untyped_representation for predicate in woodworking_predicates}
-    antecedents_combinations = create_antecedents_combination(antecedents, 2)
+    antecedents_combinations = create_cnf_combination(antecedents, 2)
     for expected_combination in antecedents:
         assert {expected_combination} in antecedents_combinations
 
@@ -189,7 +60,7 @@ def test_extract_superset_dependencies_creates_supersets_of_dependencies_contain
     """Test the extraction of superset dependencies when the literal is a subset of other dependencies."""
     test_literals = ["a", "b", "c"]
     dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
-    possible_literals_combinations = create_antecedents_combination(set(test_literals), 3)
+    possible_literals_combinations = create_cnf_combination(set(test_literals), 3)
     dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
 
     expected_superset_dependencies = [{"a", "b", "c"}, {"a", "b"}, {"a", "c"}, {"a"}]
@@ -224,21 +95,90 @@ def test_remove_dependencies_removes_correct_literals_on_simple_case_with_no_sup
     antecedents = [{"a"}, {"b"}, {"c"}, {"a", "b"}, {"a", "c"}, {"b", "c"}]
     init_antecedents_length = len(antecedents)
     dependency_set.possible_antecedents = {"a": antecedents}
+    dependency_set.possible_disjunctive_antecedents = {"a": []}
 
     tested_literal = "a"
     literals_to_remove = {"a", "b"}
     dependency_set.remove_dependencies(tested_literal, literals_to_remove)
 
-    expected_removed_literals = create_antecedents_combination(literals_to_remove, 2)
+    expected_removed_literals = create_cnf_combination(literals_to_remove, 2)
     assert len(dependency_set.possible_antecedents[tested_literal]) == init_antecedents_length - len(
         expected_removed_literals)
+
+
+def test_remove_dependencies_removes_correct_disjunctions_and_not_all_combinations_containing_the_absent_literals():
+    """Tests that the correct disjunctive antecedents are being removed and only them.
+
+    Test Scenario:
+        * The possible literals which are initialized for the dependency set are: a,b,c,d
+        * We initialize the dependency set with max number of antecedents of 2.
+        * The possible antecedents for a are: a V b, a V c, a V d, b V c, b V d, c V d
+        * State contains the following literals: b ^ c
+        * Since a and d are not in the state, they should be removed from the dependency set and only those specific
+            combinations.
+        * The removed antecedents are a V d alone.
+    """
+    dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
+    test_literals = {"a", "b", "c", "d"}
+    disjunctive_antecedents = create_dnf_combinations(test_literals, 2)
+    dependency_set.possible_antecedents = {"a": []}
+    dependency_set.possible_disjunctive_antecedents = {"a": disjunctive_antecedents.copy()}
+    test_effect_literal = "a"
+    literals_not_in_state = {"a", "d"}
+
+    assert [["a"], ["d"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+
+    dependency_set.remove_dependencies(test_effect_literal, literals_not_in_state)
+    assert len(dependency_set.possible_disjunctive_antecedents[test_effect_literal]) == len(disjunctive_antecedents) - 1
+    assert [["a"], ["d"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+
+
+def test_remove_dependencies_removes_correct_disjunctions_and_not_all_combinations_containing_the_absent_literals_when_the_maximal_antecedents_size_is_three():
+    """Tests that the correct disjunctive antecedents are being removed and only them.
+
+    Test Scenario:
+        * The possible literals which are initialized for the dependency set are: a,b,c,d
+        * We initialize the dependency set with max number of antecedents of 3.
+        * The possible antecedents for a are: a V b, a V c, a V d, b V c, b V d, c V d, a V b V c, a V b V d, a V c V d,
+            b V c V d.
+        * State contains the following literals: b
+        * Since only b is in the state, only the combinations containing it should remain and those that contain
+            only a, c, d will be removed.
+        * The removed antecedents are a V d, a V c, c V d, a V c V d, a V (c ^ d), c V (a ^ d), d V (a ^ c) only.
+    """
+    dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
+    test_literals = {"a", "b", "c", "d"}
+    disjunctive_antecedents = create_dnf_combinations(test_literals, 3)
+    dependency_set.possible_antecedents = {"a": []}
+    dependency_set.possible_disjunctive_antecedents = {"a": disjunctive_antecedents.copy()}
+    test_effect_literal = "a"
+    literals_not_in_state = {"a", "c", "d"}
+
+    assert [["a"], ["d"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a"], ["c"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["c"], ["d"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a"], ["c", "d"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a", "d"], ["c"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a", "c"], ["d"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a"], ["c"], ["d"]] in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+
+    dependency_set.remove_dependencies(test_effect_literal, literals_not_in_state)
+    assert len(dependency_set.possible_disjunctive_antecedents[test_effect_literal]) == len(disjunctive_antecedents) - 7
+    assert [["a"], ["d"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a"], ["c"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["c"], ["d"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a"], ["c", "d"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a", "d"], ["c"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a", "c"], ["d"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
+    assert [["a"], ["c"], ["d"]] not in dependency_set.possible_disjunctive_antecedents[test_effect_literal]
 
 
 def test_remove_dependencies_removes_correct_literals_on_simple_case_with_superset_literals():
     """Test the removal of a dependency from the dependency set when creating a simple scenario."""
     dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
-    antecedents = create_antecedents_combination({"a", "b", "c"}, 3)
+    antecedents = create_cnf_combination({"a", "b", "c"}, 3)
     dependency_set.possible_antecedents = {"a": antecedents}
+    dependency_set.possible_disjunctive_antecedents = {"a": []}
 
     tested_literal = "a"
     literals_to_remove = {"a", "b"}
@@ -252,10 +192,50 @@ def test_remove_dependencies_removed_correct_set_of_literals_and_all_subsets(woo
     dependency_set.initialize_dependencies(set(woodworking_predicates))
     tested_predicate = "(available ?obj)"
     predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
-    expected_removed_literals = create_antecedents_combination(predicates_to_remove, 2)
+    expected_removed_literals = create_cnf_combination(predicates_to_remove, 2)
     dependency_set.remove_dependencies(tested_predicate, predicates_to_remove)
     assert len(dependency_set.possible_antecedents[tested_predicate]) == TOTAL_NUMBER_OF_WOODWORKING_COMBINATIONS - len(
         expected_removed_literals)
+
+
+def test_remove_dependencies_removed_correct_set_of_disjunctive_literals_on_real_predicates(
+        woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set with real domain predicates used as input."""
+    dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
+    dependency_set.initialize_dependencies(set(woodworking_predicates))
+    tested_predicate = "(available ?obj)"
+    predicates_to_remove = {"(is-smooth ?surface)", "(has-colour ?agent ?colour)"}
+    disjunctions = create_dnf_combinations(
+        {p.untyped_representation for p in woodworking_predicates}, 2)
+    assert [["(has-colour ?agent ?colour)"], ["(is-smooth ?surface)"]] in \
+           dependency_set.possible_disjunctive_antecedents[tested_predicate]
+    dependency_set.remove_dependencies(tested_predicate, predicates_to_remove)
+    assert len(dependency_set.possible_disjunctive_antecedents[tested_predicate]) == len(disjunctions) - 1
+    assert [["(has-colour ?agent ?colour)"], ["(is-smooth ?surface)"]] not in \
+           dependency_set.possible_disjunctive_antecedents[tested_predicate]
+
+
+def test_remove_preconditions_literals_removes_all_the_disjunctions_that_contain_the_input_preconditions():
+    """Test that all the disjunctions that contain the input preconditions are removed.
+
+    Test Scenario:
+        * The possible literals which are initialized for the dependency set are: a,b,c,d
+        * We initialize the dependency set with max number of antecedents of 3.
+        * The possible antecedents for a are all the combinations of size 2 and 3 are all the possible
+            combinations of the literals.
+        * Assuming the preconditions are the literals b and c, every disjunction that contains either of
+            them should be removed. That means that the following disjunctions should remain: a V d.
+    """
+    test_literals = {"a", "b", "c", "d"}
+    dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
+    disjunctive_antecedents = create_dnf_combinations(test_literals, 3)
+    dependency_set.possible_antecedents = {"a": []}
+    dependency_set.possible_disjunctive_antecedents = {"a": disjunctive_antecedents.copy()}
+
+    preconditions = {"b", "c"}
+    assert len(dependency_set.possible_disjunctive_antecedents["a"]) == len(disjunctive_antecedents)
+    dependency_set.remove_preconditions_literals(preconditions)
+    assert len(dependency_set.possible_disjunctive_antecedents["a"]) == 1
 
 
 def test_remove_preconditions_literals_correctly_removed_preconditions_from_the_dependency_set(
@@ -282,19 +262,35 @@ def test_is_safe_literal_returns_literal_unsafe_if_contains_more_that_one_item(w
     assert not dependency_set.is_safe_literal(tested_predicate, predicates_to_remove)
 
 
-def test_is_safe_literal_returns_literal_safe_if_contains_zero_items(woodworking_predicates: List[Predicate]):
+def test_is_safe_literal_returns_literal_safe_if_all_contain_zero_items(woodworking_predicates: List[Predicate]):
     """Test the check if a literal is safe when the literal contains zero items."""
     dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
     tested_predicate = "(available ?obj)"
     dependency_set.possible_antecedents[tested_predicate] = []
+    dependency_set.possible_disjunctive_antecedents[tested_predicate] = []
     assert dependency_set.is_safe_literal(tested_predicate)
 
 
-def test_is_safe_literal_returns_literal_safe_if_contains_one_item(woodworking_predicates: List[Predicate]):
+def test_is_safe_literal_returns_literal_safe_if_conjunctions_contain_one_item_and_disjunctions_none(
+        woodworking_predicates: List[Predicate]):
     """Test the removal of a dependency from the dependency set."""
     dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
     tested_predicate = "(available ?obj)"
     dependency_set.possible_antecedents[tested_predicate] = [{"(available ?obj)"}]
+    dependency_set.possible_disjunctive_antecedents[tested_predicate] = []
+
+    assert dependency_set.is_safe_literal(tested_predicate)
+
+
+def test_is_safe_literal_returns_literal_safe_if_disjunctions_contain_one_item_an_conjunctions_none(
+        woodworking_predicates: List[Predicate]):
+    """Test the removal of a dependency from the dependency set."""
+    dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
+    tested_predicate = "(available ?obj)"
+    dependency_set.possible_antecedents[tested_predicate] = []
+    dependency_set.possible_disjunctive_antecedents[tested_predicate] = [
+        [["(available ?obj)"], ["(not (available ?obj))"]]]
+
     assert dependency_set.is_safe_literal(tested_predicate)
 
 
@@ -303,6 +299,7 @@ def test_is_conditional_effect_returns_true_when_the_the_literal_contains_a_sing
     dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
     tested_predicate = "(available ?obj)"
     dependency_set.possible_antecedents[tested_predicate] = [{"(not (available ?obj))"}]
+    dependency_set.possible_disjunctive_antecedents[tested_predicate] = []
     assert dependency_set.is_safe_conditional_effect(tested_predicate)
 
 
@@ -311,22 +308,35 @@ def test_is_conditional_effect_returns_false_when_there_are_no_antecedents_for_t
     dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
     tested_predicate = "(available ?obj)"
     dependency_set.possible_antecedents[tested_predicate] = []
+    dependency_set.possible_disjunctive_antecedents[tested_predicate] = []
     assert not dependency_set.is_safe_conditional_effect(tested_predicate)
 
 
-def test_extract_safe_antecedents_extracts_correct_set_of_literals():
+def test_extract_safe_antecedents_extracts_correct_set_of_literals_when_no_there_are_no_disjunctions_and_one_conjunction():
     """Test that extract_safe_conditionals returns the correct set of literals."""
     dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
     antecedents = {"a", "b", "(not c)"}
     dependency_set.possible_antecedents = {"a": [antecedents]}
+    dependency_set.possible_disjunctive_antecedents = {"a": []}
     result_antecedents = dependency_set.extract_safe_antecedents("a")
     assert result_antecedents == antecedents
+
+
+def test_extract_safe_antecedents_extracts_correct_set_of_literals_when_there_are_no_conjunctions_and_one_disjunction():
+    """Test that extract_safe_conditionals returns the correct set of literals."""
+    dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
+    dependency_set.possible_antecedents = {"a": []}
+    dependency_set.possible_disjunctive_antecedents = {"a": [[["a"], ["b"], ["(not c)"]]]}
+    result_antecedents = dependency_set.extract_safe_antecedents("a")
+    assert result_antecedents == [["a"], ["b"], ["(not c)"]]
 
 
 def test_extract_safe_antecedents_empty_set_when_there_are_no_antecedents():
     """Test that extract_safe_conditionals returns the correct set of literals."""
     dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
     dependency_set.possible_antecedents = {"a": []}
+    dependency_set.possible_disjunctive_antecedents = {"a": []}
+
     result_antecedents = dependency_set.extract_safe_antecedents("a")
     assert len(result_antecedents) == 0
 
@@ -360,7 +370,7 @@ def test_construct_restrictive_preconditions_a_precondition_object_with_literals
 def test_construct_restrictive_preconditions_returns_none_if_the_negated_antecedents_are_the_same_as_the_preconditions():
     test_literals = ["(a )", "(b )", "(c )"]
     dependency_set = DependencySet(max_size_antecedents=1, action_signature={}, domain_constants={})
-    possible_literals_combinations = create_antecedents_combination(set(test_literals), 1)
+    possible_literals_combinations = create_cnf_combination(set(test_literals), 1)
     dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
     preconditions = {"(not (a ))", "(not (b ))", "(not (c ))"}
     tested_literal = "(a )"
@@ -373,7 +383,7 @@ def test_construct_restrictive_preconditions_returns_none_if_the_negated_anteced
 def test_construct_restrictive_preconditions_creates_conditions_that_do_not_include_precondition_literal_if_is_not_effect_and_negated_effect_is_precondition():
     test_literals = ["(a )", "(b )", "(c )"]
     dependency_set = DependencySet(max_size_antecedents=1, action_signature={}, domain_constants={})
-    possible_literals_combinations = create_antecedents_combination(set(test_literals), 1)
+    possible_literals_combinations = create_cnf_combination(set(test_literals), 1)
     dependency_set.possible_antecedents = {literal: possible_literals_combinations for literal in test_literals}
     preconditions = {"(not (a ))"}
     tested_literal = "(a )"
@@ -386,7 +396,7 @@ def test_construct_restrictive_preconditions_creates_conditions_that_do_not_incl
 def test_construct_restrictive_preconditions_creates_conditions_that_do_not_include_precondition_literal_if_is_effect_and_negated_effect_is_precondition():
     test_literals = ["(a )", "(b )", "(c )"]
     dependency_set = DependencySet(max_size_antecedents=1, action_signature={}, domain_constants={})
-    possible_literals_combinations = create_antecedents_combination(set(test_literals), 1)
+    possible_literals_combinations = create_cnf_combination(set(test_literals), 1)
     tested_literal = "(a )"
     dependency_set.possible_antecedents = {tested_literal: possible_literals_combinations}
     preconditions = {"(not (a ))"}
@@ -400,7 +410,7 @@ def test_construct_restrictive_preconditions_creates_conditions_that_do_not_incl
 def test_construct_restrictive_preconditions_creates_nested_condition_with_correct_elements_with_size_two_antecedents():
     test_literals = ["(a )", "(b )"]
     dependency_set = DependencySet(max_size_antecedents=2, action_signature={}, domain_constants={})
-    possible_literals_combinations = create_antecedents_combination(set(test_literals), 2)
+    possible_literals_combinations = create_cnf_combination(set(test_literals), 2)
     tested_literal = "(effect )"
     dependency_set.possible_antecedents = {tested_literal: possible_literals_combinations}
     condition = dependency_set.construct_restrictive_preconditions(set(), tested_literal, is_effect=False)
@@ -422,7 +432,7 @@ def test_construct_restrictive_preconditions_creates_nested_condition_with_corre
 def test_construct_restrictive_preconditions_creates_nested_condition_with_correct_elements_with_size_three_antecedents():
     test_literals = ["(a )", "(b )", "(c )"]
     dependency_set = DependencySet(max_size_antecedents=3, action_signature={}, domain_constants={})
-    possible_literals_combinations = create_antecedents_combination(set(test_literals), 3)
+    possible_literals_combinations = create_cnf_combination(set(test_literals), 3)
     tested_literal = "(effect )"
     dependency_set.possible_antecedents = {tested_literal: possible_literals_combinations}
     condition = dependency_set.construct_restrictive_preconditions(set(), tested_literal, is_effect=False)

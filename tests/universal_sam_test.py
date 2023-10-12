@@ -291,6 +291,10 @@ def test_construct_universal_effects_from_dependency_set_when_the_literal_is_saf
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
+    dependency_set.possible_disjunctive_antecedents = {
+        "(blocked ?c)": [],
+        "(not (available ?c))": []
+    }
     test_action = nurikabe_conditional_sam.partial_domain.actions["move"]
     nurikabe_conditional_sam.observed_universal_effects[test_action.name]["cell"] = {"(blocked ?c)"}
     nurikabe_conditional_sam.additional_parameters[test_action.name]["cell"] = "?c"
@@ -323,6 +327,10 @@ def test_construct_universal_effects_from_dependency_set_constructs_with_more_th
     dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
+    }
+    dependency_set.possible_disjunctive_antecedents = {
+        "(blocked ?c)": [],
+        "(not (available ?c))": []
     }
     test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
     nurikabe_conditional_sam.observed_universal_effects[test_action.name]["cell"] = {"(blocked ?c)",
@@ -362,6 +370,10 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
+    dependency_set.possible_disjunctive_antecedents = {
+        "(blocked ?c)": [],
+        "(not (available ?c))": []
+    }
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
     nurikabe_conditional_sam._construct_restrictive_preconditions(
@@ -399,6 +411,10 @@ def test_construct_restrictive_universal_preconditions_creates_correct_restricti
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
     }
+    dependency_set.possible_disjunctive_antecedents = {
+        "(blocked ?c)": [],
+        "(not (available ?c))": []
+    }
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
 
@@ -435,6 +451,10 @@ def test_construct_restrictive_universal_effect_constructs_correct_restrictive_u
     dependency_set.possible_antecedents = {
         "(blocked ?c)": [{"(connected ?to ?c)"}],
         "(not (available ?c))": [{"(available ?c)"}]
+    }
+    dependency_set.possible_disjunctive_antecedents = {
+        "(blocked ?c)": [],
+        "(not (available ?c))": []
     }
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     test_action = nurikabe_conditional_sam.partial_domain.actions["move-painting"]
