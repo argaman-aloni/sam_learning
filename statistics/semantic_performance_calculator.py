@@ -11,6 +11,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, ActionCall, State, MultiAgentObservation, \
     JointActionCall, Operator, PDDLObject, PDDLType, Action
 
+from sam_learning.core import VocabularyCreator
 from statistics.performance_calculation_utils import _calculate_single_action_applicability_rate
 from utilities import LearningAlgorithmType
 
@@ -76,6 +77,7 @@ class SemanticPerformanceCalculator:
         self.learning_algorithm = learning_algorithm
         self.combined_stats = []
         self.results_dir_path = working_directory_path / "results_directory"
+        self.vocabulary_creator = VocabularyCreator()
 
     def _validate_type_matching(self, grounded_signatures: Dict[str, PDDLType], action: Action) -> bool:
         """Validates that the types of the grounded signature match the types of the predicate signature.
@@ -103,22 +105,14 @@ class SemanticPerformanceCalculator:
         :return: list containing all the predicates with the different combinations of parameters.
         """
         self.logger.info("Creating grounded action vocabulary with sampled ground actions")
+        possible_ground_actions = self.vocabulary_creator.create_grounded_actions_vocabulary(
+            domain=self.model_domain, observed_objects=observed_objects)
+
         vocabulary = []
-        possible_objects_str = list(observed_objects.keys()) + list(domain.constants.keys())
-        objects_and_consts = list(observed_objects.values()) + list(domain.constants.values())
         for action in domain.actions.values():
             self.logger.debug(f"Creating grounded action vocabulary for action {action.name}")
-            action_name = action.name
-            signature_permutations = choose_objects_subset(possible_objects_str, len(action.signature))
-            action_vocabulary = []
-            for signature_permutation in signature_permutations:
-                grounded_signature = {object_name: objects_and_consts[possible_objects_str.index(object_name)].type
-                                      for object_name in signature_permutation}
-                if not self._validate_type_matching(grounded_signature, action):
-                    continue
-
-                action_vocabulary.append(ActionCall(action_name, grounded_parameters=list(grounded_signature.keys())))
-
+            action_vocabulary = [action_call for action_call in possible_ground_actions if
+                                 action_call.name == action.name]
             sampled_action_vocabulary = random.choices(action_vocabulary, k=10)
             vocabulary.extend(sampled_action_vocabulary)
 

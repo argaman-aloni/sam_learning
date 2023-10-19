@@ -203,3 +203,19 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_
     coefficients, border_point, transformed_vars, span_verification_conditions = (
         convex_hull_learner._create_convex_hull_linear_inequalities(pre_state_df, display_mode=False))
     assert span_verification_conditions == []
+
+
+def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_when_remaining_only_one_dimension_returns_correct_values(
+        convex_hull_learner: ConvexHullLearner):
+    pre_state_data = {
+        "(x)": [2, 1, 3, 4],
+        "(y)": [1, 1, 1, 1],
+    }
+    pre_state_df = DataFrame(pre_state_data)
+    coefficients, border_point, transformed_vars, span_verification_conditions = (
+        convex_hull_learner._create_convex_hull_linear_inequalities(pre_state_df, display_mode=False))
+    assert span_verification_conditions == ["(= (- (y) 1) 0.0)"]
+    assert coefficients == [[-1], [1]]
+    assert transformed_vars == ["(* (- (x) 2) -1)"]
+    assert border_point == [2, 1]
+

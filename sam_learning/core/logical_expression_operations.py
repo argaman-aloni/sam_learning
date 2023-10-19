@@ -2,9 +2,9 @@
 import itertools
 import re
 from typing import Set, List, Optional
-from lark import Lark, Transformer
+from lark import Lark, Transformer, v_args
 
-from sympy import Symbol, And, Or, simplify_logic, true
+from sympy import Symbol, And, Or, simplify_logic, true, Not
 
 NOT_PREFIX = "(not"
 AFTER_NOT_PREFIX_INDEX = 5
@@ -12,47 +12,52 @@ RIGHT_BRACKET_INDEX = -1
 LITERAL_REGEX = r"(\([\?w+[\-?_?\w]*\s?[?\w+\s?]*\))"
 
 cnf_grammar = """
-    start: and_expr  
-    or_expr: atom | not_expr | or_expr "|" or_expr
-    and_expr: atom | not_expr | and_expr "&" and_expr
-    not_expr: "~" atom
-    atom: PREDICATE
+    start: or_expr
 
-    PREDICATE: /(\([\?w+[\-?_?\w]*\s?[?\w+\s?]*\))/
+    or_expr: and_expr ("|" and_expr)*
+    and_expr: not_expr ("&" not_expr)*
+    not_expr: "~" atom -> true_not
+             | atom
 
-    %import common.CNAME -> NAME
-    %import common.WS_INLINE
-    %ignore WS_INLINE
+    atom: "(" or_expr ")"
+        | NAME
+    
+    NAME: /(\([\?w+[\-?_?\w]*\s?[?\w+\s?]*\))/
+    
+    %import common.WS
+    %ignore WS
 """
 
 
 # Define a transformer to build the AST
 class LogicalExpressionTransformer(Transformer):
-    def start(self, items):
-        return items[0]
+    def start(self, args):
+        return args[0]
 
-    def or_expr(self, items):
-        print(items)
-        if len(items) == 1:
-            return items[0]
-        else:
-            left, right = items
-            return f"(or {left} {right})"
+    @v_args(inline=True)
+    def or_expr(self, *args):
+        if len(args) == 1:
+            return args[0]
 
-    def not_expr(self, items):
-        print(items)
-        return f"(not {items[0]})"
+        or_components = " ".join(args)
+        return f"(or {or_components})"
 
-    def and_expr(self, items):
-        if len(items) == 1:
-            return items[0]
-        else:
-            left, right = items
-            return f"(and {left} {right})"
+    @v_args(inline=True)
+    def and_expr(self, *args):
+        if len(args) == 1:
+            return args[0]
 
-    def atom(self, items):
-        print(items[0])
-        return str(items[0])
+        and_components = " ".join(args)
+        return f"(and {and_components})"
+
+    def not_expr(self, arg):
+        return arg[0]
+
+    def true_not(self, arg):
+        return f"(not {arg[0]})"
+
+    def atom(self, arg):
+        return str(arg[0])
 
 
 def _flip_single_predicate(predicate: str) -> str:
@@ -213,6 +218,12 @@ def minimize_dnf_clauses(
                     cnf_compiled_expression.append(true)
                     continue
 
+                if literal.startswith(NOT_PREFIX):
+                    normalized_literal = literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]
+                    if normalized_literal in assumptions:
+                        cnf_compiled_expression.append(Not(true))
+                        continue
+
                 normalized_literal = literal if not literal.startswith(NOT_PREFIX) else \
                     literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]
                 if normalized_literal not in symbols:
@@ -229,4 +240,4 @@ def minimize_dnf_clauses(
     sympy_expression = And(*dnf_compiled_expressions)
 
     parser = Lark(cnf_grammar, parser='lalr', transformer=LogicalExpressionTransformer())
-    return str(parser.parse(str(simplify_logic(sympy_expression, form='cnf'))))
+    return str(parser.parse(str(simplify_logic(sympy_expression, form='dnf'))))

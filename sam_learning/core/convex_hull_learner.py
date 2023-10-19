@@ -76,7 +76,7 @@ class ConvexHullLearner:
         if projected_points.shape[1] == 1:
             self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
             coefficients = [[-1], [1]]
-            border_point = prettify_coefficients([projected_points.min(), projected_points.max()])
+            border_point = prettify_coefficients([-projected_points.min(), projected_points.max()])
 
         else:
             coefficients, border_point = self._execute_convex_hull(projected_points, display_mode)
