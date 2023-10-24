@@ -7,7 +7,7 @@ from typing import Dict, List, Any, Optional, Union
 
 from pddl_plus_parser.models import Observation, MultiAgentObservation
 
-from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver
+from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver, FFADLSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from validators.common import AGGREGATED_SOLVING_FIELDS
 from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, \
@@ -75,7 +75,7 @@ class DomainValidator:
     """
 
     logger: logging.Logger
-    solver: Union[ENHSPSolver, MetricFFSolver, FastDownwardSolver]
+    solver: Union[ENHSPSolver, MetricFFSolver, FastDownwardSolver, FFADLSolver]
     solving_stats: List[Dict[str, Any]]
     aggregated_solving_stats: List[Dict[str, Any]]
     learning_algorithm: LearningAlgorithmType

@@ -42,6 +42,12 @@ class FFADLSolver:
             solution_path.unlink(missing_ok=True)
             return
 
+        if process.returncode == 137:
+            self.logger.warning(f"FF solver was killed by the system due to resource consumption.")
+            solving_stats[problem_file_path.stem] = "solver_error"
+            solution_path.unlink(missing_ok=True)
+            return
+
         if process.returncode != 0:
             self.logger.warning(f"Solver returned status code {process.returncode}.")
             solving_stats[problem_file_path.stem] = "solver_error"
@@ -58,21 +64,26 @@ class FFADLSolver:
         elif solving_status == "no-solution":
             self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "no_solution"
+            solution_path.unlink(missing_ok=True)
 
-    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path) -> Dict[str, str]:
+    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
+                       problems_prefix: str = "pfile", tolerance: float = 0.1) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the FF algorithm and outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
         :param domain_file_path: the path to the domain file.
+        :param problems_prefix: the prefix of the problems files.
+        :param tolerance: the tolerance for the numeric problems (only used for compliance with the interface).
         """
         solving_stats = {}
         os.chdir(FF_DIRECTORY)
         self.logger.info("Starting to solve the input problems using FF solver.")
-        for problem_file_path in problems_directory_path.glob("pfile*.pddl"):
+        for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -i 114 > {solution_path}"
+            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -i 102 > {solution_path}"
             self._run_ff_process(run_command, solution_path, problem_file_path, solving_stats)
+            self.logger.debug(f"Finished working on solving problem - {problem_file_path.stem}")
 
         return solving_stats
 
@@ -84,4 +95,5 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.INFO)
     solver = FFADLSolver()
-    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]))
+    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]),
+                          problems_prefix=args[3])

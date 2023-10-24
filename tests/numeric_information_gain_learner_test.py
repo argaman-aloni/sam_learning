@@ -25,22 +25,26 @@ def test_predicates() -> List[Predicate]:
 
 @pytest.fixture
 def information_gain_learner_no_predicates() -> InformationGainLearner:
-    return InformationGainLearner(
-        action_name=TEST_ACTION_NAME, lifted_functions=TEST_FUNCTION_NAMES, lifted_predicates=[])
+    information_gain = InformationGainLearner(action_name=TEST_ACTION_NAME)
+    information_gain.init_dataframes(lifted_functions=TEST_FUNCTION_NAMES, lifted_predicates=[])
+    return information_gain
 
 
 @pytest.fixture
 def information_gain_learner_with_predicates(test_predicates: List[Predicate]) -> InformationGainLearner:
-    return InformationGainLearner(
-        action_name=TEST_ACTION_NAME, lifted_functions=TEST_FUNCTION_NAMES,
-        lifted_predicates=[p.untyped_representation for p in test_predicates])
+    information_gain = InformationGainLearner(action_name=TEST_ACTION_NAME)
+    information_gain.init_dataframes(lifted_functions=TEST_FUNCTION_NAMES,
+                                     lifted_predicates=[p.untyped_representation for p in test_predicates])
+    return information_gain
 
 
 @pytest.fixture
 def depot_numeric_information_gain_learner(depot_domain: Domain) -> InformationGainLearner:
-    return InformationGainLearner(
-        action_name="drive", lifted_functions=list(depot_domain.functions.keys()),
+    information_gain = InformationGainLearner(action_name="drive")
+    information_gain.init_dataframes(
+        lifted_functions=list(depot_domain.functions.keys()),
         lifted_predicates=[p.untyped_representation for p in depot_domain.predicates.values()])
+    return information_gain
 
 
 def test_locate_sample_in_df_locates_that_samples_exists_in_the_dataframe_and_returns_its_index(

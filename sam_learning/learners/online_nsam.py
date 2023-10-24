@@ -100,15 +100,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
     def init_online_learning(self) -> None:
         """Initializes the online learning algorithm."""
         for action_name, action_data in self.partial_domain.actions.items():
-            action_predicate_lifted_vocabulary = self.vocabulary_creator.create_lifted_vocabulary(
-                self.partial_domain, action_data.signature)
-            lifted_functions = self.vocabulary_creator.create_lifted_functions_vocabulary(
-                self.partial_domain, action_data.signature)
-            lifted_predicate_names = [p.untyped_representation for p in action_predicate_lifted_vocabulary]
-            lifted_function_names = [func for func in lifted_functions]
-            self.ig_learner[action_name] = InformationGainLearner(
-                action_name=action_name, lifted_functions=lifted_function_names,
-                lifted_predicates=lifted_predicate_names)
+            self.ig_learner[action_name] = InformationGainLearner(action_name=action_name)
 
     def calculate_state_action_information_gain(
             self, state: State, action: ActionCall, action_already_calculated: bool = False) -> float:
@@ -129,7 +121,9 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         lifted_functions = self.function_matcher.match_state_functions(action, grounded_state_functions)
         if self._action_observation_rate[action.name] == 1:
             self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
-            self.ig_learner[action.name].remove_non_existing_functions(list(lifted_functions.keys()))
+            self.ig_learner[action.name].init_dataframes(
+                lifted_functions=list([func for func in lifted_functions.keys()]),
+                lifted_predicates=[pred.untyped_representation for pred in lifted_predicates])
 
         features_to_explore = self.preconditions_fluent_map[action.name] if self.preconditions_fluent_map else None
         is_informative = self.ig_learner[action.name].is_sample_informative(

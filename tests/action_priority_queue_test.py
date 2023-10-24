@@ -1,7 +1,7 @@
 """Module test for the action priority queue."""
 import pytest
 
-from sam_learning.core.action_priority_queue import PriorityQueue
+from sam_learning.core.priority_queue import PriorityQueue
 
 
 def test_insert_adds_an_item_with_priority():

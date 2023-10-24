@@ -1,5 +1,5 @@
 from .abstract_agent import AbstractAgent
-from .action_priority_queue import PriorityQueue
+from .priority_queue import PriorityQueue
 from .convex_hull_learner import ConvexHullLearner
 from .dependency_set import DependencySet
 from .discrete_utilities import extract_predicate_data, create_additional_parameter_name, \

@@ -7,7 +7,6 @@ from matplotlib import pyplot as plt
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
-from sklearn.decomposition import PCA
 
 from sam_learning.core.numeric_utils import get_num_independent_equations, filter_constant_features, \
     detect_linear_dependent_features, extended_gram_schmidt, EPSILON
@@ -24,18 +23,18 @@ class InformationGainLearner:
     negative_samples_df: DataFrame
     _effects_learned_perfectly: bool
     _cached_convex_hull: Optional[Delaunay]
-    _pca_model: Optional[PCA]
 
-    def __init__(self, action_name: str, lifted_functions: List[str], lifted_predicates: List[str]):
+    def __init__(self, action_name: str):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
-        self.lifted_functions = lifted_functions
-        self.lifted_predicates = lifted_predicates
-        self.positive_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
-        self.negative_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
+        self.lifted_functions = None
+        self.lifted_predicates = None
+        self.positive_samples_df = None
+        self.negative_samples_df = None
         self._effects_learned_perfectly = False
         self._cached_convex_hull = None
-        self._pca_model = None
+        self._orthonormal_span = None
+        self._projected_base = None
 
     def _locate_sample_in_df(self, sample_to_locate: List[float], df: DataFrame) -> int:
         """Locates the sample in the data frame.
@@ -84,26 +83,9 @@ class InformationGainLearner:
 
         return False
 
-    @staticmethod
-    def _validate_consts_match(
-            points_to_test: DataFrame, hull_df: DataFrame, constant_features: List[str]) -> bool:
-        """Validates that the points to test contain the same constant features as the hull.
-
-        :param points_to_test: the points to test whether they are inside the convex hull.
-        :param hull_df: the points composing the positive samples convex hull.
-        :param constant_features: the constant features to validate.
-        :return: whether the points to test contain the same constant features as the hull.
-        """
-        for constant_feature in constant_features:
-            if len(points_to_test[constant_feature].unique().tolist()) != 1 or \
-                    points_to_test[constant_feature].unique().tolist()[0] != hull_df[constant_feature].iloc[0]:
-                return False
-
-        return True
-
     def _calculate_whether_in_delanauy_hull(
             self, convex_hull_points: np.ndarray,
-            new_point: np.ndarray, debug_mode: bool = False, use_cached_ch: bool = False, ) -> bool:
+            new_point: np.ndarray, debug_mode: bool = False, use_cached_ch: bool = False) -> bool:
         """Calculates whether the new point is inside the convex hull using the delanauy algorith.
 
         :param convex_hull_points: the points composing the convex hull.
@@ -112,21 +94,15 @@ class InformationGainLearner:
         :param use_cached_ch: whether to use the cached convex hull. This reduces runtime.
         :return: whether the new point is inside the convex hull.
         """
-        if self._cached_convex_hull is not None and use_cached_ch:
-            delaunay_hull = self._cached_convex_hull
-            relevant_sample = new_point if not self._pca_model is None else self._pca_model.transform(new_point)
-
-        else:
-            delaunay_hull = Delaunay(convex_hull_points)
-            self._pca_model = None
-            relevant_sample = new_point
-            if use_cached_ch:
-                self._cached_convex_hull = delaunay_hull
+        delaunay_hull = self._cached_convex_hull if self._cached_convex_hull is not None and use_cached_ch \
+            else Delaunay(convex_hull_points)
+        if use_cached_ch:
+            self._cached_convex_hull = delaunay_hull
 
         if debug_mode:
             self._display_delaunay_graph(delaunay_hull, convex_hull_points.shape[1])
 
-        result = delaunay_hull.find_simplex(relevant_sample) >= 0
+        result = delaunay_hull.find_simplex(new_point) >= 0
         if isinstance(result, np.bool_):
             return result
 
@@ -152,23 +128,34 @@ class InformationGainLearner:
         :return: whether any of the negative samples is inside the convex hull.
         """
         self.logger.debug("Validating whether the input samples are inside the convex hull.")
-        shifted_new_points = points_to_test.to_numpy() - hull_df.to_numpy()[0]
         shifted_hull_points = hull_df.to_numpy() - hull_df.to_numpy()[0]
-        projection_basis = extended_gram_schmidt(shifted_hull_points)
-        projected_points = np.dot(shifted_hull_points, np.array(projection_basis).T)
-        projected_new_point = np.dot(shifted_new_points, np.array(projection_basis).T)
         diagonal_eye = [list(vector) for vector in np.eye(shifted_hull_points.shape[1])]
-        orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
+
+        if self._projected_base is not None and use_cached_ch:
+            projection_basis = self._projected_base
+            orthnormal_span = self._orthonormal_span
+
+        else:
+            projection_basis = extended_gram_schmidt(shifted_hull_points)
+            orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
+            if use_cached_ch:
+                self._projected_base = projection_basis
+                self._orthonormal_span = orthnormal_span
+
+        projected_ch_points = np.dot(shifted_hull_points, np.array(projection_basis).T)
+        shifted_new_points = points_to_test.to_numpy() - hull_df.to_numpy()[0]
+        projected_new_point = np.dot(shifted_new_points, np.array(projection_basis).T)
         if (len(orthnormal_span) > 0 and
                 (np.absolute(np.dot(np.array(orthnormal_span), np.array(shifted_new_points).T)) > EPSILON).any()):
             self.logger.debug("The new points are not in the span of the input points.")
             return False
 
-        if projected_points.shape[1] == 1:
-            return all([projected_points.min() <= point <= projected_points.max() for point in projected_new_point])
+        if projected_ch_points.shape[1] == 1:
+            return all([projected_ch_points.min() <= point <= projected_ch_points.max()
+                        for point in projected_new_point])
 
         return self._calculate_whether_in_delanauy_hull(
-            projected_points, projected_new_point, debug_mode, use_cached_ch)
+            projected_ch_points, projected_new_point, debug_mode, use_cached_ch)
 
     def _remove_features(self, features_to_keep: List[str], features_list: List[str]) -> List[str]:
         """Removes features from the data frames.
@@ -320,21 +307,20 @@ class InformationGainLearner:
 
         return False
 
+    def init_dataframes(self, lifted_functions: List[str], lifted_predicates: List[str]) -> None:
+        """Initializes the data frames used to calculate the information gain.
+
+        :param lifted_functions: the lifted functions matching the action (used to avoid adding redundant ones).
+        :param lifted_predicates: the lifted predicates matching the action.
+        """
+        self.positive_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
+        self.negative_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
+        self.lifted_functions = lifted_functions
+        self.lifted_predicates = lifted_predicates
+
     def clear_convex_hull_cache(self) -> None:
         """Clears the cached convex hull."""
         self._cached_convex_hull = None
-
-    def remove_non_existing_functions(self, functions_to_keep: List[str]) -> None:
-        """Removes functions that do not exist in the state and thus irrelevant to the action.
-
-        :param functions_to_keep: the functions to keep.
-        """
-        self.logger.info("Removing functions that do not exist in the state.")
-        columns_to_drop = self._remove_features(functions_to_keep, self.lifted_functions)
-        self.logger.debug(f"Found the following columns to drop - {columns_to_drop}")
-        for column in columns_to_drop:
-            if column in self.lifted_functions:
-                self.lifted_functions.remove(column)
 
     def add_positive_sample(self, positive_numeric_sample: Dict[str, PDDLFunction],
                             positive_propositional_sample: List[Predicate]) -> None:

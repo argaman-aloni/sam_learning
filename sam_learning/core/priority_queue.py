@@ -1,4 +1,4 @@
-"""Module to create a smart priority queue for the actions in the domain."""
+"""Module to create a smart priority queue for the items to be selected with random options."""
 import random
 from collections import defaultdict
 
