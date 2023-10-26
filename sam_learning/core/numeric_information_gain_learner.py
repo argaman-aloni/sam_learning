@@ -240,6 +240,10 @@ class InformationGainLearner:
         if not self._validate_action_discrete_preconditions_hold_in_state(new_propositional_sample):
             return False
 
+        if len(self.positive_samples_df) == 0:
+            self.logger.debug("There are no positive samples to calculate the information gain from.")
+            return False
+
         functions_to_explore = self.lifted_functions if relevant_numeric_features is None else relevant_numeric_features
         if len(functions_to_explore) == 0:
             return True

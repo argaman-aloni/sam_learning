@@ -6,8 +6,8 @@ import math
 from pddl_plus_parser.models import Predicate, Precondition, SignatureType, PDDLConstant
 
 from sam_learning.core.discrete_utilities import extract_predicate_data
-from sam_learning.core.logical_expression_operations import create_cnf_combination, create_dnf_combinations, \
-    minimize_cnf_clauses, _flip_single_predicate, check_complementary_literals
+from sam_learning.core.logical_expression_operations import create_cnf_combination, minimize_cnf_clauses, \
+    _flip_single_predicate, check_complementary_literals
 
 NOT_PREFIX = "(not"
 AFTER_NOT_PREFIX_INDEX = 5
@@ -17,7 +17,6 @@ RIGHT_BRACKET_INDEX = -1
 class DependencySet:
     """Class representing the dependency set of an action."""
     possible_antecedents: Dict[str, List[Set[str]]]
-    possible_disjunctive_antecedents: Dict[str, List[List[List[str]]]]
     max_antecedents: int
     action_signature: SignatureType
     domain_constants: Dict[str, PDDLConstant]
@@ -26,7 +25,6 @@ class DependencySet:
     def __init__(self, max_size_antecedents: int, action_signature: SignatureType,
                  domain_constants: Dict[str, PDDLConstant]):
         self.possible_antecedents = {}
-        self.possible_disjunctive_antecedents = {}
         self.max_antecedents = max_size_antecedents
         self.action_signature = action_signature
         self.domain_constants = domain_constants
@@ -207,8 +205,6 @@ class DependencySet:
                 if antecedents is not None else literals_str
             self.possible_antecedents[literal] = create_cnf_combination(
                 antecedents_literals, self.max_antecedents)
-            self.possible_disjunctive_antecedents[literal] = [] if self.max_antecedents == 1 else (
-                create_dnf_combinations(antecedents_literals, self.max_antecedents))
 
     def remove_dependencies(self, literal: str, literals_to_remove: Set[str], include_supersets: bool = False) -> None:
         """Remove a dependency from the dependency set.
@@ -219,33 +215,12 @@ class DependencySet:
         """
         self.logger.debug(f"Removing dependencies {literals_to_remove} for literal {literal}")
         conjunctions_to_remove = create_cnf_combination(literals_to_remove, self.max_antecedents)
-        disjunctions_to_remove = create_dnf_combinations(literals_to_remove, self.max_antecedents)
         if include_supersets:
             conjunctions_to_remove = self._extract_superset_dependencies(literal, literals_to_remove)
 
         for dependency in conjunctions_to_remove:
             if dependency in self.possible_antecedents[literal]:
                 self.possible_antecedents[literal].remove(dependency)
-
-        for dependency in disjunctions_to_remove:
-            if dependency in self.possible_disjunctive_antecedents[literal]:
-                self.possible_disjunctive_antecedents[literal].remove(dependency)
-
-    def _remove_preconditions_supersets_from_disjunctive_antecedents(self, preconditions_literals: Set[str]) -> None:
-        """Removes all disjunctions that contain the preconditions as part of them.
-
-        :param preconditions_literals: the preconditions that should not be part of the antecedents.
-        """
-        for literal in self.possible_disjunctive_antecedents:
-            disjunctions_to_remove = []
-            for precondition in preconditions_literals:
-                for disjunctive_ante in self.possible_disjunctive_antecedents[literal]:
-                    if (any([precondition in ante for ante in disjunctive_ante]) and
-                            disjunctive_ante not in disjunctions_to_remove):
-                        disjunctions_to_remove.append(disjunctive_ante)
-
-            for clause in disjunctions_to_remove:
-                self.possible_disjunctive_antecedents[literal].remove(clause)
 
     def remove_preconditions_literals(self, preconditions_literals: Set[str]) -> None:
         """Removes the preconditions literals from the dependency set (from both the antecedents and the results).
@@ -254,13 +229,9 @@ class DependencySet:
         """
         for literal in preconditions_literals:
             self.possible_antecedents.pop(literal, None)
-            self.possible_disjunctive_antecedents.pop(literal, None)
 
         for literal in self.possible_antecedents:
             self.remove_dependencies(literal, preconditions_literals, include_supersets=True)
-
-        # removing supersets of the preconditions literals from the disjunctive antecedents
-        self._remove_preconditions_supersets_from_disjunctive_antecedents(preconditions_literals)
 
     def is_safe_literal(self, literal: str, preconditions_literals: Optional[Set[str]] = None) -> bool:
         """Determines whether the literal is safe in terms of number of antecedents.
@@ -272,7 +243,7 @@ class DependencySet:
         if preconditions_literals is not None:
             self.remove_dependencies(literal, preconditions_literals, include_supersets=True)
 
-        return len(self.possible_antecedents[literal]) + len(self.possible_disjunctive_antecedents[literal]) <= 1
+        return len(self.possible_antecedents[literal]) <= 1
 
     def is_safe_conditional_effect(self, literal: str) -> bool:
         """Determines whether the literal is a conditional effect with safe number of antecedents.
@@ -282,7 +253,7 @@ class DependencySet:
         """
         self.logger.info(f"Determining whether the literal {literal} is a conditional effect "
                          f"with safe number of antecedents")
-        return len(self.possible_antecedents[literal]) + len(self.possible_disjunctive_antecedents[literal]) == 1
+        return len(self.possible_antecedents[literal]) == 1
 
     def is_possible_result(self, literal: str) -> bool:
         """Determines whether the literal is a possible result.
@@ -299,16 +270,11 @@ class DependencySet:
         """
         self.logger.info("Extracting the tuple of the safe antecedents for the literal %s", literal)
         antecedents_copy = self.possible_antecedents[literal].copy()
-        disjunctive_antecedents_copy = self.possible_disjunctive_antecedents[
-            literal].copy() if literal in self.possible_disjunctive_antecedents else []
-        if len(antecedents_copy) > 1 or len(disjunctive_antecedents_copy) > 1:
+        if len(antecedents_copy) > 1:
             raise ValueError("The literal has more than one antecedent so it is unsafe!")
 
-        if len(antecedents_copy) == 0 and len(disjunctive_antecedents_copy) == 0:
-            return set()
-
         if len(antecedents_copy) == 0:
-            return disjunctive_antecedents_copy[0]
+            return set()
 
         safe_antecedents = antecedents_copy.pop()
         return safe_antecedents
