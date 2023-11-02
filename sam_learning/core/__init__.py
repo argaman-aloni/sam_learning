@@ -23,3 +23,4 @@ from .predicates_matcher import PredicatesMatcher
 from .propositional_information_gain_learner import PropositionalInformationGainLearner
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
+from .consistent_model_validator import NumericConsistencyValidator

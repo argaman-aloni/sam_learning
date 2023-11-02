@@ -17,6 +17,9 @@ class LearningAlgorithmType(Enum):
     extended_svc = 12
     online_nsam = 13
     raw_polynomial_nam = 14
+    # To remove
+    naive_nsam = 15
+    naive_polysam = 16
 
 
 class SolverType(Enum):

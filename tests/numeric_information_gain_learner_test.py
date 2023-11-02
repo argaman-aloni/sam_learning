@@ -26,14 +26,14 @@ def test_predicates() -> List[Predicate]:
 @pytest.fixture
 def information_gain_learner_no_predicates() -> InformationGainLearner:
     information_gain = InformationGainLearner(action_name=TEST_ACTION_NAME)
-    information_gain.init_dataframes(lifted_functions=TEST_FUNCTION_NAMES, lifted_predicates=[])
+    information_gain.init_dataframes(valid_lifted_functions=TEST_FUNCTION_NAMES, lifted_predicates=[])
     return information_gain
 
 
 @pytest.fixture
 def information_gain_learner_with_predicates(test_predicates: List[Predicate]) -> InformationGainLearner:
     information_gain = InformationGainLearner(action_name=TEST_ACTION_NAME)
-    information_gain.init_dataframes(lifted_functions=TEST_FUNCTION_NAMES,
+    information_gain.init_dataframes(valid_lifted_functions=TEST_FUNCTION_NAMES,
                                      lifted_predicates=[p.untyped_representation for p in test_predicates])
     return information_gain
 
@@ -42,7 +42,7 @@ def information_gain_learner_with_predicates(test_predicates: List[Predicate]) -
 def depot_numeric_information_gain_learner(depot_domain: Domain) -> InformationGainLearner:
     information_gain = InformationGainLearner(action_name="drive")
     information_gain.init_dataframes(
-        lifted_functions=list(depot_domain.functions.keys()),
+        valid_lifted_functions=list(depot_domain.functions.keys()),
         lifted_predicates=[p.untyped_representation for p in depot_domain.predicates.values()])
     return information_gain
 
@@ -79,8 +79,8 @@ def test_add_positive_sample_adds_new_sample_to_the_existing_positive_dataframe(
         "(z)": [1, 2, 3],
         "(w)": [1, 2, 3]
     })
-    information_gain_learner_no_predicates.positive_samples_df = test_dataframe
-    assert len(information_gain_learner_no_predicates.positive_samples_df) == 3
+    information_gain_learner_no_predicates.numeric_positive_samples = test_dataframe
+    assert len(information_gain_learner_no_predicates.numeric_positive_samples) == 3
     new_sample = {}
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
         new_func = PDDLFunction(name=function_name, signature={})
@@ -88,8 +88,8 @@ def test_add_positive_sample_adds_new_sample_to_the_existing_positive_dataframe(
         new_sample[function_name] = new_func
 
     information_gain_learner_no_predicates.add_positive_sample(new_sample, [])
-    assert len(information_gain_learner_no_predicates.positive_samples_df) == 4
-    assert len(information_gain_learner_no_predicates.positive_samples_df.columns) == 4
+    assert len(information_gain_learner_no_predicates.numeric_positive_samples) == 4
+    assert len(information_gain_learner_no_predicates.numeric_positive_samples.columns) == 4
 
 
 def test_add_positive_sample_does_not_add_to_negative_samples(
@@ -100,8 +100,8 @@ def test_add_positive_sample_does_not_add_to_negative_samples(
         "(z)": [1, 2, 3],
         "(w)": [1, 2, 3]
     })
-    information_gain_learner_no_predicates.positive_samples_df = test_dataframe
-    assert len(information_gain_learner_no_predicates.positive_samples_df) == 3
+    information_gain_learner_no_predicates.numeric_positive_samples = test_dataframe
+    assert len(information_gain_learner_no_predicates.numeric_positive_samples) == 3
     new_sample = {}
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
         new_func = PDDLFunction(name=function_name, signature={})
@@ -109,7 +109,7 @@ def test_add_positive_sample_does_not_add_to_negative_samples(
         new_sample[function_name] = new_func
 
     information_gain_learner_no_predicates.add_positive_sample(new_sample, [])
-    assert len(information_gain_learner_no_predicates.negative_samples_df) == 0
+    assert len(information_gain_learner_no_predicates.numeric_negative_samples) == 0
 
 
 def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_removes_columns_that_are_no_longer_relevant_for_calculation(
@@ -126,13 +126,13 @@ def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_rem
             new_discrete_sample.append(predicate.copy())
 
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
-    assert len(information_gain_learner_with_predicates.positive_samples_df.columns.tolist()) == 8 \
-           + len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 8
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
 
     information_gain_learner_with_predicates.add_positive_sample(new_numeric_sample, new_discrete_sample)
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 4
-    assert len(information_gain_learner_with_predicates.positive_samples_df.columns.tolist()) == 4 + \
-           len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 4
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
 
 
 def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_adds_new_sample_to_the_existing_positive_dataframe_with_the_correct_values(
@@ -148,18 +148,21 @@ def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_add
         if index % 2 != 0:
             new_discrete_sample.append(predicate.copy())
 
-    assert len(information_gain_learner_with_predicates.positive_samples_df) == 0
+    assert len(information_gain_learner_with_predicates.positive_discrete_sample_df) == 0
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples) == 0
     information_gain_learner_with_predicates.add_positive_sample(new_numeric_sample, new_discrete_sample)
-    assert len(information_gain_learner_with_predicates.positive_samples_df) == 1
-    positive_sample = information_gain_learner_with_predicates.positive_samples_df.iloc[0]
+    assert len(information_gain_learner_with_predicates.positive_discrete_sample_df) == 1
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples) == 1
+    discrete_positive_sample = information_gain_learner_with_predicates.positive_discrete_sample_df.iloc[0]
+    numeric_positive_sample = information_gain_learner_with_predicates.numeric_positive_samples.iloc[0]
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
-        assert positive_sample[function_name] == 4 + index
+        assert numeric_positive_sample[function_name] == 4 + index
 
     for index, predicate in enumerate(new_discrete_sample):
-        assert positive_sample[predicate.untyped_representation] == 1
+        assert discrete_positive_sample[predicate.untyped_representation] == 1
 
 
-def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_does_not_change_the_dimensionality_of_dataframes(
+def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_does_not_change_the_dimensionality_of_the_positive_dataframes(
         information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
     new_numeric_sample = {}
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
@@ -173,20 +176,16 @@ def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_doe
             new_discrete_sample.append(predicate.copy())
 
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
-    assert len(information_gain_learner_with_predicates.positive_samples_df.columns.tolist()) == 8 \
-           + len(TEST_FUNCTION_NAMES)
-    assert len(information_gain_learner_with_predicates.negative_samples_df.columns.tolist()) == 8 \
-           + len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 8
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
 
     information_gain_learner_with_predicates.add_negative_sample(new_numeric_sample, new_discrete_sample)
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
-    assert len(information_gain_learner_with_predicates.positive_samples_df.columns.tolist()) == 8 \
-           + len(TEST_FUNCTION_NAMES)
-    assert len(information_gain_learner_with_predicates.negative_samples_df.columns.tolist()) == 8 \
-           + len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 8
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
 
 
-def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_does_not_change_the_dimensionality_of_dataframes(
+def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_the_values_are_being_added_to_the_negative_dataframe_correctly(
         information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
     new_numeric_sample = {}
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
@@ -200,18 +199,19 @@ def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_doe
             new_discrete_sample.append(predicate.copy())
 
     information_gain_learner_with_predicates.add_negative_sample(new_numeric_sample, new_discrete_sample)
-    negative_sample = information_gain_learner_with_predicates.negative_samples_df.iloc[0]
+    discrete_negative_sample = information_gain_learner_with_predicates.negative_combined_sample_df.iloc[0]
+    numeric_negative_sample = information_gain_learner_with_predicates.numeric_negative_samples.iloc[0]
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
-        assert negative_sample[function_name] == 4 + index
+        assert numeric_negative_sample[function_name] == 4 + index
 
     for predicate in test_predicates:
         if predicate in new_discrete_sample:
-            assert negative_sample[predicate.untyped_representation] == 1
+            assert discrete_negative_sample[predicate.untyped_representation] == 1
         else:
-            assert negative_sample[predicate.untyped_representation] == 0
+            assert discrete_negative_sample[predicate.untyped_representation] == 0
 
 
-def test_add_negative_sample_adds_new_sample_to_the_existing_negative_dataframe(
+def test_add_negative_sample_adds_new_sample_to_the_existing_negative_numeric_dataframe(
         information_gain_learner_no_predicates: InformationGainLearner):
     test_dataframe = pd.DataFrame({
         "(x)": [1, 2, 3],
@@ -219,8 +219,8 @@ def test_add_negative_sample_adds_new_sample_to_the_existing_negative_dataframe(
         "(z)": [1, 2, 3],
         "(w)": [1, 2, 3]
     })
-    information_gain_learner_no_predicates.negative_samples_df = test_dataframe
-    assert len(information_gain_learner_no_predicates.negative_samples_df) == 3
+    information_gain_learner_no_predicates.numeric_negative_samples = test_dataframe
+    assert len(information_gain_learner_no_predicates.numeric_negative_samples) == 3
     new_sample = {}
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
         new_func = PDDLFunction(name=function_name, signature={})
@@ -228,8 +228,8 @@ def test_add_negative_sample_adds_new_sample_to_the_existing_negative_dataframe(
         new_sample[function_name] = new_func
 
     information_gain_learner_no_predicates.add_negative_sample(new_sample, [])
-    assert len(information_gain_learner_no_predicates.negative_samples_df) == 4
-    assert len(information_gain_learner_no_predicates.negative_samples_df.columns) == 4
+    assert len(information_gain_learner_no_predicates.numeric_negative_samples) == 4
+    assert len(information_gain_learner_no_predicates.numeric_negative_samples.columns) == 4
 
 
 def test_add_negative_sample_does_not_add_to_positive_samples(
@@ -240,8 +240,8 @@ def test_add_negative_sample_does_not_add_to_positive_samples(
         "(z)": [1, 2, 3],
         "(w)": [1, 2, 3]
     })
-    information_gain_learner_no_predicates.negative_samples_df = test_dataframe
-    assert len(information_gain_learner_no_predicates.negative_samples_df) == 3
+    information_gain_learner_no_predicates.numeric_negative_samples = test_dataframe
+    assert len(information_gain_learner_no_predicates.numeric_negative_samples) == 3
     new_sample = {}
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
         new_func = PDDLFunction(name=function_name, signature={})
@@ -249,7 +249,7 @@ def test_add_negative_sample_does_not_add_to_positive_samples(
         new_sample[function_name] = new_func
 
     information_gain_learner_no_predicates.add_negative_sample(new_sample, [])
-    assert len(information_gain_learner_no_predicates.positive_samples_df) == 0
+    assert len(information_gain_learner_no_predicates.numeric_positive_samples) == 0
 
 
 def test_in_hull_captures_that_a_point_is_in_a_convex_hull_in_a_2d_plane(
@@ -336,8 +336,7 @@ def test_is_non_informative_safe_returns_true_when_the_point_is_in_the_positive_
         "(y)": [0, 1, 0, 1]  # The convex hull is a square.
 
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
     new_sample = {}
     for function_name in positive_samples_df.columns:
         new_func = PDDLFunction(name=function_name, signature={})
@@ -355,8 +354,7 @@ def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_the_ch(
         "(y)": [0, 1, 0, 1]  # The convex hull is a square.
 
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
     new_sample = {}
     for function_name in positive_samples_df.columns:
         new_func = PDDLFunction(name=function_name, signature={})
@@ -373,8 +371,7 @@ def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_range_wh
         "(x)": [0, 1],
 
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
     new_sample = {}
     for function_name in positive_samples_df.columns:
         new_func = PDDLFunction(name=function_name, signature={})
@@ -391,8 +388,7 @@ def test_is_non_informative_safe_returns_true_when_the_point_is_in_range_when_on
         "(x)": [0, 1],
 
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
     new_sample = {}
     for function_name in positive_samples_df.columns:
         new_func = PDDLFunction(name=function_name, signature={})
@@ -421,8 +417,7 @@ def test_is_non_informative_safe_returns_true_when_the_predicates_in_the_state_a
         "(y)": [0, 0, 1, 1],
 
     })
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_with_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_with_predicates.numeric_positive_samples = positive_samples_df
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
     assert information_gain_learner_with_predicates._is_non_informative_safe(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=new_discrete_sample)
@@ -446,8 +441,7 @@ def test_is_non_informative_safe_returns_false_when_predicates_are_contained_in_
         "(y)": [0, 0, 1, 1],
 
     })
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_with_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_with_predicates.numeric_positive_samples = positive_samples_df
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
     assert not information_gain_learner_with_predicates._is_non_informative_safe(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=test_predicates)
@@ -471,8 +465,7 @@ def test_is_non_informative_safe_returns_false_when_some_predicates_are_missing_
         "(y)": [0, 0, 1, 1],
 
     })
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_with_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_with_predicates.numeric_positive_samples = positive_samples_df
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in test_predicates]
     assert not information_gain_learner_with_predicates._is_non_informative_safe(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=new_discrete_sample)
@@ -496,7 +489,6 @@ def test_is_non_informative_safe_returns_true_when_the_relevant_fluents_is_empty
         if index % 2 != 0:
             new_discrete_sample.append(predicate.copy())
 
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
@@ -524,9 +516,8 @@ def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_
         "(y)": [1.5],
     })
 
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_no_predicates.negative_combined_sample_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
     new_func.set_value(0.5)
@@ -559,11 +550,10 @@ def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_
         "(y)": [1.5],
         **negative_discrete_data
     })
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
 
-    information_gain_learner_with_predicates.negative_samples_df = negative_samples_df
-    information_gain_learner_with_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_with_predicates.negative_combined_sample_df = negative_samples_df
+    information_gain_learner_with_predicates.numeric_positive_samples = positive_samples_df
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
     new_func.set_value(0.5)
@@ -597,11 +587,10 @@ def test_is_non_informative_unsafe_returns_true_when_a_non_of_the_negative_sampl
         "(y)": [1.5],
         **negative_discrete_data
     })
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
 
-    information_gain_learner_with_predicates.negative_samples_df = negative_samples_df
-    information_gain_learner_with_predicates.positive_samples_df = positive_samples_df
+    information_gain_learner_with_predicates.numeric_negative_samples = negative_samples_df
+    information_gain_learner_with_predicates.numeric_positive_samples = positive_samples_df
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
     new_func.set_value(0.5)
@@ -621,7 +610,6 @@ def test_is_non_informative_unsafe_returns_true_when_the_relevant_fluents_is_emp
         if index % 2 != 0:
             new_discrete_sample.append(predicate.copy())
 
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
@@ -644,7 +632,6 @@ def test_is_non_informative_unsafe_returns_true_when_the_relevant_fluents_is_emp
         if index % 2 != 0:
             new_discrete_sample.append(predicate.copy())
 
-    information_gain_learner_with_predicates.lifted_functions = ["(x)", "(y)"]
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
@@ -672,7 +659,6 @@ def test_is_non_informative_unsafe_returns_false_when_no_negative_point_is_in_th
         "(y)": [4.5, 5.5],
     })
 
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)"]
     information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
     information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
     new_sample = {}
@@ -701,8 +687,8 @@ def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_veri
         "(z)": [3, 4],
         "(w)": [3, 4]
     })
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.negative_combined_sample_df = negative_samples_df
     new_sample = {}
     for function_name in TEST_FUNCTION_NAMES:
         new_func = PDDLFunction(name=function_name, signature={})
@@ -726,8 +712,8 @@ def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_veri
         "(z)": [3, 4],
         "(w)": [3, 4]
     })
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
     for function_name in TEST_FUNCTION_NAMES:
         new_func = PDDLFunction(name=function_name, signature={})
@@ -751,8 +737,8 @@ def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_veri
         "(z)": [3, 4],
         "(w)": [3, 4]
     })
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
     for index, function_name in enumerate(TEST_FUNCTION_NAMES):
         new_func = PDDLFunction(name=function_name, signature={})
@@ -772,9 +758,8 @@ def test_is_sample_informative_when_can_create_convex_hull_and_point_is_in_ch_re
         "(x)": [3, 4],
         "(y)": [3, 4],
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
     for function_name in ["(x)", "(y)"]:
         new_func = PDDLFunction(name=function_name, signature={})
@@ -794,9 +779,8 @@ def test_is_sample_informative_returns_zero_when_new_point_combined_with_positiv
         "(x)": [0.5, 4],
         "(y)": [1.5, 4],
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.negative_combined_sample_df = negative_samples_df
     new_sample = {}
 
     x_function = PDDLFunction(name="(x)", signature={})
@@ -819,9 +803,8 @@ def test_is_sample_informative_returns_value_greater_than_zero_when_new_point_sh
         "(x)": [0.5],
         "(y)": [1.5],
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
 
     x_function = PDDLFunction(name="(x)", signature={})
@@ -848,9 +831,8 @@ def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_c
         "(z)": [1.0],
         "(w)": [1.1]
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
 
     x_function = PDDLFunction(name="(x)", signature={})
@@ -883,9 +865,8 @@ def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_c
         "(z)": [1.0],
         "(w)": [1.1]
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
 
     x_function = PDDLFunction(name="(x)", signature={})
@@ -918,9 +899,8 @@ def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_c
         "(z)": [1.0],
         "(w)": [1.1]
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
 
     x_function = PDDLFunction(name="(x)", signature={})
@@ -953,9 +933,8 @@ def test_is_sample_informative_when_using_relevant_features_with_a_single_featur
         "(z)": [1.0],
         "(w)": [1.1]
     })
-    information_gain_learner_no_predicates.lifted_functions = ["(x)", "(y)", "(z)", "(w)"]
-    information_gain_learner_no_predicates.positive_samples_df = positive_samples_df
-    information_gain_learner_no_predicates.negative_samples_df = negative_samples_df
+    information_gain_learner_no_predicates.numeric_positive_samples = positive_samples_df
+    information_gain_learner_no_predicates.numeric_negative_samples = negative_samples_df
     new_sample = {}
 
     x_function = PDDLFunction(name="(x)", signature={})

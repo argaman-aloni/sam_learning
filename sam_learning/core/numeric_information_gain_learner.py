@@ -2,172 +2,31 @@
 import logging
 from typing import Dict, List, Optional
 
-import numpy as np
-from matplotlib import pyplot as plt
+import pandas as pd
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
-from scipy.spatial import Delaunay, QhullError, delaunay_plot_2d
+from scipy.spatial import Delaunay, QhullError
 
-from sam_learning.core.numeric_utils import get_num_independent_equations, filter_constant_features, \
-    detect_linear_dependent_features, extended_gram_schmidt, EPSILON
+from sam_learning.core.consistent_model_validator import NumericConsistencyValidator
 
 
-class InformationGainLearner:
+class InformationGainLearner(NumericConsistencyValidator):
     """Information gain calculation of the numeric part of an action."""
 
     logger: logging.Logger
     action_name: str
-    lifted_functions: List[str]
     lifted_predicates: List[str]
-    positive_samples_df: DataFrame
-    negative_samples_df: DataFrame
-    _effects_learned_perfectly: bool
+    positive_discrete_sample_df: DataFrame
+    negative_combined_sample_df: DataFrame
     _cached_convex_hull: Optional[Delaunay]
 
     def __init__(self, action_name: str):
+        super().__init__(action_name)
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
-        self.lifted_functions = None
-        self.lifted_predicates = None
-        self.positive_samples_df = None
-        self.negative_samples_df = None
-        self._effects_learned_perfectly = False
-        self._cached_convex_hull = None
-        self._orthonormal_span = None
-        self._projected_base = None
-
-    def _locate_sample_in_df(self, sample_to_locate: List[float], df: DataFrame) -> int:
-        """Locates the sample in the data frame.
-
-        :param sample_to_locate: the sample to locate in the data frame.
-        :param df: the data frame to locate the sample in.
-        :return: the index of the sample in the data frame.
-        """
-        for index, row in df.iterrows():
-            if row.values.tolist() == sample_to_locate:
-                self.logger.debug("Found the matching row.")
-                return int(index)
-
-        return -1
-
-    def _display_delaunay_graph(self, hull: Delaunay, num_dimensions: int) -> None:
-        """Displays the convex hull in as a plot.
-
-        :param hull: the convex hull to display.
-        :param num_dimensions: the number of dimensions of the original data.
-        """
-        if num_dimensions == 2:
-            _ = delaunay_plot_2d(hull)
-            plt.title(f"{self.action_name} - delaunay graph")
-            plt.show()
-
-    def _can_determine_effects_perfectly(self) -> bool:
-        """Determines whether the effects of the action can be predicted perfectly.
-
-        :return: whether the effects of the action can be predicted perfectly.
-        """
-        if self._effects_learned_perfectly:
-            # This is to prevent redundant calculations when the effects are already learned perfectly.
-            return True
-
-        if len(self.positive_samples_df) == 1:
-            return False
-
-        filtered_df, _, _ = filter_constant_features(self.positive_samples_df)
-        regression_df, _, _ = detect_linear_dependent_features(filtered_df)
-        num_dimensions = len(regression_df.columns.tolist()) + 1  # +1 for the bias.
-        num_independent_rows = get_num_independent_equations(regression_df)
-        if num_independent_rows >= num_dimensions:
-            self._effects_learned_perfectly = True
-            return True
-
-        return False
-
-    def _calculate_whether_in_delanauy_hull(
-            self, convex_hull_points: np.ndarray,
-            new_point: np.ndarray, debug_mode: bool = False, use_cached_ch: bool = False) -> bool:
-        """Calculates whether the new point is inside the convex hull using the delanauy algorith.
-
-        :param convex_hull_points: the points composing the convex hull.
-        :param new_point: the new point to test whether it is inside the convex hull.
-        :param debug_mode: whether to display the convex hull.
-        :param use_cached_ch: whether to use the cached convex hull. This reduces runtime.
-        :return: whether the new point is inside the convex hull.
-        """
-        delaunay_hull = self._cached_convex_hull if self._cached_convex_hull is not None and use_cached_ch \
-            else Delaunay(convex_hull_points)
-        if use_cached_ch:
-            self._cached_convex_hull = delaunay_hull
-
-        if debug_mode:
-            self._display_delaunay_graph(delaunay_hull, convex_hull_points.shape[1])
-
-        result = delaunay_hull.find_simplex(new_point) >= 0
-        if isinstance(result, np.bool_):
-            return result
-
-        return any(result)
-
-    def _in_hull(
-            self, points_to_test: DataFrame, hull_df: DataFrame, debug_mode: bool = False,
-            use_cached_ch: bool = False) -> bool:
-        """
-        Test if the points are in `hull`
-
-        `p` should be a `NxK` coordinates of `N` points in `K` dimensions
-        `hull` is either a scipy.spatial.Delaunay object or the `MxK` array of the
-        coordinates of `M` points in `K`dimensions for which Delaunay triangulation
-        will be computed.
-
-        It returns true if any of the points lies inside the hull.
-
-        :param points_to_test: the points to test whether they are inside the convex hull.
-        :param hull_df: the points composing the positive samples convex hull.
-        :param debug_mode: whether to display the convex hull.
-        :param use_cached_ch: whether to use the cached convex hull. This reduces runtime.
-        :return: whether any of the negative samples is inside the convex hull.
-        """
-        self.logger.debug("Validating whether the input samples are inside the convex hull.")
-        shifted_hull_points = hull_df.to_numpy() - hull_df.to_numpy()[0]
-        diagonal_eye = [list(vector) for vector in np.eye(shifted_hull_points.shape[1])]
-
-        if self._projected_base is not None and use_cached_ch:
-            projection_basis = self._projected_base
-            orthnormal_span = self._orthonormal_span
-
-        else:
-            projection_basis = extended_gram_schmidt(shifted_hull_points)
-            orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
-            if use_cached_ch:
-                self._projected_base = projection_basis
-                self._orthonormal_span = orthnormal_span
-
-        projected_ch_points = np.dot(shifted_hull_points, np.array(projection_basis).T)
-        shifted_new_points = points_to_test.to_numpy() - hull_df.to_numpy()[0]
-        projected_new_point = np.dot(shifted_new_points, np.array(projection_basis).T)
-        if (len(orthnormal_span) > 0 and
-                (np.absolute(np.dot(np.array(orthnormal_span), np.array(shifted_new_points).T)) > EPSILON).any()):
-            self.logger.debug("The new points are not in the span of the input points.")
-            return False
-
-        if projected_ch_points.shape[1] == 1:
-            return all([projected_ch_points.min() <= point <= projected_ch_points.max()
-                        for point in projected_new_point])
-
-        return self._calculate_whether_in_delanauy_hull(
-            projected_ch_points, projected_new_point, debug_mode, use_cached_ch)
-
-    def _remove_features(self, features_to_keep: List[str], features_list: List[str]) -> List[str]:
-        """Removes features from the data frames.
-
-        :param features_to_keep: the features to keep.
-        :param features_list: the features list to remove the features from.
-        :return: the list of the removed features.
-        """
-        columns_to_drop = [feature for feature in features_list if feature not in features_to_keep]
-        self.positive_samples_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
-        self.negative_samples_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
-        return columns_to_drop
+        self.lifted_predicates = []
+        self.positive_discrete_sample_df = None
+        self.negative_combined_sample_df = None
 
     def _remove_redundant_propositional_features(self, positive_propositional_sample: List[Predicate]) -> List[str]:
         """Removes features that are not needed for the calculation of the information gain.
@@ -177,7 +36,9 @@ class InformationGainLearner:
         """
         self.logger.info("Removing propositional features that are not needed for the calculation.")
         state_predicates_names = [predicate.untyped_representation for predicate in positive_propositional_sample]
-        columns_to_drop = self._remove_features(state_predicates_names, self.lifted_predicates)
+        columns_to_drop = [feature for feature in self.lifted_predicates if feature not in state_predicates_names]
+        self.positive_discrete_sample_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
+        self.positive_discrete_sample_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
         for column in columns_to_drop:
             if column in self.lifted_predicates:
                 self.lifted_predicates.remove(column)
@@ -240,19 +101,21 @@ class InformationGainLearner:
         if not self._validate_action_discrete_preconditions_hold_in_state(new_propositional_sample):
             return False
 
-        if len(self.positive_samples_df) == 0:
-            self.logger.debug("There are no positive samples to calculate the information gain from.")
+        if len(self.numeric_positive_samples) == 0 and relevant_numeric_features and len(relevant_numeric_features) > 0:
+            self.logger.debug("There are no positive samples to calculate the information "
+                              "gain from and there are features to learn numerically.")
             return False
 
-        functions_to_explore = self.lifted_functions if relevant_numeric_features is None else relevant_numeric_features
+        functions_to_explore = self.numeric_positive_samples.columns.tolist() \
+            if relevant_numeric_features is None else relevant_numeric_features
         if len(functions_to_explore) == 0:
             return True
 
-        positive_points_data = self.positive_samples_df[functions_to_explore]
+        positive_points_data = self.numeric_positive_samples[functions_to_explore]
         new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in functions_to_explore})
         try:
-            return self._in_hull(new_point_data,
-                                 self.positive_samples_df[functions_to_explore], use_cached_ch=use_cache)
+            return self._in_hull(new_point_data, self.numeric_positive_samples[functions_to_explore],
+                                 use_cached_ch=use_cache)
 
         except (QhullError, ValueError):
             sample_values = [new_numeric_sample[col].value for col in functions_to_explore]
@@ -278,25 +141,29 @@ class InformationGainLearner:
             the calculations.
         :return: whether the new sample is non-informative according to the unsafe model.
         """
-        new_sample_predicates = {predicate.untyped_representation for predicate in new_propositional_sample}
-        if len(self.lifted_predicates) > 0 and len(new_sample_predicates.intersection(self.lifted_predicates)) == 0:
+        new_sample_predicates = [predicate.untyped_representation for predicate in new_propositional_sample]
+        if len(self.lifted_predicates) > 0 and \
+                len(set(new_sample_predicates).intersection(self.lifted_predicates)) == 0:
             self.logger.debug("None of the existing preconditions hold in the new sample. "
                               "It is not informative since it will never be applicable.")
             return True
 
         self.logger.debug("Creating a new model from the new sample and validating if the new model "
                           "contains a negative sample.")
-        functions_to_explore = self.lifted_functions if relevant_numeric_features is None else relevant_numeric_features
+        functions_to_explore = self.numeric_positive_samples.columns.tolist() \
+            if relevant_numeric_features is None else relevant_numeric_features
         if len(functions_to_explore) == 0:
             return True
 
-        new_model_data = self.positive_samples_df[functions_to_explore].copy()
+        new_model_data = self.numeric_positive_samples[functions_to_explore].copy()
         new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
                            new_numeric_sample.items()}
+        self.logger.debug("Adding the new sample to the model and creating a model from the combined data.")
         new_model_data.loc[len(new_model_data)] = new_sample_data
 
-        for _, negative_sample in self.negative_samples_df.iterrows():
-            if not self._validate_negative_sample_in_state_predicates(negative_sample, list(new_sample_predicates)):
+        for _, negative_sample in self.negative_combined_sample_df.iterrows():
+            if not self._validate_negative_sample_in_state_predicates(
+                    negative_sample[self.lifted_predicates], new_sample_predicates):
                 continue
 
             try:
@@ -311,20 +178,16 @@ class InformationGainLearner:
 
         return False
 
-    def init_dataframes(self, lifted_functions: List[str], lifted_predicates: List[str]) -> None:
+    def init_dataframes(self, valid_lifted_functions: List[str], lifted_predicates: List[str]) -> None:
         """Initializes the data frames used to calculate the information gain.
 
-        :param lifted_functions: the lifted functions matching the action (used to avoid adding redundant ones).
+        :param valid_lifted_functions: the lifted functions matching the action (used to avoid adding redundant ones).
         :param lifted_predicates: the lifted predicates matching the action.
         """
-        self.positive_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
-        self.negative_samples_df = DataFrame(columns=lifted_functions + lifted_predicates)
-        self.lifted_functions = lifted_functions
+        super().init_numeric_dataframes(valid_lifted_functions)
+        self.positive_discrete_sample_df = DataFrame(columns=lifted_predicates)
+        self.negative_combined_sample_df = DataFrame(columns=lifted_predicates + valid_lifted_functions)
         self.lifted_predicates = lifted_predicates
-
-    def clear_convex_hull_cache(self) -> None:
-        """Clears the cached convex hull."""
-        self._cached_convex_hull = None
 
     def add_positive_sample(self, positive_numeric_sample: Dict[str, PDDLFunction],
                             positive_propositional_sample: List[Predicate]) -> None:
@@ -333,14 +196,14 @@ class InformationGainLearner:
         :param positive_numeric_sample: the numeric functions representing the positive sample.
         :param positive_propositional_sample: the propositional predicates representing the positive sample.
         """
-        filtered_predicates_names = self._remove_redundant_propositional_features(positive_propositional_sample)
+        super().add_positive_numeric_sample(positive_numeric_sample)
         self.logger.info(f"Adding a new positive sample for the action {self.action_name}.")
-        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
-                           positive_numeric_sample.items()}
-        for predicate in filtered_predicates_names:
-            new_sample_data[predicate] = 1.0
+        filtered_predicates_names = self._remove_redundant_propositional_features(positive_propositional_sample)
+        new_sample_data = {predicate: 1.0 for predicate in filtered_predicates_names}
+        if len(self.positive_discrete_sample_df.columns) == 0:
+            return
 
-        self.positive_samples_df.loc[len(self.positive_samples_df)] = new_sample_data
+        self.positive_discrete_sample_df.loc[len(self.positive_discrete_sample_df)] = new_sample_data
 
     def add_negative_sample(self, numeric_negative_sample: Dict[str, PDDLFunction],
                             negative_propositional_sample: List[Predicate]) -> None:
@@ -350,17 +213,15 @@ class InformationGainLearner:
         :param negative_propositional_sample: the propositional predicates representing the negative sample.
         """
         self.logger.info(f"Adding a new negative sample for the action {self.action_name}.")
+        super().add_negative_numeric_sample(numeric_negative_sample)
         new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
                            numeric_negative_sample.items()}
-        relevant_predicates = [predicate.untyped_representation for predicate in negative_propositional_sample if
-                               predicate.untyped_representation in self.lifted_predicates]
+        observed_literals = [predicate.untyped_representation for predicate in negative_propositional_sample if
+                             predicate.untyped_representation in self.lifted_predicates]
         for predicate in self.lifted_predicates:
-            if predicate not in relevant_predicates:
-                new_sample_data[predicate] = 0.0
-            else:
-                new_sample_data[predicate] = 1.0
+            new_sample_data[predicate] = 1.0 if predicate in observed_literals else 0.0
 
-        self.negative_samples_df.loc[len(self.negative_samples_df)] = new_sample_data
+        self.negative_combined_sample_df.loc[len(self.negative_combined_sample_df)] = new_sample_data
 
     def is_applicable_and_new_state(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> bool:
@@ -374,12 +235,12 @@ class InformationGainLearner:
         if not self._validate_action_discrete_preconditions_hold_in_state(new_propositional_sample):
             return False
 
-        positive_points_data = self.positive_samples_df[self.lifted_functions]
-        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in self.lifted_functions})
-        sample_values = [new_numeric_sample[col].value for col in self.lifted_functions]
+        relevant_functions = self.numeric_positive_samples.columns.tolist()
+        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in relevant_functions})
+        sample_values = [new_numeric_sample[col].value for col in relevant_functions]
         try:
-            return self._in_hull(new_point_data, self.positive_samples_df[self.lifted_functions]) and \
-                self._locate_sample_in_df(sample_values, positive_points_data) == -1
+            return self._in_hull(new_point_data, self.numeric_positive_samples) and \
+                self._locate_sample_in_df(sample_values, self.numeric_positive_samples) == -1
 
         except (QhullError, ValueError):
             return False
@@ -400,7 +261,8 @@ class InformationGainLearner:
         """
         self.logger.info("Calculating the information gain of a new sample.")
         # this way we maintain the order of the columns in the data frame.
-        if len(self.positive_samples_df) == 0 and len(self.negative_samples_df) == 0:
+        if (self._are_numeric_dataframes_empty()
+                and len(self.positive_discrete_sample_df) == 0 and len(self.negative_combined_sample_df) == 0):
             self.logger.debug("There are no samples to calculate the information gain from - action not observed yet.")
             return True
 

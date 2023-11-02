@@ -33,6 +33,8 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         self._action_observation_rate = {action: 1 for action in self.partial_domain.actions}
         self._state_failure_rate = 0
         self._state_applicable_actions = PriorityQueue()
+        for action_name, action_data in self.partial_domain.actions.items():
+            self.ig_learner[action_name] = InformationGainLearner(action_name=action_name)
 
     def _extract_objects_from_state(self, state: State) -> Dict[str, PDDLObject]:
         """Extracts the objects from the state.
@@ -64,6 +66,21 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """
         self.logger.debug("Checking whether or not the action was successful.")
         return self.are_states_different(previous_state, next_state)
+
+    def _apply_feature_selection(self, action: ActionCall) -> List[str]:
+        """Applies feature selection to the action's numeric features.
+
+        Note:
+            This approach is used to reduce the calculation efforts of the learner. The idea is to select features in a
+            greedy manner, starting from the minimal number of features, i.e. zero and increasing the number over time.
+            There might be a more informative way to apply feature selection, but this is for future work.
+
+
+        :param action: the action being applied.
+        :return: the features to explore.
+        """
+        return self.preconditions_fluent_map[action.name] if \
+            self.preconditions_fluent_map else self.ig_learner[action.name].numeric_positive_samples.columns.tolist()
 
     def _select_next_action_to_execute(self, frontier_actions: PriorityQueue) -> ActionCall:
         """Selects the next action to execute from both the informative frontier and the applicable actions.
@@ -97,11 +114,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
             action.numeric_effects = set()
 
-    def init_online_learning(self) -> None:
-        """Initializes the online learning algorithm."""
-        for action_name, action_data in self.partial_domain.actions.items():
-            self.ig_learner[action_name] = InformationGainLearner(action_name=action_name)
-
     def calculate_state_action_information_gain(
             self, state: State, action: ActionCall, action_already_calculated: bool = False) -> float:
         """Calculates the information gain of a state.
@@ -122,23 +134,26 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         if self._action_observation_rate[action.name] == 1:
             self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
             self.ig_learner[action.name].init_dataframes(
-                lifted_functions=list([func for func in lifted_functions.keys()]),
+                valid_lifted_functions=list([func for func in lifted_functions.keys()]),
                 lifted_predicates=[pred.untyped_representation for pred in lifted_predicates])
 
-        features_to_explore = self.preconditions_fluent_map[action.name] if self.preconditions_fluent_map else None
+        # TODO: Remove this code to the feature selection values.
+        features_to_explore = self._apply_feature_selection(action)
         is_informative = self.ig_learner[action.name].is_sample_informative(
             lifted_functions, lifted_predicates, use_cache=action_already_calculated,
             relevant_numeric_features=features_to_explore)
-        IG = NON_INFORMATIVE_IG if not is_informative else self.ig_learner[action.name].calculate_information_gain(
-            lifted_functions, lifted_predicates)
         if not is_informative:
+            # TODO: This code will be removed later on.
             self.logger.debug(f"The action {action.name} is not informative, checking if it is an applicable one.")
             if self.ig_learner[action.name].is_applicable_and_new_state(lifted_functions, lifted_predicates):
                 selection_prob = (1 - self._action_observation_rate[action.name] /
                                   sum([rate for rate in self._action_observation_rate.values()]))
                 self._state_applicable_actions.insert(item=action, priority=1, selection_probability=selection_prob)
 
-        return IG
+            return NON_INFORMATIVE_IG
+
+        else:
+            return self.ig_learner[action.name].calculate_information_gain(lifted_functions, lifted_predicates)
 
     def create_all_grounded_actions(self, observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
         """Creates all the grounded actions for the domain given the current possible objects.
