@@ -86,7 +86,6 @@ class PIL:
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         online_learner = OnlineNSAMLearner(partial_domain=partial_domain, fluents_map=self._fluents_map,
                                            polynomial_degree=self._polynomial_degree)
-        online_learner.init_online_learning()
         for problem_index, problem_path in enumerate(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")):
             self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
@@ -100,10 +99,10 @@ class PIL:
             if goal_achieved:
                 self.logger.info("The agent successfully solved the current task!")
 
-            if (problem_index + 1) % 10 == 0:
+            if (problem_index + 1) % 100 == 0:
                 solved_all_test_problems = self.validate_learned_domain(
                     learned_model, test_set_dir_path, episode_number=problem_index + 1,
-                    num_steps_in_episode=num_steps_in_episode)
+                    num_steps_in_episode=num_steps_in_episode, fold_num=fold_num)
                 if solved_all_test_problems:
                     self.domain_validator.write_statistics(fold_num)
                     return
@@ -112,19 +111,21 @@ class PIL:
 
         self.domain_validator.write_statistics(fold_num)
 
-    def validate_learned_domain(self, learned_model: LearnerDomain,
-                                test_set_dir_path: Path, episode_number: int, num_steps_in_episode: int) -> bool:
+    def validate_learned_domain(
+            self, learned_model: LearnerDomain,test_set_dir_path: Path,
+            episode_number: int, num_steps_in_episode: int, fold_num: int) -> bool:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param episode_number: the number of the current episode.
         :param num_steps_in_episode: the number of steps that were taken in the current episode.
+        :param fold_num: the index of the current folder that is currently running.
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"online_nsam_{learned_model.name}_epoch_{episode_number}.pddl")
+                                   f"online_nsam_fold_{fold_num}_{learned_model.name}_epoch_{episode_number}.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         all_possible_solution_types = [solution_type.name for solution_type in SolutionOutputTypes]
 

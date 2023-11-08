@@ -7,9 +7,8 @@ from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, Proble
 from pddl_plus_parser.models import Observation, Domain
 
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import SAMLearner, NumericSAMLearner, PolynomialSAMLearning, ConditionalSAM, \
-    UniversallyConditionalSAM
 from solvers import ENHSPSolver, MetricFFSolver, FastDownwardSolver
+from solvers.fast_forward_adl_solver import FFADLSolver
 from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
@@ -21,17 +20,9 @@ from validators import DomainValidator
 DEFAULT_SPLIT = 5
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
-                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam]
-
-LEARNING_ALGORITHMS = {
-    LearningAlgorithmType.sam_learning: SAMLearner,
-    LearningAlgorithmType.numeric_sam: NumericSAMLearner,
-    # difference is that the learner is not given any fluents to assist in learning
-    LearningAlgorithmType.raw_numeric_sam: NumericSAMLearner,
-    LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
-    LearningAlgorithmType.conditional_sam: ConditionalSAM,
-    LearningAlgorithmType.universal_sam: UniversallyConditionalSAM,
-}
+                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam,
+                      LearningAlgorithmType.raw_polynomial_nam, LearningAlgorithmType.naive_nsam,
+                      LearningAlgorithmType.naive_polysam]
 
 DEFAULT_NUMERIC_TOLERANCE = 0.1
 
@@ -140,21 +131,29 @@ class OfflineBasicExperimentRunner:
                                    f"{self._learning_algorithm.name}_{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
-        self.domain_validator.solver = MetricFFSolver()
-        self.domain_validator._solver_name = "metric_ff"
-        self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                              test_set_directory_path=test_set_dir_path,
-                                              used_observations=allowed_observations,
-                                              tolerance=DEFAULT_NUMERIC_TOLERANCE)
-
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
+            self.domain_validator.solver = MetricFFSolver()
+            self.domain_validator._solver_name = "metric_ff"
+            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                                  test_set_directory_path=test_set_dir_path,
+                                                  used_observations=allowed_observations,
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
+
             self.domain_validator.solver = ENHSPSolver()
             self.domain_validator._solver_name = "enhsp"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,
                                                   tolerance=DEFAULT_NUMERIC_TOLERANCE)
+
         else:
+            self.domain_validator.solver = FFADLSolver()
+            self.domain_validator._solver_name = "fast_forward"
+            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+                                                  test_set_directory_path=test_set_dir_path,
+                                                  used_observations=allowed_observations,
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
+
             self.domain_validator.solver = FastDownwardSolver()
             self.domain_validator._solver_name = "fast_downward"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,

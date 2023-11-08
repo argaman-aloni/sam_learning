@@ -6,13 +6,14 @@ from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Prec
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm, LearnerAction
+from sam_learning.core.naive_numeric_fluent_learner_algorithm import NaiveNumericFluentStateStorage
 from sam_learning.learners.sam_learning import SAMLearner
 
 
-class NumericSAMLearner(SAMLearner):
+class NaiveNumericSAMLearner(SAMLearner):
     """The Extension of SAM that is able to learn numeric state variables."""
 
-    storage: Dict[str, NumericFluentStateStorage]
+    storage: Dict[str, NaiveNumericFluentStateStorage]
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
@@ -126,13 +127,25 @@ class NumericSAMLearner(SAMLearner):
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
 
-    def _create_safe_action_model(self) -> Tuple[Dict[str, LearnerAction], Dict[str, str]]:
-        """Crates the safe action model learned by the algorithm.
+    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
+        """Learn the SAFE action model from the input observations.
 
-        :return: the actions that are allowed to execute and the metadata about the learning.
+        :param observations: the list of trajectories that are used to learn the safe action model.
+        :return: a domain containing the actions that were learned and the metadata about the learning.
         """
+        self.logger.info("Starting to learn the action model!")
+        super().start_measure_learning_time()
         allowed_actions = {}
         learning_metadata = {}
+        super().deduce_initial_inequality_preconditions()
+        for observation in observations:
+            self.current_trajectory_objects = observation.grounded_objects
+            for component in observation.components:
+                if not super().are_states_different(component.previous_state, component.next_state):
+                    continue
+
+                self.handle_single_trajectory_component(component)
+
         for action_name, action in self.partial_domain.actions.items():
             if action_name not in self.storage:
                 self.logger.debug(f"The action - {action_name} has not been observed in the trajectories!")
@@ -151,33 +164,13 @@ class NumericSAMLearner(SAMLearner):
                 learning_metadata[action_name] = e.solution_type.name
 
         self.partial_domain.actions = allowed_actions
-        return allowed_actions, learning_metadata
-
-    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
-        """Learn the SAFE action model from the input observations.
-
-        :param observations: the list of trajectories that are used to learn the safe action model.
-        :return: a domain containing the actions that were learned and the metadata about the learning.
-        """
-        self.logger.info("Starting to learn the action model!")
-        super().start_measure_learning_time()
-        super().deduce_initial_inequality_preconditions()
-        for observation in observations:
-            self.current_trajectory_objects = observation.grounded_objects
-            for component in observation.components:
-                if not super().are_states_different(component.previous_state, component.next_state):
-                    continue
-
-                self.handle_single_trajectory_component(component)
-
-        allowed_actions, learning_metadata = self._create_safe_action_model()
 
         super().end_measure_learning_time()
         learning_metadata["learning_time"] = str(self.learning_end_time - self.learning_start_time)
         return self.partial_domain, learning_metadata
 
 
-class PolynomialSAMLearning(NumericSAMLearner):
+class NaivePolynomialSAMLearning(NaiveNumericSAMLearner):
     """The Extension of SAM that is able to learn polynomial state variables."""
     storage: Dict[str, PolynomialFluentsLearningAlgorithm]
     polynom_degree: int

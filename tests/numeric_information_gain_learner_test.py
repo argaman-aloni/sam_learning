@@ -127,12 +127,14 @@ def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_rem
 
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
     assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 8
-    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(
+        TEST_FUNCTION_NAMES)
 
     information_gain_learner_with_predicates.add_positive_sample(new_numeric_sample, new_discrete_sample)
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 4
     assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 4
-    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(
+        TEST_FUNCTION_NAMES)
 
 
 def test_add_positive_sample_when_domain_contains_numeric_and_discrete_parts_adds_new_sample_to_the_existing_positive_dataframe_with_the_correct_values(
@@ -177,12 +179,14 @@ def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_doe
 
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
     assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 8
-    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(
+        TEST_FUNCTION_NAMES)
 
     information_gain_learner_with_predicates.add_negative_sample(new_numeric_sample, new_discrete_sample)
     assert len(information_gain_learner_with_predicates.lifted_predicates) == 8
     assert len(information_gain_learner_with_predicates.positive_discrete_sample_df.columns.tolist()) == 8
-    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(TEST_FUNCTION_NAMES)
+    assert len(information_gain_learner_with_predicates.numeric_positive_samples.columns.tolist()) == len(
+        TEST_FUNCTION_NAMES)
 
 
 def test_add_negative_sample_when_domain_contains_numeric_and_discrete_parts_the_values_are_being_added_to_the_negative_dataframe_correctly(
@@ -312,6 +316,7 @@ def test_validate_action_discrete_preconditions_hold_in_state_when_predicates_ar
 
 def test_validate_action_discrete_preconditions_hold_in_state_when_predicates_are_are_partial_from_required_returns_false(
         information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    
     information_gain_learner_with_predicates.lifted_predicates = [
         p.untyped_representation for p in test_predicates]
     assert not information_gain_learner_with_predicates._validate_action_discrete_preconditions_hold_in_state(
@@ -482,7 +487,7 @@ def test_is_non_informative_safe_returns_action_informative_when_not_observed_be
         new_numeric_sample=initial_state.state_fluents, new_propositional_sample=state_predicates)
 
 
-def test_is_non_informative_safe_returns_true_when_the_relevant_fluents_is_empty_and_the_predicates_are_all_in_the_preconditions(
+def test_is_non_informative_safe_returns_false_when_the_relevant_fluents_is_empty_and_the_predicates_are_all_in_the_preconditions_and_the_effects_are_not_determined_perfectly(
         information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
     new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
@@ -498,6 +503,28 @@ def test_is_non_informative_safe_returns_true_when_the_relevant_fluents_is_empty
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
+    assert not information_gain_learner_with_predicates._is_non_informative_safe(
+        new_numeric_sample=new_sample,
+        new_propositional_sample=[p for p in test_predicates if p in new_discrete_sample],
+        relevant_numeric_features=[])
+
+
+def test_is_non_informative_safe_returns_true_when_the_relevant_fluents_is_empty_and_the_predicates_are_all_in_the_preconditions_and_the_effects_are_determined_perfectly(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_discrete_sample = []
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+
+    information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
+    new_sample = {}
+    new_func = PDDLFunction(name="(x)", signature={})
+    new_func.set_value(0.5)
+    new_sample[new_func.name] = new_func
+    new_func = PDDLFunction(name="(y)", signature={})
+    new_func.set_value(2.0)
+    new_sample[new_func.name] = new_func
+    information_gain_learner_with_predicates._effects_learned_perfectly = True
     assert information_gain_learner_with_predicates._is_non_informative_safe(
         new_numeric_sample=new_sample,
         new_propositional_sample=[p for p in test_predicates if p in new_discrete_sample],

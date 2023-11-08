@@ -107,6 +107,10 @@ class NumericConsistencyValidator:
         :return: whether any of the negative samples is inside the convex hull.
         """
         self.logger.debug("Validating whether the input samples are inside the convex hull.")
+        if len(hull_df.columns.tolist()) == 0:
+            # If there is nothing to explore the points are by default in the convex hull.
+            return True
+
         if len(points_to_test) == 0:
             return False
 
@@ -157,7 +161,7 @@ class NumericConsistencyValidator:
             # This is to prevent redundant calculations when the effects are already learned perfectly.
             return True
 
-        if len(self.numeric_positive_samples) == 1:
+        if len(self.numeric_positive_samples) <= 1:
             return False
 
         filtered_df, _, _ = filter_constant_features(self.numeric_positive_samples)

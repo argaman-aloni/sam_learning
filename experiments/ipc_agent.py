@@ -1,6 +1,6 @@
 """An agent for the active learning of IPC models"""
 import logging
-from typing import Dict, Set
+from typing import Dict, Set, Tuple
 
 from pddl_plus_parser.models import State, Domain, ActionCall, Problem, Operator, evaluate_expression, PDDLFunction, \
     NumericalExpressionTree
@@ -36,7 +36,22 @@ class IPCAgent(AbstractAgent):
                     if state_fluent.untyped_representation == expression_function.untyped_representation:
                         expression_function.set_value(state_fluent.value)
 
-    def observe(self, state: State, action: ActionCall) -> State:
+    def _get_reward(self, previous_state: State, next_state: State) -> int:
+        """Evaluates the reward for advancing from the previous state to the next state.
+
+        :param previous_state: the previous state.
+        :param next_state: the next state.
+        :return: the reward for advancing from the previous state to the next state.
+        """
+        self.logger.debug(f"Checking if the previous state {previous_state} "
+                          f"is different from the next state {next_state}")
+        if previous_state == next_state:
+            self.logger.warning("The previous state is the same as the next state. ")
+            return -1
+
+        return 1
+
+    def observe(self, state: State, action: ActionCall) -> Tuple[State, int]:
         """Observes an action being executed on the state and the resulting new state of the environment.
 
         :param state: the state before the action was executed.
@@ -48,20 +63,20 @@ class IPCAgent(AbstractAgent):
         operator = Operator(action=self._domain.actions[action.name], domain=self._domain,
                             grounded_action_call=action.parameters, problem_objects=self._problem.objects)
         try:
-            return operator.apply(state)
+            new_state = operator.apply(state)
 
         except ValueError:
             self.logger.debug(f"Could not apply the action {str(operator)} to the state.")
-            return state.copy()
+            new_state = state.copy()
 
-    def get_reward(self, state: State) -> float:
-        """Evaluates whether the agent has reached the goal state and returns the reward.
+        reward = self._get_reward(state, new_state)
+        return new_state, reward
 
-        Note:
-            At the moment the reward is binary on whether the agent has reached the goal state or not.
+    def goal_reached(self, state: State) -> bool:
+        """Evaluates whether the goal of the PDDL problem has been reached.
 
         :param state: the state to be evaluated.
-        :return: the reward for the state.
+        :return: whether the goal has been reached.
         """
         self.logger.info("Evaluating the reward for the state %s.", state.serialize())
         goal_predicates = {p.untyped_representation for p in self._problem.goal_state_predicates}
@@ -75,8 +90,8 @@ class IPCAgent(AbstractAgent):
 
         if (goal_predicates.issubset(state_predicates) and
                 all([evaluate_expression(fluent.root) for fluent in goal_fluents])):
-            self.logger.info("The agent has reached the goal state.")
-            return 1
+            self.logger.info("The IPC agent has reached the goal state.")
+            return True
 
-        self.logger.debug("Goal has not been reached.")
-        return 0
+        self.logger.debug("Goal has not been reached according to the IPC agent.")
+        return False

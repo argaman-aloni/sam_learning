@@ -92,7 +92,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         :param frontier_actions: the actions that are informative and their execution helps the learner.
         :return: the next action to execute.
         """
-        select_from_applicable_prob = 1 - 1 / (1 + self._state_failure_rate)
+        select_from_applicable_prob = 0.5   # TODO: Change later on.
         select_from_frontier_prob = 1 - select_from_applicable_prob
         queue_to_select_from = random.choices(
             [self._state_applicable_actions, frontier_actions],
@@ -170,6 +170,8 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """Updates the agent that the learner is using."""
         self.logger.info(f"Updating the agent.")
         self.agent = new_agent
+        for action in self.partial_domain.actions:
+            self._action_observation_rate[action] = 1 if self._action_observation_rate[action] == 1 else 2
 
     def calculate_valid_neighbors(
             self, grounded_actions: Set[ActionCall], current_state: State) -> PriorityQueue:
@@ -231,12 +233,13 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         return new_neighbors
 
     def execute_action(
-            self, action_to_execute: ActionCall, previous_state: State, next_state: State) -> None:
+            self, action_to_execute: ActionCall, previous_state: State, next_state: State, reward: int) -> None:
         """Executes an action in the environment and updates the action model accordingly.
 
         :param action_to_execute: the action to execute in the environment.
         :param previous_state: the state prior to the action's execution.
         :param next_state: the state following the action's execution.
+        :param reward: the reward for executing the action.
         """
         self.logger.info(f"Executing the action {action_to_execute.name} in the environment.")
         self._action_observation_rate[action_to_execute.name] += 1
@@ -250,7 +253,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         pre_state_lifted_predicates = self.matcher.get_possible_literal_matches(
             action_to_execute, list(self.triplet_snapshot.previous_state_predicates))
 
-        if not self._is_successful_action(previous_state, next_state):
+        if reward < 0:
             self.logger.debug("The action was not successful, adding the negative sample to the learner.")
             self.ig_learner[action_to_execute.name].add_negative_sample(
                 numeric_negative_sample=pre_state_lifted_numeric_functions,
@@ -267,24 +270,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
         super().add_new_action(action_to_execute, previous_state, next_state)
 
-    def create_safe_model(self) -> LearnerDomain:
-        """Creates a safe model from the currently learned data."""
-        for action_name, action in self.partial_domain.actions.items():
-            if action_name not in self.storage:
-                self.logger.debug(f"The action - {action_name} has not been observed in the trajectories!")
-                continue
-
-            self.storage[action_name].filter_out_inconsistent_state_variables()
-            try:
-                self._construct_safe_numeric_preconditions(action)
-                self._construct_safe_numeric_effects(action)
-                self.logger.info(f"Done learning the action - {action_name}!")
-
-            except NotSafeActionError as e:
-                self.logger.warning(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")
-
-        return self.partial_domain
-
     def search_to_learn_action_model(
             self, init_state: State, problem_objects: Optional[Dict[str, PDDLObject]] = None) -> Tuple[
         LearnerDomain, int, bool]:
@@ -300,31 +285,33 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         neighbors = self.calculate_valid_neighbors(grounded_actions, init_state)
         current_state = init_state.copy()
         num_steps = 0
-        while len(neighbors) > 0:
+        while len(neighbors) > 0 and num_steps < MAX_STEPS_PER_EPISODE:
             action = self._select_next_action_to_execute(neighbors)
-            next_state = self.agent.observe(state=current_state, action=action)
-            self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
+            next_state, reward = self.agent.observe(state=current_state, action=action)
+            self.execute_action(action, current_state, next_state, reward=reward)
             num_steps += 1
-            while not self._is_successful_action(current_state, next_state) and len(neighbors) > 0:
+            while reward < 0 < len(neighbors) and num_steps < MAX_STEPS_PER_EPISODE:
                 self._state_failure_rate += 1
                 self.logger.debug("The action was not successful, trying again.")
                 neighbors = self.update_failed_action_neighbors(neighbors, current_state, action)
                 action = self._select_next_action_to_execute(neighbors)
-                next_state = self.agent.observe(state=current_state, action=action)
-                self.execute_action(action_to_execute=action, previous_state=current_state, next_state=next_state)
+                next_state, reward = self.agent.observe(state=current_state, action=action)
+                self.execute_action(action, current_state, next_state, reward=reward)
                 num_steps += 1
-                if num_steps == MAX_STEPS_PER_EPISODE:
-                    self.logger.warning("Reached the maximum number of steps per epoch, returning the safe model.")
-                    return self.create_safe_model(), num_steps, False
+
+            if num_steps >= MAX_STEPS_PER_EPISODE:
+                break
 
             self.logger.debug("The action changed the state of the environment, updating the possible neighbors.")
             self._state_applicable_actions.clear()
             self._state_failure_rate = 0
             neighbors = self.calculate_valid_neighbors(grounded_actions, next_state)
-
             current_state = next_state
-            if self.agent.get_reward(current_state) == 1:
-                return self.create_safe_model(), num_steps, True
+            if self.agent.goal_reached(current_state):
+                self.logger.info("The goal has been reached, returning the learned model.")
+                self._create_safe_action_model()
+                return self.partial_domain, num_steps, True
 
         self.logger.info("Reached a state with no neighbors to pull an action from, returning the learned model.")
-        return self.create_safe_model(), num_steps, False
+        self._create_safe_action_model()
+        return self.partial_domain, num_steps, False

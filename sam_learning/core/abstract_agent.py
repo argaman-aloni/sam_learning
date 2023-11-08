@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 
 from pddl_plus_parser.models import State, ActionCall
+from typing import Tuple
 
 
 class AbstractAgent(ABC):
@@ -12,9 +13,9 @@ class AbstractAgent(ABC):
         pass
 
     @abstractmethod
-    def observe(self, state: State, action: ActionCall) -> State:
+    def observe(self, state: State, action: ActionCall) -> Tuple[State, int]:
         pass
 
     @abstractmethod
-    def get_reward(self, state: State) -> float:
+    def goal_reached(self, state: State) -> bool:
         pass

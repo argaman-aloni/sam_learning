@@ -8,7 +8,7 @@ from pddl_plus_parser.models import PDDLFunction
 from sam_learning.core.consistent_model_validator import NumericConsistencyValidator
 
 
-class GreedyFeatureSelector(NumericConsistencyValidator):
+class BFSFeatureSelector(NumericConsistencyValidator):
     """A greedy algorithm for feature selection.
 
     The algorithm works as a Breadth-First Search (BFS) algorithm, where each node in the search tree represents
@@ -34,16 +34,6 @@ class GreedyFeatureSelector(NumericConsistencyValidator):
 
     # def
 
-    def init_search_data_structures(self, lifted_functions: List[str]) -> None:
-        """
-
-        :param lifted_functions:
-        :return:
-        """
-        super().init_numeric_dataframes(lifted_functions)
-        self._function_vocabulary = lifted_functions
-        self.open_list.append(set())
-
     def _expand_node(self) -> Set[str]:
         """The function executed the node expansion step of the algorithm.
 
@@ -53,26 +43,33 @@ class GreedyFeatureSelector(NumericConsistencyValidator):
         if len(self.open_list) == 0:
             raise ValueError("The open list is empty. This should not happen.")
 
-        next_set_of_features = self.open_list.pop(0)
-        while next_set_of_features in self.closed_list:
-            self.logger.debug(f"The node {next_set_of_features} was already expanded. Skipping.")
-            next_set_of_features = self.open_list.pop(0)
+        selected_feature_set = self.open_list.pop(0)
+        while selected_feature_set in self.closed_list:
+            self.logger.debug(f"The node {selected_feature_set} was already expanded. Skipping.")
+            selected_feature_set = self.open_list.pop(0)
 
         self.logger.debug("Adding the next level of features to the open list.")
-        for function_name in self._function_vocabulary:
-            if function_name in next_set_of_features:
-                continue
-
-            new_set_of_features = next_set_of_features.union({function_name})
+        features_not_in_selected_feature_set = set(self._function_vocabulary).difference(selected_feature_set)
+        for function_name in features_not_in_selected_feature_set:
+            new_set_of_features = selected_feature_set.union({function_name})
             if new_set_of_features in self.closed_list or new_set_of_features in self.open_list:
                 continue
 
             self.open_list.append(new_set_of_features)
 
-        self.closed_list.append(next_set_of_features)
-        self.logger.debug(f"Done expanding node {next_set_of_features}.")
+        self.closed_list.append(selected_feature_set)
+        self.logger.debug(f"Done expanding node {selected_feature_set}.")
 
-        return next_set_of_features
+        return selected_feature_set
+
+    def init_search_data_structures(self, lifted_functions: List[str]) -> None:
+        """Initializes the data structures used by the algorithm.
+
+        :param lifted_functions: the names of the lifted numeric functions.
+        """
+        super().init_numeric_dataframes(lifted_functions)
+        self._function_vocabulary = lifted_functions
+        self.open_list.append(set())
 
     def apply_feature_selection(self) -> List[str]:
         """Applies feature selection and selects the next set of features to use for the active learning.

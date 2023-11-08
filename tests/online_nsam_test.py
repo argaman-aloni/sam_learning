@@ -86,7 +86,7 @@ def test_execute_action_when_action_is_successful_adds_action_to_positive_sample
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
     depot_online_nsam.execute_action(
-        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
+        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
     assert len(depot_online_nsam.ig_learner[tested_action.name].numeric_positive_samples) == 1
     assert len(depot_online_nsam.ig_learner[tested_action.name].positive_discrete_sample_df) == 1
 
@@ -100,7 +100,7 @@ def test_execute_action_when_action_is_successful_adds_the_action_to_observed_ac
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
     depot_online_nsam.execute_action(
-        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
+        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
 
     assert tested_action.name in depot_online_nsam.observed_actions
     # checking that the drive action was correctly learned
@@ -116,7 +116,7 @@ def test_execute_action_when_action_is_not_successful_adds_action_to_negative_sa
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
     depot_online_nsam.execute_action(
-        action_to_execute=tested_action, previous_state=tested_next_state, next_state=tested_next_state)
+        action_to_execute=tested_action, previous_state=tested_next_state, next_state=tested_next_state, reward=-1)
 
     assert len(depot_online_nsam.ig_learner[tested_action.name].numeric_negative_samples) == 1
     assert len(depot_online_nsam.ig_learner[tested_action.name].negative_combined_sample_df) == 1
@@ -130,7 +130,7 @@ def test_execute_action_when_action_is_not_successful_does_not_add_action_to_obs
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
     depot_online_nsam.execute_action(
-        action_to_execute=tested_action, previous_state=tested_next_state, next_state=tested_next_state)
+        action_to_execute=tested_action, previous_state=tested_next_state, next_state=tested_next_state, reward=-1)
 
     assert tested_action.name not in depot_online_nsam.observed_actions
 
@@ -147,7 +147,7 @@ def test_calculate_state_information_gain_when_action_is_observed_twice_returns_
     assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
                                                                      action=tested_action) > 0
     depot_online_nsam.execute_action(
-        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
+        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
 
     assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
                                                                      action=tested_action) == 0
@@ -166,7 +166,8 @@ def test_consecutive_execution_of_informative_actions_creates_small_convex_hulls
             if depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
                                                                          action=tested_action) > 0:
                 depot_online_nsam.execute_action(
-                    action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
+                    action_to_execute=tested_action,
+                    previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
 
     except Exception as e:
         fail()
@@ -184,8 +185,10 @@ def test_consecutive_execution_of_informative_actions_creates_a_usable_model(
         if depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
                                                                      action=tested_action) > 0:
             depot_online_nsam.execute_action(
-                action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state)
-    domain = depot_online_nsam.create_safe_model()
+                action_to_execute=tested_action, previous_state=tested_previous_state,
+                next_state=tested_next_state, reward=1)
+    depot_online_nsam._create_safe_action_model()
+    domain = depot_online_nsam.partial_domain
     print(domain.to_pddl())
 
 
@@ -231,7 +234,8 @@ def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_a
                                                                   current_state=initial_state)
     num_neighbors = valid_neighbors.__len__()
 
-    depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=initial_state)
+    depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=initial_state,
+                                     reward=-1)
     valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
                                                                   current_state=initial_state)
     new_num_neighbors = valid_neighbors.__len__()
@@ -254,7 +258,7 @@ def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_a
     num_neighbors = valid_neighbors.__len__()
 
     # executed action '(drive truck0 depot0 distributor0)'
-    depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=next_state)
+    depot_online_nsam.execute_action(observation_action, previous_state=initial_state, next_state=next_state, reward=1)
     valid_neighbors = depot_online_nsam.calculate_valid_neighbors(grounded_actions=grounded_actions,
                                                                   current_state=initial_state)
     new_num_neighbors = valid_neighbors.__len__()

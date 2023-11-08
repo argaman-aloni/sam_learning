@@ -35,7 +35,7 @@ def test_observe_on_state_with_applicable_action_returns_correct_next_state_only
     expected_predicate_not_in_state = "(at truck1 depot0)"
 
     # Act
-    next_state = depot_discrete_agent.observe(initial_state, action)
+    next_state, reward = depot_discrete_agent.observe(initial_state, action)
 
     # Assert
     assert expected_predicate_in_state in next_state.serialize()
@@ -50,7 +50,7 @@ def test_observe_on_state_with_inapplicable_action_returns_the_same_state_as_bef
     action = ActionCall(name="drive", grounded_parameters=["truck1", "distributor1", "depot0"])
 
     # Act
-    next_state = depot_discrete_agent.observe(initial_state, action)
+    next_state, reward  = depot_discrete_agent.observe(initial_state, action)
 
     # Assert
     initial_state_predicates = {p.untyped_representation for predicates in state_predicates.values() for p in
@@ -73,7 +73,7 @@ def test_observe_on_state_with_applicable_action_returns_correct_next_state_nume
     expected_numeric_fluent_in_state = "(= (fuel-cost ) 10.0)"
 
     # Act
-    next_state = depot_numeric_agent.observe(initial_state, action)
+    next_state, reward  = depot_numeric_agent.observe(initial_state, action)
 
     # Assert
     assert expected_predicate_in_state in next_state.serialize()
@@ -90,7 +90,7 @@ def test_observe_on_state_with_inapplicable_action_returns_the_same_state_as_bef
     action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot0"])
 
     # Act
-    next_state = depot_numeric_agent.observe(initial_state, action)
+    next_state, reward  = depot_numeric_agent.observe(initial_state, action)
 
     # Assert
     initial_state_predicates = {p.untyped_representation for predicates in state_predicates.values() for p in
@@ -119,10 +119,10 @@ def test_get_reward_returns_correct_reward_one_only_discrete(
     goal_state.state_predicates[depot_discrete_domain.predicates["on"].untyped_representation].update(goal_predicates)
 
     # Act
-    reward = depot_discrete_agent.get_reward(goal_state)
+    reward = depot_discrete_agent.goal_reached(goal_state)
 
     # Assert
-    assert reward == 1.0
+    assert reward
 
 
 def test_get_reward_returns_correct_reward_zero_only_discrete(
@@ -142,10 +142,10 @@ def test_get_reward_returns_correct_reward_zero_only_discrete(
     goal_state.state_predicates[depot_discrete_domain.predicates["on"].untyped_representation].update(goal_predicates)
 
     # Act
-    reward = depot_discrete_agent.get_reward(goal_state)
+    reward = depot_discrete_agent.goal_reached(goal_state)
 
     # Assert
-    assert reward == 0.0
+    assert not reward
 
 
 def test_get_reward_returns_correct_reward_one_when_goal_includes_numeric_conditions(
@@ -160,10 +160,9 @@ def test_get_reward_returns_correct_reward_one_when_goal_includes_numeric_condit
         construct_expression_tree(numeric_goal_components, domain_functions=depot_domain.functions))
     depot_problem.goal_state_fluents.add(numeric_expression)
 
-    assert depot_numeric_agent.get_reward(initial_state) == 0.0
-
+    assert not depot_numeric_agent.goal_reached(initial_state)
     # Act
-    next_state = depot_numeric_agent.observe(initial_state, action)
+    next_state, reward = depot_numeric_agent.observe(initial_state, action)
     goal_predicates = {
         GroundedPredicate(name="on", signature=depot_domain.predicates["on"].signature,
                           object_mapping={"?x": "crate0", "?y": "pallet2"}),
@@ -177,7 +176,7 @@ def test_get_reward_returns_correct_reward_one_when_goal_includes_numeric_condit
 
     # Assert
     next_state.state_predicates[depot_domain.predicates["on"].untyped_representation].update(goal_predicates)
-    assert depot_numeric_agent.get_reward(next_state) == 1.0
+    assert depot_numeric_agent.goal_reached(next_state)
 
 
 def test_get_reward_returns_correct_reward_zero_when_goal_includes_numeric_conditions_but_goal_not_reached(
@@ -192,10 +191,10 @@ def test_get_reward_returns_correct_reward_zero_when_goal_includes_numeric_condi
         construct_expression_tree(numeric_goal_components, domain_functions=depot_domain.functions))
     depot_problem.goal_state_fluents.add(numeric_expression)
 
-    assert depot_numeric_agent.get_reward(initial_state) == 0.0
+    assert not depot_numeric_agent.goal_reached(initial_state)
 
     # Act
-    next_state = depot_numeric_agent.observe(initial_state, action)
+    next_state, reward = depot_numeric_agent.observe(initial_state, action)
     goal_predicates = {
         GroundedPredicate(name="on", signature=depot_domain.predicates["on"].signature,
                           object_mapping={"?x": "crate0", "?y": "pallet2"}),
@@ -209,5 +208,5 @@ def test_get_reward_returns_correct_reward_zero_when_goal_includes_numeric_condi
 
     # Assert
     next_state.state_predicates[depot_domain.predicates["on"].untyped_representation].update(goal_predicates)
-    assert depot_numeric_agent.get_reward(next_state) == 0.0
+    assert not depot_numeric_agent.goal_reached(next_state)
     assert next_state.state_fluents["(fuel-cost )"].value == 10.0
