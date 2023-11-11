@@ -189,7 +189,7 @@ class NumericConsistencyValidator:
 
         :param numeric_negative_sample: the numeric functions representing the negative sample.
         """
-        self.logger.info(f"Adding a new negative sample for the action {self.action_name}.")
+        self.logger.info(f"Adding a new negative numeric sample for the action {self.action_name}.")
         new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
                            numeric_negative_sample.items()}
         self.numeric_negative_samples.loc[len(self.numeric_negative_samples)] = new_sample_data

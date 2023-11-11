@@ -14,7 +14,8 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     DEPOT_NUMERIC_TRAJECTORY_PATH, NURIKABE_DOMAIN_PATH, MINECRAFT_DOMAIN_PATH, MINECRAFT_PROBLEM_PATH, \
     MINECRAFT_TRAJECTORY_PATH, SATELLITE_DOMAIN_PATH, SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, \
     NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
-    ADL_SATELLITE_TRAJECTORY_PATH, DEPOTS_DISCRETE_DOMAIN_PATH, DEPOTS_DISCRETE_PROBLEM_PATH
+    ADL_SATELLITE_TRAJECTORY_PATH, DEPOTS_DISCRETE_DOMAIN_PATH, DEPOTS_DISCRETE_PROBLEM_PATH, \
+    MINECRAFT_LARGE_DOMAIN_PATH, MINECRAFT_LARGE_PROBLEM_PATH, MINECRAFT_LARGE_TRAJECTORY_PATH
 from tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
 
 os.environ["CONVEX_HULL_ERROR_PATH"] = "tests\\convex_hull_error.txt"
@@ -205,3 +206,21 @@ def satellite_numeric_problem(satellite_numeric_domain: Domain) -> Problem:
 def satellite_numeric_observation(satellite_numeric_domain: Domain, satellite_numeric_problem: Problem) -> Observation:
     return TrajectoryParser(satellite_numeric_domain, satellite_numeric_problem).parse_trajectory(
         SATELLITE_NUMERIC_TRAJECTORY_PATH)
+
+
+
+@fixture()
+def minecraft_large_domain() -> Domain:
+    domain_parser = DomainParser(MINECRAFT_LARGE_DOMAIN_PATH, partial_parsing=True)
+    return domain_parser.parse_domain()
+
+
+@fixture()
+def minecraft_large_problem(minecraft_large_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=MINECRAFT_LARGE_PROBLEM_PATH, domain=minecraft_large_domain).parse_problem()
+
+
+@fixture()
+def minecraft_large_trajectory(minecraft_large_domain: Domain, minecraft_large_problem: Problem) -> Observation:
+    return TrajectoryParser(minecraft_large_domain, minecraft_large_problem).parse_trajectory(
+        MINECRAFT_LARGE_TRAJECTORY_PATH)

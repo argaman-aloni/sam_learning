@@ -82,6 +82,10 @@ MINECRAFT_SMALL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "minecraft_domain_small.pddl"
 MINECRAFT_SMALL_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "minecraft_problem_small.trajectory"
 
 
+MINECRAFT_LARGE_DOMAIN_PATH = EXAMPLES_DIR_PATH / "advanced_minecraft_domain.pddl"
+MINECRAFT_LARGE_PROBLEM_PATH = EXAMPLES_DIR_PATH / "advanced_map_instance_0.pddl"
+MINECRAFT_LARGE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "advanced_map_instance_0.trajectory"
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)

@@ -73,3 +73,13 @@ def test_create_grounded_actions_vocabulary_creates_only_unique_actions(
         observed_objects=observed_objects)
     assert len({str(action) for action in vocabulary_actions}) == len([action for action in vocabulary_actions])
     print([str(action) for action in vocabulary_actions])
+
+
+def test_create_grounded_actions_vocabulary_creates_actions_that_are_applicable_in_the_state(
+        minecraft_large_domain: Domain, vocabulary_creator: VocabularyCreator, minecraft_large_problem: Problem):
+    observed_objects = minecraft_large_problem.objects
+    vocabulary_actions = vocabulary_creator.create_grounded_actions_vocabulary(
+        domain=minecraft_large_domain,
+        observed_objects=observed_objects)
+    action_signatures = {str(action) for action in vocabulary_actions}
+    assert "(tp_to cell15 cell0)" in action_signatures

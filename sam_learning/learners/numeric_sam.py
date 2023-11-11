@@ -58,6 +58,9 @@ class NumericSAMLearner(SAMLearner):
         effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations()
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
+        else:
+            self.logger.debug(f"The action - {action.name} has no numeric effects.")
+            action.numeric_effects = set()
 
         if self.preconditions_fluent_map is None:
             self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
@@ -126,6 +129,18 @@ class NumericSAMLearner(SAMLearner):
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
 
+    def _create_safe_action(self, action_name: str) -> LearnerAction:
+        """Creates a safe action that can be executed in the environment.
+
+        :return: the safe action that can be executed in the environment.
+        """
+        self.storage[action_name].filter_out_inconsistent_state_variables()
+        action = self.partial_domain.actions[action_name]
+        self._construct_safe_numeric_preconditions(action)
+        self._construct_safe_numeric_effects(action)
+        self.logger.info(f"Done learning the action - {action_name}!")
+        return action
+
     def _create_safe_action_model(self) -> Tuple[Dict[str, LearnerAction], Dict[str, str]]:
         """Crates the safe action model learned by the algorithm.
 
@@ -138,13 +153,10 @@ class NumericSAMLearner(SAMLearner):
                 self.logger.debug(f"The action - {action_name} has not been observed in the trajectories!")
                 continue
 
-            self.storage[action_name].filter_out_inconsistent_state_variables()
             try:
-                self._construct_safe_numeric_preconditions(action)
-                self._construct_safe_numeric_effects(action)
-                allowed_actions[action_name] = action
+                safe_action = self._create_safe_action(action_name)
+                allowed_actions[action_name] = safe_action
                 learning_metadata[action_name] = "OK"
-                self.logger.info(f"Done learning the action - {action_name}!")
 
             except NotSafeActionError as e:
                 self.logger.debug(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")

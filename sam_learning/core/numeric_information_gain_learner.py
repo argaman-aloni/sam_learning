@@ -35,11 +35,11 @@ class InformationGainLearner(NumericConsistencyValidator):
         """
         self.logger.info("Removing propositional features that are not needed for the calculation.")
         state_predicates_names = [predicate.untyped_representation for predicate in positive_propositional_sample]
-        columns_to_drop = [feature for feature in self.lifted_predicates if feature not in state_predicates_names]
+        columns_to_drop = [feature for feature in self.positive_discrete_sample_df.columns.tolist()
+                           if feature not in state_predicates_names]
         self.positive_discrete_sample_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
         self.negative_combined_sample_df.drop(columns_to_drop, axis=1, errors="ignore", inplace=True)
-        self.lifted_predicates = [predicate for predicate in self.lifted_predicates if predicate not in columns_to_drop]
-        return self.lifted_predicates
+        return self.positive_discrete_sample_df.columns.tolist()
 
     def _validate_negative_sample_in_state_predicates(
             self, negative_sample: Series, state_predicates_names: List[str]) -> bool:
@@ -49,7 +49,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         :param state_predicates_names:  the state predicates names.
         :return:  whether the negative sample is relevant to the state predicates.
         """
-        for predicate in self.lifted_predicates:
+        for predicate in self.positive_discrete_sample_df.columns.tolist():
             if negative_sample[predicate] == 0.0 and predicate not in state_predicates_names or \
                     negative_sample[predicate] == 1.0 and predicate in state_predicates_names:
                 continue
@@ -65,13 +65,50 @@ class InformationGainLearner(NumericConsistencyValidator):
         :return: whether the bounded lifted predicates in the preconditions hold in the new sample.
         """
         state_bounded_lifted_predicates = {predicate.untyped_representation for predicate in new_propositional_sample}
-        if len(self.positive_discrete_sample_df) > 0 and \
-                not set(state_bounded_lifted_predicates).issuperset(self.positive_discrete_sample_df.columns.tolist()):
+        if len(self.positive_discrete_sample_df) <= 0 < len(self.positive_discrete_sample_df.columns.tolist()):
+            return False
+
+        if not set(state_bounded_lifted_predicates).issuperset(self.positive_discrete_sample_df.columns.tolist()):
             self.logger.debug("Not all of the discrete preconditions hold in the new sample. "
                               "It is not applicable according to the safe model")
             return False
 
         return True
+
+    def is_applicable_in_domain(
+            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
+            relevant_numeric_features: Optional[List[str]] = None, use_cache: bool = False) -> bool:
+        """Checks whether the new sample corresponds with the action's precondition.
+
+        :param new_numeric_sample: the numeric functions representing the new sample.
+        :param new_propositional_sample: the propositional predicates representing the new sample.
+        :param relevant_numeric_features: the relevant numeric features to calculate the information gain for. If None,
+            all the numeric features are used. This is used to reduce the runtime and reduce the dimensionality of
+            the calculations.
+        :param use_cache: whether to use the cached convex hull. This prevents redundant calculations and reduces
+            runtime.
+        :return: whether the state can be used to apply the action and whether this state has already been observed.
+        """
+        self.logger.info("Validating whether the new sample is applicable according to the domain.")
+        if not self._validate_action_discrete_preconditions_hold_in_state(new_propositional_sample):
+            return False
+
+        if len(self.numeric_positive_samples) == 0 and relevant_numeric_features and len(relevant_numeric_features) > 0:
+            self.logger.debug("There are no positive samples to calculate the information "
+                              "so cannot know if the action is applicable.")
+            return False
+
+        functions_to_explore = self.numeric_positive_samples.columns.tolist() \
+            if relevant_numeric_features is None else relevant_numeric_features
+
+        positive_points_data = self.numeric_positive_samples[functions_to_explore]
+        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in functions_to_explore})
+        sample_values = [new_numeric_sample[col].value for col in functions_to_explore]
+        try:
+            return self._in_hull(new_point_data, positive_points_data, use_cached_ch=use_cache)
+
+        except (QhullError, ValueError):
+            return self._locate_sample_in_df(sample_values, positive_points_data) != -1
 
     def _is_non_informative_safe(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
@@ -85,7 +122,7 @@ class InformationGainLearner(NumericConsistencyValidator):
 
         :param new_numeric_sample: the numeric functions representing the new sample.
         :param new_propositional_sample: the propositional predicates representing the new sample.
-        :param relevant_numeric_features:
+        :param relevant_numeric_features: the numeric features that are relevant to the action.
         :param use_cache: whether to use the cached convex hull. This prevents redundant calculations and reduces
         :param relevant_numeric_features: the relevant numeric features to calculate the information gain for. If None,
             all the numeric features are used. This is used to reduce the runtime and reduce the dimensionality of
@@ -93,37 +130,51 @@ class InformationGainLearner(NumericConsistencyValidator):
             runtime.
         :return: whether the new sample is non-informative according to the safe model.
         """
-        self.logger.info("Validating whether the new sample is non-informative according to the safe model.")
-        if not self._validate_action_discrete_preconditions_hold_in_state(new_propositional_sample):
+        is_applicable = self.is_applicable_in_domain(
+            new_numeric_sample, new_propositional_sample, relevant_numeric_features, use_cache)
+
+        if not is_applicable:
             return False
 
-        if len(self.numeric_positive_samples) == 0 and relevant_numeric_features and len(relevant_numeric_features) > 0:
-            self.logger.debug("There are no positive samples to calculate the information "
-                              "gain from and there are features to learn numerically.")
-            return False
+        if self.can_determine_numeric_effects_effects_perfectly():
+            self.logger.debug("The effects of the action can be determined perfectly.")
+            return True
 
+        self.logger.debug("Validating whether the state was visited already.")
         functions_to_explore = self.numeric_positive_samples.columns.tolist() \
             if relevant_numeric_features is None else relevant_numeric_features
+        if len(functions_to_explore) == 0:
+            return True
 
         positive_points_data = self.numeric_positive_samples[functions_to_explore]
-        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in functions_to_explore})
         sample_values = [new_numeric_sample[col].value for col in functions_to_explore]
-        try:
-            is_sample_in_hull = self._in_hull(new_point_data, positive_points_data, use_cached_ch=use_cache)
-            if is_sample_in_hull:
-                self.logger.debug("The new sample is inside the convex hull.")
-                if self.can_determine_numeric_effects_effects_perfectly():
-                    self.logger.debug("The effects of the action can be determined perfectly.")
-                    return True
+        self.logger.debug("The have not being perfectly learned yet. "
+                          "Trying to see if the point has not been explored yet.")
+        return self._locate_sample_in_df(sample_values, positive_points_data) != -1
 
-                self.logger.debug("The have not being perfectly learned yet. "
-                                  "Trying to see if the point has not been explored yet.")
-                return self._locate_sample_in_df(sample_values, positive_points_data) != -1
+    def _visited_previously_failed_execution(
+            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> bool:
+        """
 
-            return False
+        :param new_numeric_sample:
+        :param new_propositional_sample:
+        :return:
+        """
+        self.logger.info("Checking if the observed state is a state the action failed to execute at.")
+        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
+                           new_numeric_sample.items()}
+        observed_literals = [predicate.untyped_representation for predicate in new_propositional_sample]
 
-        except (QhullError, ValueError):
-            return self._locate_sample_in_df(sample_values, positive_points_data) != -1
+        for predicate in self.lifted_predicates:
+            new_sample_data[predicate] = 1.0 if predicate in observed_literals else 0.0
+
+        negative_samples_copy = self.negative_combined_sample_df.copy()
+        negative_samples_copy.loc[len(negative_samples_copy)] = new_sample_data
+        if len(self.negative_combined_sample_df) == len(negative_samples_copy):
+            return True
+
+        self.logger.debug("This is not a failed state.")
+        return False
 
     def _is_non_informative_unsafe(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
@@ -147,6 +198,13 @@ class InformationGainLearner(NumericConsistencyValidator):
         """
         new_sample_predicates = [predicate.untyped_representation for predicate in new_propositional_sample]
         discrete_preconditions = self.positive_discrete_sample_df.columns.tolist()
+        if len(self.positive_discrete_sample_df) == 0 and len(self.numeric_positive_samples) == 0:
+            self.logger.debug("There are no positive samples to determine whether the sample is non informative.")
+            return False
+
+        if self._visited_previously_failed_execution(new_numeric_sample, new_propositional_sample):
+            return True
+
         if len(self.positive_discrete_sample_df) > 0 and \
                 len(set(new_sample_predicates).intersection(discrete_preconditions)) == 0:
             self.logger.debug("None of the existing preconditions hold in the new sample. "
@@ -158,7 +216,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         functions_to_explore = self.numeric_positive_samples.columns.tolist() \
             if relevant_numeric_features is None else relevant_numeric_features
         if len(functions_to_explore) == 0:
-            return True
+            return False
 
         new_model_data = self.numeric_positive_samples[functions_to_explore].copy()
         new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
@@ -194,6 +252,13 @@ class InformationGainLearner(NumericConsistencyValidator):
         self.negative_combined_sample_df = DataFrame(columns=lifted_predicates + valid_lifted_functions)
         self.lifted_predicates = lifted_predicates
 
+    def are_dataframes_initialized(self) -> bool:
+        """Validates if the dataframes have already been initialized.
+
+        :return: whether the dataframes have already been initialized.
+        """
+        return self.positive_discrete_sample_df is not None and self.negative_combined_sample_df is not None
+
     def add_positive_sample(self, positive_numeric_sample: Dict[str, PDDLFunction],
                             positive_propositional_sample: List[Predicate]) -> None:
         """Adds a positive sample to the samples list used to create the action's precondition.
@@ -205,7 +270,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         self.logger.info(f"Adding a new positive sample for the action {self.action_name}.")
         filtered_predicates_names = self._remove_redundant_propositional_features(positive_propositional_sample)
         new_sample_data = {predicate: 1.0 for predicate in filtered_predicates_names}
-        if len(self.positive_discrete_sample_df.columns) == 0:
+        if len(self.positive_discrete_sample_df.columns.tolist()) == 0:
             return
 
         self.positive_discrete_sample_df.loc[len(self.positive_discrete_sample_df)] = new_sample_data
@@ -227,28 +292,6 @@ class InformationGainLearner(NumericConsistencyValidator):
             new_sample_data[predicate] = 1.0 if predicate in observed_literals else 0.0
 
         self.negative_combined_sample_df.loc[len(self.negative_combined_sample_df)] = new_sample_data
-
-    def is_applicable_and_new_state(
-            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> bool:
-        """Checks whether the new sample corresponds with the action's precondition and whether it is a new state.
-
-        :param new_numeric_sample: the numeric functions representing the new sample.
-        :param new_propositional_sample: the propositional predicates representing the new sample.
-        :return: whether the state can be used to apply the action and whether this state has already been observed.
-        """
-        self.logger.info("Validating whether the new sample is applicable and a new state.")
-        if not self._validate_action_discrete_preconditions_hold_in_state(new_propositional_sample):
-            return False
-
-        relevant_functions = self.numeric_positive_samples.columns.tolist()
-        new_point_data = DataFrame({col: [new_numeric_sample[col].value] for col in relevant_functions})
-        sample_values = [new_numeric_sample[col].value for col in relevant_functions]
-        try:
-            return self._in_hull(new_point_data, self.numeric_positive_samples) and \
-                self._locate_sample_in_df(sample_values, self.numeric_positive_samples) == -1
-
-        except (QhullError, ValueError, IndexError):
-            return False
 
     def is_sample_informative(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
