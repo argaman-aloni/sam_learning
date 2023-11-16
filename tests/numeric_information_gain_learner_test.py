@@ -343,6 +343,70 @@ def test_in_hull_captures_that_point_is_in_1d_hull_when_given_only_one_test_poin
     assert information_gain_learner_no_predicates._in_hull(points_to_test, hull_df)
 
 
+def test_visited_previously_failed_execution_when_predicates_match_negative_samples_but_numeric_values_not_match(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_numeric_sample = {}
+    for index, function_name in enumerate(TEST_FUNCTION_NAMES):
+        new_func = PDDLFunction(name=function_name, signature={})
+        new_func.set_value(4 + index)
+        new_numeric_sample[function_name] = new_func
+
+    new_discrete_sample = []
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+
+    not_observed_numeric_sample = {}
+    for index, function_name in enumerate(TEST_FUNCTION_NAMES):
+        new_func = PDDLFunction(name=function_name, signature={})
+        new_func.set_value(18 + index)
+        new_numeric_sample[function_name] = new_func
+
+    information_gain_learner_with_predicates.add_negative_sample(new_numeric_sample, new_discrete_sample)
+    assert not information_gain_learner_with_predicates._visited_previously_failed_execution(
+        new_numeric_sample=not_observed_numeric_sample, new_propositional_sample=new_discrete_sample)
+
+
+def test_visited_previously_failed_execution_when_numeric_functions_match_negative_samples_but_predicates_do_not_match(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_numeric_sample = {}
+    for index, function_name in enumerate(TEST_FUNCTION_NAMES):
+        new_func = PDDLFunction(name=function_name, signature={})
+        new_func.set_value(4 + index)
+        new_numeric_sample[function_name] = new_func
+
+    new_discrete_sample = []
+    not_observed_discrete_sample = []
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+
+        elif index % 2 == 1:
+            not_observed_discrete_sample.append(predicate.copy())
+
+    information_gain_learner_with_predicates.add_negative_sample(new_numeric_sample, new_discrete_sample)
+    assert not information_gain_learner_with_predicates._visited_previously_failed_execution(
+        new_numeric_sample=new_numeric_sample, new_propositional_sample=not_observed_discrete_sample)
+
+
+def test_visited_previously_failed_execution_when_both_predicates_and_numeric_functions_match_return_true(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_numeric_sample = {}
+    for index, function_name in enumerate(TEST_FUNCTION_NAMES):
+        new_func = PDDLFunction(name=function_name, signature={})
+        new_func.set_value(4 + index)
+        new_numeric_sample[function_name] = new_func
+
+    new_discrete_sample = []
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+
+    information_gain_learner_with_predicates.add_negative_sample(new_numeric_sample, new_discrete_sample)
+    assert information_gain_learner_with_predicates._visited_previously_failed_execution(
+        new_numeric_sample=new_numeric_sample, new_propositional_sample=new_discrete_sample)
+
+
 def test_is_non_informative_safe_returns_true_when_the_point_is_in_the_positive_samples(
         information_gain_learner_no_predicates: InformationGainLearner):
     positive_samples_df = pd.DataFrame({
@@ -647,7 +711,40 @@ def test_is_non_informative_unsafe_returns_true_when_a_non_of_the_negative_sampl
         new_numeric_sample=new_sample, new_propositional_sample=new_discrete_sample)
 
 
-def test_is_non_informative_unsafe_returns_true_when_the_relevant_fluents_is_empty_and_the_predicates_are_not_in_the_state(
+def test_is_non_informative_unsafe_should_return_false_when_the_relevant_fluents_is_empty_and_the_state_predicates_do_not_appear_in_any_negative_sample(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_discrete_sample = []
+    negative_samples = {
+        p.untyped_representation: [] for p in test_predicates
+    }
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+            negative_samples[predicate.untyped_representation].append(0)
+        else:
+            negative_samples[predicate.untyped_representation].append(1)
+
+    information_gain_learner_with_predicates.positive_discrete_sample_df = DataFrame(
+        data={p.untyped_representation: [1] for p in new_discrete_sample})
+
+    new_sample = {}
+    new_func = PDDLFunction(name="(x)", signature={})
+    new_func.set_value(0.5)
+    new_sample[new_func.name] = new_func
+    negative_samples[new_func.name] = [0.5]
+    new_func = PDDLFunction(name="(y)", signature={})
+    new_func.set_value(2.0)
+    new_sample[new_func.name] = new_func
+    negative_samples[new_func.name] = [1.5]
+    information_gain_learner_with_predicates.negative_combined_sample_df = DataFrame(data=negative_samples)
+
+    assert not information_gain_learner_with_predicates._is_non_informative_unsafe(
+        new_numeric_sample=new_sample,
+        new_propositional_sample=[p for p in test_predicates if p not in new_discrete_sample],
+        relevant_numeric_features=[])
+
+
+def test_is_non_informative_unsafe_should_return_true_when_the_relevant_fluents_is_empty_and_the_state_predicates_appear_in_a_negative_sample_and_the_numeric_values_match_an_observed_state(
         information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
     new_discrete_sample = []
     for index, predicate in enumerate(test_predicates):
@@ -656,6 +753,41 @@ def test_is_non_informative_unsafe_returns_true_when_the_relevant_fluents_is_emp
 
     information_gain_learner_with_predicates.positive_discrete_sample_df = DataFrame(
         data={p.untyped_representation: [1] for p in new_discrete_sample})
+
+    new_sample = {}
+    new_func = PDDLFunction(name="(x)", signature={})
+    new_func.set_value(0.5)
+    new_sample[new_func.name] = new_func
+    new_func = PDDLFunction(name="(y)", signature={})
+    new_func.set_value(2.0)
+    new_sample[new_func.name] = new_func
+    information_gain_learner_with_predicates.add_negative_sample(new_sample, new_discrete_sample)
+    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
+        new_numeric_sample=new_sample,
+        new_propositional_sample=new_discrete_sample,
+        relevant_numeric_features=[])
+
+
+def test_is_non_informative_unsafe_should_return_true_when_the_relevant_fluents_is_empty_and_the_state_predicates_appear_in_a_negative_sample_and_the_numeric_values_do_not_match_an_observed_state(
+        information_gain_learner_with_predicates: InformationGainLearner, test_predicates: List[Predicate]):
+    new_discrete_sample = []
+    negative_samples = {
+        p.untyped_representation: [] for p in test_predicates
+    }
+    for index, predicate in enumerate(test_predicates):
+        if index % 2 != 0:
+            new_discrete_sample.append(predicate.copy())
+            negative_samples[predicate.untyped_representation].append(1)
+        else:
+            negative_samples[predicate.untyped_representation].append(0)
+
+    negative_samples["(x)"] = [0.5]
+    negative_samples["(y)"] = [2.2]
+
+    information_gain_learner_with_predicates.positive_discrete_sample_df = DataFrame(
+        data={p.untyped_representation: [1] for p in new_discrete_sample})
+    information_gain_learner_with_predicates.negative_combined_sample_df = DataFrame(data=negative_samples)
+
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
     new_func.set_value(0.5)
@@ -664,7 +796,7 @@ def test_is_non_informative_unsafe_returns_true_when_the_relevant_fluents_is_emp
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert not information_gain_learner_with_predicates._is_non_informative_unsafe(
         new_numeric_sample=new_sample,
         new_propositional_sample=[p for p in test_predicates if p not in new_discrete_sample],
         relevant_numeric_features=[])

@@ -1,5 +1,5 @@
 from .abstract_agent import AbstractAgent
-from .priority_queue import PriorityQueue
+from .consistent_model_validator import NumericConsistencyValidator
 from .convex_hull_learner import ConvexHullLearner
 from .dependency_set import DependencySet
 from .discrete_utilities import extract_predicate_data, create_additional_parameter_name, \
@@ -12,6 +12,7 @@ from .linear_regression_learner import LinearRegressionLearner
 from .literals_cnf import LiteralCNF
 from .matching_utils import extract_effects, contains_duplicates, create_signature_permutations, \
     create_fully_observable_predicates
+from .novelty_learner import NoveltyLearner
 from .numeric_fluent_learner_algorithm import NumericFluentStateStorage
 from .numeric_function_matcher import NumericFunctionMatcher
 from .numeric_information_gain_learner import InformationGainLearner
@@ -20,7 +21,7 @@ from .numeric_utils import construct_multiplication_strings, prettify_coefficien
 from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
 from .predicates_matcher import PredicatesMatcher
+from .priority_queue import PriorityQueue
 from .propositional_information_gain_learner import PropositionalInformationGainLearner
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
-from .consistent_model_validator import NumericConsistencyValidator

@@ -50,27 +50,15 @@ def test_extract_objects_from_state_extract_all_objects_from_state(
     assert len(objects) == 36
 
 
-def test_add_action_execution_to_db_adds_correctly_the_execution_data_of_a_successful_action_in_a_state(
-        minecraft_large_map_online_nsam: OnlineNSAMLearner, minecraft_large_trajectory: Observation):
-    action = minecraft_large_trajectory.components[0].grounded_action_call
-    prev_state = minecraft_large_trajectory.components[0].previous_state
-    lifted_functions, lifted_predicates = minecraft_large_map_online_nsam._get_lifted_bounded_state(action, prev_state)
-    assert all([len(val) for val in minecraft_large_map_online_nsam._state_action_execution_db.values()]) == 0
-    minecraft_large_map_online_nsam._add_action_execution_to_db(
-        str(minecraft_large_map_online_nsam.partial_domain.actions["tp_to"]), lifted_predicates, lifted_functions,
-        execution_result=1)
-    assert all([len(val) for val in minecraft_large_map_online_nsam._state_action_execution_db.values()]) == 1
-
-
 def test_select_next_action_to_execute_when_failure_rate_is_large_selects_from_executable_actions(
         depot_online_nsam: OnlineNSAMLearner, depot_domain: Domain, depot_observation: Observation):
     init_information_gain_dataframes(
         depot_online_nsam, depot_observation.components[0].previous_state,
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
     depot_online_nsam._action_failure_rate = 1000
-    depot_online_nsam._state_applicable_actions = PriorityQueue()
+    depot_online_nsam.applicable_actions = PriorityQueue()
     applicable_action = depot_observation.components[0].grounded_action_call
-    depot_online_nsam._state_applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
+    depot_online_nsam.applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
     frontier = PriorityQueue()
     not_applicable_action = depot_observation.components[1].grounded_action_call
     frontier.insert(item=not_applicable_action, priority=1.0, selection_probability=1.0)
@@ -85,9 +73,9 @@ def test_select_next_action_to_execute_when_failure_rate_is_zero_will_select_fro
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
     depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     depot_online_nsam._action_failure_rate = 0
-    depot_online_nsam._state_applicable_actions = PriorityQueue()
+    depot_online_nsam.applicable_actions = PriorityQueue()
     applicable_action = depot_observation.components[0].grounded_action_call
-    depot_online_nsam._state_applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
+    depot_online_nsam.applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
     frontier = PriorityQueue()
     not_applicable_action = depot_observation.components[1].grounded_action_call
     frontier.insert(item=not_applicable_action, priority=1.0, selection_probability=1.0)

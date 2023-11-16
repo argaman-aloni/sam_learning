@@ -110,6 +110,31 @@ class InformationGainLearner(NumericConsistencyValidator):
         except (QhullError, ValueError):
             return self._locate_sample_in_df(sample_values, positive_points_data) != -1
 
+    def _visited_previously_failed_execution(
+            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> bool:
+        """Validates whether the new sample is a previously visited failed state.
+
+        :param new_numeric_sample: the numeric part of the sample.
+        :param new_propositional_sample: the discrete part of the sample.
+        :return: whether the new sample is a previously visited failed state.
+        """
+        self.logger.info("Checking if the observed state is a state the action failed to execute at.")
+        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
+                           new_numeric_sample.items()}
+        observed_literals = [predicate.untyped_representation for predicate in new_propositional_sample]
+
+        for predicate in self.lifted_predicates:
+            new_sample_data[predicate] = 1.0 if predicate in observed_literals else 0.0
+
+        negative_samples_copy = self.negative_combined_sample_df.copy()
+        negative_samples_copy.loc[len(negative_samples_copy)] = new_sample_data
+        negative_samples_copy.drop_duplicates(inplace=True)
+        if len(self.negative_combined_sample_df) == len(negative_samples_copy):
+            return True
+
+        self.logger.debug("This is not a failed state.")
+        return False
+
     def _is_non_informative_safe(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
             relevant_numeric_features: Optional[List[str]] = None, use_cache: bool = False) -> bool:
@@ -136,7 +161,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         if not is_applicable:
             return False
 
-        if self.can_determine_numeric_effects_effects_perfectly():
+        if self.can_determine_numeric_effects_perfectly():
             self.logger.debug("The effects of the action can be determined perfectly.")
             return True
 
@@ -151,30 +176,6 @@ class InformationGainLearner(NumericConsistencyValidator):
         self.logger.debug("The have not being perfectly learned yet. "
                           "Trying to see if the point has not been explored yet.")
         return self._locate_sample_in_df(sample_values, positive_points_data) != -1
-
-    def _visited_previously_failed_execution(
-            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> bool:
-        """
-
-        :param new_numeric_sample:
-        :param new_propositional_sample:
-        :return:
-        """
-        self.logger.info("Checking if the observed state is a state the action failed to execute at.")
-        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
-                           new_numeric_sample.items()}
-        observed_literals = [predicate.untyped_representation for predicate in new_propositional_sample]
-
-        for predicate in self.lifted_predicates:
-            new_sample_data[predicate] = 1.0 if predicate in observed_literals else 0.0
-
-        negative_samples_copy = self.negative_combined_sample_df.copy()
-        negative_samples_copy.loc[len(negative_samples_copy)] = new_sample_data
-        if len(self.negative_combined_sample_df) == len(negative_samples_copy):
-            return True
-
-        self.logger.debug("This is not a failed state.")
-        return False
 
     def _is_non_informative_unsafe(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
@@ -198,18 +199,12 @@ class InformationGainLearner(NumericConsistencyValidator):
         """
         new_sample_predicates = [predicate.untyped_representation for predicate in new_propositional_sample]
         discrete_preconditions = self.positive_discrete_sample_df.columns.tolist()
-        if len(self.positive_discrete_sample_df) == 0 and len(self.numeric_positive_samples) == 0:
-            self.logger.debug("There are no positive samples to determine whether the sample is non informative.")
-            return False
-
         if self._visited_previously_failed_execution(new_numeric_sample, new_propositional_sample):
             return True
 
-        if len(self.positive_discrete_sample_df) > 0 and \
-                len(set(new_sample_predicates).intersection(discrete_preconditions)) == 0:
-            self.logger.debug("None of the existing preconditions hold in the new sample. "
-                              "It is not informative since it will never be applicable.")
-            return True
+        if len(self.positive_discrete_sample_df) == 0 and len(self.numeric_positive_samples) == 0:
+            self.logger.debug("There are no positive samples to determine whether the sample is non informative.")
+            return False
 
         self.logger.debug("Creating a new model from the new sample and validating if the new model "
                           "contains a negative sample.")
@@ -235,9 +230,7 @@ class InformationGainLearner(NumericConsistencyValidator):
                     return True
 
             except (QhullError, ValueError):
-                if self._locate_sample_in_df(list(new_sample_data.values()),
-                                             negative_sample[functions_to_explore].to_frame().T) != -1:
-                    return True
+                return False
 
         return False
 
@@ -292,6 +285,7 @@ class InformationGainLearner(NumericConsistencyValidator):
             new_sample_data[predicate] = 1.0 if predicate in observed_literals else 0.0
 
         self.negative_combined_sample_df.loc[len(self.negative_combined_sample_df)] = new_sample_data
+        self.negative_combined_sample_df.drop_duplicates(inplace=True)
 
     def is_sample_informative(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],

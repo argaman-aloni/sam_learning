@@ -160,9 +160,12 @@ class NumericSAMLearner(SAMLearner):
 
             except NotSafeActionError as e:
                 self.logger.debug(f"The action - {e.action_name} is not safe for execution, reason - {e.reason}")
+                action.preconditions = Precondition("and")
+                action.discrete_effects = set()
+                action.numeric_effects = set()
                 learning_metadata[action_name] = e.solution_type.name
 
-        self.partial_domain.actions = allowed_actions
+        self.partial_domain.actions.update(allowed_actions)
         return allowed_actions, learning_metadata
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:

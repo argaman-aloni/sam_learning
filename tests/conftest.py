@@ -182,6 +182,12 @@ def minecraft_domain() -> Domain:
 
 
 @fixture()
+def minecraft_full_domain() -> Domain:
+    domain_parser = DomainParser(MINECRAFT_DOMAIN_PATH, partial_parsing=False)
+    return domain_parser.parse_domain()
+
+
+@fixture()
 def minecraft_problem(minecraft_domain: Domain) -> Problem:
     return ProblemParser(problem_path=MINECRAFT_PROBLEM_PATH, domain=minecraft_domain).parse_problem()
 
@@ -206,7 +212,6 @@ def satellite_numeric_problem(satellite_numeric_domain: Domain) -> Problem:
 def satellite_numeric_observation(satellite_numeric_domain: Domain, satellite_numeric_problem: Problem) -> Observation:
     return TrajectoryParser(satellite_numeric_domain, satellite_numeric_problem).parse_trajectory(
         SATELLITE_NUMERIC_TRAJECTORY_PATH)
-
 
 
 @fixture()

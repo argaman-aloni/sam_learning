@@ -112,6 +112,7 @@ class NumericConsistencyValidator:
             return True
 
         if len(points_to_test) == 0:
+            # If no points were given to test they are by default not in the convex hull.
             return False
 
         shifted_hull_points = hull_df.to_numpy() - hull_df.to_numpy()[0]
@@ -152,7 +153,7 @@ class NumericConsistencyValidator:
         self.numeric_positive_samples = DataFrame(columns=valid_lifted_functions)
         self.numeric_negative_samples = DataFrame(columns=valid_lifted_functions)
 
-    def can_determine_numeric_effects_effects_perfectly(self) -> bool:
+    def can_determine_numeric_effects_perfectly(self) -> bool:
         """Determines whether the effects of the action can be predicted perfectly.
 
         :return: whether the effects of the action can be predicted perfectly.
