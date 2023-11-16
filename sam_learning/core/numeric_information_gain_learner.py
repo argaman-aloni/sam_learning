@@ -2,6 +2,7 @@
 import logging
 from typing import Dict, List, Optional
 
+import pandas as pd
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError
@@ -66,6 +67,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         """
         state_bounded_lifted_predicates = {predicate.untyped_representation for predicate in new_propositional_sample}
         if len(self.positive_discrete_sample_df) <= 0 < len(self.positive_discrete_sample_df.columns.tolist()):
+            self.logger.debug("There are no discrete preconditions to validate.")
             return False
 
         if not set(state_bounded_lifted_predicates).issuperset(self.positive_discrete_sample_df.columns.tolist()):
@@ -166,16 +168,10 @@ class InformationGainLearner(NumericConsistencyValidator):
             return True
 
         self.logger.debug("Validating whether the state was visited already.")
-        functions_to_explore = self.numeric_positive_samples.columns.tolist() \
-            if relevant_numeric_features is None else relevant_numeric_features
-        if len(functions_to_explore) == 0:
-            return True
-
-        positive_points_data = self.numeric_positive_samples[functions_to_explore]
-        sample_values = [new_numeric_sample[col].value for col in functions_to_explore]
+        sample_values = [new_numeric_sample[col].value for col in self.numeric_positive_samples.columns.tolist()]
         self.logger.debug("The have not being perfectly learned yet. "
                           "Trying to see if the point has not been explored yet.")
-        return self._locate_sample_in_df(sample_values, positive_points_data) != -1
+        return self._locate_sample_in_df(sample_values, self.numeric_positive_samples) != -1
 
     def _is_non_informative_unsafe(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
@@ -197,7 +193,6 @@ class InformationGainLearner(NumericConsistencyValidator):
             the calculations.
         :return: whether the new sample is non-informative according to the unsafe model.
         """
-        new_sample_predicates = [predicate.untyped_representation for predicate in new_propositional_sample]
         discrete_preconditions = self.positive_discrete_sample_df.columns.tolist()
         if self._visited_previously_failed_execution(new_numeric_sample, new_propositional_sample):
             return True
@@ -220,8 +215,11 @@ class InformationGainLearner(NumericConsistencyValidator):
         new_model_data.loc[len(new_model_data)] = new_sample_data
 
         for _, negative_sample in self.negative_combined_sample_df.iterrows():
-            if not self._validate_negative_sample_in_state_predicates(
-                    negative_sample[discrete_preconditions], new_sample_predicates):
+            # validate that when the discrete preconditions hold the numeric part does not include a negative sample.
+            negative_discrete_sample = [negative_sample[discrete_preconditions][col] for col in discrete_preconditions]
+            if (self._locate_sample_in_df(negative_discrete_sample, self.positive_discrete_sample_df) == -1
+                    and len(self.positive_discrete_sample_df.columns.tolist()) > 0):
+                # cannot conclude on the numeric part of the sample.
                 continue
 
             try:

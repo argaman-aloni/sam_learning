@@ -5,6 +5,7 @@ from .dependency_set import DependencySet
 from .discrete_utilities import extract_predicate_data, create_additional_parameter_name, \
     find_unique_objects_by_type, NOT_PREFIX, FORALL, iterate_over_objects_of_same_type
 from .environment_snapshot import EnvironmentSnapshot
+from .episode_info_recorder import EpisodeInfoRecord
 from .exceptions import NotSafeActionError
 from .learner_domain import LearnerAction, LearnerDomain
 from .learning_types import EquationSolutionType, ConditionType

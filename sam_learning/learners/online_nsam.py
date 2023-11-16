@@ -6,7 +6,7 @@ from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject, Preco
     Action, Operator
 
 from sam_learning.core import InformationGainLearner, LearnerDomain, AbstractAgent, \
-    PriorityQueue, LearnerAction
+    PriorityQueue, LearnerAction, EpisodeInfoRecord
 from sam_learning.core.novelty_learner import NoveltyLearner, FAIL_RESULT, SUCCESS_RESULT
 from sam_learning.learners.numeric_sam import PolynomialSAMLearning
 
@@ -24,14 +24,17 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
     _action_failure_rate: Dict[str, int]
     _state_action_execution_db: Dict[str, List[Any]]
     _unsafe_domain: Domain
+    _episode_recorder: EpisodeInfoRecord
 
     def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, agent: AbstractAgent = None,
+                 episode_recorder: EpisodeInfoRecord = None,
                  fluents_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree,
                          preconditions_fluent_map=fluents_map)
         self.ig_learner = {}
         self.agent = agent
         self.applicable_actions = PriorityQueue()
+        self._episode_recorder = episode_recorder
         self._action_observation_rate = {action: 1 for action in self.partial_domain.actions}
         self._action_failure_rate = {action: 0 for action in self.partial_domain.actions}
         self.novelty_calculator = NoveltyLearner()
@@ -196,6 +199,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         self._action_failure_rate = {action: 0 for action in self.partial_domain.actions}
         grounded_action_calls = self.vocabulary_creator.create_grounded_actions_vocabulary(
             domain=self.partial_domain, observed_objects=observed_objects)
+        self._episode_recorder.add_num_grounded_actions(len(grounded_action_calls))
         return grounded_action_calls
 
     def calculate_state_action_information_gain(
@@ -259,6 +263,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         for action in self.partial_domain.actions:
             self.ig_learner[action].clear_convex_hull_cache()
 
+        self._episode_recorder.add_num_informative_actions_in_step(len(neighbors))
         return neighbors
 
     def update_failed_action_neighbors(
@@ -286,6 +291,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             selection_prob = self._calculate_selection_probability(neighbor)
             new_neighbors.insert(item=neighbor, priority=new_ig, selection_probability=selection_prob)
 
+        self._episode_recorder.add_num_informative_actions_in_step(len(new_neighbors))
         return new_neighbors
 
     def execute_action(
@@ -309,6 +315,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
             self.logger.debug("The action was not successful, adding the negative sample to the learner.")
             self._action_failure_rate[action_to_execute.name] += 1
             self.novelty_calculator.add_sample_to_execution_db(action_to_execute.name, previous_state, FAIL_RESULT)
+            self._episode_recorder.add_step_data(action_to_execute.name, FAIL_RESULT)
             self.ig_learner[action_to_execute.name].add_negative_sample(
                 numeric_negative_sample=pre_state_functions, negative_propositional_sample=pre_state_predicates)
             return
@@ -316,6 +323,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         self._reset_action_numeric_data(action_to_execute.name)
         self.logger.debug("The action was successful, adding the positive sample to the learner.")
         self.novelty_calculator.add_sample_to_execution_db(action_to_execute.name, previous_state, SUCCESS_RESULT)
+        self._episode_recorder.add_step_data(action_to_execute.name, SUCCESS_RESULT)
         self.ig_learner[action_to_execute.name].add_positive_sample(
             positive_numeric_sample=pre_state_functions, positive_propositional_sample=pre_state_predicates)
         if action_to_execute.name in self.observed_actions:

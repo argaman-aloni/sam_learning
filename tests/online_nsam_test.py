@@ -1,21 +1,23 @@
 """Module test for the online_nsam module."""
-from pddl_plus_parser.models import Domain, Observation, ActionCall, ObservedComponent, PDDLObject, State
-from pytest import fixture, fail
 from typing import Dict
 
-from sam_learning.core import PriorityQueue, InformationGainLearner
+from pddl_plus_parser.models import Domain, Observation, ActionCall, PDDLObject, State
+from pytest import fixture, fail
+
+from sam_learning.core import PriorityQueue, EpisodeInfoRecord
 from sam_learning.learners import OnlineNSAMLearner
-from tests.consts import sync_snapshot
 
 
 @fixture()
 def depot_online_nsam(depot_domain: Domain) -> OnlineNSAMLearner:
-    return OnlineNSAMLearner(partial_domain=depot_domain)
+    info_record = EpisodeInfoRecord(depot_domain.actions.keys())
+    return OnlineNSAMLearner(partial_domain=depot_domain, episode_recorder=info_record)
 
 
 @fixture()
 def minecraft_large_map_online_nsam(minecraft_large_domain: Domain) -> OnlineNSAMLearner:
-    return OnlineNSAMLearner(partial_domain=minecraft_large_domain)
+    info_record = EpisodeInfoRecord(minecraft_large_domain.actions.keys())
+    return OnlineNSAMLearner(partial_domain=minecraft_large_domain, episode_recorder=info_record)
 
 
 def init_information_gain_dataframes(
@@ -109,6 +111,33 @@ def test_execute_action_when_action_is_successful_adds_action_to_positive_sample
     assert len(depot_online_nsam.ig_learner[tested_action.name].numeric_positive_samples) == 1
     assert len(depot_online_nsam.ig_learner[tested_action.name].positive_discrete_sample_df) == 1
 
+
+def test_execute_action_when_action_is_successful_adds_action_statistics_to_episode_recorder(
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
+    init_information_gain_dataframes(
+        depot_online_nsam, depot_observation.components[0].previous_state,
+        depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
+    tested_previous_state = depot_observation.components[0].previous_state
+    tested_action = depot_observation.components[0].grounded_action_call
+    tested_next_state = depot_observation.components[0].next_state
+    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
+    depot_online_nsam.execute_action(
+        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
+    assert depot_online_nsam._episode_recorder._episode_info[f"#{tested_action.name}_success"] == 1
+
+
+def test_execute_action_when_action_fails_adds_action_statistics_to_episode_recorder(
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
+    init_information_gain_dataframes(
+        depot_online_nsam, depot_observation.components[0].previous_state,
+        depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
+    tested_previous_state = depot_observation.components[0].previous_state
+    tested_action = depot_observation.components[0].grounded_action_call
+    tested_next_state = depot_observation.components[0].next_state
+    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
+    depot_online_nsam.execute_action(
+        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=-1)
+    assert depot_online_nsam._episode_recorder._episode_info[f"#{tested_action.name}_fail"] == 1
 
 def test_execute_action_when_action_is_successful_adds_the_action_to_observed_actions_and_learn_partial_model_of_the_action(
         depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):

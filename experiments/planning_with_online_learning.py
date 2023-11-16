@@ -9,7 +9,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import State
 
 from experiments.ipc_agent import IPCAgent
-from sam_learning.core import LearnerDomain
+from sam_learning.core import LearnerDomain, EpisodeInfoRecord
 from sam_learning.learners import OnlineNSAMLearner
 from solvers import MetricFFSolver, ENHSPSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
@@ -84,8 +84,11 @@ class PIL:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
+        episode_info_recorder = EpisodeInfoRecord(action_names=[action for action in complete_domain.actions])
         online_learner = OnlineNSAMLearner(partial_domain=partial_domain, fluents_map=self._fluents_map,
-                                           polynomial_degree=self._polynomial_degree)
+                                           polynomial_degree=self._polynomial_degree,
+                                           episode_recorder=episode_info_recorder)
+        num_training_goal_achieved = 0
         for problem_index, problem_path in enumerate(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")):
             self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
@@ -96,24 +99,29 @@ class PIL:
                 online_learner.search_to_learn_action_model(init_state, problem_objects=problem.objects)
             self.logger.info(f"Finished episode number {problem_index + 1}! "
                              f"The current goal was {'achieved' if goal_achieved else 'not achieved'}.")
+            num_training_goal_achieved += 1 if goal_achieved else 0
+            episode_info_recorder.end_episode()
             if goal_achieved:
                 self.logger.info("The agent successfully solved the current task!")
 
             if (problem_index + 1) % 100 == 0:
                 solved_all_test_problems = self.validate_learned_domain(
                     learned_model, test_set_dir_path, episode_number=problem_index + 1,
-                    num_steps_in_episode=num_steps_in_episode, fold_num=fold_num)
+                    num_steps_in_episode=num_steps_in_episode, fold_num=fold_num,
+                    num_goal_achieved=num_training_goal_achieved)
+                episode_stats_path = self.working_directory_path / "results_directory" / \
+                                     f"fold_{fold_num}_episode_{problem_index + 1}_info.csv"
+                episode_info_recorder.export_statistics(episode_stats_path)
+                num_training_goal_achieved = 0
                 if solved_all_test_problems:
                     self.domain_validator.write_statistics(fold_num)
                     return
 
-            online_learner.reset_current_epoch_numeric_data()
-
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(
-            self, learned_model: LearnerDomain,test_set_dir_path: Path,
-            episode_number: int, num_steps_in_episode: int, fold_num: int) -> bool:
+            self, learned_model: LearnerDomain, test_set_dir_path: Path,
+            episode_number: int, num_steps_in_episode: int, fold_num: int, num_goal_achieved: int) -> bool:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param learned_model: the domain that was learned using POL.
@@ -121,11 +129,12 @@ class PIL:
         :param episode_number: the number of the current episode.
         :param num_steps_in_episode: the number of steps that were taken in the current episode.
         :param fold_num: the index of the current folder that is currently running.
+        :param num_goal_achieved: the number of times the training goal was achieved in the batch.
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"online_nsam_fold_{fold_num}_{learned_model.name}_epoch_{episode_number}.pddl")
+                                   f"online_nsam_fold_{fold_num}_{learned_model.name}_episode_{episode_number}.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         all_possible_solution_types = [solution_type.name for solution_type in SolutionOutputTypes]
 
@@ -135,23 +144,24 @@ class PIL:
                                               test_set_directory_path=test_set_dir_path,
                                               episode_number=episode_number,
                                               num_steps=num_steps_in_episode,
+                                              num_training_goal_achieved=num_goal_achieved,
                                               tolerance=DEFAULT_NUMERIC_TOLERANCE)
         metric_ff_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
                                          for problem_type in all_possible_solution_types])
         metric_ff_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
 
-        self.domain_validator.solver = ENHSPSolver()
-        self.domain_validator._solver_name = "enhsp"
-        self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                              test_set_directory_path=test_set_dir_path,
-                                              episode_number=episode_number,
-                                              num_steps=num_steps_in_episode,
-                                              tolerance=DEFAULT_NUMERIC_TOLERANCE)
-        enhsp_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
-                                     for problem_type in all_possible_solution_types])
-        enhsp_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
+        # self.domain_validator.solver = ENHSPSolver()
+        # self.domain_validator._solver_name = "enhsp"
+        # self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
+        #                                       test_set_directory_path=test_set_dir_path,
+        #                                       episode_number=episode_number,
+        #                                       num_steps=num_steps_in_episode,
+        #                                       tolerance=DEFAULT_NUMERIC_TOLERANCE)
+        # enhsp_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
+        #                              for problem_type in all_possible_solution_types])
+        # enhsp_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
 
-        if metric_ff_solved_problems == metric_ff_ok_problems or enhsp_solved_problems == enhsp_ok_problems:
+        if metric_ff_solved_problems == metric_ff_ok_problems:
             self.logger.info("All the test set problems were solved using the learned domain!")
             return True
 
