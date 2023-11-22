@@ -724,9 +724,6 @@ def test_is_non_informative_unsafe_should_return_false_when_the_relevant_fluents
         else:
             negative_samples[predicate.untyped_representation].append(1)
 
-    information_gain_learner_with_predicates.positive_discrete_sample_df = DataFrame(
-        data={p.untyped_representation: [1] for p in new_discrete_sample})
-
     new_sample = {}
     new_func = PDDLFunction(name="(x)", signature={})
     new_func.set_value(0.5)
@@ -796,7 +793,7 @@ def test_is_non_informative_unsafe_should_return_true_when_the_relevant_fluents_
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert not information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
         new_numeric_sample=new_sample,
         new_propositional_sample=[p for p in test_predicates if p not in new_discrete_sample],
         relevant_numeric_features=[])

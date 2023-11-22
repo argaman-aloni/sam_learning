@@ -5,13 +5,24 @@ from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Grounded
 from pytest import fixture
 
 from experiments.ipc_agent import IPCAgent
-from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH
+from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, MINECRAFT_LARGE_DOMAIN_PATH
 
 
 @fixture()
 def depot_domain() -> Domain:
     domain_parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=False)
     return domain_parser.parse_domain()
+
+
+@fixture()
+def minecraft_large_domain() -> Domain:
+    domain_parser = DomainParser(MINECRAFT_LARGE_DOMAIN_PATH, partial_parsing=False)
+    return domain_parser.parse_domain()
+
+
+@fixture
+def minecraft_agent(minecraft_large_domain: Domain, minecraft_large_problem: Problem) -> IPCAgent:
+    return IPCAgent(minecraft_large_domain, minecraft_large_problem)
 
 
 @fixture
@@ -50,7 +61,7 @@ def test_observe_on_state_with_inapplicable_action_returns_the_same_state_as_bef
     action = ActionCall(name="drive", grounded_parameters=["truck1", "distributor1", "depot0"])
 
     # Act
-    next_state, reward  = depot_discrete_agent.observe(initial_state, action)
+    next_state, reward = depot_discrete_agent.observe(initial_state, action)
 
     # Assert
     initial_state_predicates = {p.untyped_representation for predicates in state_predicates.values() for p in
@@ -73,7 +84,7 @@ def test_observe_on_state_with_applicable_action_returns_correct_next_state_nume
     expected_numeric_fluent_in_state = "(= (fuel-cost ) 10.0)"
 
     # Act
-    next_state, reward  = depot_numeric_agent.observe(initial_state, action)
+    next_state, reward = depot_numeric_agent.observe(initial_state, action)
 
     # Assert
     assert expected_predicate_in_state in next_state.serialize()
@@ -90,7 +101,7 @@ def test_observe_on_state_with_inapplicable_action_returns_the_same_state_as_bef
     action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot0"])
 
     # Act
-    next_state, reward  = depot_numeric_agent.observe(initial_state, action)
+    next_state, reward = depot_numeric_agent.observe(initial_state, action)
 
     # Assert
     initial_state_predicates = {p.untyped_representation for predicates in state_predicates.values() for p in
@@ -210,3 +221,15 @@ def test_get_reward_returns_correct_reward_zero_when_goal_includes_numeric_condi
     next_state.state_predicates[depot_domain.predicates["on"].untyped_representation].update(goal_predicates)
     assert not depot_numeric_agent.goal_reached(next_state)
     assert next_state.state_fluents["(fuel-cost )"].value == 10.0
+
+
+def test_get_environment_actions_gets_the_correct_number_of_grounded_actions(
+        minecraft_agent: IPCAgent, minecraft_large_problem: Problem):
+    # Arrange
+    state_predicates = minecraft_large_problem.initial_state_predicates
+    state_fluents = minecraft_large_problem.initial_state_fluents
+    initial_state = State(predicates=state_predicates, fluents=state_fluents, is_init=True)
+    num_expected_actions = 1442
+    total_grounded_actions = minecraft_agent.get_environment_actions(initial_state)
+
+    assert len(total_grounded_actions) == num_expected_actions

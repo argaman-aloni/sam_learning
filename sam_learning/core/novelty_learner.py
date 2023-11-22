@@ -30,6 +30,9 @@ def _try_applying_action_in_state(
 class NoveltyLearner:
     """Class to manage the novelty calculations for the online learning setting."""
 
+    _execution_db: Dict[str, List]
+    logger: logging.Logger
+
     def __init__(self):
         self._execution_db = {col: [] for col in EXECUTION_DB_COLUMNS}
         self.logger = logging.getLogger(__name__)

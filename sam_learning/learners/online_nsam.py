@@ -189,19 +189,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
         return action
 
-    def create_all_grounded_actions(self, observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
-        """Creates all the grounded actions for the domain given the current possible objects.
-
-        :param observed_objects: the objects that the learner has observed so far.
-        :return: a set of all the possible grounded actions.
-        """
-        self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
-        self._action_failure_rate = {action: 0 for action in self.partial_domain.actions}
-        grounded_action_calls = self.vocabulary_creator.create_grounded_actions_vocabulary(
-            domain=self.partial_domain, observed_objects=observed_objects)
-        self._episode_recorder.add_num_grounded_actions(len(grounded_action_calls))
-        return grounded_action_calls
-
     def calculate_state_action_information_gain(
             self, state: State, action: ActionCall, action_already_calculated: bool = False) -> float:
         """Calculates the information gain of a state.
@@ -234,6 +221,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
     def update_agent(self, new_agent: AbstractAgent) -> None:
         """Updates the agent that the learner is using."""
         self.logger.info(f"Updating the agent.")
+        self._action_failure_rate = {action: 0 for action in self.partial_domain.actions}
         self.agent = new_agent
 
     def calculate_valid_neighbors(
@@ -334,18 +322,15 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         super().add_new_action(action_to_execute, previous_state, next_state)
         self._update_unsafe_model(action_to_execute.name)
 
-    def search_to_learn_action_model(
-            self, init_state: State, problem_objects: Optional[Dict[str, PDDLObject]] = None) -> Tuple[
-        LearnerDomain, int, bool]:
+    def search_to_learn_action_model(self, init_state: State) -> Tuple[LearnerDomain, int, bool]:
         """Searches for informative actions to learn an action model that solves the problem.
 
         :param init_state: the current state of the environment.
-        :param problem_objects: the objects in the problem - an optional parameter (helps with type hierarchy).
         :return: the learned domain with the number of steps done in the episode and whether the goal was achieved.
         """
         self.logger.info("Searching for informative actions given the current state.")
-        observed_objects = problem_objects or self._extract_objects_from_state(init_state)
-        grounded_actions = self.create_all_grounded_actions(observed_objects=observed_objects)
+        grounded_actions = self.agent.get_environment_actions(init_state)
+        self._episode_recorder.add_num_grounded_actions(len(grounded_actions))
         frontier = self.calculate_valid_neighbors(grounded_actions, init_state)
         current_state = init_state.copy()
         num_steps = 0
@@ -369,6 +354,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                 break
 
             self.logger.debug("The action changed the state of the environment, updating the possible neighbors.")
+            grounded_actions = self.agent.get_environment_actions(next_state)
             frontier = self.calculate_valid_neighbors(grounded_actions, next_state)
             current_state = next_state
             if self.agent.goal_reached(current_state):

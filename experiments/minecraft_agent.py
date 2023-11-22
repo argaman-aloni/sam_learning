@@ -1,4 +1,4 @@
-"""An agent for the active learning of IPC models"""
+"""An agent for the active learning of minecraft models without the RL interactions."""
 import logging
 from typing import Dict, Set, Tuple
 
@@ -8,7 +8,7 @@ from pddl_plus_parser.models import State, Domain, ActionCall, Problem, Operator
 from sam_learning.core import AbstractAgent, VocabularyCreator
 
 
-class IPCAgent(AbstractAgent):
+class MinecraftAgent(AbstractAgent):
     _domain: Domain
     _problem: Problem
     _vocabulary_creator: VocabularyCreator
@@ -65,9 +65,26 @@ class IPCAgent(AbstractAgent):
         :return: the set of actions that are legal in the environment in the current state.
         """
         self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
+        state_copy = state.copy()
         grounded_action_calls = self._vocabulary_creator.create_grounded_actions_vocabulary(
             domain=self._domain, observed_objects=self._problem.objects)
-        return grounded_action_calls
+        position_predicate = state_copy.state_predicates[
+            self._domain.predicates["position"].untyped_representation].pop()
+        position = position_predicate.grounded_objects[0]  # there is only one parameter in the position predicate.
+        filtered_actions = set()
+        for action in grounded_action_calls:
+            if action.name == "tp_to":
+                # the agent can only teleport if its position is the same as the source of teleportation
+                if action.parameters[0] == position:
+                    filtered_actions.add(action)
+
+            elif len(action.parameters) == 1:   # BREAK, CRAFT_TREE_TAP, CRAFT_WOODEN_POGO, PLACE_TREE_TAP
+                if action.parameters[0] == position:
+                    filtered_actions.add(action)
+
+            else:
+                filtered_actions.add(action)
+        return filtered_actions
 
     def observe(self, state: State, action: ActionCall) -> Tuple[State, int]:
         """Observes an action being executed on the state and the resulting new state of the environment.
@@ -81,7 +98,12 @@ class IPCAgent(AbstractAgent):
         operator = Operator(action=self._domain.actions[action.name], domain=self._domain,
                             grounded_action_call=action.parameters, problem_objects=self._problem.objects)
         try:
-            new_state = operator.apply(state)
+            if action.name == "tp_to" and action.parameters[0] == action.parameters[1]:
+                self.logger.debug("the teleportation action is a no-op.")
+                new_state = state.copy()
+
+            else:
+                new_state = operator.apply(state)
 
         except ValueError:
             self.logger.debug(f"Could not apply the action {str(operator)} to the state.")

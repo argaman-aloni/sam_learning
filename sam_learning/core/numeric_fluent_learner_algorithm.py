@@ -1,10 +1,10 @@
 """Module that stores amd learns an action's numeric state fluents."""
 import logging
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional, Union, Set
+from typing import Dict, List, Tuple, Optional, Set
 
 import numpy as np
-from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree, ConditionalEffect
+from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 
 from sam_learning.core.convex_hull_learner import ConvexHullLearner
 from sam_learning.core.linear_regression_learner import LinearRegressionLearner
@@ -53,10 +53,19 @@ class NumericFluentStateStorage:
         :return: only the safe state variables that appear in *all* states.
         """
         max_function_len = max([len(values) for values in self.previous_state_storage.values()])
-        self.previous_state_storage = {lifted_function: state_values for lifted_function, state_values in
-                                       self.previous_state_storage.items() if len(state_values) == max_function_len}
-        self.next_state_storage = {lifted_function: state_values for lifted_function, state_values in
-                                   self.next_state_storage.items() if len(state_values) == max_function_len}
+        new_prev_state_storage = defaultdict(list)
+        for lifted_function, state_values in self.previous_state_storage.items():
+            if len(state_values) == max_function_len:
+                new_prev_state_storage[lifted_function].extend(state_values)
+
+        self.previous_state_storage = new_prev_state_storage
+
+        new_next_state_storage = defaultdict(list)
+        for lifted_function, state_values in self.next_state_storage.items():
+            if len(state_values) == max_function_len:
+                new_next_state_storage[lifted_function].extend(state_values)
+
+        self.next_state_storage = new_prev_state_storage
 
     def construct_safe_linear_inequalities(
             self, relevant_fluents: Optional[List[str]] = None) -> Precondition:
@@ -64,7 +73,7 @@ class NumericFluentStateStorage:
 
         :return: The precondition that contains the linear inequalities.
         """
-
+        self.logger.info("Constructing the safe linear inequalities.")
         return self.convex_hull_learner.construct_safe_linear_inequalities(
             self.previous_state_storage, relevant_fluents)
 
@@ -76,5 +85,6 @@ class NumericFluentStateStorage:
         :param allow_unsafe_learning: whether to allow learning from unsafe data.
         :return: the constructed assignment statements.
         """
+        self.logger.info("Constructing the assignment equations.")
         return self.linear_regression_learner.construct_assignment_equations(
             self.previous_state_storage, self.next_state_storage, allow_unsafe_learning=allow_unsafe_learning)

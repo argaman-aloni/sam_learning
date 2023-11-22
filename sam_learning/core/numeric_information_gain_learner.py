@@ -2,7 +2,6 @@
 import logging
 from typing import Dict, List, Optional
 
-import pandas as pd
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError
@@ -194,6 +193,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         :return: whether the new sample is non-informative according to the unsafe model.
         """
         discrete_preconditions = self.positive_discrete_sample_df.columns.tolist()
+        discrete_state_predicates = [predicate.untyped_representation for predicate in new_propositional_sample]
         if self._visited_previously_failed_execution(new_numeric_sample, new_propositional_sample):
             return True
 
@@ -205,24 +205,26 @@ class InformationGainLearner(NumericConsistencyValidator):
                           "contains a negative sample.")
         functions_to_explore = self.numeric_positive_samples.columns.tolist() \
             if relevant_numeric_features is None else relevant_numeric_features
-        if len(functions_to_explore) == 0:
-            return False
-
-        new_model_data = self.numeric_positive_samples[functions_to_explore].copy()
-        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
-                           new_numeric_sample.items()}
-        self.logger.debug("Adding the new sample to the model and creating a model from the combined data.")
-        new_model_data.loc[len(new_model_data)] = new_sample_data
-
+        new_model_discrete_preconditions = list(set(discrete_preconditions).intersection(discrete_state_predicates))
+        new_discrete_df = self.positive_discrete_sample_df.copy()[new_model_discrete_preconditions]
         for _, negative_sample in self.negative_combined_sample_df.iterrows():
             # validate that when the discrete preconditions hold the numeric part does not include a negative sample.
-            negative_discrete_sample = [negative_sample[discrete_preconditions][col] for col in discrete_preconditions]
-            if (self._locate_sample_in_df(negative_discrete_sample, self.positive_discrete_sample_df) == -1
-                    and len(self.positive_discrete_sample_df.columns.tolist()) > 0):
-                # cannot conclude on the numeric part of the sample.
+            negative_discrete_sample = [negative_sample[discrete_preconditions][col] for col in new_discrete_df]
+            if (self._locate_sample_in_df(negative_discrete_sample, new_discrete_df) == -1
+                    and len(new_discrete_df.columns.tolist()) > 0):
+                # the new model does not contain the negative discrete sample.
                 continue
 
             try:
+                if len(functions_to_explore) == 0:
+                    self.logger.debug("The new sample is not informative since it there are no functions to explore "
+                                      "and the model allows negative samples according to the discrete preconditions.")
+                    return True
+
+                new_model_data = self.numeric_positive_samples[functions_to_explore].copy()
+                new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
+                                   new_numeric_sample.items()}
+                new_model_data.loc[len(new_model_data)] = new_sample_data
                 if self._in_hull(negative_sample[functions_to_explore].to_frame().T, new_model_data):
                     self.logger.debug("The new sample is not informative since it contains a negative sample.")
                     return True

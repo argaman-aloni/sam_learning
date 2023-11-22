@@ -9,9 +9,10 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import State
 
 from experiments.ipc_agent import IPCAgent
+from experiments.minecraft_agent import MinecraftAgent
 from sam_learning.core import LearnerDomain, EpisodeInfoRecord
 from sam_learning.learners import OnlineNSAMLearner
-from solvers import MetricFFSolver, ENHSPSolver
+from solvers import MetricFFSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from utilities.k_fold_split import KFoldSplit
 from validators import OnlineLearningDomainValidator
@@ -37,7 +38,7 @@ class PIL:
     def __init__(
             self, working_directory_path: Path, domain_file_name: str, solver_type: SolverType,
             learning_algorithm: LearningAlgorithmType, problem_prefix: str = "pfile",
-            polynomial_degree: int = 0, fluents_map_path: Optional[Path] = None, ):
+            polynomial_degree: int = 0, fluents_map_path: Optional[Path] = None):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
@@ -93,10 +94,9 @@ class PIL:
             self.logger.info(f"Starting episode number {problem_index + 1}!")
             problem = ProblemParser(problem_path, complete_domain).parse_problem()
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
-            agent = IPCAgent(domain=complete_domain, problem=problem)
+            agent = MinecraftAgent(domain=complete_domain, problem=problem)
             online_learner.update_agent(agent)
-            learned_model, num_steps_in_episode, goal_achieved = \
-                online_learner.search_to_learn_action_model(init_state, problem_objects=problem.objects)
+            learned_model, num_steps_in_episode, goal_achieved = online_learner.search_to_learn_action_model(init_state)
             self.logger.info(f"Finished episode number {problem_index + 1}! "
                              f"The current goal was {'achieved' if goal_achieved else 'not achieved'}.")
             num_training_goal_achieved += 1 if goal_achieved else 0
@@ -149,17 +149,6 @@ class PIL:
         metric_ff_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
                                          for problem_type in all_possible_solution_types])
         metric_ff_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
-
-        # self.domain_validator.solver = ENHSPSolver()
-        # self.domain_validator._solver_name = "enhsp"
-        # self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-        #                                       test_set_directory_path=test_set_dir_path,
-        #                                       episode_number=episode_number,
-        #                                       num_steps=num_steps_in_episode,
-        #                                       tolerance=DEFAULT_NUMERIC_TOLERANCE)
-        # enhsp_solved_problems = sum([self.domain_validator.solving_stats[-1][problem_type]
-        #                              for problem_type in all_possible_solution_types])
-        # enhsp_ok_problems = self.domain_validator.solving_stats[-1][SolutionOutputTypes.ok.name]
 
         if metric_ff_solved_problems == metric_ff_ok_problems:
             self.logger.info("All the test set problems were solved using the learned domain!")

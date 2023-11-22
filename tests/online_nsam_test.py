@@ -1,23 +1,30 @@
 """Module test for the online_nsam module."""
-from typing import Dict
+from typing import Dict, Set
 
 from pddl_plus_parser.models import Domain, Observation, ActionCall, PDDLObject, State
 from pytest import fixture, fail
 
-from sam_learning.core import PriorityQueue, EpisodeInfoRecord
+from sam_learning.core import PriorityQueue, EpisodeInfoRecord, VocabularyCreator
 from sam_learning.learners import OnlineNSAMLearner
 
 
 @fixture()
 def depot_online_nsam(depot_domain: Domain) -> OnlineNSAMLearner:
-    info_record = EpisodeInfoRecord(depot_domain.actions.keys())
+    info_record = EpisodeInfoRecord(list(depot_domain.actions.keys()))
     return OnlineNSAMLearner(partial_domain=depot_domain, episode_recorder=info_record)
 
 
 @fixture()
 def minecraft_large_map_online_nsam(minecraft_large_domain: Domain) -> OnlineNSAMLearner:
-    info_record = EpisodeInfoRecord(minecraft_large_domain.actions.keys())
+    info_record = EpisodeInfoRecord(list(minecraft_large_domain.actions.keys()))
     return OnlineNSAMLearner(partial_domain=minecraft_large_domain, episode_recorder=info_record)
+
+
+def create_all_grounded_actions(domain: Domain, observation: Observation) -> Set[ActionCall]:
+    vocabulary_creator = VocabularyCreator()
+    grounded_action_calls = vocabulary_creator.create_grounded_actions_vocabulary(
+        domain=domain, observed_objects=observation.grounded_objects)
+    return grounded_action_calls
 
 
 def init_information_gain_dataframes(
@@ -52,46 +59,47 @@ def test_extract_objects_from_state_extract_all_objects_from_state(
     assert len(objects) == 36
 
 
-def test_select_next_action_to_execute_when_failure_rate_is_large_selects_from_executable_actions(
+def test_get_lifted_bounded_state_returns_correct_lifted_predicates_and_functions(
+        minecraft_large_map_online_nsam: OnlineNSAMLearner, minecraft_large_trajectory: Observation):
+    test_state = minecraft_large_trajectory.components[0].previous_state
+    test_action = minecraft_large_trajectory.components[0].grounded_action_call
+    lifted_functions, lifted_predicates = minecraft_large_map_online_nsam._get_lifted_bounded_state(
+        test_action, test_state)
+    assert len(lifted_functions) == 5
+    assert len(lifted_predicates) > 4
+
+
+def test_select_action_to_execute_when_there_are_no_actions_in_the_applicable_actions_will_select_from_the_frontier(
         depot_online_nsam: OnlineNSAMLearner, depot_domain: Domain, depot_observation: Observation):
     init_information_gain_dataframes(
         depot_online_nsam, depot_observation.components[0].previous_state,
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
-    depot_online_nsam._action_failure_rate = 1000
     depot_online_nsam.applicable_actions = PriorityQueue()
-    applicable_action = depot_observation.components[0].grounded_action_call
-    depot_online_nsam.applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
     frontier = PriorityQueue()
     not_applicable_action = depot_observation.components[1].grounded_action_call
     frontier.insert(item=not_applicable_action, priority=1.0, selection_probability=1.0)
-    next_action = depot_online_nsam._select_next_action_to_execute(frontier_actions=frontier)
-    assert next_action == applicable_action
-
-
-def test_select_next_action_to_execute_when_failure_rate_is_zero_will_select_from_the_frontier(
-        depot_online_nsam: OnlineNSAMLearner, depot_domain: Domain, depot_observation: Observation):
-    init_information_gain_dataframes(
-        depot_online_nsam, depot_observation.components[0].previous_state,
-        depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
-    depot_online_nsam._action_failure_rate = 0
-    depot_online_nsam.applicable_actions = PriorityQueue()
-    applicable_action = depot_observation.components[0].grounded_action_call
-    depot_online_nsam.applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
-    frontier = PriorityQueue()
-    not_applicable_action = depot_observation.components[1].grounded_action_call
-    frontier.insert(item=not_applicable_action, priority=1.0, selection_probability=1.0)
-    next_action = depot_online_nsam._select_next_action_to_execute(frontier_actions=frontier)
+    next_action = depot_online_nsam._select_action_to_execute(frontier=frontier)
     assert next_action == not_applicable_action
 
 
-def test_calculate_state_information_gain_returns_value_greater_than_zero_when_action_is_observed_for_the_first_time(
-        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
+def test_select_action_to_execute_when_there_are_no_actions_in_the_frontier_actions_will_select_from_the_the_applicable_actions(
+        depot_online_nsam: OnlineNSAMLearner, depot_domain: Domain, depot_observation: Observation):
     init_information_gain_dataframes(
         depot_online_nsam, depot_observation.components[0].previous_state,
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
+    depot_online_nsam.applicable_actions = PriorityQueue()
+    applicable_action = depot_observation.components[0].grounded_action_call
+    depot_online_nsam.applicable_actions.insert(item=applicable_action, priority=1.0, selection_probability=1.0)
+    frontier = PriorityQueue()
+    next_action = depot_online_nsam._select_action_to_execute(frontier=frontier)
+    assert next_action == applicable_action
 
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
+
+def test_calculate_state_information_gain_returns_value_greater_than_zero_when_action_is_observed_for_the_first_time(
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation, depot_domain: Domain):
+    init_information_gain_dataframes(
+        depot_online_nsam, depot_observation.components[0].previous_state,
+        depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
     tested_state = depot_observation.components[0].previous_state
     tested_action = depot_observation.components[0].grounded_action_call
     assert depot_online_nsam.calculate_state_action_information_gain(state=tested_state, action=tested_action) > 0
@@ -105,7 +113,6 @@ def test_execute_action_when_action_is_successful_adds_action_to_positive_sample
     tested_previous_state = depot_observation.components[0].previous_state
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
     assert len(depot_online_nsam.ig_learner[tested_action.name].numeric_positive_samples) == 1
@@ -120,7 +127,6 @@ def test_execute_action_when_action_is_successful_adds_action_statistics_to_epis
     tested_previous_state = depot_observation.components[0].previous_state
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
     assert depot_online_nsam._episode_recorder._episode_info[f"#{tested_action.name}_success"] == 1
@@ -134,10 +140,10 @@ def test_execute_action_when_action_fails_adds_action_statistics_to_episode_reco
     tested_previous_state = depot_observation.components[0].previous_state
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=-1)
     assert depot_online_nsam._episode_recorder._episode_info[f"#{tested_action.name}_fail"] == 1
+
 
 def test_execute_action_when_action_is_successful_adds_the_action_to_observed_actions_and_learn_partial_model_of_the_action(
         depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
@@ -147,7 +153,6 @@ def test_execute_action_when_action_is_successful_adds_the_action_to_observed_ac
     tested_previous_state = depot_observation.components[0].previous_state
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
 
@@ -164,7 +169,6 @@ def test_execute_action_when_action_is_not_successful_adds_action_to_negative_sa
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_next_state, next_state=tested_next_state, reward=-1)
 
@@ -179,7 +183,6 @@ def test_execute_action_when_action_is_not_successful_does_not_add_action_to_obs
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_next_state, next_state=tested_next_state, reward=-1)
 
@@ -194,9 +197,8 @@ def test_calculate_state_information_gain_when_action_is_observed_twice_returns_
     tested_previous_state = depot_observation.components[0].previous_state
     tested_action = depot_observation.components[0].grounded_action_call
     tested_next_state = depot_observation.components[0].next_state
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
-    assert depot_online_nsam.calculate_state_action_information_gain(state=tested_previous_state,
-                                                                     action=tested_action) > 0
+    assert depot_online_nsam.calculate_state_action_information_gain(
+        state=tested_previous_state, action=tested_action) > 0
     depot_online_nsam.execute_action(
         action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
 
@@ -204,12 +206,33 @@ def test_calculate_state_information_gain_when_action_is_observed_twice_returns_
                                                                      action=tested_action) == 0
 
 
+def test_calculate_state_action_information_gain_when_tp_is_successful_and_then_fails_will_return_zero_for_second_failure(
+        minecraft_large_map_online_nsam: OnlineNSAMLearner, minecraft_large_trajectory: Observation,
+        minecraft_large_domain: Domain):
+    init_information_gain_dataframes(
+        minecraft_large_map_online_nsam, minecraft_large_trajectory.components[0].previous_state,
+        minecraft_large_trajectory.grounded_objects, minecraft_large_trajectory.components[0].grounded_action_call)
+    tested_previous_state = minecraft_large_trajectory.components[0].previous_state
+    tested_action = minecraft_large_trajectory.components[0].grounded_action_call
+    tested_next_state = minecraft_large_trajectory.components[0].next_state
+    minecraft_large_map_online_nsam.execute_action(
+        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
+
+    failed_teleport_action = ActionCall(name="tp_to", grounded_parameters=["cell21", "cell21"])
+    minecraft_large_map_online_nsam.execute_action(
+        action_to_execute=failed_teleport_action, previous_state=tested_next_state, next_state=tested_next_state,
+        reward=-1)
+
+    second_failed_teleport_action = ActionCall(name="tp_to", grounded_parameters=["cell15", "cell15"])
+    assert minecraft_large_map_online_nsam.calculate_state_action_information_gain(
+        state=tested_previous_state, action=second_failed_teleport_action) == 0
+
+
 def test_consecutive_execution_of_informative_actions_creates_small_convex_hulls_and_does_not_fail(
         depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
     init_information_gain_dataframes(
         depot_online_nsam, depot_observation.components[0].previous_state,
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     try:
         for component in depot_observation.components:
             tested_previous_state = component.previous_state
@@ -230,7 +253,6 @@ def test_consecutive_execution_of_informative_actions_creates_a_usable_model(
     init_information_gain_dataframes(
         depot_online_nsam, depot_observation.components[0].previous_state,
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
-    depot_online_nsam.create_all_grounded_actions(observed_objects=depot_observation.grounded_objects)
     for component in depot_observation.components:
         tested_previous_state = component.previous_state
         tested_action = component.grounded_action_call
@@ -240,25 +262,17 @@ def test_consecutive_execution_of_informative_actions_creates_a_usable_model(
             depot_online_nsam.execute_action(
                 action_to_execute=tested_action, previous_state=tested_previous_state,
                 next_state=tested_next_state, reward=1)
+
     depot_online_nsam._create_safe_action_model()
     domain = depot_online_nsam.partial_domain
     print(domain.to_pddl())
 
 
-def test_create_all_grounded_actions_create_all_possible_grounded_action_assignments_for_all_actions(
-        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation, depot_domain: Domain):
-    grounded_actions = depot_online_nsam.create_all_grounded_actions(
-        observed_objects=depot_observation.grounded_objects)
-    assert len({action.name for action in grounded_actions}) == len(depot_domain.actions)
-
-
 def test_calculate_valid_neighbors_returns_a_set_of_actions_containing_the_action_that_was_actually_executed_on_the_state(
-        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
-    grounded_actions = depot_online_nsam.create_all_grounded_actions(
-        observed_objects=depot_observation.grounded_objects)
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation, depot_domain: Domain):
+    grounded_actions = create_all_grounded_actions(domain=depot_domain, observation=depot_observation)
     initial_state = depot_observation.components[0].previous_state
     observation_action = depot_observation.components[0].grounded_action_call
-
     init_information_gain_dataframes(
         depot_online_nsam, depot_observation.components[0].previous_state,
         depot_observation.grounded_objects, depot_observation.components[0].grounded_action_call)
@@ -274,9 +288,8 @@ def test_calculate_valid_neighbors_returns_a_set_of_actions_containing_the_actio
 
 
 def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_already_executed_in_state_and_the_action_is_not_applicable(
-        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
-    grounded_actions = depot_online_nsam.create_all_grounded_actions(
-        observed_objects=depot_observation.grounded_objects)
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation, depot_domain: Domain):
+    grounded_actions = create_all_grounded_actions(domain=depot_domain, observation=depot_observation)
     initial_state = depot_observation.components[0].previous_state
     observation_action = depot_observation.components[0].grounded_action_call
 
@@ -296,9 +309,8 @@ def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_a
 
 
 def test_calculate_valid_neighbors_returns_a_set_with_less_actions_when_action_already_executed_in_state_and_the_action_is_applicable(
-        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation):
-    grounded_actions = depot_online_nsam.create_all_grounded_actions(
-        observed_objects=depot_observation.grounded_objects)
+        depot_online_nsam: OnlineNSAMLearner, depot_observation: Observation, depot_domain: Domain):
+    grounded_actions = create_all_grounded_actions(domain=depot_domain, observation=depot_observation)
     initial_state = depot_observation.components[0].previous_state
     observation_action = depot_observation.components[0].grounded_action_call
     next_state = depot_observation.components[0].next_state
