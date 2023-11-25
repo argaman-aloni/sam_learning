@@ -134,7 +134,7 @@ class PIL:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"online_nsam_fold_{fold_num}_{learned_model.name}_episode_{episode_number}.pddl")
+                                   f"online_nsam_{self._learning_algorithm.name}_fold_{fold_num}_{learned_model.name}_episode_{episode_number}.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         all_possible_solution_types = [solution_type.name for solution_type in SolutionOutputTypes]
 

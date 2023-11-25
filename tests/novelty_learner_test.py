@@ -18,12 +18,14 @@ def test_add_sample_to_execution_db_successfully_adds_the_new_sample(
     first_state = minecraft_observation.components[0].previous_state
     first_action = minecraft_observation.components[0].grounded_action_call
 
-    state_predicates = {predicate.untyped_representation for predicates in
-                        first_state.state_predicates.values() for predicate in predicates}
+    state_predicates_str = {predicate.untyped_representation for predicates in
+                            first_state.state_predicates.values() for predicate in predicates}
 
-    novelty_learner.add_sample_to_execution_db(first_action.name, first_state, 1)
+    state_predicates = [predicate for predicates in first_state.state_predicates.values() for predicate in predicates]
+
+    novelty_learner.add_sample_to_execution_db(first_action.name, first_state.state_fluents, state_predicates, 1)
     assert novelty_learner._execution_db["lifted_action"] == [first_action.name]
-    assert novelty_learner._execution_db["state_predicates"] == [state_predicates]
+    assert novelty_learner._execution_db["state_predicates"] == [state_predicates_str]
     state_functions = {func.state_representation for func in first_state.state_fluents.values()}
     db_functions = {func.state_representation for func in novelty_learner._execution_db["functions_and_values"][0]}
     assert state_functions == db_functions
@@ -39,8 +41,10 @@ def test_compute_state_l1_norm_when_states_are_the_same_returns_zero(
     state_predicates = {predicate.untyped_representation for predicates in
                         first_state.state_predicates.values() for predicate in predicates}
 
-    novelty_learner.add_sample_to_execution_db(first_action.name, first_state, 1)
-    assert novelty_learner._compute_state_l1_norm(first_state.state_fluents, state_predicates, 0) == 0
+    predicates = [predicate for predicates in first_state.state_predicates.values() for predicate in predicates]
+
+    novelty_learner.add_sample_to_execution_db(first_action.name, first_state.state_fluents, predicates, 1)
+    assert novelty_learner._compute_state_l1_norm(first_state.state_fluents, predicates, 0) == 0
 
 
 def test_compute_state_l1_norm_when_states_are_different_returns_value_larger_than_zero(
@@ -50,11 +54,12 @@ def test_compute_state_l1_norm_when_states_are_different_returns_value_larger_th
     first_action = minecraft_observation.components[0].grounded_action_call
     next_state = minecraft_observation.components[0].next_state
 
-    state_predicates = {predicate.untyped_representation for predicates in
-                        next_state.state_predicates.values() for predicate in predicates}
+    state_predicates = [predicate for predicates in first_state.state_predicates.values() for predicate in predicates]
+    next_state_predicates = [predicate for predicates in next_state.state_predicates.values() for predicate in
+                             predicates]
 
-    novelty_learner.add_sample_to_execution_db(first_action.name, first_state, 1)
-    assert novelty_learner._compute_state_l1_norm(next_state.state_fluents, state_predicates, 0) > 0
+    novelty_learner.add_sample_to_execution_db(first_action.name, first_state.state_fluents, state_predicates, 1)
+    assert novelty_learner._compute_state_l1_norm(next_state.state_fluents, next_state_predicates, 0) > 0
 
 
 def test_calculate_novelty_when_the_action_was_not_observed_returns_the_default_exploration_rate(
@@ -64,7 +69,9 @@ def test_calculate_novelty_when_the_action_was_not_observed_returns_the_default_
     first_action = minecraft_observation.components[0].grounded_action_call
     next_state = minecraft_observation.components[0].next_state
 
-    novelty_learner.add_sample_to_execution_db(first_action.name, first_state, -1)
+    state_predicates = [predicate for predicates in first_state.state_predicates.values() for predicate in predicates]
+
+    novelty_learner.add_sample_to_execution_db(first_action.name, first_state.state_fluents, state_predicates, -1)
     assert novelty_learner.calculate_novelty(
         action=first_action, state=next_state, domain=minecraft_full_domain, observed_actions=[]) == 1000
 
@@ -75,7 +82,9 @@ def test_calculate_novelty_when_the_action_has_been_observed_and_is_learned_retu
     first_state = minecraft_observation.components[0].previous_state
     first_action = minecraft_observation.components[0].grounded_action_call
 
-    novelty_learner.add_sample_to_execution_db(first_action.name, first_state, 1)
+    state_predicates = [predicate for predicates in first_state.state_predicates.values() for predicate in predicates]
+
+    novelty_learner.add_sample_to_execution_db(first_action.name, first_state.state_fluents, state_predicates, 1)
     assert novelty_learner.calculate_novelty(
         action=first_action, state=first_state, domain=minecraft_full_domain,
         observed_actions=[first_action.name]) < 1000

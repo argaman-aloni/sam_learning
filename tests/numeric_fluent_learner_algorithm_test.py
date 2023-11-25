@@ -281,7 +281,7 @@ def test_construct_assignment_equations_with_fewer_equations_than_needed_to_crea
     assert effects is not None
 
 
-def test_construct_safe_linear_inequalities_when_given_only_one_state_retsurns_degraded_conditions(
+def test_construct_safe_linear_inequalities_when_given_only_one_state_returns_degraded_conditions(
         load_action_state_fluent_storage: NumericFluentStateStorage):
     LOAD_LIMIT_TRAJECTORY_FUNCTION.set_value(411.0)
     CURRENT_LOAD_TRAJECTORY_FUNCTION.set_value(121.0)

@@ -50,12 +50,14 @@ class NumericSAMLearner(SAMLearner):
         self.logger.debug("The learned preconditions are not a conjunction. Adding them as a separate condition.")
         action.preconditions.add_condition(learned_numeric_preconditions)
 
-    def _construct_safe_numeric_effects(self, action: LearnerAction) -> None:
+    def _construct_safe_numeric_effects(self, action: LearnerAction, allow_unsafe_learning: bool = False) -> None:
         """Constructs the safe numeric effects for the input action.
 
         :param action: the action that its effects are constructed for.
+        :param allow_unsafe_learning: whether to allow unsafe learning of the effects.
         """
-        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations()
+        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations(
+            allow_unsafe_learning=allow_unsafe_learning)
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
         else:
@@ -129,15 +131,17 @@ class NumericSAMLearner(SAMLearner):
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
 
-    def _create_safe_action(self, action_name: str) -> LearnerAction:
+    def _create_safe_action(self, action_name: str, allow_unsafe_learning: bool = False) -> LearnerAction:
         """Creates a safe action that can be executed in the environment.
 
+        :param action_name: the name of the action to create.
+        :param allow_unsafe_learning: whether to allow unsafe learning of the effects.
         :return: the safe action that can be executed in the environment.
         """
         self.storage[action_name].filter_out_inconsistent_state_variables()
         action = self.partial_domain.actions[action_name]
         self._construct_safe_numeric_preconditions(action)
-        self._construct_safe_numeric_effects(action)
+        self._construct_safe_numeric_effects(action, allow_unsafe_learning=allow_unsafe_learning)
         self.logger.info(f"Done learning the action - {action_name}!")
         return action
 

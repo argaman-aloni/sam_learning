@@ -42,28 +42,6 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         for action_name, action_data in self.partial_domain.actions.items():
             self.ig_learner[action_name] = InformationGainLearner(action_name=action_name)
 
-    def _extract_objects_from_state(self, state: State) -> Dict[str, PDDLObject]:
-        """Extracts the objects from the state.
-
-        :param state: the state to extract the objects from.
-        :return: a dictionary mapping object names to their matching PDDL object .
-        """
-        self.logger.debug("Extracting the objects from the state.")
-        state_objects = {}
-        for grounded_predicates_set in state.state_predicates.values():
-            for grounded_predicate in grounded_predicates_set:
-                for param_name, obj_type in grounded_predicate.signature.items():
-                    object_name = grounded_predicate.object_mapping[param_name]
-                    state_objects[object_name] = PDDLObject(name=object_name, type=obj_type)
-
-        for grounded_function in state.state_fluents.values():
-            for obj_name, obj_type in grounded_function.signature.items():
-                state_objects[obj_name] = PDDLObject(name=obj_name, type=obj_type)
-
-        state_objects.update(self.partial_domain.constants)
-        self.logger.debug(f"Extracted the following objects - {list(state_objects.keys())}")
-        return state_objects
-
     def _apply_feature_selection(self, action: ActionCall) -> List[str]:
         """Applies feature selection to the action's numeric features.
 
@@ -87,7 +65,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         :param state: the state in which the action is being executed.
         :return: the lifted bounded functions and predicates.
         """
-        state_objects = self._extract_objects_from_state(state)
+        state_objects = state.get_state_objects()
         grounded_state_propositions = self.triplet_snapshot.create_propositional_state_snapshot(
             state, action, state_objects)
         lifted_predicates = self.matcher.get_possible_literal_matches(action, list(grounded_state_propositions))
@@ -115,7 +93,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         :param action_name: the action that had been successfully executed.
         """
         self.logger.info(f"Updating the unsafe model after observing a successful execution of {action_name}.")
-        action = self._create_safe_action(action_name)
+        action = self._create_safe_action(action_name, allow_unsafe_learning=True)
         updated_action = Action()
         updated_action.name = action.name
         updated_action.signature = action.signature
@@ -293,16 +271,16 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """
         self.logger.info(f"Executing the action {action_to_execute.name} in the environment.")
         self._action_observation_rate[action_to_execute.name] += 1
-        observation_objects = self._extract_objects_from_state(next_state)
         self.triplet_snapshot.create_triplet_snapshot(
             previous_state=previous_state, next_state=next_state, current_action=action_to_execute,
-            observation_objects=observation_objects)
+            observation_objects=next_state.get_state_objects())
 
         pre_state_functions, pre_state_predicates = self._get_lifted_bounded_state(action_to_execute, previous_state)
         if reward < 0:
             self.logger.debug("The action was not successful, adding the negative sample to the learner.")
             self._action_failure_rate[action_to_execute.name] += 1
-            self.novelty_calculator.add_sample_to_execution_db(action_to_execute.name, previous_state, FAIL_RESULT)
+            self.novelty_calculator.add_sample_to_execution_db(
+                action_to_execute.name, pre_state_functions, pre_state_predicates, FAIL_RESULT)
             self._episode_recorder.add_step_data(action_to_execute.name, FAIL_RESULT)
             self.ig_learner[action_to_execute.name].add_negative_sample(
                 numeric_negative_sample=pre_state_functions, negative_propositional_sample=pre_state_predicates)
@@ -310,7 +288,8 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
 
         self._reset_action_numeric_data(action_to_execute.name)
         self.logger.debug("The action was successful, adding the positive sample to the learner.")
-        self.novelty_calculator.add_sample_to_execution_db(action_to_execute.name, previous_state, SUCCESS_RESULT)
+        self.novelty_calculator.add_sample_to_execution_db(
+            action_to_execute.name, pre_state_functions, pre_state_predicates, SUCCESS_RESULT)
         self._episode_recorder.add_step_data(action_to_execute.name, SUCCESS_RESULT)
         self.ig_learner[action_to_execute.name].add_positive_sample(
             positive_numeric_sample=pre_state_functions, positive_propositional_sample=pre_state_predicates)

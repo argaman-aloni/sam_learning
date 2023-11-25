@@ -48,17 +48,6 @@ def init_information_gain_dataframes(
         lifted_predicates=[pred.untyped_representation for pred in lifted_predicates])
 
 
-def test_extract_objects_from_state_extract_all_objects_from_state(
-        minecraft_large_map_online_nsam: OnlineNSAMLearner, minecraft_large_trajectory: Observation):
-    objects = minecraft_large_map_online_nsam._extract_objects_from_state(
-        state=minecraft_large_trajectory.components[0].previous_state)
-
-    valid_regular_cells = [f"cell{i}" for i in range(36) if i != 16]
-    assert "crafting_table" in objects
-    assert all([cell in objects for cell in valid_regular_cells])
-    assert len(objects) == 36
-
-
 def test_get_lifted_bounded_state_returns_correct_lifted_predicates_and_functions(
         minecraft_large_map_online_nsam: OnlineNSAMLearner, minecraft_large_trajectory: Observation):
     test_state = minecraft_large_trajectory.components[0].previous_state
@@ -213,17 +202,19 @@ def test_calculate_state_action_information_gain_when_tp_is_successful_and_then_
         minecraft_large_map_online_nsam, minecraft_large_trajectory.components[0].previous_state,
         minecraft_large_trajectory.grounded_objects, minecraft_large_trajectory.components[0].grounded_action_call)
     tested_previous_state = minecraft_large_trajectory.components[0].previous_state
-    tested_action = minecraft_large_trajectory.components[0].grounded_action_call
     tested_next_state = minecraft_large_trajectory.components[0].next_state
+
+    successful_action = ActionCall(name="tp_to", grounded_parameters=["cell15", "cell21"])
     minecraft_large_map_online_nsam.execute_action(
-        action_to_execute=tested_action, previous_state=tested_previous_state, next_state=tested_next_state, reward=1)
+        action_to_execute=successful_action, previous_state=tested_previous_state, next_state=tested_next_state,
+        reward=1)
 
     failed_teleport_action = ActionCall(name="tp_to", grounded_parameters=["cell21", "cell21"])
     minecraft_large_map_online_nsam.execute_action(
         action_to_execute=failed_teleport_action, previous_state=tested_next_state, next_state=tested_next_state,
         reward=-1)
 
-    second_failed_teleport_action = ActionCall(name="tp_to", grounded_parameters=["cell15", "cell15"])
+    second_failed_teleport_action = ActionCall(name="tp_to", grounded_parameters=["cell13", "cell13"])
     assert minecraft_large_map_online_nsam.calculate_state_action_information_gain(
         state=tested_previous_state, action=second_failed_teleport_action) == 0
 

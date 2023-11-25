@@ -90,3 +90,18 @@ def test_observe_when_trying_to_teleport_to_the_same_position_does_not_remove_th
     tp_to_self = ActionCall(name="tp_to", grounded_parameters=["cell15", "cell15"])
     new_state, reward = minecraft_agent.observe(initial_state, tp_to_self)
     assert "(position cell15)" in new_state.serialize()
+
+
+def test_observe_when_trying_to_apply_craft_plank_when_craft_plank_is_applicable_returns_new_state_with_less_logs_and_more_planks(
+        minecraft_agent: MinecraftAgent, minecraft_large_problem: Problem):
+    state_predicates = minecraft_large_problem.initial_state_predicates
+    state_fluents = minecraft_large_problem.initial_state_fluents
+    initial_state = State(predicates=state_predicates, fluents=state_fluents, is_init=True)
+    assert state_fluents["(count_log_in_inventory )"].value == 4
+    assert state_fluents["(count_planks_in_inventory )"].value == 7
+
+    craft_plank_action = ActionCall(name="craft_plank", grounded_parameters=[])
+    new_state, reward = minecraft_agent.observe(initial_state, craft_plank_action)
+    assert reward == 1
+    assert new_state.state_fluents["(count_log_in_inventory )"].value == 3
+    assert new_state.state_fluents["(count_planks_in_inventory )"].value == 11

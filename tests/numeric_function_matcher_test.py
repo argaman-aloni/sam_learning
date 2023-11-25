@@ -84,7 +84,7 @@ def test_match_state_functions_with_small_number_of_grounded_functions_finds_all
     assert matches["(current_load ?z)"].value == 121.0
 
 
-def test_get_possible_literal_matches_from_actual_trajectory_state(
+def test_match_state_functions_matches_from_actual_trajectory_state(
         numeric_function_matcher: NumericFunctionMatcher, depot_observation: Observation):
     observation_component = depot_observation.components[0]
     test_action_call = observation_component.grounded_action_call

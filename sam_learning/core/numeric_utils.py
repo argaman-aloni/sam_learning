@@ -298,6 +298,3 @@ def extended_gram_schmidt(
         return normal_vectors
 
     return [b for b in normal_vectors if b not in eigen_vectors]
-
-
-# def calculate_

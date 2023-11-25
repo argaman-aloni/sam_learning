@@ -63,11 +63,11 @@ class EnvironmentSnapshot:
 
     def _create_state_numeric_snapshot(
             self, state: State, relevant_objects: Dict[str, PDDLObject]) -> Dict[str, PDDLFunction]:
-        """
+        """Creating a snapshot of the state functions.
 
-        :param state:
-        :param relevant_objects:
-        :return:
+        :param state: the state to create a snapshot of.
+        :param relevant_objects: the relevant objects of the action or all the possible objects in the observation.
+        :return: the snapshot of the state functions.
         """
         self.logger.debug("Creating a snapshot of the state functions.")
         result = {}

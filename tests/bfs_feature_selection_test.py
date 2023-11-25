@@ -6,7 +6,7 @@ import math
 import pytest
 from pandas import DataFrame
 
-from sam_learning.core.bfs_feature_selection import BFSFeatureSelector
+from sam_learning.core.online_learning.bfs_feature_selection import BFSFeatureSelector
 
 TEST_ACTION_NAME = 'test_action'
 TEST_FUNCTION_NAMES = ["(x)", "(y)", "(z)", "(w)"]

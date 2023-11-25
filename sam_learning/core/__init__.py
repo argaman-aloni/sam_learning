@@ -1,4 +1,4 @@
-from .abstract_agent import AbstractAgent
+from sam_learning.core.online_learning.abstract_agent import AbstractAgent
 from .consistent_model_validator import NumericConsistencyValidator
 from .convex_hull_learner import ConvexHullLearner
 from .dependency_set import DependencySet
@@ -23,6 +23,6 @@ from .oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
 from .predicates_matcher import PredicatesMatcher
 from .priority_queue import PriorityQueue
-from .propositional_information_gain_learner import PropositionalInformationGainLearner
+from sam_learning.core.online_learning.propositional_information_gain_learner import PropositionalInformationGainLearner
 from .svm_fluents_learning import SVMFluentsLearning
 from .vocabulary_creator import VocabularyCreator
