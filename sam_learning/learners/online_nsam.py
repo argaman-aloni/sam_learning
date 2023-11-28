@@ -182,7 +182,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         if not self.ig_learner[action.name].are_dataframes_initialized():
             self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
             self.ig_learner[action.name].init_dataframes(
-                valid_lifted_functions=list([func for func in lifted_functions.keys()]),
+                valid_lifted_functions=[func for func in lifted_functions.keys()],
                 lifted_predicates=[pred.untyped_representation for pred in lifted_predicates])
 
         features_to_explore = self._apply_feature_selection(action)

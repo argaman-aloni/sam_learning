@@ -215,12 +215,13 @@ class DomainValidator:
     def validate_domain(
             self, tested_domain_file_path: Path, test_set_directory_path: Optional[Path] = None,
             used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None,
-            tolerance: float = 0.01) -> None:
+            tolerance: float = 0.01, timeout: int = 5) -> None:
         """Validates that using the input domain problems can be solved.
 
         :param tested_domain_file_path: the path of the domain that was learned using POL.
         :param test_set_directory_path: the path to the directory containing the test set problems.
         :param used_observations: the observations that were used to learn the domain.
+        :param timeout: the timeout for the solver.
         :param tolerance: the numeric tolerance to use.
         """
         num_triplets = self._extract_num_triplets(used_observations)
@@ -229,7 +230,8 @@ class DomainValidator:
             problems_directory_path=test_set_directory_path,
             domain_file_path=tested_domain_file_path,
             problems_prefix=self.problem_prefix,
-            tolerance=tolerance
+            tolerance=tolerance,
+            solving_timeout=timeout
         )
 
         solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
@@ -283,9 +285,11 @@ class DomainValidator:
             test_set_writer.writeheader()
             test_set_writer.writerows(self.solving_stats)
 
-    def write_complete_joint_statistics(self) -> None:
+    def write_complete_joint_statistics(self, fold: Optional[int] = None) -> None:
         """Writes a statistics file containing all the folds combined data."""
-        output_path = self.results_dir_path / f"{self.learning_algorithm.name}_all_folds_solving_stats.csv"
+
+        output_path = self.results_dir_path / f"{self.learning_algorithm.name}_all_folds_solving_stats.csv" if fold is None \
+            else self.results_dir_path / f"{self.learning_algorithm.name}_problem_solving_stats_{fold}.csv"
         with open(output_path, 'wt', newline='') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
             writer.writeheader()
