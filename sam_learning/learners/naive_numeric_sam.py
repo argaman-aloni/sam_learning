@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple, Optional
 from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, Predicate
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
-    PolynomialFluentsLearningAlgorithm, LearnerAction
+    PolynomialFluentsLearningAlgorithm, LearnerAction, EquationSolutionType
 from sam_learning.core.naive_numeric_fluent_learner_algorithm import NaiveNumericFluentStateStorage
 from sam_learning.learners.sam_learning import SAMLearner
 
@@ -75,17 +75,9 @@ class NaiveNumericSAMLearner(SAMLearner):
 
             return
 
-        self.logger.debug(f"Creating restrictive numeric preconditions for the action.")
-        restrictive_preconditions = Precondition("and")
-        for precondition in action.preconditions.root.operands:
-            if isinstance(precondition, Predicate):
-                restrictive_preconditions.add_condition(precondition)
-
-        action.preconditions.root = restrictive_preconditions
-        fluents_map_backup = self.preconditions_fluent_map
-        self.preconditions_fluent_map = None
-        self._construct_safe_numeric_preconditions(action)
-        self.preconditions_fluent_map = fluents_map_backup
+        raise NotSafeActionError(
+            name=action.name, reason="The effects were not learned perfectly.",
+            solution_type=EquationSolutionType.not_enough_data)
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.

@@ -19,16 +19,30 @@ LEARNING_ALGORITHMS = {
     LearningAlgorithmType.raw_numeric_sam: NumericSAMLearner,
     LearningAlgorithmType.naive_nsam: NaiveNumericSAMLearner,
     LearningAlgorithmType.polynomial_sam: PolynomialSAMLearning,
-    LearningAlgorithmType.raw_polynomial_nam: PolynomialSAMLearning,
+    LearningAlgorithmType.raw_polynomial_nsam: PolynomialSAMLearning,
     LearningAlgorithmType.naive_polysam: NaivePolynomialSAMLearning,
+    LearningAlgorithmType.raw_naive_nsam: NaiveNumericSAMLearner,
+    LearningAlgorithmType.raw_naive_polysam: NaivePolynomialSAMLearning,
+
 }
 
 NO_INSIGHT_NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.raw_numeric_sam.value,
-    LearningAlgorithmType.raw_polynomial_nam.value,
-    LearningAlgorithmType.naive_nsam.value,
-    LearningAlgorithmType.naive_polysam.value
+    LearningAlgorithmType.raw_polynomial_nsam.value,
+    LearningAlgorithmType.raw_naive_nsam.value,
+    LearningAlgorithmType.raw_naive_polysam.value
 ]
+
+MAP_TO_OTHER_COMPARED_VERSIONS = {
+    LearningAlgorithmType.numeric_sam: [LearningAlgorithmType.numeric_sam,
+                                        LearningAlgorithmType.naive_nsam,
+                                        LearningAlgorithmType.raw_numeric_sam,
+                                        LearningAlgorithmType.raw_naive_nsam],
+    LearningAlgorithmType.polynomial_sam: [LearningAlgorithmType.polynomial_sam,
+                                           LearningAlgorithmType.naive_polysam,
+                                           LearningAlgorithmType.raw_polynomial_nsam,
+                                           LearningAlgorithmType.raw_naive_polysam]
+}
 
 
 class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
@@ -39,12 +53,9 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
                  solver_type: SolverType, problem_prefix: str = "pfile"):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=learning_algorithm, solver_type=solver_type, problem_prefix=problem_prefix)
-        if learning_algorithm.value in NO_INSIGHT_NUMERIC_ALGORITHMS:
-            self.fluents_map = None
-
-        else:
-            with open(fluents_map_path, "rt") as json_file:
-                self.fluents_map = json.load(json_file)
+        self._internal_learning_algorithm = learning_algorithm
+        with open(fluents_map_path, "rt") as json_file:
+            self._internal_fluents_map = json.load(json_file)
 
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
@@ -66,6 +77,26 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
             partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map)
         return learner.learn_action_model(allowed_observations)
 
+    def run_fold(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
+        """Runs the numeric action model learning algorithms on the input fold.
+
+        :param fold_num: the number of the fold to run.
+        :param train_set_dir_path: the path to the directory containing the training set problems.
+        :param test_set_dir_path: the path to the directory containing the test set problems.
+        """
+        self._init_semantic_performance_calculator(test_set_path=test_set_dir_path)
+        for version_to_iterate in MAP_TO_OTHER_COMPARED_VERSIONS[self._internal_learning_algorithm]:
+            self.fluents_map = self._internal_fluents_map if (version_to_iterate.value not in
+                                                              NO_INSIGHT_NUMERIC_ALGORITHMS) else None
+
+            self._learning_algorithm = version_to_iterate
+            self.domain_validator.learning_algorithm = version_to_iterate
+            self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
+            self.domain_validator.clear_statistics()
+
+        self.domain_validator.learning_algorithm = self._internal_learning_algorithm
+        self.domain_validator.write_complete_joint_statistics(fold_num)
+
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -83,20 +114,25 @@ def parse_arguments() -> argparse.Namespace:
                         default=3)
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
+    parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     args = parser.parse_args()
     return args
 
 
 def main():
     args = parse_arguments()
+    working_directory_path = Path(args.working_directory_path)
     offline_learner = OfflineNumericExperimentRunner(
-        working_directory_path=Path(args.working_directory_path),
+        working_directory_path=working_directory_path,
         domain_file_name=args.domain_file_name,
         learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
         fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
         solver_type=SolverType(args.solver_type),
         problem_prefix=args.problems_prefix)
-    offline_learner.run_cross_validation()
+    offline_learner.run_fold(
+        fold_num=args.fold_number,
+        train_set_dir_path=(working_directory_path / "train") / f"fold_{args.fold_number}",
+        test_set_dir_path=(working_directory_path / "test") / f"fold_{args.fold_number}")
 
 
 if __name__ == '__main__':

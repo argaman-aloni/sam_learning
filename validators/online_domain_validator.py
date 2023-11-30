@@ -94,7 +94,7 @@ class OnlineLearningDomainValidator(DomainValidator):
 
         :param fold_num: the index of the fold that is currently being tested.
         """
-        output_statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}" \
+        output_statistics_path = self.results_dir_path / f"online_nsam_{self.learning_algorithm.name}" \
                                                          f"_problem_solving_stats_{fold_num}.csv"
         with open(output_statistics_path, 'wt', newline='') as csv_file:
             test_set_writer = csv.DictWriter(csv_file, fieldnames=ONLINE_SOLVING_STATISTICS)
@@ -103,7 +103,7 @@ class OnlineLearningDomainValidator(DomainValidator):
 
     def write_complete_joint_statistics(self) -> None:
         """Writes a statistics file containing all the folds combined data."""
-        output_path = self.results_dir_path / f"{self.learning_algorithm.name}_all_folds_solving_stats.csv"
+        output_path = self.results_dir_path / f"online_nsam_{self.learning_algorithm.name}_all_folds_solving_stats.csv"
         with open(output_path, 'wt', newline='') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=ONLINE_SOLVING_STATISTICS)
             writer.writeheader()

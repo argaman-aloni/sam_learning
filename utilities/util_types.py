@@ -16,10 +16,12 @@ class LearningAlgorithmType(Enum):
     oblique_tree = 11
     extended_svc = 12
     online_nsam = 13
-    raw_polynomial_nam = 14
+    raw_polynomial_nsam = 14
     # To remove
     naive_nsam = 15
     naive_polysam = 16
+    raw_naive_nsam = 17
+    raw_naive_polysam = 18
 
 
 class SolverType(Enum):

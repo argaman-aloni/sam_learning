@@ -21,8 +21,9 @@ DEFAULT_SPLIT = 5
 
 NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
                       LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam,
-                      LearningAlgorithmType.raw_polynomial_nam, LearningAlgorithmType.naive_nsam,
-                      LearningAlgorithmType.naive_polysam]
+                      LearningAlgorithmType.raw_polynomial_nsam, LearningAlgorithmType.naive_nsam,
+                      LearningAlgorithmType.naive_polysam, LearningAlgorithmType.raw_naive_nsam,
+                      LearningAlgorithmType.raw_naive_polysam]
 
 DEFAULT_NUMERIC_TOLERANCE = 0.1
 
@@ -103,7 +104,7 @@ class OfflineBasicExperimentRunner:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if index != 0 and (index + 1) % 10 != 0:
+            if index != 0 and (index + 1) % 2 != 0:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
@@ -111,14 +112,15 @@ class OfflineBasicExperimentRunner:
                 partial_domain, allowed_observations, test_set_dir_path)
 
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path)
+            learned_domain_path = self.validate_learned_domain(
+                allowed_observations, learned_model, test_set_dir_path, fold_num)
             self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
-                                test_set_dir_path: Path) -> Path:
+                                test_set_dir_path: Path, fold_number: int) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
@@ -128,7 +130,7 @@ class OfflineBasicExperimentRunner:
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"{self._learning_algorithm.name}_{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
+                                   f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
@@ -137,14 +139,16 @@ class OfflineBasicExperimentRunner:
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
+                                                  timeout=60)
 
             self.domain_validator.solver = ENHSPSolver()
             self.domain_validator._solver_name = "enhsp"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
+                                                  timeout=60)
 
         else:
             self.domain_validator.solver = FFADLSolver()

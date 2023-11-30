@@ -42,16 +42,18 @@ class PriorityQueue:
             This action removes the selected item from the priority queue.
 
         :return: the item with the highest priority. If there are multiple items with the same priority,
-            returns the first one.
+            returns a random selection from the items based on the internal probabilities.
         """
         highest_priority = max(list(self._prioritized_queue.keys()))
         highest_priority_queue = self._prioritized_queue[highest_priority]
-        item, probability = highest_priority_queue[0]
+        probabilities = [queue_item[1] for queue_item in highest_priority_queue]
+        selected_queue_item = random.choices(highest_priority_queue, weights=probabilities, k=1)[0]
+        item, probability = selected_queue_item
         if len(highest_priority_queue) == 1:
             self._prioritized_queue.pop(highest_priority)
 
         else:
-            highest_priority_queue.pop(highest_priority_queue.index(highest_priority_queue[0]))
+            highest_priority_queue.pop(highest_priority_queue.index(selected_queue_item))
 
         return item, highest_priority, probability
 

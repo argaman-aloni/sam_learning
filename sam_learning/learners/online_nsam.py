@@ -2,7 +2,7 @@
 import random
 from typing import Dict, Set, Optional, Tuple, List, Any
 
-from pddl_plus_parser.models import Domain, State, ActionCall, PDDLObject, Precondition, Predicate, PDDLFunction, \
+from pddl_plus_parser.models import Domain, State, ActionCall, Precondition, Predicate, PDDLFunction, \
     Action, Operator
 
 from sam_learning.core import InformationGainLearner, LearnerDomain, AbstractAgent, \

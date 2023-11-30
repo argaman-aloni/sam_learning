@@ -14,7 +14,6 @@ from sam_learning.core import LearnerDomain, EpisodeInfoRecord
 from sam_learning.learners import OnlineNSAMLearner
 from solvers import MetricFFSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
-from utilities.k_fold_split import KFoldSplit
 from validators import OnlineLearningDomainValidator
 
 DEFAULT_SPLIT = 10
@@ -22,7 +21,7 @@ DEFAULT_NUMERIC_TOLERANCE = 0.1
 
 NO_INSIGHT_NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.raw_numeric_sam.value,
-    LearningAlgorithmType.raw_polynomial_nam.value,
+    LearningAlgorithmType.raw_polynomial_nsam.value,
 ]
 
 
@@ -30,7 +29,6 @@ class PIL:
     """Class that represents the PIL framework."""
     logger: logging.Logger
     working_directory_path: Path
-    k_fold: KFoldSplit
     domain_file_name: str
     domain_validator: OnlineLearningDomainValidator
     problems_prefix: str
@@ -41,12 +39,10 @@ class PIL:
             polynomial_degree: int = 0, fluents_map_path: Optional[Path] = None):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
-                                 n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self.problems_prefix = problem_prefix
         self.domain_validator = OnlineLearningDomainValidator(
-            self.working_directory_path, LearningAlgorithmType.online_nsam,
+            self.working_directory_path, learning_algorithm,
             self.working_directory_path / domain_file_name,
             solver_type=solver_type, problem_prefix=problem_prefix)
         self._learning_algorithm = learning_algorithm
@@ -73,15 +69,14 @@ class PIL:
 
         return domain_path
 
-    def learn_model_online(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
+    def learn_model_online(self, fold_num: int) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
-        :param train_set_dir_path: the directory containing the trajectories in which the algorithm is learning from.
-        :param test_set_dir_path: the directory containing the test set problems in which the learned model should be
-            used to solve.
         """
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
+        train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}"
+        test_set_dir_path = self.working_directory_path / "test" / f"fold_{fold_num}"
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
@@ -104,7 +99,10 @@ class PIL:
             if goal_achieved:
                 self.logger.info("The agent successfully solved the current task!")
 
-            if (problem_index + 1) % 100 == 0:
+            if (problem_index + 1) % 200 == 0:
+                break
+
+            if (problem_index + 1) % 10 == 0:
                 solved_all_test_problems = self.validate_learned_domain(
                     learned_model, test_set_dir_path, episode_number=problem_index + 1,
                     num_steps_in_episode=num_steps_in_episode, fold_num=fold_num,
@@ -115,9 +113,11 @@ class PIL:
                 num_training_goal_achieved = 0
                 if solved_all_test_problems:
                     self.domain_validator.write_statistics(fold_num)
+                    self.logger.info(f"All test set problem were solved after {problem_index + 1} episodes!")
                     return
 
         self.domain_validator.write_statistics(fold_num)
+        self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
     def validate_learned_domain(
             self, learned_model: LearnerDomain, test_set_dir_path: Path,
@@ -156,16 +156,6 @@ class PIL:
 
         return False
 
-    def run_cross_validation(self) -> None:
-        """Runs that cross validation process on the domain's working directory and validates the results."""
-        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
-            self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
-            self.learn_model_online(fold_num, train_dir_path, test_dir_path)
-            self.domain_validator.clear_statistics()
-            self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
-
-        self.domain_validator.write_complete_joint_statistics()
-
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the PIL algorithm on the input domain.")
@@ -181,6 +171,7 @@ def parse_arguments() -> argparse.Namespace:
                                                                    "fluents", default=None)
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
+    parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
 
     args = parser.parse_args()
     return args
@@ -188,13 +179,13 @@ def parse_arguments() -> argparse.Namespace:
 
 def main():
     args = parse_arguments()
-    offline_learner = PIL(working_directory_path=Path(args.working_directory_path),
-                          domain_file_name=args.domain_file_name,
-                          solver_type=SolverType(args.solver_type),
-                          learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
-                          fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-                          problem_prefix=args.problems_prefix)
-    offline_learner.run_cross_validation()
+    learner = PIL(working_directory_path=Path(args.working_directory_path),
+                  domain_file_name=args.domain_file_name,
+                  solver_type=SolverType(args.solver_type),
+                  learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
+                  fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
+                  problem_prefix=args.problems_prefix)
+    learner.learn_model_online(fold_num=args.fold_number)
 
 
 if __name__ == '__main__':
