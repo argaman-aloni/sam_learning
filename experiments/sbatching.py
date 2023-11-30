@@ -27,7 +27,7 @@ def submit_job(
         dependency=None, mem=None, runtime=None, jobname=None, cpus_per_task=None, suppress_error=False,
         error_file=None, suppress_output=False, output_file=None, conda_env=None,
         python_file=None, arguments=None, environment_variables=None):
-    with open("/home/mordocha/numeric_planning/domains/temp.sh", 'w+', newline="\n") as f:
+    with open("temp.sh", 'w+', newline="\n") as f:
         f.write('#!/bin/bash\n')
         if runtime:
             f.write(f'#SBATCH --time {runtime}\n')
@@ -114,7 +114,9 @@ def main():
             environment_variables=environment_variables)
         print(f"Submitted job with sid {fold_creation_sid}")
         progress_bar(experiment_index * configuration["num_folds"] + 1, total_run_time)
-        pathlib.Path('/home/mordocha/numeric_planning/domains/temp.sh').unlink()
+        time.sleep(5)
+        print("Removeing the temp.sh file")
+        pathlib.Path('temp.sh').unlink()
         print("Waiting for the fold creation job to finish")
         time.sleep(100)
 
@@ -139,6 +141,7 @@ def main():
             print(f"Submitted job with sid {sid}")
             progress_bar(current_iteration, total_run_time)
             time.sleep(5)
+            pathlib.Path('temp.sh').unlink()
 
 
 if __name__ == '__main__':
