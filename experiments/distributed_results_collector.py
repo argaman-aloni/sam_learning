@@ -28,14 +28,14 @@ class StatisticsCollector:
             num_folds: int = 5):
         self.domain_file_name = domain_file_name
         self.working_directory_path = working_directory_path
-        self.learning_algorithms = [LearningAlgorithmType(e) for e in learning_algorithms]
+        self.learning_algorithms = [LearningAlgorithmType(int(e)) for e in learning_algorithms]
         self.num_folds = num_folds
         self.logger = logging.getLogger("ClusterRunner")
 
     def collect_statistics(self) -> None:
         """Collects the statistics from the statistics files in the results directory and combines them."""
         self.logger.info("Collecting the statistics from the results directory.")
-        results_directory = self.working_directory_path / "results"
+        results_directory = self.working_directory_path / "results_directory"
         combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
         combined_statistics_data = []
         for fold in range(self.num_folds):
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.DEBUG)
     args = parse_arguments()
-    experiment_learning_algorithms = args["learning_algorithms"].split(",")
+    experiment_learning_algorithms = args.learning_algorithms.split(",")
     StatisticsCollector(working_directory_path=Path(args.working_directory_path),
                         domain_file_name=args.domain_file_name,
                         learning_algorithms=experiment_learning_algorithms,

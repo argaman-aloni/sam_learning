@@ -45,7 +45,7 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.DEBUG)
     args = parse_arguments()
-    experiment_learning_algorithms = args["learning_algorithms"].split(",")
+    experiment_learning_algorithms = args.learning_algorithms.split(",")
     FoldsCreator(working_directory_path=Path(args.working_directory_path),
                  domain_file_name=args.domain_file_name,
                  learning_algorithms=experiment_learning_algorithms).create_folds_from_cross_validation()
