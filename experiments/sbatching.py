@@ -1,5 +1,4 @@
 import json
-import os
 import pathlib
 import signal
 import subprocess
@@ -29,6 +28,9 @@ def submit_job(
         python_file=None, arguments=None, environment_variables=None):
     with open("temp.sh", 'w+', newline="\n") as f:
         f.write('#!/bin/bash\n')
+
+        f.write("#SBATCH --partition main\n")
+
         if runtime:
             f.write(f'#SBATCH --time {runtime}\n')
         else:
@@ -85,6 +87,49 @@ def submit_job(
     return int(data.split()[-1])
 
 
+def execute_experiment_setup_batch(
+        code_directory, configuration, environment_variables, experiment, experiment_index, total_run_time):
+    print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
+    fold_creation_sid = submit_job(
+        conda_env='online_nsam', mem="32G",
+        python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
+        jobname=f"create_folds_job_{experiment['domain_file_name']}",
+        suppress_output=False,
+        arguments=[
+            f"--working_directory_path {experiment['working_directory_path']}",
+            f"--domain_file_name {experiment['domain_file_name']}",
+            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
+        ],
+        environment_variables=environment_variables)
+    print(f"Submitted job with sid {fold_creation_sid}\n")
+    progress_bar(experiment_index * configuration["num_folds"] + 1, total_run_time)
+    time.sleep(5)
+    print("Removing the temp.sh file")
+    pathlib.Path('temp.sh').unlink()
+    return fold_creation_sid
+
+
+def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids):
+    print(f"Creating the job that will collect the statistics from all the domain's experiments.")
+    statistics_collection_job = submit_job(
+        conda_env='online_nsam', mem="32G",
+        python_file=f"{code_directory}/distributed_results_collector.py",
+        dependency=f"afterok:{':'.join([str(e) for e in job_ids])}",
+        jobname=f"collect_statistics_{experiment['domain_file_name']}",
+        suppress_output=False,
+        arguments=[
+            f"--working_directory_path {experiment['working_directory_path']}",
+            f"--domain_file_name {experiment['domain_file_name']}",
+            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
+            f"--num_folds {configuration['num_folds']}"
+        ],
+        environment_variables=environment_variables)
+    print(f"Submitted job with sid {statistics_collection_job}\n")
+    time.sleep(5)
+    print("Removing the temp.sh for the statistics collection file")
+    pathlib.Path('temp.sh').unlink()
+
+
 def main():
     signal.signal(signal.SIGINT, sigint_handler)
     print("Reading the configuration file.")
@@ -99,49 +144,40 @@ def main():
 
     print("Submitted fold creation job")
     num_experiments = len(configuration["experiment_configurations"])
-    total_run_time = configuration["num_folds"] * num_experiments + num_experiments
+    total_run_time = configuration["num_folds"] * num_experiments * 4 + num_experiments
     progress_bar(0, total_run_time)
+    experiment_termination_ids = {}
     for experiment_index, experiment in enumerate(configuration["experiment_configurations"]):
-        fold_creation_sid = submit_job(
-            conda_env='online_nsam', mem="32G",
-            python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
-            jobname=f"create_folds_job_{experiment['domain_file_name']}",
-            suppress_output=False,
-            arguments=[
-                f"--working_directory_path {experiment['working_directory_path']}",
-                f"--domain_file_name {experiment['domain_file_name']}",
-            ],
-            environment_variables=environment_variables)
-        print(f"Submitted job with sid {fold_creation_sid}")
-        progress_bar(experiment_index * configuration["num_folds"] + 1, total_run_time)
-        time.sleep(5)
-        print("Removeing the temp.sh file")
-        pathlib.Path('temp.sh').unlink()
-        print("Waiting for the fold creation job to finish")
-        time.sleep(100)
+        fold_creation_sid = execute_experiment_setup_batch(code_directory, configuration, environment_variables,
+                                                           experiment, experiment_index, total_run_time)
 
         for fold in range(configuration["num_folds"]):
-            current_iteration = (experiment_index + 1) * configuration["num_folds"] + fold + 2
-            sid = submit_job(
-                conda_env='online_nsam', mem="32G",
-                python_file=f"{code_directory}/numeric_experiment_runner.py",
-                jobname=f"run_experiment_{experiment['domain_file_name']}_{fold}",
-                suppress_output=False,
-                arguments=[
-                    f"--working_directory_path {experiment['working_directory_path']}",
-                    f"--domain_file_name {experiment['domain_file_name']}",
-                    f"--solver_type {experiment['solver_type']}",
-                    f"--learning_algorithm {experiment['learning_algorithm']}",
-                    f"--fluents_map_path {experiment['fluents_map_path']}",
-                    f"--problems_prefix {experiment['problems_prefix']}",
-                    f"--num_folds {configuration['num_folds']}",
-                    f"--fold_number {fold}"
-                ],
-                environment_variables=environment_variables)
-            print(f"Submitted job with sid {sid}")
-            progress_bar(current_iteration, total_run_time)
-            time.sleep(5)
-            pathlib.Path('temp.sh').unlink()
+            experiment_termination_ids[f"{experiment['domain_file_name']}"] = []
+            for version_index, compared_version in enumerate(experiment["compared_versions"]):
+                current_iteration = (experiment_index + 1) * configuration["num_folds"] * version_index + fold + 2
+                arguments = [f"--{key} {value}" for key, value in experiment.items()]
+                arguments.append(f"--fold_number {fold}")
+                arguments.append(f"--learning_algorithm {compared_version}")
+                sid = submit_job(
+                    conda_env='online_nsam', mem="32G",
+                    python_file=f"{code_directory}/{configuration['experiments_script_path']}.py",
+                    jobname=f"run_experiment_{experiment['domain_file_name']}_{fold}",
+                    dependency=f"afterok:{fold_creation_sid}",
+                    suppress_output=False,
+                    arguments=arguments,
+                    environment_variables=environment_variables)
+                print(f"Submitted job with sid {sid}")
+                # maintaining the IDs of the experiment jobs so that once they are all done a job that
+                # collects the data will be called and will combine the data together.
+                experiment_termination_ids[f"{experiment['domain_file_name']}"].append(sid)
+                progress_bar(current_iteration, total_run_time)
+                time.sleep(5)
+                pathlib.Path('temp.sh').unlink()
+
+        print("Finished building the experiment folds!")
+        execute_statistics_collection_job(
+            code_directory, configuration, environment_variables,
+            experiment, experiment_termination_ids[f"{experiment['domain_file_name']}"])
 
 
 if __name__ == '__main__':

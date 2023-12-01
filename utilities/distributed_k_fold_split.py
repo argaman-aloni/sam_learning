@@ -23,7 +23,7 @@ class DistributedKFoldSplit:
     only_train_test: bool
 
     def __init__(self, working_directory_path: Path, domain_file_name: str, n_split: int = 0,
-                 only_train_test: bool = False):
+                 only_train_test: bool = False, learning_algorithms: List[int] = None):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.n_split = n_split
@@ -31,6 +31,7 @@ class DistributedKFoldSplit:
         self.test_set_dir_path = working_directory_path / "test"
         self.domain_file_path = working_directory_path / domain_file_name
         self.only_train_test = only_train_test
+        self._learning_algorithms = learning_algorithms
 
     def _copy_domain(self, directory_path: Path) -> None:
         """Copies the domain to the train set directory so that it'd be used in the learning process."""
@@ -39,6 +40,7 @@ class DistributedKFoldSplit:
 
     def remove_created_directories(self) -> None:
         """Deletes the train and test directories."""
+
         self.logger.debug("Deleting the train set directory!")
         shutil.rmtree(self.train_set_dir_path, ignore_errors=True)
         self.logger.debug("Deleting the test set directory!")
@@ -46,10 +48,10 @@ class DistributedKFoldSplit:
 
     def create_directories_content(
             self, train_set_problems: List[Path], test_set_problems: List[Path], trajectory_paths: List[Path],
-            fold_index: int) -> Tuple[Path, Path]:
+            fold_index: int, learning_algorithm: int) -> Tuple[Path, Path]:
         """Creates the content of the train and test set directories."""
-        fold_train_dir_path = self.train_set_dir_path / f"fold_{fold_index}"
-        fold_test_dir_path = self.test_set_dir_path / f"fold_{fold_index}"
+        fold_train_dir_path = self.train_set_dir_path / f"fold_{fold_index}_{learning_algorithm}"
+        fold_test_dir_path = self.test_set_dir_path / f"fold_{fold_index}_{learning_algorithm}"
         fold_train_dir_path.mkdir(exist_ok=True)
         fold_test_dir_path.mkdir(exist_ok=True)
         self._copy_domain(fold_train_dir_path)
@@ -84,8 +86,11 @@ class DistributedKFoldSplit:
                 train_set_trajectories = [
                     self.working_directory_path / f"{problem_path.stem}.trajectory" for
                     problem_path in fold_content["train"]]
-                train_test_paths.append(self.create_directories_content(
-                    fold_content["train"], fold_content["test"], train_set_trajectories, index))
+                for learning_algorithm in self._learning_algorithms:
+                    self.logger.debug("Creating fold directories content for each learning algorithm.")
+                    train_test_paths.append(self.create_directories_content(
+                        fold_content["train"], fold_content["test"], train_set_trajectories, index, learning_algorithm))
+
                 self.logger.debug("Finished creating fold!")
 
             return train_test_paths
@@ -107,9 +112,11 @@ class DistributedKFoldSplit:
                                       i not in test_set_indices]
             self.logger.info(f"Created a new fold - train set has the following problems: {train_set_problems} "
                              f"and test set had the following problems: {test_set_problems}")
-            train_test_paths.append(
-                self.create_directories_content(train_set_problems, test_set_problems, train_set_trajectories,
-                                                fold_index))
+            for learning_algorithm in self._learning_algorithms:
+                train_test_paths.append(
+                    self.create_directories_content(train_set_problems, test_set_problems, train_set_trajectories,
+                                                    fold_index, learning_algorithm))
+
             folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
                 "train": [str(p.absolute()) for p in train_set_problems],
                 "test": [str(p.absolute()) for p in test_set_problems]

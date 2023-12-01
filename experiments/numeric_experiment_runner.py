@@ -2,6 +2,8 @@
 import argparse
 import json
 import logging
+import uuid
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 
@@ -23,7 +25,6 @@ LEARNING_ALGORITHMS = {
     LearningAlgorithmType.naive_polysam: NaivePolynomialSAMLearning,
     LearningAlgorithmType.raw_naive_nsam: NaiveNumericSAMLearner,
     LearningAlgorithmType.raw_naive_polysam: NaivePolynomialSAMLearning,
-
 }
 
 NO_INSIGHT_NUMERIC_ALGORITHMS = [
@@ -33,16 +34,7 @@ NO_INSIGHT_NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.raw_naive_polysam.value
 ]
 
-MAP_TO_OTHER_COMPARED_VERSIONS = {
-    LearningAlgorithmType.numeric_sam: [LearningAlgorithmType.numeric_sam,
-                                        LearningAlgorithmType.naive_nsam,
-                                        LearningAlgorithmType.raw_numeric_sam,
-                                        LearningAlgorithmType.raw_naive_nsam],
-    LearningAlgorithmType.polynomial_sam: [LearningAlgorithmType.polynomial_sam,
-                                           LearningAlgorithmType.naive_polysam,
-                                           LearningAlgorithmType.raw_polynomial_nsam,
-                                           LearningAlgorithmType.raw_naive_polysam]
-}
+MAX_SIZE_MB = 1
 
 
 class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
@@ -53,7 +45,6 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
                  solver_type: SolverType, problem_prefix: str = "pfile"):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=learning_algorithm, solver_type=solver_type, problem_prefix=problem_prefix)
-        self._internal_learning_algorithm = learning_algorithm
         with open(fluents_map_path, "rt") as json_file:
             self._internal_fluents_map = json.load(json_file)
 
@@ -85,17 +76,8 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the directory containing the test set problems.
         """
         self._init_semantic_performance_calculator(test_set_path=test_set_dir_path)
-        for version_to_iterate in MAP_TO_OTHER_COMPARED_VERSIONS[self._internal_learning_algorithm]:
-            self.fluents_map = self._internal_fluents_map if (version_to_iterate.value not in
-                                                              NO_INSIGHT_NUMERIC_ALGORITHMS) else None
-
-            self._learning_algorithm = version_to_iterate
-            self.domain_validator.learning_algorithm = version_to_iterate
-            self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
-            self.domain_validator.clear_statistics()
-
-        self.domain_validator.learning_algorithm = self._internal_learning_algorithm
-        self.domain_validator.write_complete_joint_statistics(fold_num)
+        self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
+        self.domain_validator.clear_statistics()
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -104,7 +86,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--working_directory_path", required=True,
                         help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
-    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[3, 4, 6, 14, 15, 16],
+    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[3, 4, 6, 14, 15, 16, 17],
                         help="The type of learning algorithm. "
                              "\n3: numeric_sam\n4: raw_numeric_sam\n 6: polynomial_sam\n ")
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "
@@ -119,25 +101,45 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
+def configure_logger(args: argparse.Namespace):
+    """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
+    learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
+    working_directory_path = Path(args.working_directory_path)
+    logs_directory_path = working_directory_path / "logs"
+    logs_directory_path.mkdir(exist_ok=True)
+    # Create a rotating file handler
+    max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
+    file_handler = RotatingFileHandler(
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
+        maxBytes=max_bytes, backupCount=0)
+
+    # Create a formatter and set it for the handler
+    formatter = logging.Formatter('%(asctime)s -%(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+
+    logging.basicConfig(
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+        handlers=[file_handler])
+
+
 def main():
     args = parse_arguments()
+    configure_logger(args)
+    learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
     working_directory_path = Path(args.working_directory_path)
     offline_learner = OfflineNumericExperimentRunner(
         working_directory_path=working_directory_path,
         domain_file_name=args.domain_file_name,
-        learning_algorithm=LearningAlgorithmType(args.learning_algorithm),
+        learning_algorithm=learning_algorithm,
         fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
         solver_type=SolverType(args.solver_type),
         problem_prefix=args.problems_prefix)
     offline_learner.run_fold(
         fold_num=args.fold_number,
-        train_set_dir_path=(working_directory_path / "train") / f"fold_{args.fold_number}",
-        test_set_dir_path=(working_directory_path / "test") / f"fold_{args.fold_number}")
+        train_set_dir_path=(working_directory_path / "train") / f"fold_{args.fold_number}_{args.learning_algorithm}",
+        test_set_dir_path=(working_directory_path / "test") / f"fold_{args.fold_number}_{args.learning_algorithm}")
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
     main()

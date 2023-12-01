@@ -2,6 +2,7 @@
 import argparse
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +24,8 @@ NO_INSIGHT_NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.raw_numeric_sam.value,
     LearningAlgorithmType.raw_polynomial_nsam.value,
 ]
+
+MAX_SIZE_MB = 1
 
 
 class PIL:
@@ -179,6 +182,21 @@ def parse_arguments() -> argparse.Namespace:
 
 def main():
     args = parse_arguments()
+    # Create a rotating file handler
+    max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
+    file_handler = RotatingFileHandler(
+        f"log_{args.domain_file_name}_fold_{args.fold_number}", maxBytes=max_bytes, backupCount=1)
+
+    # Create a formatter and set it for the handler
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+        handlers=[file_handler])
+
     learner = PIL(working_directory_path=Path(args.working_directory_path),
                   domain_file_name=args.domain_file_name,
                   solver_type=SolverType(args.solver_type),
