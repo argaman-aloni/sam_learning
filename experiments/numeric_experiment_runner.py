@@ -46,7 +46,10 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=learning_algorithm, solver_type=solver_type, problem_prefix=problem_prefix)
         with open(fluents_map_path, "rt") as json_file:
-            self._internal_fluents_map = json.load(json_file)
+            self.fluents_map = json.load(json_file)
+
+        if learning_algorithm.value in NO_INSIGHT_NUMERIC_ALGORITHMS:
+            self.fluents_map = None
 
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
@@ -111,7 +114,7 @@ def configure_logger(args: argparse.Namespace):
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
         logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
-        maxBytes=max_bytes, backupCount=0)
+        maxBytes=max_bytes, backupCount=1)
 
     # Create a formatter and set it for the handler
     formatter = logging.Formatter('%(asctime)s -%(name)s - %(levelname)s - %(message)s')

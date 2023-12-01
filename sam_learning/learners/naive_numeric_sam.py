@@ -2,11 +2,12 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, Predicate
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain
 
-from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
-    PolynomialFluentsLearningAlgorithm, LearnerAction, EquationSolutionType
+from sam_learning.core import LearnerDomain, NumericFunctionMatcher, NotSafeActionError, \
+    LearnerAction, EquationSolutionType
 from sam_learning.core.naive_numeric_fluent_learner_algorithm import NaiveNumericFluentStateStorage
+from sam_learning.core.naive_polynomial_fluents_learning_algorithm import NaivePolynomialFluentsLearningAlgorithm
 from sam_learning.learners.sam_learning import SAMLearner
 
 
@@ -92,7 +93,7 @@ class NaiveNumericSAMLearner(SAMLearner):
             grounded_action, self.triplet_snapshot.previous_state_functions)
         next_state_lifted_matches = self.function_matcher.match_state_functions(
             grounded_action, self.triplet_snapshot.next_state_functions)
-        self.storage[grounded_action.name] = NumericFluentStateStorage(
+        self.storage[grounded_action.name] = NaiveNumericFluentStateStorage(
             grounded_action.name, self.partial_domain.functions)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
@@ -164,7 +165,7 @@ class NaiveNumericSAMLearner(SAMLearner):
 
 class NaivePolynomialSAMLearning(NaiveNumericSAMLearner):
     """The Extension of SAM that is able to learn polynomial state variables."""
-    storage: Dict[str, PolynomialFluentsLearningAlgorithm]
+    storage: Dict[str, NaivePolynomialFluentsLearningAlgorithm]
     polynom_degree: int
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
@@ -186,7 +187,7 @@ class NaivePolynomialSAMLearning(NaiveNumericSAMLearner):
             grounded_action, previous_state.state_fluents)
         next_state_lifted_matches = self.function_matcher.match_state_functions(
             grounded_action, next_state.state_fluents)
-        self.storage[grounded_action.name] = PolynomialFluentsLearningAlgorithm(
+        self.storage[grounded_action.name] = NaivePolynomialFluentsLearningAlgorithm(
             grounded_action.name, self.polynom_degree, self.partial_domain.functions, is_verbose=True)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)

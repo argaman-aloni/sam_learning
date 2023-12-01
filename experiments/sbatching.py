@@ -91,7 +91,7 @@ def execute_experiment_setup_batch(
         code_directory, configuration, environment_variables, experiment, experiment_index, total_run_time):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     fold_creation_sid = submit_job(
-        conda_env='online_nsam', mem="32G",
+        conda_env='online_nsam', mem="6G",
         python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
         suppress_output=False,
@@ -112,7 +112,7 @@ def execute_experiment_setup_batch(
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids):
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
     statistics_collection_job = submit_job(
-        conda_env='online_nsam', mem="32G",
+        conda_env='online_nsam', mem="6G",
         python_file=f"{code_directory}/distributed_results_collector.py",
         dependency=f"afterok:{':'.join([str(e) for e in job_ids])}",
         jobname=f"collect_statistics_{experiment['domain_file_name']}",
@@ -155,12 +155,12 @@ def main():
             experiment_termination_ids[f"{experiment['domain_file_name']}"] = []
             for version_index, compared_version in enumerate(experiment["compared_versions"]):
                 current_iteration = (experiment_index + 1) * configuration["num_folds"] * version_index + fold + 2
-                arguments = [f"--{key} {value}" for key, value in experiment.items()]
+                arguments = [f"--{key} {value}" for key, value in experiment.items() if key != "compared_versions"]
                 arguments.append(f"--fold_number {fold}")
                 arguments.append(f"--learning_algorithm {compared_version}")
                 sid = submit_job(
                     conda_env='online_nsam', mem="32G",
-                    python_file=f"{code_directory}/{configuration['experiments_script_path']}.py",
+                    python_file=f"{code_directory}/{configuration['experiments_script_path']}",
                     jobname=f"run_experiment_{experiment['domain_file_name']}_{fold}",
                     dependency=f"afterok:{fold_creation_sid}",
                     suppress_output=False,
