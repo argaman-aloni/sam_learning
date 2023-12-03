@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict
 
 FAST_DOWNWARD_DIR_PATH = os.environ["FAST_DOWNWARD_DIR_PATH"]
-
+MAX_RUNNING_TIME = 60  # seconds
 
 class FastDownwardSolver:
     """Class designated to use to activate the metric-FF solver on the cluster and parse its result."""
@@ -40,7 +40,7 @@ class FastDownwardSolver:
 
     def execute_solver(
             self, problems_directory_path: Path, domain_file_path: Path, problems_prefix: str = "pfile",
-            tolerance: float = 0.01) -> Dict[str, str]:
+            tolerance: float = 0.01, solving_timeout: int = MAX_RUNNING_TIME) -> Dict[str, str]:
         """Runs the Fast Downward solver on all the problems in the given directory.
 
         :param problems_directory_path: the path to the directory containing the problems.
@@ -55,7 +55,7 @@ class FastDownwardSolver:
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
             solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            running_options = ["--overall-time-limit", "60s",
+            running_options = ["--overall-time-limit", f"{solving_timeout}s",
                                "--plan-file", str(solution_path.absolute()),
                                "--sas-file", f"{domain_file_path.stem}_output.sas",
                                str(domain_file_path.absolute()),

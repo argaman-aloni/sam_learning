@@ -8,6 +8,7 @@ from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
     extract_predicate_data
+from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
 
 
@@ -436,6 +437,7 @@ class ConditionalSAM(SAMLearner):
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
+        self.partial_domain.requirements.extend([DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ])
         super().start_measure_learning_time()
         super().deduce_initial_inequality_preconditions()
         for observation in observations:

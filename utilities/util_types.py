@@ -28,7 +28,7 @@ class SolverType(Enum):
     fast_downward = 1
     metric_ff = 2
     enhsp = 3
-
+    fast_forward = 4
 
 class SolutionOutputTypes(Enum):
     ok = 1

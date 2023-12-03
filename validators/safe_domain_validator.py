@@ -16,7 +16,8 @@ from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, \
 SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,
     SolverType.metric_ff: MetricFFSolver,
-    SolverType.enhsp: ENHSPSolver
+    SolverType.enhsp: ENHSPSolver,
+    SolverType.fast_forward: FFADLSolver
 }
 
 SOLVING_STATISTICS = [

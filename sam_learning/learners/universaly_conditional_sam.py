@@ -8,6 +8,8 @@ from pddl_plus_parser.models import Domain, State, ActionCall, Observation, \
 
 from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
     create_additional_parameter_name, find_unique_objects_by_type
+from sam_learning.core.learner_domain import CONDITIONAL_EFFECTS_REQ, DISJUNCTIVE_PRECONDITIONS_REQ, \
+    UNIVERSAL_PRECONDITIONS_REQ
 from sam_learning.learners.conditional_sam import ConditionalSAM
 
 
@@ -393,6 +395,8 @@ class UniversallyConditionalSAM(ConditionalSAM):
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
+        self.partial_domain.requirements.extend(
+            [DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ, UNIVERSAL_PRECONDITIONS_REQ])
         super().start_measure_learning_time()
         super().deduce_initial_inequality_preconditions()
         for observation in observations:
