@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Tuple
 
 from pddl_plus_parser.models import Observation, Domain
 
-from experiments.basic_experiment_runner import OfflineBasicExperimentRunner
+from experiments.basic_experiment_runner import OfflineBasicExperimentRunner, configure_logger
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericSAMLearner, PolynomialSAMLearning, UniversallyConditionalSAM
 from utilities import LearningAlgorithmType, SolverType
@@ -34,7 +34,7 @@ class OfflineConditionalEffectsExperimentRunner(OfflineBasicExperimentRunner):
         self.domain_validator = DomainValidator(
             self.working_directory_path, LearningAlgorithmType.universal_sam,
             self.working_directory_path / domain_file_name,
-            solver_type=SolverType.metric_ff, problem_prefix=problem_prefix)
+            solver_type=SolverType.fast_forward, problem_prefix=problem_prefix)
 
     def _apply_learning_algorithm(
             self, partial_domain: Domain, allowed_observations: List[Observation],
@@ -52,6 +52,17 @@ class OfflineConditionalEffectsExperimentRunner(OfflineBasicExperimentRunner):
                                             universals_map=self.action_to_universals_map)
         return learner.learn_action_model(allowed_observations)
 
+    def run_fold(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
+        """Runs the numeric action model learning algorithms on the input fold.
+
+        :param fold_num: the number of the fold to run.
+        :param train_set_dir_path: the path to the directory containing the training set problems.
+        :param test_set_dir_path: the path to the directory containing the test set problems.
+        """
+        self._init_semantic_performance_calculator(test_set_path=test_set_dir_path)
+        self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
+        self.domain_validator.clear_statistics()
+
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -62,28 +73,32 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--universals_map", required=False,
                         help="The path to the file mapping indicating whether there are universals or not",
                         default=None)
+    parser.add_argument("--learning_algorithm", required=True, type=int, help="The type of learning algorithm. "
+                             "\n3: numeric_sam\n4: raw_numeric_sam\n 6: polynomial_sam\n ")
     parser.add_argument("--max_antecedent_size", required=False, type=int, help="The maximum antecedent size",
                         default=1)
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
+    parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     args = parser.parse_args()
     return args
 
 
 def main():
     args = parse_arguments()
+    configure_logger(args)
+    working_directory_path = Path(args.working_directory_path)
     offline_learner = OfflineConditionalEffectsExperimentRunner(
-        working_directory_path=Path(args.working_directory_path),
+        working_directory_path=working_directory_path,
         domain_file_name=args.domain_file_name,
         universals_map_path=Path(args.universals_map) if args.universals_map else None,
         max_num_antecedents=args.max_antecedent_size or 0,
         problem_prefix=args.problems_prefix)
-    offline_learner.run_cross_validation()
+    offline_learner.run_fold(
+        fold_num=args.fold_number,
+        train_set_dir_path=(working_directory_path / "train") / f"fold_{args.fold_number}_{args.learning_algorithm}",
+        test_set_dir_path=(working_directory_path / "test") / f"fold_{args.fold_number}_{args.learning_algorithm}")
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
     main()

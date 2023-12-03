@@ -144,8 +144,8 @@ class NaiveConvexHullLearner:
             relevant_fluents is not None else []
         state_data = DataFrame(state_storge).drop_duplicates().drop(columns=irrelevant_fluents)
         if relevant_fluents is not None and len(relevant_fluents) == 1:
-            raise NotSafeActionError(name=self.action_name, reason="cannot create a convex hull from one sample!",
-                                     solution_type=EquationSolutionType.convex_hull_not_found)
+            self.logger.debug("Only one dimension is needed in the preconditions!")
+            return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         try:
             A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(

@@ -1,15 +1,12 @@
 """Runs experiments for the numeric model learning algorithms."""
 import argparse
 import json
-import logging
-import uuid
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 
 from pddl_plus_parser.models import Observation, Domain
 
-from experiments.basic_experiment_runner import OfflineBasicExperimentRunner
+from experiments.basic_experiment_runner import OfflineBasicExperimentRunner, configure_logger
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import NumericSAMLearner, PolynomialSAMLearning
 from sam_learning.learners.naive_numeric_sam import NaiveNumericSAMLearner, NaivePolynomialSAMLearning
@@ -33,8 +30,6 @@ NO_INSIGHT_NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.raw_naive_nsam.value,
     LearningAlgorithmType.raw_naive_polysam.value
 ]
-
-MAX_SIZE_MB = 1
 
 
 class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
@@ -102,28 +97,6 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     args = parser.parse_args()
     return args
-
-
-def configure_logger(args: argparse.Namespace):
-    """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
-    learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
-    working_directory_path = Path(args.working_directory_path)
-    logs_directory_path = working_directory_path / "logs"
-    logs_directory_path.mkdir(exist_ok=True)
-    # Create a rotating file handler
-    max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
-    file_handler = RotatingFileHandler(
-        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
-        maxBytes=max_bytes, backupCount=1)
-
-    # Create a formatter and set it for the handler
-    formatter = logging.Formatter('%(asctime)s -%(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-
-    logging.basicConfig(
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO,
-        handlers=[file_handler])
 
 
 def main():

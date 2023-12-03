@@ -25,7 +25,7 @@ NO_INSIGHT_NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.raw_polynomial_nsam.value,
 ]
 
-MAX_SIZE_MB = 1
+MAX_SIZE_MB = 10
 
 
 class PIL:
@@ -78,8 +78,8 @@ class PIL:
         :param fold_num: the index of the current folder that is currently running.
         """
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
-        train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}"
-        test_set_dir_path = self.working_directory_path / "test" / f"fold_{fold_num}"
+        train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{self._learning_algorithm.value}"
+        test_set_dir_path = self.working_directory_path / "test" / f"fold_{fold_num}_{self._learning_algorithm.value}"
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
@@ -102,16 +102,14 @@ class PIL:
             if goal_achieved:
                 self.logger.info("The agent successfully solved the current task!")
 
-            if (problem_index + 1) % 200 == 0:
-                break
-
-            if (problem_index + 1) % 10 == 0:
+            if (problem_index + 1) % 100 == 0:
                 solved_all_test_problems = self.validate_learned_domain(
                     learned_model, test_set_dir_path, episode_number=problem_index + 1,
                     num_steps_in_episode=num_steps_in_episode, fold_num=fold_num,
                     num_goal_achieved=num_training_goal_achieved)
                 episode_stats_path = self.working_directory_path / "results_directory" / \
-                                     f"fold_{fold_num}_episode_{problem_index + 1}_info.csv"
+                                     (f"fold_{self._learning_algorithm.name}_{fold_num}"
+                                      f"_episode_{problem_index + 1}_info.csv")
                 episode_info_recorder.export_statistics(episode_stats_path)
                 num_training_goal_achieved = 0
                 if solved_all_test_problems:
@@ -136,8 +134,11 @@ class PIL:
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
-        self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"online_nsam_{self._learning_algorithm.name}_fold_{fold_num}_{learned_model.name}_episode_{episode_number}.pddl")
+        domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
+        domains_backup_dir_path.mkdir(exist_ok=True)
+        self.export_learned_domain(learned_model, domains_backup_dir_path,
+                                   f"online_nsam_{self._learning_algorithm.name}_fold_{fold_num}_"
+                                   f"{learned_model.name}_episode_{episode_number}.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         all_possible_solution_types = [solution_type.name for solution_type in SolutionOutputTypes]
 
@@ -180,23 +181,31 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-def main():
-    args = parse_arguments()
+def configure_logger(args: argparse.Namespace):
+    """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
+    learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
+    working_directory_path = Path(args.working_directory_path)
+    logs_directory_path = working_directory_path / "logs"
+    logs_directory_path.mkdir(exist_ok=True)
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
-        f"log_{args.domain_file_name}_fold_{args.fold_number}", maxBytes=max_bytes, backupCount=1)
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
+        maxBytes=max_bytes, backupCount=1)
 
     # Create a formatter and set it for the handler
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s -%(name)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
 
     logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.INFO,
         handlers=[file_handler])
 
+
+def main():
+    args = parse_arguments()
+    configure_logger(args)
     learner = PIL(working_directory_path=Path(args.working_directory_path),
                   domain_file_name=args.domain_file_name,
                   solver_type=SolverType(args.solver_type),
@@ -207,8 +216,4 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
     main()

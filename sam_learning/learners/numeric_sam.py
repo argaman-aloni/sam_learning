@@ -6,6 +6,7 @@ from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Prec
 
 from sam_learning.core import LearnerDomain, NumericFluentStateStorage, NumericFunctionMatcher, NotSafeActionError, \
     PolynomialFluentsLearningAlgorithm, LearnerAction
+from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
 
 
@@ -49,6 +50,7 @@ class NumericSAMLearner(SAMLearner):
 
         self.logger.debug("The learned preconditions are not a conjunction. Adding them as a separate condition.")
         action.preconditions.add_condition(learned_numeric_preconditions)
+        self.partial_domain.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
 
     def _construct_safe_numeric_effects(self, action: LearnerAction, allow_unsafe_learning: bool = False) -> None:
         """Constructs the safe numeric effects for the input action.

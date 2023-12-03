@@ -5,7 +5,8 @@ from typing import List, Dict, Tuple, Optional
 from pddl_plus_parser.models import Observation, ActionCall, State, Domain
 
 from sam_learning.core import LearnerDomain, NumericFunctionMatcher, NotSafeActionError, \
-    LearnerAction, EquationSolutionType
+    LearnerAction
+from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
 from sam_learning.core.naive_numeric_fluent_learner_algorithm import NaiveNumericFluentStateStorage
 from sam_learning.core.naive_polynomial_fluents_learning_algorithm import NaivePolynomialFluentsLearningAlgorithm
 from sam_learning.learners.sam_learning import SAMLearner
@@ -51,6 +52,7 @@ class NaiveNumericSAMLearner(SAMLearner):
 
         self.logger.debug("The learned preconditions are not a conjunction. Adding them as a separate condition.")
         action.preconditions.add_condition(learned_numeric_preconditions)
+        self.partial_domain.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
 
     def _construct_safe_numeric_effects(self, action: LearnerAction) -> None:
         """Constructs the safe numeric effects for the input action.
@@ -65,20 +67,15 @@ class NaiveNumericSAMLearner(SAMLearner):
             self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
             return
 
-        if learned_perfectly:
-            self.logger.debug(f"The effect of action - {action.name} were learned perfectly.")
-            if numeric_preconditions is not None:
-                for cond in numeric_preconditions.operands:
-                    if cond in action.preconditions.root:
-                        continue
+        self.logger.info(f"The effect of action - {action.name} were learned perfectly.")
+        if numeric_preconditions is not None:
+            for cond in numeric_preconditions.operands:
+                if cond in action.preconditions.root:
+                    continue
 
-                    action.preconditions.add_condition(cond)
+                action.preconditions.add_condition(cond)
 
-            return
-
-        raise NotSafeActionError(
-            name=action.name, reason="The effects were not learned perfectly.",
-            solution_type=EquationSolutionType.not_enough_data)
+        return
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.

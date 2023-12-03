@@ -1,5 +1,7 @@
 """The POL main framework - Compile, Learn and Plan."""
+import argparse
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Dict, Union, Tuple
 
@@ -26,6 +28,29 @@ NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.p
                       LearningAlgorithmType.raw_naive_polysam]
 
 DEFAULT_NUMERIC_TOLERANCE = 0.1
+MAX_SIZE_MB = 1
+
+
+def configure_logger(args: argparse.Namespace):
+    """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
+    learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
+    working_directory_path = Path(args.working_directory_path)
+    logs_directory_path = working_directory_path / "logs"
+    logs_directory_path.mkdir(exist_ok=True)
+    # Create a rotating file handler
+    max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
+    file_handler = RotatingFileHandler(
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
+        maxBytes=max_bytes, backupCount=1)
+
+    # Create a formatter and set it for the handler
+    formatter = logging.Formatter('%(asctime)s -%(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+
+    logging.basicConfig(
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+        handlers=[file_handler])
 
 
 class OfflineBasicExperimentRunner:
@@ -104,7 +129,11 @@ class OfflineBasicExperimentRunner:
             observed_objects.update(problem.objects)
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if index != 0 and (index + 1) % 2 != 0:
+            if index == 70:
+                # stopping all the experiments after 50 trajectories so that the experiments will not take too long
+                break
+
+            if index != 0 and (index + 1) % 5 != 0:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
@@ -126,11 +155,15 @@ class OfflineBasicExperimentRunner:
         :param allowed_observations: the observations that were used in the learning process.
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
+        :param fold_number: the number of the fold that is currently running.
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
-        self.export_learned_domain(learned_model, self.working_directory_path / "results_directory",
-                                   f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}_{len(allowed_observations)}_trajectories.pddl")
+        domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
+        domains_backup_dir_path.mkdir(exist_ok=True)
+        self.export_learned_domain(learned_model, domains_backup_dir_path,
+                                   f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
+                                   f"_{len(allowed_observations)}_trajectories.pddl")
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
@@ -156,14 +189,16 @@ class OfflineBasicExperimentRunner:
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
+                                                  timeout=60)
 
             self.domain_validator.solver = FastDownwardSolver()
             self.domain_validator._solver_name = "fast_downward"
             self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE)
+                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
+                                                  timeout=60)
         return domain_file_path
 
     def run_cross_validation(self) -> None:

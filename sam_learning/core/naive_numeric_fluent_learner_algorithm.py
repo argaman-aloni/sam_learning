@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple, Optional, Set
 import numpy as np
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 
+from sam_learning.core import NotSafeActionError, EquationSolutionType
 from sam_learning.core.naive_convex_hull_learner import NaiveConvexHullLearner
 from sam_learning.core.naive_linear_regression_learner import NaiveLinearRegressionLearner
 
@@ -24,6 +25,7 @@ class NaiveNumericFluentStateStorage:
         self.logger = logging.getLogger(__name__)
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
+        self.action_name = action_name
         self.convex_hull_learner = NaiveConvexHullLearner(action_name, domain_functions)
         self.linear_regression_learner = NaiveLinearRegressionLearner(action_name, domain_functions)
 
@@ -64,9 +66,20 @@ class NaiveNumericFluentStateStorage:
 
         :return: The precondition that contains the linear inequalities.
         """
-
         return self.convex_hull_learner.construct_safe_linear_inequalities(
             self.previous_state_storage, relevant_fluents)
+
+    def _validate_safe_solving(self) -> None:
+        """Validates that it is safe to apply linear regression to solve the input equations."""
+        for lifted_function in self.next_state_storage:
+            num_variables = len(self.previous_state_storage)
+            num_equations = len(self.next_state_storage[lifted_function])
+            # validate that it is possible to solve linear equations at all.
+            if num_equations < num_variables or num_equations == num_variables == 1:
+                failure_reason = f"Cannot solve linear equations when too little input equations given."
+                self.logger.warning(failure_reason)
+                raise NotSafeActionError(
+                    self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 
     def construct_assignment_equations(
             self, allow_unsafe_learning: bool = False) -> Tuple[
@@ -76,5 +89,6 @@ class NaiveNumericFluentStateStorage:
         :param allow_unsafe_learning: whether to allow learning from unsafe data.
         :return: the constructed assignment statements.
         """
+        self._validate_safe_solving()
         return self.linear_regression_learner.construct_assignment_equations(
             self.previous_state_storage, self.next_state_storage, allow_unsafe_learning=allow_unsafe_learning)

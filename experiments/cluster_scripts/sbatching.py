@@ -103,7 +103,7 @@ def execute_experiment_setup_batch(
         environment_variables=environment_variables)
     print(f"Submitted job with sid {fold_creation_sid}\n")
     progress_bar(experiment_index * configuration["num_folds"] + 1, total_run_time)
-    time.sleep(5)
+    time.sleep(1)
     print("Removing the temp.sh file")
     pathlib.Path('temp.sh').unlink()
     return fold_creation_sid
@@ -125,9 +125,14 @@ def execute_statistics_collection_job(code_directory, configuration, environment
         ],
         environment_variables=environment_variables)
     print(f"Submitted job with sid {statistics_collection_job}\n")
-    time.sleep(5)
+    time.sleep(1)
     print("Removing the temp.sh for the statistics collection file")
     pathlib.Path('temp.sh').unlink()
+
+
+def write_contextual_sids_to_file(contextual_sids):
+    with open("contextual_sids.json", "wt") as contextual_sids_file:
+        json.dump(contextual_sids, contextual_sids_file)
 
 
 def main():
@@ -151,8 +156,8 @@ def main():
         fold_creation_sid = execute_experiment_setup_batch(code_directory, configuration, environment_variables,
                                                            experiment, experiment_index, total_run_time)
 
+        experiment_termination_ids[f"{experiment['domain_file_name']}"] = []
         for fold in range(configuration["num_folds"]):
-            experiment_termination_ids[f"{experiment['domain_file_name']}"] = []
             for version_index, compared_version in enumerate(experiment["compared_versions"]):
                 current_iteration = (experiment_index + 1) * configuration["num_folds"] * version_index + fold + 2
                 arguments = [f"--{key} {value}" for key, value in experiment.items() if key != "compared_versions"]
@@ -171,13 +176,15 @@ def main():
                 # collects the data will be called and will combine the data together.
                 experiment_termination_ids[f"{experiment['domain_file_name']}"].append(sid)
                 progress_bar(current_iteration, total_run_time)
-                time.sleep(5)
+                time.sleep(1)
                 pathlib.Path('temp.sh').unlink()
 
         print("Finished building the experiment folds!")
         execute_statistics_collection_job(
             code_directory, configuration, environment_variables,
             experiment, experiment_termination_ids[f"{experiment['domain_file_name']}"])
+
+    write_contextual_sids_to_file(experiment_termination_ids)
 
 
 if __name__ == '__main__':

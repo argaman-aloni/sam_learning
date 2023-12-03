@@ -309,6 +309,7 @@ class NaiveLinearRegressionLearner:
             raise NotSafeActionError(name=self.action_name, reason="Not enough data to learn the numeric effects!",
                                      solution_type=EquationSolutionType.not_enough_data)
 
+        self.logger.info(f"Finished constructing the assignment statements for the action {self.action_name}.")
         return (construct_numeric_effects(assignment_statements, self.domain_functions),
                 construct_numeric_conditions(combined_conditions, ConditionType.conjunctive, self.domain_functions),
                 True)
