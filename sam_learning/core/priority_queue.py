@@ -64,7 +64,7 @@ class PriorityQueue:
         :param priority: the priority of the action.
         :param selection_probability: the probability of selecting the action in case of tie-breaking.
         """
-        normalized_priority = round(priority, 4)
+        normalized_priority = round(priority, 2)
         self._prioritized_queue[normalized_priority].append((item, selection_probability))
 
     def __len__(self) -> int:

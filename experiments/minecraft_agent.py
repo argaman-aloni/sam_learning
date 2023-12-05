@@ -79,6 +79,11 @@ class MinecraftAgent(AbstractAgent):
                     filtered_actions.add(action)
 
             elif len(action.parameters) == 1:   # BREAK, CRAFT_TREE_TAP, CRAFT_WOODEN_POGO, PLACE_TREE_TAP
+                if ((action.name == "craft_tree_tap" or action.name == "craft_wooden_pogo") and
+                        (action.parameters[0] == "crafting_table")):
+                    # the agent can only craft a tree tap or a wooden pogo if the position is not the crafting table.
+                    continue
+
                 if action.parameters[0] == position:
                     filtered_actions.add(action)
 

@@ -421,7 +421,7 @@ def test_is_non_informative_safe_returns_true_when_the_point_is_in_the_positive_
         new_func.set_value(0.5)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates._is_non_informative_safe(
+    assert information_gain_learner_no_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
@@ -439,7 +439,7 @@ def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_the_ch(
         new_func.set_value(1.5)
         new_sample[function_name] = new_func
 
-    assert not information_gain_learner_no_predicates._is_non_informative_safe(
+    assert not information_gain_learner_no_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
@@ -456,7 +456,7 @@ def test_is_non_informative_safe_returns_false_when_the_point_is_not_in_range_wh
         new_func.set_value(1.5)
         new_sample[function_name] = new_func
 
-    assert not information_gain_learner_no_predicates._is_non_informative_safe(
+    assert not information_gain_learner_no_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
@@ -473,7 +473,7 @@ def test_is_non_informative_safe_returns_true_when_the_point_is_in_range_when_on
         new_func.set_value(1)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates._is_non_informative_safe(
+    assert information_gain_learner_no_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
@@ -499,7 +499,7 @@ def test_is_non_informative_safe_returns_true_when_the_predicates_in_the_state_a
     information_gain_learner_with_predicates.positive_discrete_sample_df = DataFrame(data={
         p.untyped_representation: [1] for p in new_discrete_sample
     })
-    assert information_gain_learner_with_predicates._is_non_informative_safe(
+    assert information_gain_learner_with_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=new_discrete_sample)
 
 
@@ -523,7 +523,7 @@ def test_is_non_informative_safe_returns_false_when_predicates_are_contained_in_
     })
     information_gain_learner_with_predicates.numeric_positive_samples = positive_samples_df
     information_gain_learner_with_predicates.lifted_predicates = [p.untyped_representation for p in new_discrete_sample]
-    assert not information_gain_learner_with_predicates._is_non_informative_safe(
+    assert not information_gain_learner_with_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=test_predicates)
 
 
@@ -549,7 +549,7 @@ def test_is_non_informative_safe_returns_false_when_some_predicates_are_missing_
     information_gain_learner_with_predicates.positive_discrete_sample_df = DataFrame(data={
         p.untyped_representation: [1 for _ in range(10)] for p in test_predicates
     })
-    assert not information_gain_learner_with_predicates._is_non_informative_safe(
+    assert not information_gain_learner_with_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=new_discrete_sample)
 
 
@@ -560,7 +560,7 @@ def test_is_non_informative_safe_returns_action_informative_when_not_observed_be
     for predicate_set in initial_state.state_predicates.values():
         state_predicates.extend(predicate_set)
 
-    assert not depot_numeric_information_gain_learner._is_non_informative_safe(
+    assert not depot_numeric_information_gain_learner._is_applicable_and_non_informative(
         new_numeric_sample=initial_state.state_fluents, new_propositional_sample=state_predicates)
 
 
@@ -580,7 +580,7 @@ def test_is_non_informative_safe_returns_false_when_the_relevant_fluents_is_empt
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert not information_gain_learner_with_predicates._is_non_informative_safe(
+    assert not information_gain_learner_with_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_sample,
         new_propositional_sample=[p for p in test_predicates if p in new_discrete_sample],
         relevant_numeric_features=[])
@@ -604,7 +604,7 @@ def test_is_non_informative_safe_returns_true_when_the_relevant_fluents_is_empty
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
     information_gain_learner_with_predicates._effects_learned_perfectly = True
-    assert information_gain_learner_with_predicates._is_non_informative_safe(
+    assert information_gain_learner_with_predicates._is_applicable_and_non_informative(
         new_numeric_sample=new_sample,
         new_propositional_sample=[p for p in test_predicates if p in new_discrete_sample],
         relevant_numeric_features=[])
@@ -632,7 +632,7 @@ def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert information_gain_learner_no_predicates._is_non_informative_unsafe(
+    assert information_gain_learner_no_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
@@ -669,7 +669,7 @@ def test_is_non_informative_unsafe_returns_true_when_a_negative_point_is_in_the_
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert information_gain_learner_with_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample, new_propositional_sample=new_discrete_sample)
 
 
@@ -707,7 +707,7 @@ def test_is_non_informative_unsafe_returns_true_when_a_non_of_the_negative_sampl
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert not information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert not information_gain_learner_with_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample, new_propositional_sample=new_discrete_sample)
 
 
@@ -735,7 +735,7 @@ def test_is_non_informative_unsafe_should_return_false_when_the_relevant_fluents
     negative_samples[new_func.name] = [1.5]
     information_gain_learner_with_predicates.negative_combined_sample_df = DataFrame(data=negative_samples)
 
-    assert not information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert not information_gain_learner_with_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample,
         new_propositional_sample=[p for p in test_predicates if p not in new_discrete_sample],
         relevant_numeric_features=[])
@@ -759,7 +759,7 @@ def test_is_non_informative_unsafe_should_return_true_when_the_relevant_fluents_
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
     information_gain_learner_with_predicates.add_negative_sample(new_sample, new_discrete_sample)
-    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert information_gain_learner_with_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample,
         new_propositional_sample=new_discrete_sample,
         relevant_numeric_features=[])
@@ -793,7 +793,7 @@ def test_is_non_informative_unsafe_should_return_true_when_the_relevant_fluents_
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert information_gain_learner_with_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample,
         new_propositional_sample=[p for p in test_predicates if p not in new_discrete_sample],
         relevant_numeric_features=[])
@@ -816,7 +816,7 @@ def test_is_non_informative_unsafe_returns_false_when_the_relevant_fluents_is_em
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert not information_gain_learner_with_predicates._is_non_informative_unsafe(
+    assert not information_gain_learner_with_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample,
         new_propositional_sample=random.choices(new_discrete_sample, k=2),
         relevant_numeric_features=[])
@@ -844,7 +844,7 @@ def test_is_non_informative_unsafe_returns_false_when_no_negative_point_is_in_th
     new_func.set_value(2.0)
     new_sample[new_func.name] = new_func
 
-    assert not information_gain_learner_no_predicates._is_non_informative_unsafe(
+    assert not information_gain_learner_no_predicates._is_definitely_not_applicable(
         new_numeric_sample=new_sample, new_propositional_sample=[])
 
 
@@ -870,7 +870,8 @@ def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_veri
         new_func.set_value(4)
         new_sample[function_name] = new_func
 
-    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert not informative
 
 
 def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_verifies_if_the_point_was_already_observed_positive(
@@ -895,7 +896,8 @@ def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_veri
         new_func.set_value(1)
         new_sample[function_name] = new_func
 
-    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert not informative
 
 
 def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_verifies_that_the_point_was_not_observed_in_the_negative_and_positive_samples(
@@ -920,7 +922,8 @@ def test_is_sample_informative_when_not_enough_points_to_create_convex_hull_veri
         new_func.set_value(index)
         new_sample[function_name] = new_func
 
-    assert information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert informative
 
 
 def test_is_sample_informative_when_can_create_convex_hull_and_point_is_in_ch_returns_that_the_point_is_not_informative(
@@ -941,7 +944,8 @@ def test_is_sample_informative_when_can_create_convex_hull_and_point_is_in_ch_re
         new_func.set_value(0.5)
         new_sample[function_name] = new_func
 
-    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert not informative
 
 
 def test_is_sample_informative_returns_zero_when_new_point_combined_with_positive_points_creates_a_hull_that_includes_a_negative_sample(
@@ -965,7 +969,8 @@ def test_is_sample_informative_returns_zero_when_new_point_combined_with_positiv
     y_function.set_value(2.0)
     new_sample["(y)"] = y_function
 
-    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert not informative
 
 
 def test_is_sample_informative_returns_value_greater_than_zero_when_new_point_should_be_informative(
@@ -989,7 +994,8 @@ def test_is_sample_informative_returns_value_greater_than_zero_when_new_point_sh
     y_function.set_value(-0.5)
     new_sample["(y)"] = y_function
 
-    assert information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert informative
 
 
 def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_checks_the_convex_hull_only_on_the_relevant_part_when_consts_are_equal(
@@ -1023,7 +1029,8 @@ def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_c
     w_function.set_value(1.0)
     new_sample["(w)"] = w_function
 
-    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert not informative
 
 
 def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal(
@@ -1057,7 +1064,8 @@ def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_c
     w_function.set_value(1.0)
     new_sample["(w)"] = w_function
 
-    assert not information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert not informative
 
 
 def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_checks_min_max_values_only_on_the_relevant_part_when_consts_are_equal_and_value_out_of_range(
@@ -1091,7 +1099,8 @@ def test_is_sample_informative_when_there_are_constant_features_in_the_dataset_c
     w_function.set_value(1.0)
     new_sample["(w)"] = w_function
 
-    assert information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [])
+    assert informative
 
 
 def test_is_sample_informative_when_using_relevant_features_with_a_single_features_only_examines_only_that_feature_for_the_informative_calculation(
@@ -1125,5 +1134,6 @@ def test_is_sample_informative_when_using_relevant_features_with_a_single_featur
     w_function.set_value(1.0)
     new_sample["(w)"] = w_function
 
-    assert not information_gain_learner_no_predicates.is_sample_informative(
-        new_sample, [], relevant_numeric_features=["(z)"])
+    informative, _ = information_gain_learner_no_predicates.is_sample_informative(new_sample, [],
+                                                                                  relevant_numeric_features=["(z)"])
+    assert not informative

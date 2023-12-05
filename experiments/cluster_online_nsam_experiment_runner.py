@@ -2,9 +2,15 @@
 import json
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 if __name__ == '__main__':
+    now = datetime.now()
+    # Format the date and time in a pretty way
+    formatted_date_time = now.strftime("%A, %B %d, %Y %I:%M %p")
+    print(f"Current date and time: {formatted_date_time}")
+
     args = sys.argv
     environment_file_path = Path(args[1]) / "environment.json"
     with open(environment_file_path, "rt") as environment_file:

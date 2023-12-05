@@ -52,23 +52,25 @@ class NumericSAMLearner(SAMLearner):
         action.preconditions.add_condition(learned_numeric_preconditions)
         self.partial_domain.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
 
-    def _construct_safe_numeric_effects(self, action: LearnerAction, allow_unsafe_learning: bool = False) -> None:
+    def _construct_safe_numeric_effects(self, action: LearnerAction, allow_unsafe_learning: bool = False) -> bool:
         """Constructs the safe numeric effects for the input action.
 
         :param action: the action that its effects are constructed for.
         :param allow_unsafe_learning: whether to allow unsafe learning of the effects.
+        :return: whether the effects were learned perfectly.
         """
         effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations(
             allow_unsafe_learning=allow_unsafe_learning)
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
+
         else:
             self.logger.debug(f"The action - {action.name} has no numeric effects.")
             action.numeric_effects = set()
 
         if self.preconditions_fluent_map is None:
             self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
-            return
+            return learned_perfectly
 
         if learned_perfectly:
             self.logger.debug(f"The effect of action - {action.name} were learned perfectly.")
@@ -79,7 +81,7 @@ class NumericSAMLearner(SAMLearner):
 
                     action.preconditions.add_condition(cond)
 
-            return
+            return learned_perfectly
 
         self.logger.debug(f"Creating restrictive numeric preconditions for the action.")
         restrictive_preconditions = Precondition("and")
@@ -92,6 +94,7 @@ class NumericSAMLearner(SAMLearner):
         self.preconditions_fluent_map = None
         self._construct_safe_numeric_preconditions(action)
         self.preconditions_fluent_map = fluents_map_backup
+        return learned_perfectly
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Adds a new action to the learned domain.

@@ -194,7 +194,7 @@ def configure_logger(args: argparse.Namespace):
         maxBytes=max_bytes, backupCount=1)
 
     # Create a formatter and set it for the handler
-    formatter = logging.Formatter('%(asctime)s -%(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
 
     logging.basicConfig(

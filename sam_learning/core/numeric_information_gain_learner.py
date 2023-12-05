@@ -1,7 +1,9 @@
 """A module containing the algorithm to calculate the information gain of new samples."""
+import copy
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError
@@ -76,7 +78,7 @@ class InformationGainLearner(NumericConsistencyValidator):
 
         return True
 
-    def is_applicable_in_domain(
+    def _is_applicable_in_domain(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
             relevant_numeric_features: Optional[List[str]] = None, use_cache: bool = False) -> bool:
         """Checks whether the new sample corresponds with the action's precondition.
@@ -136,7 +138,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         self.logger.debug("This is not a failed state.")
         return False
 
-    def _is_non_informative_safe(
+    def _is_applicable_and_non_informative(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
             relevant_numeric_features: Optional[List[str]] = None, use_cache: bool = False) -> bool:
         """Validate whether a new sample is non-informative according to the safe model.
@@ -156,7 +158,7 @@ class InformationGainLearner(NumericConsistencyValidator):
             runtime.
         :return: whether the new sample is non-informative according to the safe model.
         """
-        is_applicable = self.is_applicable_in_domain(
+        is_applicable = self._is_applicable_in_domain(
             new_numeric_sample, new_propositional_sample, relevant_numeric_features, use_cache)
 
         if not is_applicable:
@@ -172,7 +174,7 @@ class InformationGainLearner(NumericConsistencyValidator):
                           "Trying to see if the point has not been explored yet.")
         return self._locate_sample_in_df(sample_values, self.numeric_positive_samples) != -1
 
-    def _is_non_informative_unsafe(
+    def _is_definitely_not_applicable(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
             relevant_numeric_features: Optional[List[str]] = None) -> bool:
         """Tests whether a new sample is non-informative according to the unsafe model.
@@ -210,8 +212,7 @@ class InformationGainLearner(NumericConsistencyValidator):
         for _, negative_sample in self.negative_combined_sample_df.iterrows():
             # validate that when the discrete preconditions hold the numeric part does not include a negative sample.
             negative_discrete_sample = [negative_sample[discrete_preconditions][col] for col in new_discrete_df]
-            if (self._locate_sample_in_df(negative_discrete_sample, new_discrete_df) == -1
-                    and len(new_discrete_df.columns.tolist()) > 0):
+            if len(new_discrete_df.columns.tolist()) > 0 and any([val != 1 for val in negative_discrete_sample]):
                 # the new model does not contain the negative discrete sample.
                 continue
 
@@ -289,7 +290,7 @@ class InformationGainLearner(NumericConsistencyValidator):
 
     def is_sample_informative(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate],
-            use_cache: bool = False, relevant_numeric_features: Optional[List[str]] = None) -> bool:
+            use_cache: bool = False, relevant_numeric_features: Optional[List[str]] = None) -> Tuple[bool, bool]:
         """Checks whether the sample is informative.
 
         :param new_numeric_sample: the new sample to calculate whether it is informative.
@@ -299,25 +300,27 @@ class InformationGainLearner(NumericConsistencyValidator):
         :param relevant_numeric_features: the relevant numeric features to calculate the information gain for. If None,
             all the numeric features are used. This is used to reduce the runtime and reduce the dimensionality of
             the calculations.
-        :return: whether the sample is informative.
+        :return: whether the sample is informative as well as whether the action should be applicable.
         """
         self.logger.info("Calculating the information gain of a new sample.")
         # this way we maintain the order of the columns in the data frame.
         if (self._are_numeric_dataframes_empty()
                 and len(self.positive_discrete_sample_df) == 0 and len(self.negative_combined_sample_df) == 0):
             self.logger.debug("There are no samples to calculate the information gain from - action not observed yet.")
-            return True
+            return True, False
 
-        is_non_informative_safe = self._is_non_informative_safe(
+        definitely_applicable_and_non_informative = self._is_applicable_and_non_informative(
             new_numeric_sample, new_propositional_sample, use_cache=use_cache,
             relevant_numeric_features=relevant_numeric_features)
-        is_non_informative_unsafe = self._is_non_informative_unsafe(
-            new_numeric_sample, new_propositional_sample, relevant_numeric_features=relevant_numeric_features)
-        if is_non_informative_safe or is_non_informative_unsafe:
-            return False
 
-        self.logger.debug("The point is informative, calculating the information gain.")
-        return True
+        if definitely_applicable_and_non_informative:
+            self.logger.debug("We can avoid calculating the part where we check if the action is not applicable in this"
+                              " case since we know it is in fact applicable.")
+            return False, definitely_applicable_and_non_informative
+
+        definitely_not_applicable = self._is_definitely_not_applicable(
+            new_numeric_sample, new_propositional_sample, relevant_numeric_features=relevant_numeric_features)
+        return (not definitely_not_applicable), definitely_applicable_and_non_informative
 
     def calculate_information_gain(
             self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> float:
