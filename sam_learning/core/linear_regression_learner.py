@@ -299,6 +299,11 @@ class LinearRegressionLearner:
         is_safe_to_learn = self._validate_legal_equations(regression_df)
         for feature_fluent, tagged_fluent in zip(tested_fluents_names, tagged_next_state_fluents):
             regression_df[LABEL_COLUMN] = combined_data[tagged_fluent]
+            if combined_data[feature_fluent].equals(combined_data[tagged_fluent]) and is_safe_to_learn:
+                self.logger.debug(f"The value of the {feature_fluent} is the same before and "
+                                  f"after the application of the action. The action does not change the value!")
+                continue
+
             polynomial_equation = self._solve_linear_equations(
                 feature_fluent, regression_df, allow_unsafe_learning=allow_unsafe_learning)
 

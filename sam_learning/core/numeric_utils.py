@@ -47,17 +47,17 @@ def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List
     """
     product_components = []
     for func, coefficient in zip(function_variables, coefficients_vector):
-        if coefficient == 0.0:
+        if abs(round(coefficient, 2)) <= EPSILON:
             continue
 
         if func == "(dummy)":
-            product_components.append(f"{prettify_floating_point_number(round(coefficient, 4))}")
+            product_components.append(f"{prettify_floating_point_number(round(coefficient, 2))}")
 
         elif coefficient == 1.0:
             product_components.append(func)
 
         else:
-            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 4))})")
+            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 2))})")
 
     return product_components
 
@@ -69,7 +69,7 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     :return: the prettified version of the coefficients.
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = [round(value, 4) for value in coefficients]
+    prettified_coefficients = [round(value, 2) for value in coefficients]
     return prettified_coefficients
 
 
@@ -85,21 +85,21 @@ def construct_projected_variable_strings(function_variables: List[str], shift_po
     shifted_by_mean = []
     for func, shift_value in zip(function_variables, shift_point):
         component_function = func if shift_value == 0.0 else \
-            f"(- {func} {prettify_floating_point_number(round(shift_value, 4))})"
+            f"(- {func} {prettify_floating_point_number(round(shift_value, 2))})"
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
     for row in range(len(projection_basis)):
         product_by_components_row = []
         for shifted, component in zip(shifted_by_mean, projection_basis[row]):
-            if abs(round(component, 4)) <= EPSILON:
+            if abs(round(component, 2)) <= EPSILON:
                 continue
 
             if component == 1.0:
                 product_by_components_row.append(shifted)
                 continue
 
-            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 4))})")
+            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 2))})")
 
         sum_of_product_by_components.append(construct_linear_equation_string(product_by_components_row))
 
@@ -164,7 +164,7 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
             linear_coeff = value
             break
 
-    return prettify_floating_point_number(round(linear_coeff, 4))
+    return prettify_floating_point_number(round(linear_coeff, 2))
 
 
 def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[

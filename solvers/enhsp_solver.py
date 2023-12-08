@@ -102,7 +102,7 @@ class ENHSPSolver:
             running_options = ["-o", str(domain_file_path.absolute()),
                                "-f", str(problem_file_path.absolute()),
                                "-planner", "sat-hmrphj",
-                               "-tolerance", f"{tolerance}",
+                               # "-tolerance", f"{tolerance}",
                                "-sp", str(solution_path.absolute())]
             run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
             solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
@@ -128,4 +128,5 @@ if __name__ == '__main__':
     solver.execute_solver(problems_directory_path=Path(args[1]),
                           domain_file_path=Path(args[2]),
                           tolerance=0.1,
-                          problems_prefix=args[3])
+                          problems_prefix=args[3],
+                          solving_timeout=int(args[4]))

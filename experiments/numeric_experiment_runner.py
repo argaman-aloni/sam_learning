@@ -84,7 +84,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--working_directory_path", required=True,
                         help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
-    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[3, 4, 6, 14, 15, 16, 17],
+    parser.add_argument("--learning_algorithm", required=True, type=int, choices=[3, 4, 6, 14, 15, 16, 17, 18],
                         help="The type of learning algorithm. "
                              "\n3: numeric_sam\n4: raw_numeric_sam\n 6: polynomial_sam\n ")
     parser.add_argument("--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' "

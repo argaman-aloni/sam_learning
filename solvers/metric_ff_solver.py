@@ -112,4 +112,4 @@ if __name__ == '__main__':
         level=logging.INFO)
     solver = MetricFFSolver()
     solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]),
-                          problems_prefix=args[3])
+                          problems_prefix=args[3], solving_timeout=int(args[4]))
