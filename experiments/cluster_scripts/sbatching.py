@@ -164,9 +164,9 @@ def main():
                 arguments.append(f"--fold_number {fold}")
                 arguments.append(f"--learning_algorithm {compared_version}")
                 sid = submit_job(
-                    conda_env='online_nsam', mem="32G",
+                    conda_env='online_nsam', mem="64G",
                     python_file=f"{code_directory}/{configuration['experiments_script_path']}",
-                    jobname=f"run_experiment_{experiment['domain_file_name']}_{fold}",
+                    jobname=f"{experiment['domain_file_name']}_{fold}_run_experiments",
                     dependency=f"afterok:{fold_creation_sid}",
                     suppress_output=False,
                     arguments=arguments,
