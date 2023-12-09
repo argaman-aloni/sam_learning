@@ -190,7 +190,7 @@ def main():
                     pathlib.Path('temp.sh').unlink()
 
                     arguments.pop(-1)   # removing the internal iteration from the arguments list
-s
+
             time.sleep(600)
 
         print("Finished building the experiment folds!")
