@@ -28,11 +28,12 @@ NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.p
                       LearningAlgorithmType.raw_naive_polysam]
 
 DEFAULT_NUMERIC_TOLERANCE = 0.1
-MAX_SIZE_MB = 1
+MAX_SIZE_MB = 10
 
 
-def configure_logger(args: argparse.Namespace):
+def configure_iteration_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
+    iteration_number = int(args.iteration_number)
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
     working_directory_path = Path(args.working_directory_path)
     logs_directory_path = working_directory_path / "logs"
@@ -40,7 +41,7 @@ def configure_logger(args: argparse.Namespace):
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
-        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}_{iteration_number}.log",
         maxBytes=max_bytes, backupCount=1)
 
     # Create a formatter and set it for the handler
@@ -53,7 +54,7 @@ def configure_logger(args: argparse.Namespace):
         handlers=[file_handler])
 
 
-class OfflineBasicExperimentRunner:
+class ParallelExperimentRunner:
     """Class that represents the POL framework."""
     logger: logging.Logger
     working_directory_path: Path
@@ -63,7 +64,6 @@ class OfflineBasicExperimentRunner:
     _learning_algorithm: LearningAlgorithmType
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
-    semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator]
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  learning_algorithm: LearningAlgorithmType, solver_type: SolverType, problem_prefix: str = "pfile"):
@@ -72,23 +72,12 @@ class OfflineBasicExperimentRunner:
         self.k_fold = KFoldSplit(
             working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
-        self.learning_statistics_manager = LearningStatisticsManager(
-            working_directory_path=working_directory_path, domain_path=self.working_directory_path / domain_file_name,
-            learning_algorithm=learning_algorithm)
         self._learning_algorithm = learning_algorithm
-        self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
             solver_type=solver_type, problem_prefix=problem_prefix)
 
-    def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
-        """Initializes the algorithm of the semantic precision / recall calculator."""
-        self.semantic_performance_calc = init_semantic_performance_calculator(
-            self.working_directory_path,
-            self.domain_file_name,
-            self._learning_algorithm,
-            test_set_dir_path=test_set_path,
-            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS)
+
 
     def _apply_learning_algorithm(
             self, partial_domain: Domain, allowed_observations: List[Observation],
@@ -110,7 +99,8 @@ class OfflineBasicExperimentRunner:
 
         return domain_path
 
-    def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
+    def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path,
+                            iteration_number: int = 0) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
@@ -127,24 +117,16 @@ class OfflineBasicExperimentRunner:
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if index == 70:
-                # stopping all the experiments after 50 trajectories so that the experiments will not take too long
-                break
-
-            if index != 0 and (index + 1) % 5 != 0:
+            if index != iteration_number:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learned_model, learning_report = self._apply_learning_algorithm(
                 partial_domain, allowed_observations, test_set_dir_path)
 
-            self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(
-                allowed_observations, learned_model, test_set_dir_path, fold_num)
-            self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+            self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, fold_num)
 
-        self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
-        self.domain_validator.write_statistics(fold_num)
+        self.domain_validator.write_statistics(fold_num, iteration_number + 1)
 
     def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
                                 test_set_dir_path: Path, fold_number: int) -> Path:
@@ -171,7 +153,7 @@ class OfflineBasicExperimentRunner:
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,
                                                   tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
+                                                  timeout=600)
 
             self.domain_validator.solver = ENHSPSolver()
             self.domain_validator._solver_name = "enhsp"
@@ -179,38 +161,6 @@ class OfflineBasicExperimentRunner:
                                                   test_set_directory_path=test_set_dir_path,
                                                   used_observations=allowed_observations,
                                                   tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
+                                                  timeout=600)
 
-        else:
-            self.domain_validator.solver = FFADLSolver()
-            self.domain_validator._solver_name = "fast_forward"
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
-
-            self.domain_validator.solver = FastDownwardSolver()
-            self.domain_validator._solver_name = "fast_downward"
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
         return domain_file_path
-
-    def run_cross_validation(self) -> None:
-        """Runs that cross validation process on the domain's working directory and validates the results."""
-        self.learning_statistics_manager.create_results_directory()
-        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
-            self._init_semantic_performance_calculator(test_set_path=test_dir_path)
-            self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
-            self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
-            self.domain_validator.clear_statistics()
-            self.learning_statistics_manager.clear_statistics()
-            self.semantic_performance_calc.export_semantic_performance(fold_num + 1)
-            self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
-
-        self.domain_validator.write_complete_joint_statistics()
-        self.semantic_performance_calc.export_combined_semantic_performance()
-        self.learning_statistics_manager.write_complete_joint_statistics()

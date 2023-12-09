@@ -1,7 +1,7 @@
 {
   "environment_variables_file_path": "/sise/home/mordocha/numeric_planning/domains/environment.json",
   "code_directory_path": "/sise/home/mordocha/code/sam_learning/experiments",
-  "experiments_script_path": "numeric_experiment_runner.py",
+  "experiments_script_path": "parallel_numeric_experiment_runner.py",
   "num_folds": 5,
   "experiment_configurations": [
     {

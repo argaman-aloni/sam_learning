@@ -274,13 +274,15 @@ class DomainValidator:
         })
         self._clear_plans(test_set_directory_path)
 
-    def write_statistics(self, fold_num: int) -> None:
+    def write_statistics(self, fold_num: int, iteration: Optional[int] = None) -> None:
         """Writes the statistics of the learned model into a CSV file.
 
         :param fold_num: the index of the fold that is currently being tested.
+        :param iteration: the index of the iteration that is currently being tested.
         """
-        output_statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}" \
-                                                         f"_problem_solving_stats_{fold_num}.csv"
+        output_statistics_path = self.results_dir_path / (f"{self.learning_algorithm.name}" 
+                                                          f"_problem_solving_stats_{fold_num}"
+                                                          f"{f'_{iteration}' if iteration is not None else ''}.csv")
         with open(output_statistics_path, 'wt', newline='') as csv_file:
             test_set_writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
             test_set_writer.writeheader()

@@ -88,7 +88,8 @@ def submit_job(
 
 
 def execute_experiment_setup_batch(
-        code_directory, configuration, environment_variables, experiment, experiment_index, total_run_time):
+        code_directory, configuration, environment_variables, experiment, experiment_index, total_run_time,
+        internal_iterations):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     fold_creation_sid = submit_job(
         conda_env='online_nsam', mem="6G",
@@ -99,6 +100,7 @@ def execute_experiment_setup_batch(
             f"--working_directory_path {experiment['working_directory_path']}",
             f"--domain_file_name {experiment['domain_file_name']}",
             f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
+            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}"
         ],
         environment_variables=environment_variables)
     print(f"Submitted job with sid {fold_creation_sid}\n")
@@ -109,7 +111,8 @@ def execute_experiment_setup_batch(
     return fold_creation_sid
 
 
-def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids):
+def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids,
+                                      internal_iterations):
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
     statistics_collection_job = submit_job(
         conda_env='online_nsam', mem="6G",
@@ -121,7 +124,8 @@ def execute_statistics_collection_job(code_directory, configuration, environment
             f"--working_directory_path {experiment['working_directory_path']}",
             f"--domain_file_name {experiment['domain_file_name']}",
             f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            f"--num_folds {configuration['num_folds']}"
+            f"--num_folds {configuration['num_folds']}",
+            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}"
         ],
         environment_variables=environment_variables)
     print(f"Submitted job with sid {statistics_collection_job}\n")
@@ -152,9 +156,11 @@ def main():
     total_run_time = configuration["num_folds"] * num_experiments * 4 + num_experiments
     progress_bar(0, total_run_time)
     experiment_termination_ids = {}
+    experiment_internal_iterations = list(range(0, 70, 5))  # TODO: change to read from config file
     for experiment_index, experiment in enumerate(configuration["experiment_configurations"]):
-        fold_creation_sid = execute_experiment_setup_batch(code_directory, configuration, environment_variables,
-                                                           experiment, experiment_index, total_run_time)
+        fold_creation_sid = execute_experiment_setup_batch(
+            code_directory, configuration, environment_variables,
+            experiment, experiment_index, total_run_time, experiment_internal_iterations)
 
         experiment_termination_ids[f"{experiment['domain_file_name']}"] = []
         for fold in range(configuration["num_folds"]):
@@ -163,26 +169,30 @@ def main():
                 arguments = [f"--{key} {value}" for key, value in experiment.items() if key != "compared_versions"]
                 arguments.append(f"--fold_number {fold}")
                 arguments.append(f"--learning_algorithm {compared_version}")
-                sid = submit_job(
-                    conda_env='online_nsam', mem="64G",
-                    python_file=f"{code_directory}/{configuration['experiments_script_path']}",
-                    jobname=f"{experiment['domain_file_name']}_{fold}_run_experiments",
-                    dependency=f"afterok:{fold_creation_sid}",
-                    suppress_output=False,
-                    arguments=arguments,
-                    environment_variables=environment_variables)
-                print(f"Submitted job with sid {sid}")
-                # maintaining the IDs of the experiment jobs so that once they are all done a job that
-                # collects the data will be called and will combine the data together.
-                experiment_termination_ids[f"{experiment['domain_file_name']}"].append(sid)
-                progress_bar(current_iteration, total_run_time)
-                time.sleep(1)
-                pathlib.Path('temp.sh').unlink()
+                for internal_iteration in experiment_internal_iterations:
+                    arguments.append(f"--internal_iteration {internal_iteration}")
+                    sid = submit_job(
+                        conda_env='online_nsam', mem="64G",
+                        python_file=f"{code_directory}/{configuration['experiments_script_path']}",
+                        jobname=f"{experiment['domain_file_name']}_{fold}_{internal_iteration}_run_experiments",
+                        dependency=f"afterok:{fold_creation_sid}",
+                        suppress_output=False,
+                        arguments=arguments,
+                        environment_variables=environment_variables)
+                    print(f"Submitted job with sid {sid}")
+                    # maintaining the IDs of the experiment jobs so that once they are all done a job that
+                    # collects the data will be called and will combine the data together.
+                    experiment_termination_ids[f"{experiment['domain_file_name']}"].append(sid)
+                    progress_bar(current_iteration, total_run_time)
+                    time.sleep(1)
+                    pathlib.Path('temp.sh').unlink()
+
+                    arguments.pop(-1)   # removing the internal iteration from the arguments list
 
         print("Finished building the experiment folds!")
         execute_statistics_collection_job(
             code_directory, configuration, environment_variables,
-            experiment, experiment_termination_ids[f"{experiment['domain_file_name']}"])
+            experiment, experiment_termination_ids[f"{experiment['domain_file_name']}"], experiment_internal_iterations)
 
     write_contextual_sids_to_file(experiment_termination_ids)
 
