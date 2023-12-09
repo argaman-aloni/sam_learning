@@ -156,8 +156,10 @@ def main():
     total_run_time = configuration["num_folds"] * num_experiments * 4 + num_experiments
     progress_bar(0, total_run_time)
     experiment_termination_ids = {}
-    experiment_internal_iterations = list(range(0, 70, 5))  # TODO: change to read from config file
     for experiment_index, experiment in enumerate(configuration["experiment_configurations"]):
+        parallelization_data = experiment["parallelization_data"]
+        experiment_internal_iterations = list(
+            range(parallelization_data["min_index"], parallelization_data["max_index"], parallelization_data["hop"]))
         fold_creation_sid = execute_experiment_setup_batch(
             code_directory, configuration, environment_variables,
             experiment, experiment_index, total_run_time, experiment_internal_iterations)
@@ -166,11 +168,11 @@ def main():
         for fold in range(configuration["num_folds"]):
             for version_index, compared_version in enumerate(experiment["compared_versions"]):
                 current_iteration = (experiment_index + 1) * configuration["num_folds"] * version_index + fold + 2
-                arguments = [f"--{key} {value}" for key, value in experiment.items() if key != "compared_versions"]
+                arguments = [f"--{key} {value}" for key, value in experiment.items() if key != "compared_versions" and key != "parallelization_data"]
                 arguments.append(f"--fold_number {fold}")
                 arguments.append(f"--learning_algorithm {compared_version}")
                 for internal_iteration in experiment_internal_iterations:
-                    arguments.append(f"--internal_iteration {internal_iteration}")
+                    arguments.append(f"--iteration_number {internal_iteration}")
                     sid = submit_job(
                         conda_env='online_nsam', mem="64G",
                         python_file=f"{code_directory}/{configuration['experiments_script_path']}",
@@ -184,10 +186,12 @@ def main():
                     # collects the data will be called and will combine the data together.
                     experiment_termination_ids[f"{experiment['domain_file_name']}"].append(sid)
                     progress_bar(current_iteration, total_run_time)
-                    time.sleep(1)
+                    time.sleep(10)
                     pathlib.Path('temp.sh').unlink()
 
                     arguments.pop(-1)   # removing the internal iteration from the arguments list
+s
+            time.sleep(600)
 
         print("Finished building the experiment folds!")
         execute_statistics_collection_job(

@@ -117,7 +117,7 @@ class ParallelExperimentRunner:
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if index != iteration_number:
+            if iteration_number != 0 and index + 1 != iteration_number:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
