@@ -44,7 +44,8 @@ class StatisticsCollector:
         for fold in range(self.num_folds):
             for iteration in self.iterations:
                 for learning_algorithm in self.learning_algorithms:
-                    statistics_file_path = results_directory / f"{learning_algorithm.name}_problem_solving_stats_{fold}_{iteration}.csv"
+                    statistics_file_path = results_directory / (f"{learning_algorithm.name}_problem_solving_stats"
+                                                                f"_fold_{fold}_{iteration}_trajectories.csv")
                     with open(statistics_file_path, "rt") as statistics_file:
                         reader = csv.DictReader(statistics_file)
                         combined_statistics_data.extend([{"fold": fold, **row} for row in reader])

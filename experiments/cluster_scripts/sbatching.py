@@ -4,6 +4,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime
 
 
 def sigint_handler(sig, frame):
@@ -181,12 +182,14 @@ def main():
                         suppress_output=False,
                         arguments=arguments,
                         environment_variables=environment_variables)
-                    print(f"Submitted job with sid {sid}")
+                    formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+                    print(f"Current date and time: {formatted_date_time}")
+                    print(f"{formatted_date_time} Submitted job with sid {sid}")
                     # maintaining the IDs of the experiment jobs so that once they are all done a job that
                     # collects the data will be called and will combine the data together.
                     experiment_termination_ids[f"{experiment['domain_file_name']}"].append(sid)
                     progress_bar(current_iteration, total_run_time)
-                    time.sleep(10)
+                    time.sleep(5)
                     pathlib.Path('temp.sh').unlink()
 
                     arguments.pop(-1)   # removing the internal iteration from the arguments list

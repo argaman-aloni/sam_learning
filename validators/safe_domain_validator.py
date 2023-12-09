@@ -281,8 +281,8 @@ class DomainValidator:
         :param iteration: the index of the iteration that is currently being tested.
         """
         output_statistics_path = self.results_dir_path / (f"{self.learning_algorithm.name}" 
-                                                          f"_problem_solving_stats_{fold_num}"
-                                                          f"{f'_{iteration}' if iteration is not None else ''}.csv")
+                                                          f"_problem_solving_stats_fold_{fold_num}"
+                                                          f"{f'_{iteration}_trajectories' if iteration is not None else ''}.csv")
         with open(output_statistics_path, 'wt', newline='') as csv_file:
             test_set_writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
             test_set_writer.writeheader()
