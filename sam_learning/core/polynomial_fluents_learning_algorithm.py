@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 import numpy
 from pddl_plus_parser.models import PDDLFunction, Precondition
 
-from sam_learning.core.numeric_fluent_learner_algorithm import NumericFluentStateStorage
+from sam_learning.core.numeric_learning.numeric_fluent_learner_algorithm import NumericFluentStateStorage
 
 
 class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
@@ -16,11 +16,13 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
         degree of 1 is the multiplication of each couple of state fluents.
         degree 2 and above is the maximal degree of the polynomial.
     """
+
     polynom_degree: int
     is_verbose: bool
 
-    def __init__(self, action_name: str, polynom_degree: int,
-                 domain_functions: Dict[str, PDDLFunction], is_verbose: bool = False):
+    def __init__(
+        self, action_name: str, polynom_degree: int, domain_functions: Dict[str, PDDLFunction], is_verbose: bool = False
+    ):
         super().__init__(action_name, domain_functions)
         self.polynom_degree = polynom_degree
         self.is_verbose = is_verbose
@@ -44,8 +46,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
         """
         return self._create_polynomial_string_recursive(fluents)
 
-    def _add_polynom_to_storage(self, state_fluents: Dict[str, PDDLFunction],
-                                storage: Dict[str, List[float]]) -> None:
+    def _add_polynom_to_storage(self, state_fluents: Dict[str, PDDLFunction], storage: Dict[str, List[float]]) -> None:
         """Adds the polynomial representation of the state fluents to the storage.
 
         :param state_fluents: the numeric fluents present in the input state.
@@ -55,12 +56,12 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
             for first_fluent, second_fluent in itertools.combinations(list(state_fluents.keys()), r=2):
                 multiplied_fluent = self.create_polynomial_string([first_fluent, second_fluent])
                 storage[multiplied_fluent].append(
-                    state_fluents[first_fluent].value * state_fluents[second_fluent].value)
+                    state_fluents[first_fluent].value * state_fluents[second_fluent].value
+                )
             return
 
         for degree in range(2, self.polynom_degree + 1):
-            for fluent_combination in itertools.combinations_with_replacement(
-                    list(state_fluents.keys()), r=degree):
+            for fluent_combination in itertools.combinations_with_replacement(list(state_fluents.keys()), r=degree):
                 polynomial_fluent = self.create_polynomial_string(list(fluent_combination))
                 values = [state_fluents[fluent].value for fluent in fluent_combination]
                 self.previous_state_storage[polynomial_fluent].append(numpy.prod(values))
@@ -90,8 +91,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
                 self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
                 self.previous_state_storage[fluent].append(0)
 
-    def construct_safe_linear_inequalities(
-            self, relevant_fluents: Optional[List[str]] = None) -> Precondition:
+    def construct_safe_linear_inequalities(self, relevant_fluents: Optional[List[str]] = None) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)

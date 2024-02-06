@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from pddl_plus_parser.models import Domain, Observation
 
 from sam_learning.core import LearnerDomain, SVMFluentsLearning
-from sam_learning.core.oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
+from sam_learning.core.unsafe_learning.oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from sam_learning.learners import SAMLearner
 
 

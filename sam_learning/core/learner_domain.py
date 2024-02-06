@@ -73,7 +73,7 @@ class LearnerAction:
 
         :return: the PDDL format of the effects.
         """
-        simple_effects = "\n\t\t".join([effect.untyped_representation for effect in self.discrete_effects])
+        simple_effects = "\n\t\t".join(sorted([effect.untyped_representation for effect in self.discrete_effects]))
 
         conditional_effects = "\n\t\t"
         conditional_effects += "\t\t\n".join([str(conditional_effect) for conditional_effect

@@ -8,8 +8,7 @@ from typing import Dict, List
 
 from sam_learning.learners import SAMLearner, MultiAgentSAM
 
-CWD = os.getcwd()
-EXAMPLES_DIR_PATH = Path(CWD, "examples")
+EXAMPLES_DIR_PATH = Path("tests/examples").absolute()
 LOGISTICS_DOMAIN_PATH = EXAMPLES_DIR_PATH / "domain-logistics.pddl"
 WOODWORKING_DOMAIN_PATH = EXAMPLES_DIR_PATH / "woodworking-domain.pddl"
 WOODWORKING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_problem.pddl"

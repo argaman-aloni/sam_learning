@@ -3,11 +3,11 @@ import random
 from typing import Dict, Set, Optional, Tuple, List, Any
 
 from pddl_plus_parser.models import Domain, State, ActionCall, Precondition, Predicate, PDDLFunction, \
-    Action, Operator
+    Action, NumericalExpressionTree, CompoundPrecondition
 
 from sam_learning.core import InformationGainLearner, LearnerDomain, AbstractAgent, \
     PriorityQueue, LearnerAction, EpisodeInfoRecord
-from sam_learning.core.novelty_learner import NoveltyLearner, FAIL_RESULT, SUCCESS_RESULT
+from sam_learning.core.online_learning.novelty_learner import NoveltyLearner, FAIL_RESULT, SUCCESS_RESULT
 from sam_learning.learners.numeric_sam import PolynomialSAMLearning
 
 NON_INFORMATIVE_IG = 0
@@ -25,6 +25,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
     _state_action_execution_db: Dict[str, List[Any]]
     _unsafe_domain: Domain
     _episode_recorder: EpisodeInfoRecord
+    safe_perfect_numeric_effects = Dict[str, Set[NumericalExpressionTree]]
 
     def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, agent: AbstractAgent = None,
                  episode_recorder: EpisodeInfoRecord = None,
@@ -39,6 +40,8 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         self._action_failure_rate = {action: 0 for action in self.partial_domain.actions}
         self.novelty_calculator = NoveltyLearner()
         self._unsafe_domain = partial_domain.shallow_copy()
+        self.safe_perfect_numeric_effects = {}
+
         for action_name, action_data in self.partial_domain.actions.items():
             self.ig_learner[action_name] = InformationGainLearner(action_name=action_name)
 
@@ -87,19 +90,42 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         selection_prob = (1 - normalized_observation_rate) + failure_rate
         return selection_prob
 
+    def _construct_safe_numeric_effects(self, action: LearnerAction, allow_unsafe_learning: bool = False) -> bool:
+        """Constructs the safe numeric effects for the input action.
+
+        :param action: the action that its effects are constructed for.
+        :param allow_unsafe_learning: whether to allow unsafe learning of the effects.
+        """
+        if action.name in self.safe_perfect_numeric_effects and allow_unsafe_learning:
+            self.logger.debug(f"The effects of action - {action.name} were already learned perfectly, "
+                              f"and can use it for internal calculations.")
+            action.numeric_effects = self.safe_perfect_numeric_effects[action.name]
+            return True
+
+        learned_perfectly = super()._construct_safe_numeric_effects(action, allow_unsafe_learning)
+        if learned_perfectly:
+            self.safe_perfect_numeric_effects[action.name] = action.numeric_effects
+
     def _update_unsafe_model(self, action_name: str) -> None:
         """Updates the unsafe model after observing a successful execution of the action.
 
         :param action_name: the action that had been successfully executed.
         """
         self.logger.info(f"Updating the unsafe model after observing a successful execution of {action_name}.")
-        action = self._create_safe_action(action_name, allow_unsafe_learning=True)
+        action = self.partial_domain.actions[action_name]
+        if action_name in self.safe_perfect_numeric_effects:
+            numeric_effects = self.safe_perfect_numeric_effects[action_name]
+
+        else:
+            self._construct_safe_numeric_effects(action, allow_unsafe_learning=True)
+            numeric_effects = {effect for effect in action.numeric_effects}
+
         updated_action = Action()
         updated_action.name = action.name
         updated_action.signature = action.signature
-        updated_action.preconditions = action.preconditions
+        updated_action.preconditions = CompoundPrecondition()
         updated_action.discrete_effects = {effect.copy() for effect in action.discrete_effects}
-        updated_action.numeric_effects = {effect for effect in action.numeric_effects}
+        updated_action.numeric_effects = numeric_effects
         self._unsafe_domain.actions[action.name] = updated_action
 
     def _reset_action_numeric_data(self, action_name: str) -> None:
@@ -131,18 +157,12 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         :param action: the action that is not informative and possibly applicable.
         :param state: the state in which the action is being evaluated.
         """
-        if action.name in self.observed_actions:
-            operator = Operator(action=self._unsafe_domain.actions[action.name], domain=self._unsafe_domain,
-                                grounded_action_call=action.parameters)
-            if not operator.is_applicable(state):
-                self.logger.debug(f"The action {action.name} is not applicable in the state.")
-                return
-
-            applicable_action_novelty = self.novelty_calculator.calculate_novelty(
-                action, state, self._unsafe_domain, self.observed_actions)
-            self.applicable_actions.insert(
-                item=action, priority=applicable_action_novelty,
-                selection_probability=self._calculate_selection_probability(action))
+        self.logger.info(f"Handling the non-informative applicable action {action.name}.")
+        applicable_action_novelty = self.novelty_calculator.calculate_novelty(
+            action, state, self._unsafe_domain, self.observed_actions)
+        self.applicable_actions.insert(
+            item=action, priority=applicable_action_novelty,
+            selection_probability=self._calculate_selection_probability(action))
 
     def _select_action_to_execute(self, frontier: PriorityQueue) -> ActionCall:
         """Selects the next action to execute from both the frontier and the applicable actions.
@@ -151,21 +171,12 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         :return: the next action to execute which is the action with the largest novelty chosen from one of the queues.
         """
         self.logger.info("Selecting the next action to execute...")
-        if len(self.applicable_actions) == 0:
-            self.logger.debug("There are no applicable actions in the state, "
-                              "selecting one of the informative actions.")
-            action, information_gain, probability = frontier.get_queue_item_data()
+        if len(frontier) == 0 or len(self.applicable_actions) == 0:
+            queue_to_select_from = frontier if len(frontier) > 0 else self.applicable_actions
+            return queue_to_select_from.get_item()
 
-        elif len(frontier) == 0:
-            self.logger.debug("There are no informative actions, selecting one of the applicable actions.")
-            action, information_gain, probability = self.applicable_actions.get_queue_item_data()
-
-        else:
-            queue_to_select_from = random.choices(
-                [self.applicable_actions, frontier], weights=[0.2, 0.8], k=1)[0]
-            action, information_gain, probability = queue_to_select_from.get_queue_item_data()
-
-        return action
+        queue_to_select_from = random.choices([self.applicable_actions, frontier], weights=[0.2, 0.8], k=1)[0]
+        return queue_to_select_from.get_item()
 
     def calculate_state_action_information_gain(
             self, state: State, action: ActionCall, action_already_calculated: bool = False) -> float:
@@ -179,19 +190,24 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """
         self.logger.info(f"Calculating the information gain of applying {str(action)} on the state.")
         lifted_functions, lifted_predicates = self._get_lifted_bounded_state(action, state)
+        all_possible_predicates = self.vocabulary_creator.create_lifted_vocabulary(
+            domain=self.partial_domain, possible_parameters=self.partial_domain.actions[action.name].signature)
         if not self.ig_learner[action.name].are_dataframes_initialized():
             self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
             self.ig_learner[action.name].init_dataframes(
                 valid_lifted_functions=[func for func in lifted_functions.keys()],
-                lifted_predicates=[pred.untyped_representation for pred in lifted_predicates])
+                lifted_predicates=[pred.untyped_representation for pred in all_possible_predicates])
 
         features_to_explore = self._apply_feature_selection(action)
-        is_informative = self.ig_learner[action.name].is_sample_informative(
+        is_informative, is_applicable = self.ig_learner[action.name].is_sample_informative(
             lifted_functions, lifted_predicates, use_cache=action_already_calculated,
             relevant_numeric_features=features_to_explore)
         if not is_informative:
             self.logger.debug(f"The action {action.name} is not informative checking if it is applicable in the state.")
-            self._handle_non_informative_action(action, state)
+            if is_applicable:
+                self.logger.debug(f"The action {action.name} is applicable, adding to the applicable actions queue.")
+                self._handle_non_informative_action(action, state)
+
             return NON_INFORMATIVE_IG
 
         return self.novelty_calculator.calculate_novelty(action, state, self._unsafe_domain, self.observed_actions)
@@ -203,7 +219,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         self.agent = new_agent
 
     def calculate_valid_neighbors(
-            self, grounded_actions: Set[ActionCall], current_state: State) -> PriorityQueue:
+            self, grounded_actions: Set[ActionCall], current_state: State, step_number: int) -> PriorityQueue:
         """Calculates the valid action neighbors for the current state that the learner is in.
 
         :param grounded_actions: all possible grounded actions.
@@ -213,16 +229,26 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         """
         self.logger.info("Calculating the valid neighbors for the current state.")
         neighbors = PriorityQueue()
-        self.applicable_actions.clear()
+
         action_calculation_cache = {action_name: 0 for action_name in self.partial_domain.actions}
-        for grounded_action in grounded_actions:
+        lifted_to_grounded = {action_name: [action for action in grounded_actions if action.name == action_name]
+                              for action_name in self.partial_domain.actions}
+        actions_to_explore = []
+        for action, groundings in lifted_to_grounded.items():
+            actions_to_explore.extend(random.sample(groundings, k=min(len(groundings), 2)))
+
+        for grounded_action in actions_to_explore:
             self.logger.debug(f"Checking the action {grounded_action.name}.")
-            action_info_gain = self.calculate_state_action_information_gain(
-                state=current_state, action=grounded_action,
-                action_already_calculated=action_calculation_cache[grounded_action.name] > 0)
+            if step_number % 10 == 0:   # TODO: Delete this abomination.
+                action_info_gain = self.calculate_state_action_information_gain(
+                    state=current_state, action=grounded_action,
+                    action_already_calculated=action_calculation_cache[grounded_action.name] > 0)
+            else:
+                action_info_gain = 1
+
             action_calculation_cache[grounded_action.name] += 1
-            selection_prob = self._calculate_selection_probability(grounded_action)
             if abs(action_info_gain) > NON_INFORMATIVE_IG:  # IG is a negative number.
+                selection_prob = self._calculate_selection_probability(grounded_action)
                 self.logger.info(f"The action {grounded_action.name} is informative, adding it to the priority queue.")
                 neighbors.insert(item=grounded_action, priority=action_info_gain, selection_probability=selection_prob)
 
@@ -255,7 +281,9 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                 state=current_state, action=neighbor, action_already_calculated=failed_action_observed)
             failed_action_observed = True
             selection_prob = self._calculate_selection_probability(neighbor)
-            new_neighbors.insert(item=neighbor, priority=new_ig, selection_probability=selection_prob)
+            if abs(new_ig) > NON_INFORMATIVE_IG:
+                self.logger.info(f"The action {neighbor.name} is informative, adding it to the priority queue.")
+                new_neighbors.insert(item=neighbor, priority=new_ig, selection_probability=selection_prob)
 
         self._episode_recorder.add_num_informative_actions_in_step(len(new_neighbors))
         return new_neighbors
@@ -310,37 +338,31 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         self.logger.info("Searching for informative actions given the current state.")
         grounded_actions = self.agent.get_environment_actions(init_state)
         self._episode_recorder.add_num_grounded_actions(len(grounded_actions))
-        frontier = self.calculate_valid_neighbors(grounded_actions, init_state)
+        step_number = 0
+        frontier = self.calculate_valid_neighbors(grounded_actions, init_state, step_number)
         current_state = init_state.copy()
-        num_steps = 0
-        while len(frontier) + len(self.applicable_actions) > 0 and num_steps < MAX_STEPS_PER_EPISODE:
+        while len(frontier) + len(self.applicable_actions) > 0 and step_number < MAX_STEPS_PER_EPISODE:
             action = self._select_action_to_execute(frontier)
             next_state, reward = self.agent.observe(state=current_state, action=action)
             self.execute_action(action, current_state, next_state, reward=reward)
-            num_steps += 1
-            while reward < 0 < len(frontier) + len(self.applicable_actions) and num_steps < MAX_STEPS_PER_EPISODE:
+            step_number += 1
+            while reward < 0 < len(frontier) + len(self.applicable_actions) and step_number < MAX_STEPS_PER_EPISODE:
                 self.logger.debug("The action was not successful, trying again.")
                 frontier = self.update_failed_action_neighbors(frontier, current_state, action)
-                if len(frontier) == 0:
-                    break
-
                 action = self._select_action_to_execute(frontier)
                 next_state, reward = self.agent.observe(state=current_state, action=action)
                 self.execute_action(action, current_state, next_state, reward=reward)
-                num_steps += 1
+                step_number += 1
 
-            if num_steps >= MAX_STEPS_PER_EPISODE or len(frontier) + len(self.applicable_actions) == 0:
-                break
-
-            self.logger.debug("The action changed the state of the environment, updating the possible neighbors.")
             grounded_actions = self.agent.get_environment_actions(next_state)
-            frontier = self.calculate_valid_neighbors(grounded_actions, next_state)
+            self.applicable_actions.clear()
+            frontier = self.calculate_valid_neighbors(grounded_actions, next_state, step_number)
             current_state = next_state
             if self.agent.goal_reached(current_state):
                 self.logger.info("The goal has been reached, returning the learned model.")
                 self._create_safe_action_model()
-                return self.partial_domain, num_steps, True
+                return self.partial_domain, step_number, True
 
         self.logger.info("Reached a state with no neighbors to pull an action from, returning the learned model.")
         self._create_safe_action_model()
-        return self.partial_domain, num_steps, False
+        return self.partial_domain, step_number, False

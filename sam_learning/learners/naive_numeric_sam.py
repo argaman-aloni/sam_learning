@@ -7,8 +7,8 @@ from pddl_plus_parser.models import Observation, ActionCall, State, Domain
 from sam_learning.core import LearnerDomain, NumericFunctionMatcher, NotSafeActionError, \
     LearnerAction
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
-from sam_learning.core.naive_numeric_fluent_learner_algorithm import NaiveNumericFluentStateStorage
-from sam_learning.core.naive_polynomial_fluents_learning_algorithm import NaivePolynomialFluentsLearningAlgorithm
+from sam_learning.core.baseline_algorithms_version.naive_numeric_fluent_learner_algorithm import NaiveNumericFluentStateStorage
+from sam_learning.core.baseline_algorithms_version.naive_polynomial_fluents_learning_algorithm import NaivePolynomialFluentsLearningAlgorithm
 from sam_learning.learners.sam_learning import SAMLearner
 
 

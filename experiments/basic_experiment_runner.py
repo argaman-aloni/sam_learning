@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Union, Tuple
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import Observation, Domain
 
+from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_NUMERIC_TOLERANCE, NUMERIC_ALGORITHMS, DEFAULT_SPLIT
 from sam_learning.core import LearnerDomain
 from solvers import ENHSPSolver, MetricFFSolver, FastDownwardSolver
 from solvers.fast_forward_adl_solver import FFADLSolver
@@ -18,17 +19,6 @@ from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
-
-DEFAULT_SPLIT = 5
-
-NUMERIC_ALGORITHMS = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.plan_miner,
-                      LearningAlgorithmType.polynomial_sam, LearningAlgorithmType.raw_numeric_sam,
-                      LearningAlgorithmType.raw_polynomial_nsam, LearningAlgorithmType.naive_nsam,
-                      LearningAlgorithmType.naive_polysam, LearningAlgorithmType.raw_naive_nsam,
-                      LearningAlgorithmType.raw_naive_polysam]
-
-DEFAULT_NUMERIC_TOLERANCE = 0.1
-MAX_SIZE_MB = 1
 
 
 def configure_logger(args: argparse.Namespace):
@@ -41,20 +31,20 @@ def configure_logger(args: argparse.Namespace):
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
         logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
-        maxBytes=max_bytes, backupCount=1)
+        maxBytes=max_bytes,
+        backupCount=1,
+    )
 
     # Create a formatter and set it for the handler
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
 
-    logging.basicConfig(
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO,
-        handlers=[file_handler])
+    logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
 
 
 class OfflineBasicExperimentRunner:
     """Class that represents the POL framework."""
+
     logger: logging.Logger
     working_directory_path: Path
     k_fold: KFoldSplit
@@ -65,21 +55,34 @@ class OfflineBasicExperimentRunner:
     fluents_map: Dict[str, List[str]]
     semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator]
 
-    def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 learning_algorithm: LearningAlgorithmType, solver_type: SolverType, problem_prefix: str = "pfile"):
+    def __init__(
+        self,
+        working_directory_path: Path,
+        domain_file_name: str,
+        learning_algorithm: LearningAlgorithmType,
+        solver_type: SolverType,
+        problem_prefix: str = "pfile",
+    ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.k_fold = KFoldSplit(
-            working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
+            working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT
+        )
         self.domain_file_name = domain_file_name
         self.learning_statistics_manager = LearningStatisticsManager(
-            working_directory_path=working_directory_path, domain_path=self.working_directory_path / domain_file_name,
-            learning_algorithm=learning_algorithm)
+            working_directory_path=working_directory_path,
+            domain_path=self.working_directory_path / domain_file_name,
+            learning_algorithm=learning_algorithm,
+        )
         self._learning_algorithm = learning_algorithm
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
-            self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name,
-            solver_type=solver_type, problem_prefix=problem_prefix)
+            self.working_directory_path,
+            learning_algorithm,
+            self.working_directory_path / domain_file_name,
+            solver_type=solver_type,
+            problem_prefix=problem_prefix,
+        )
 
     def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
         """Initializes the algorithm of the semantic precision / recall calculator."""
@@ -88,15 +91,17 @@ class OfflineBasicExperimentRunner:
             self.domain_file_name,
             self._learning_algorithm,
             test_set_dir_path=test_set_path,
-            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS)
+            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
+        )
 
     def _apply_learning_algorithm(
-            self, partial_domain: Domain, allowed_observations: List[Observation],
-            test_set_dir_path: Path) -> Tuple[LearnerDomain, Dict[str, str]]:
+        self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
+    ) -> Tuple[LearnerDomain, Dict[str, str]]:
         raise NotImplementedError
 
-    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path,
-                              file_name: Optional[str] = None) -> Path:
+    def export_learned_domain(
+        self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None
+    ) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
@@ -136,18 +141,69 @@ class OfflineBasicExperimentRunner:
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learned_model, learning_report = self._apply_learning_algorithm(
-                partial_domain, allowed_observations, test_set_dir_path)
+                partial_domain, allowed_observations, test_set_dir_path
+            )
 
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
             learned_domain_path = self.validate_learned_domain(
-                allowed_observations, learned_model, test_set_dir_path, fold_num)
+                allowed_observations, learned_model, test_set_dir_path, fold_num
+            )
             self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
-    def validate_learned_domain(self, allowed_observations: List[Observation], learned_model: LearnerDomain,
-                                test_set_dir_path: Path, fold_number: int) -> Path:
+    def _run_classical_solvers_and_validate(
+        self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path
+    ) -> None:
+        self.domain_validator.solver = FFADLSolver()
+        self.domain_validator._solver_name = "fast_forward"
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=domain_file_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=allowed_observations,
+            tolerance=DEFAULT_NUMERIC_TOLERANCE,
+            timeout=60,
+        )
+        self.domain_validator.solver = FastDownwardSolver()
+        self.domain_validator._solver_name = "fast_downward"
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=domain_file_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=allowed_observations,
+            tolerance=DEFAULT_NUMERIC_TOLERANCE,
+            timeout=60,
+        )
+
+    def _run_numeric_solvers_and_validate(
+        self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path
+    ) -> None:
+        self.domain_validator.solver = MetricFFSolver()
+        self.domain_validator._solver_name = "metric_ff"
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=domain_file_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=allowed_observations,
+            tolerance=DEFAULT_NUMERIC_TOLERANCE,
+            timeout=60,
+        )
+        self.domain_validator.solver = ENHSPSolver()
+        self.domain_validator._solver_name = "enhsp"
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=domain_file_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=allowed_observations,
+            tolerance=DEFAULT_NUMERIC_TOLERANCE,
+            timeout=60,
+        )
+
+    def validate_learned_domain(
+        self,
+        allowed_observations: List[Observation],
+        learned_model: LearnerDomain,
+        test_set_dir_path: Path,
+        fold_number: int,
+    ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
@@ -159,44 +215,20 @@ class OfflineBasicExperimentRunner:
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
         domains_backup_dir_path.mkdir(exist_ok=True)
-        self.export_learned_domain(learned_model, domains_backup_dir_path,
-                                   f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
-                                   f"_{len(allowed_observations)}_trajectories.pddl")
+        self.export_learned_domain(
+            learned_model,
+            domains_backup_dir_path,
+            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
+            f"_{len(allowed_observations)}_trajectories.pddl",
+        )
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self.domain_validator.solver = MetricFFSolver()
-            self.domain_validator._solver_name = "metric_ff"
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
-
-            self.domain_validator.solver = ENHSPSolver()
-            self.domain_validator._solver_name = "enhsp"
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
+            self._run_numeric_solvers_and_validate(allowed_observations, domain_file_path, test_set_dir_path)
 
         else:
-            self.domain_validator.solver = FFADLSolver()
-            self.domain_validator._solver_name = "fast_forward"
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
+            self._run_classical_solvers_and_validate(allowed_observations, domain_file_path, test_set_dir_path)
 
-            self.domain_validator.solver = FastDownwardSolver()
-            self.domain_validator._solver_name = "fast_downward"
-            self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                                  test_set_directory_path=test_set_dir_path,
-                                                  used_observations=allowed_observations,
-                                                  tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                                                  timeout=60)
         return domain_file_path
 
     def run_cross_validation(self) -> None:

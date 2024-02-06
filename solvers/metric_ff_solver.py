@@ -34,8 +34,13 @@ class MetricFFSolver:
             return solution_content.decode("utf-8", errors="ignore")
 
     def _run_metric_ff_process(
-            self, run_command: str, solution_path: Path,
-            problem_file_path: Path, solving_stats: Dict[str, str], solving_timeout: int = MAX_RUNNING_TIME) -> None:
+        self,
+        run_command: str,
+        solution_path: Path,
+        problem_file_path: Path,
+        solving_stats: Dict[str, str],
+        solving_timeout: int = MAX_RUNNING_TIME,
+    ) -> None:
         """Runs the metric-ff process."""
         self.logger.info(f"Metric-FF solver is working on - {problem_file_path.stem}")
         process = subprocess.Popen(run_command, shell=True)
@@ -81,9 +86,14 @@ class MetricFFSolver:
             solving_stats[problem_file_path.stem] = "no_solution"
             solution_path.unlink(missing_ok=True)
 
-    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
-                       solving_timeout: int = MAX_RUNNING_TIME,
-                       problems_prefix: str = "pfile", tolerance: float = 0.1) -> Dict[str, str]:
+    def execute_solver(
+        self,
+        problems_directory_path: Path,
+        domain_file_path: Path,
+        solving_timeout: int = MAX_RUNNING_TIME,
+        problems_prefix: str = "pfile",
+        tolerance: float = 0.1,
+    ) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the Metric-FF algorithm and outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
@@ -104,12 +114,15 @@ class MetricFFSolver:
         return solving_stats
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = sys.argv
     logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO
+    )
     solver = MetricFFSolver()
-    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]),
-                          problems_prefix=args[3], solving_timeout=int(args[4]))
+    solver.execute_solver(
+        problems_directory_path=Path(args[1]),
+        domain_file_path=Path(args[2]),
+        problems_prefix=args[3],
+        solving_timeout=int(args[4]),
+    )

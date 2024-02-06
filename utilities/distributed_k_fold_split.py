@@ -1,12 +1,9 @@
 """Create a train and test set split for the input directory for the action model learning algorithms to use."""
-import json
 import logging
 import random
 import shutil
 from pathlib import Path
-from typing import Tuple, List, Iterator, Generator, Dict, Optional
-
-from sklearn.model_selection import train_test_split, KFold
+from typing import Tuple, List, Optional
 
 from utilities.k_fold_split import create_test_set_indices, save_fold_settings, FOLDS_LABEL, load_fold_settings
 
@@ -50,7 +47,8 @@ class DistributedKFoldSplit:
 
     def create_directories_content(
             self, train_set_problems: List[Path], test_set_problems: List[Path], trajectory_paths: List[Path],
-            fold_index: int, learning_algorithm: int, internal_iteration: Optional[int] = None) -> Tuple[Path, Path]:
+            fold_index: int, learning_algorithm: int, internal_iteration: Optional[int] = None,
+            selected_training_trajectories: Optional[List[Path]] = None) -> Tuple[Path, Path]:
         """Creates the content of the train and test set directories."""
         fold_train_dir_path = (
                 self.train_set_dir_path / f"fold_{fold_index}_{learning_algorithm}"
@@ -65,9 +63,15 @@ class DistributedKFoldSplit:
         for problem in test_set_problems:
             shutil.copy(problem, fold_test_dir_path / problem.name)
 
-        for trajectory, problem in zip(trajectory_paths, train_set_problems):
-            shutil.copy(trajectory, fold_train_dir_path / trajectory.name)
-            shutil.copy(problem, fold_train_dir_path / problem.name)
+        if selected_training_trajectories is not None:
+            for trajectory in selected_training_trajectories:
+                shutil.copy(trajectory, fold_train_dir_path / trajectory.name)
+                problem_path = self.working_directory_path / f"{trajectory.stem}.pddl"
+                shutil.copy(problem_path, fold_train_dir_path / problem_path.name)
+        else:
+            for trajectory, problem in zip(trajectory_paths, train_set_problems):
+                shutil.copy(trajectory, fold_train_dir_path / trajectory.name)
+                shutil.copy(problem, fold_train_dir_path / problem.name)
 
         return fold_train_dir_path, fold_test_dir_path
 
@@ -92,17 +96,21 @@ class DistributedKFoldSplit:
                 train_set_trajectories = [
                     self.working_directory_path / f"{problem_path.stem}.trajectory" for
                     problem_path in fold_content["train"]]
-                for learning_algorithm in self._learning_algorithms:
-                    self.logger.debug("Creating fold directories content for each learning algorithm.")
-                    if self._internal_iterations is not None:
-                        for internal_iteration in self._internal_iterations:
+                if self._internal_iterations is not None:
+                    for internal_iteration in self._internal_iterations:
+                        selected_training_trajectories = random.sample(
+                            train_set_trajectories, k=internal_iteration if internal_iteration > 0 else 1)
+                        for learning_algorithm in self._learning_algorithms:
+                            self.logger.debug("Creating fold directories content for each learning algorithm.")
                             train_test_paths.append(self.create_directories_content(
                                 fold_content["train"], fold_content["test"], train_set_trajectories, index,
-                                learning_algorithm, internal_iteration))
+                                learning_algorithm, internal_iteration, selected_training_trajectories))
+
                     else:
-                        train_test_paths.append(self.create_directories_content(
-                            fold_content["train"], fold_content["test"], train_set_trajectories, index,
-                            learning_algorithm))
+                        for learning_algorithm in self._learning_algorithms:
+                            train_test_paths.append(self.create_directories_content(
+                                fold_content["train"], fold_content["test"], train_set_trajectories, index,
+                                learning_algorithm))
 
                 self.logger.debug("Finished creating fold!")
 

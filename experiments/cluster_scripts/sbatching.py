@@ -183,8 +183,7 @@ def main():
                         arguments=arguments,
                         environment_variables=environment_variables)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-                    print(f"Current date and time: {formatted_date_time}")
-                    print(f"{formatted_date_time} Submitted job with sid {sid}")
+                    print(f"{formatted_date_time} - submitted job with sid {sid}")
                     # maintaining the IDs of the experiment jobs so that once they are all done a job that
                     # collects the data will be called and will combine the data together.
                     experiment_termination_ids[f"{experiment['domain_file_name']}"].append(sid)
@@ -194,7 +193,7 @@ def main():
 
                     arguments.pop(-1)   # removing the internal iteration from the arguments list
 
-            time.sleep(600)
+            time.sleep(60)
 
         print("Finished building the experiment folds!")
         execute_statistics_collection_job(

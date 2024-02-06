@@ -8,7 +8,7 @@ from pandas import DataFrame
 from pddl_plus_parser.models import PDDLFunction
 from scipy.spatial import Delaunay, delaunay_plot_2d
 
-from sam_learning.core.numeric_utils import get_num_independent_equations, filter_constant_features, \
+from sam_learning.core.numeric_learning.numeric_utils import get_num_independent_equations, filter_constant_features, \
     detect_linear_dependent_features, extended_gram_schmidt, EPSILON
 
 

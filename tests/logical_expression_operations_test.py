@@ -2,7 +2,7 @@
 
 from pytest import raises
 
-from sam_learning.core.logical_expression_operations import create_dnf_combinations, minimize_cnf_clauses, \
+from sam_learning.core.propositional_operations.logical_expression_operations import create_dnf_combinations, minimize_cnf_clauses, \
     minimize_dnf_clauses, create_cnf_combination
 
 
