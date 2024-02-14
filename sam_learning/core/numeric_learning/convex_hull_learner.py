@@ -4,11 +4,10 @@ import os
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import Precondition, PDDLFunction
-from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
+from scipy.spatial import ConvexHull, QhullError
 
 from sam_learning.core.learning_types import ConditionType
 from sam_learning.core.numeric_learning.numeric_utils import (
@@ -18,9 +17,8 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_numeric_conditions,
     construct_projected_variable_strings,
     extended_gram_schmidt,
+    display_convex_hull,
 )
-
-EPSILON = 1e-10
 
 
 class ConvexHullLearner:
@@ -47,7 +45,7 @@ class ConvexHullLearner:
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
         hull = ConvexHull(points)
-        self._display_convex_hull(display_mode, hull, points.shape[1])
+        display_convex_hull(self.action_name, display_mode, hull)
 
         A = hull.equations[:, : points.shape[1]]
         b = -hull.equations[:, points.shape[1]]
@@ -167,35 +165,10 @@ class ConvexHullLearner:
 
         return disjunctive_precondition
 
-    def _display_convex_hull(self, display_mode: bool, hull: ConvexHull, num_dimensions: int) -> None:
-        """Displays the convex hull in as a plot.
-
-        :param display_mode: whether to display the plot.
-        :param hull: the convex hull to display.
-        :param num_dimensions: the number of dimensions of the original data.
-        """
-        if not display_mode:
-            return
-
-        if num_dimensions == 2:
-            _ = convex_hull_plot_2d(hull)
-            plt.title(f"{self.action_name} - convex hull")
-            plt.show()
-
-        elif num_dimensions == 3:
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection="3d")
-            ax.plot_trisurf(hull.points[:, 0], hull.points[:, 1], hull.points[:, 2], triangles=hull.simplices)
-            plt.title(f"{self.action_name} - convex hull")
-            plt.show()
-
-    def _construct_single_dimension_inequalities(
-        self, single_column_df: Series, equality_strs: List[str] = []
-    ) -> Precondition:
+    def _construct_single_dimension_inequalities(self, single_column_df: Series) -> Precondition:
         """Construct a single dimension precondition representation.
 
         :param single_column_df: the fluent only fluent that is relevant to the preconditions' creation.
-        :param equality_strs: the equality conditions that are already present in the preconditions.
         :return: the preconditions string and the condition type.
         """
         min_value = single_column_df.min()
@@ -206,7 +179,6 @@ class ConvexHullLearner:
         else:
             conditions = [f"(>= {relevant_fluent} {min_value})", f"(<= {relevant_fluent} {max_value})"]
 
-        conditions.extend(equality_strs)
         return construct_numeric_conditions(
             conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions
         )

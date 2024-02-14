@@ -17,8 +17,7 @@ class NumericFunctionMatcher:
         self.matcher_domain = domain
 
     @staticmethod
-    def create_possible_function_signatures(action_parameters: List[str],
-                                            numeric_function: PDDLFunction) -> List[str]:
+    def create_possible_function_signatures(action_parameters: List[str], numeric_function: PDDLFunction) -> List[str]:
         """Create all possible grounded calls of the function.
 
         Note: Assuming the input function has less or the same number of parameters as the action.
@@ -36,8 +35,9 @@ class NumericFunctionMatcher:
 
         return possible_untyped_signatures
 
-    def lift_matched_parameters(self, executed_action: Action, grounded_call_parameters: List[str],
-                                grounded_function: PDDLFunction) -> PDDLFunction:
+    def lift_matched_parameters(
+        self, executed_action: Action, grounded_call_parameters: List[str], grounded_function: PDDLFunction
+    ) -> PDDLFunction:
         """Matches the parameters of the function to the lifted action definition.
 
         :param executed_action: the lifted action that was called in the observation.
@@ -58,13 +58,13 @@ class NumericFunctionMatcher:
                 lifted_param_type = executed_action.signature[lifted_param_name]
                 lifted_signature[lifted_param_name] = lifted_param_type
 
-        lifted_state_function = PDDLFunction(name=grounded_function.name,
-                                             signature=lifted_signature)
+        lifted_state_function = PDDLFunction(name=grounded_function.name, signature=lifted_signature)
         lifted_state_function.set_value(grounded_function.value)
         return lifted_state_function
 
-    def match_state_functions(self, action_call: ActionCall,
-                              grounded_state_fluents: Dict[str, PDDLFunction]) -> Dict[str, PDDLFunction]:
+    def match_state_functions(
+        self, action_call: ActionCall, grounded_state_fluents: Dict[str, PDDLFunction]
+    ) -> Dict[str, PDDLFunction]:
         """Match the state functions to the action according to the grounded object names.
 
         :param action_call: the action that was called in the observation.
@@ -80,24 +80,26 @@ class NumericFunctionMatcher:
 
             if len(domain_function.signature) == 0:
                 grounded_function = grounded_state_fluents[domain_function.untyped_representation]
-                self.logger.debug(f"Function {domain_function.name} has zero parameters. "
-                                  f"Instantly considering as match.")
+                self.logger.debug(
+                    f"Function {domain_function.name} has zero parameters. " f"Instantly considering as match."
+                )
                 matched_function = PDDLFunction(name=domain_function.name, signature={})
                 matched_function.set_value(grounded_function.value)
                 possible_matches[domain_function.untyped_representation] = matched_function
                 continue
 
             call_parameters = action_call.parameters + list(self.matcher_domain.constants.keys())
-            possible_function_signatures = self.create_possible_function_signatures(
-                call_parameters, domain_function)
+            possible_function_signatures = self.create_possible_function_signatures(call_parameters, domain_function)
             for unsigned_representation in possible_function_signatures:
                 if unsigned_representation in grounded_state_fluents:
-                    self.logger.info(f"found a possible match to the action "
-                                     f"{action_call.name} - {unsigned_representation}")
+                    self.logger.info(
+                        f"found a possible match to the action " f"{action_call.name} - {unsigned_representation}"
+                    )
                     matched_lifted_function = self.lift_matched_parameters(
                         executed_action=self.matcher_domain.actions[action_call.name],
                         grounded_call_parameters=action_call.parameters,
-                        grounded_function=grounded_state_fluents[unsigned_representation])
+                        grounded_function=grounded_state_fluents[unsigned_representation],
+                    )
                     possible_matches[matched_lifted_function.untyped_representation] = matched_lifted_function
 
         return possible_matches

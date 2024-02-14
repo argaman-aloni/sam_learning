@@ -3,11 +3,13 @@ import itertools
 from typing import Union, List, Dict, Tuple, Optional, Set
 
 import math
+import matplotlib.pyplot as plt
 import numpy as np
 import sympy
 from pandas import DataFrame, Series
 from pddl_plus_parser.lisp_parsers import PDDLTokenizer
 from pddl_plus_parser.models import Precondition, PDDLFunction, construct_expression_tree, NumericalExpressionTree
+from scipy.spatial import ConvexHull, convex_hull_plot_2d
 from sklearn.feature_selection import VarianceThreshold
 
 from sam_learning.core.learning_types import ConditionType
@@ -37,8 +39,9 @@ def prettify_floating_point_number(number: float) -> float:
     return int(number) if abs(number - int(number)) < EPSILON else number
 
 
-def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List[float]],
-                                     function_variables: List[str]) -> List[str]:
+def construct_multiplication_strings(
+    coefficients_vector: Union[np.ndarray, List[float]], function_variables: List[str]
+) -> List[str]:
     """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
     :param coefficients_vector: the coefficient that multiplies the function vector.
@@ -47,17 +50,17 @@ def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List
     """
     product_components = []
     for func, coefficient in zip(function_variables, coefficients_vector):
-        if abs(round(coefficient, 2)) <= EPSILON:
+        if abs(round(coefficient, 4)) <= EPSILON:
             continue
 
         if func == "(dummy)":
-            product_components.append(f"{prettify_floating_point_number(round(coefficient, 2))}")
+            product_components.append(f"{prettify_floating_point_number(round(coefficient, 4))}")
 
         elif coefficient == 1.0:
             product_components.append(func)
 
         else:
-            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 2))})")
+            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 4))})")
 
     return product_components
 
@@ -69,12 +72,15 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     :return: the prettified version of the coefficients.
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = [round(value, 2) for value in coefficients]
+    prettified_coefficients = [round(value, 4) for value in coefficients]
     return prettified_coefficients
 
 
-def construct_projected_variable_strings(function_variables: List[str], shift_point: Union[np.ndarray, List[float]],
-                                         projection_basis: Union[np.ndarray, List[List[float]]]) -> List[str]:
+def construct_projected_variable_strings(
+    function_variables: List[str],
+    shift_point: Union[np.ndarray, List[float]],
+    projection_basis: Union[np.ndarray, List[List[float]]],
+) -> List[str]:
     """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
     :param function_variables: the name of the numeric fluents that are being used.
@@ -84,22 +90,23 @@ def construct_projected_variable_strings(function_variables: List[str], shift_po
     """
     shifted_by_mean = []
     for func, shift_value in zip(function_variables, shift_point):
-        component_function = func if shift_value == 0.0 else \
-            f"(- {func} {prettify_floating_point_number(round(shift_value, 2))})"
+        component_function = (
+            func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, 2))})"
+        )
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
     for row in range(len(projection_basis)):
         product_by_components_row = []
         for shifted, component in zip(shifted_by_mean, projection_basis[row]):
-            if abs(round(component, 2)) <= EPSILON:
+            if abs(round(component, 4)) <= EPSILON:
                 continue
 
             if component == 1.0:
                 product_by_components_row.append(shifted)
                 continue
 
-            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 2))})")
+            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 4))})")
 
         sum_of_product_by_components.append(construct_linear_equation_string(product_by_components_row))
 
@@ -119,8 +126,9 @@ def construct_linear_equation_string(multiplication_parts: List[str]) -> str:
     return f"(+ {multiplication_parts[0]} {inner_layer})"
 
 
-def construct_non_circular_assignment(lifted_function: str, coefficients_map: Dict[str, float],
-                                      previous_value: float, next_value: float) -> str:
+def construct_non_circular_assignment(
+    lifted_function: str, coefficients_map: Dict[str, float], previous_value: float, next_value: float
+) -> str:
     """Changes circular assignment statements to be non-circular.
 
     Note:
@@ -141,7 +149,8 @@ def construct_non_circular_assignment(lifted_function: str, coefficients_map: Di
         coefficients_map[lifted_function] = coefficients_map[lifted_function] + 1
 
     multiplication_functions = construct_multiplication_strings(
-        list(coefficients_map.values()), list(coefficients_map.keys()))
+        list(coefficients_map.values()), list(coefficients_map.keys())
+    )
     constructed_right_side = construct_linear_equation_string(multiplication_functions)
 
     if previous_value < next_value:
@@ -158,17 +167,18 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
     :return: the first numeric divisor.
     """
     linear_coeff = 0
-    division_res = (np.array(function1_values) / np.array(function2_values))
+    division_res = np.array(function1_values) / np.array(function2_values)
     for value in division_res:
         if not math.isnan(value) and not math.isinf(value):
             linear_coeff = value
             break
 
-    return prettify_floating_point_number(round(linear_coeff, 2))
+    return prettify_floating_point_number(round(linear_coeff, 4))
 
 
-def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[
-    DataFrame, List[str], List[str]]:
+def filter_constant_features(
+    input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []
+) -> Tuple[DataFrame, List[str], List[str]]:
     """Filters out fluents that contain only constant values since they do not contribute to the convex hull.
 
     :param input_df: the matrix of the previous state values.
@@ -217,7 +227,8 @@ def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame,
 
         independent_column, dependent_column = col1, col2
         linear_coeff = extract_numeric_linear_coefficient(
-            data_matrix_copy[dependent_column], data_matrix_copy[independent_column])
+            data_matrix_copy[dependent_column], data_matrix_copy[independent_column]
+        )
         additional_conditions.append(f"(= {dependent_column} (* {linear_coeff} {independent_column}))")
         dependent_columns[dependent_column] = independent_column
 
@@ -226,8 +237,8 @@ def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame,
 
 
 def construct_numeric_conditions(
-        conditions: List[str], condition_type: ConditionType,
-        domain_functions: Dict[str, PDDLFunction]) -> Optional[Precondition]:
+    conditions: List[str], condition_type: ConditionType, domain_functions: Dict[str, PDDLFunction]
+) -> Optional[Precondition]:
     """Construct the numeric conditions from the given equality conditions.
 
     :param conditions: the condition strings to create the preconditions from.
@@ -250,7 +261,8 @@ def construct_numeric_conditions(
 
 
 def construct_numeric_effects(
-        effects: List[str], domain_functions: Dict[str, PDDLFunction]) -> Set[NumericalExpressionTree]:
+    effects: List[str], domain_functions: Dict[str, PDDLFunction]
+) -> Set[NumericalExpressionTree]:
     """Construct the numeric effects for the given set of input strings.
 
     :param effects: the effect strings to create the numeric effects from.
@@ -271,7 +283,8 @@ def construct_numeric_effects(
 
 
 def extended_gram_schmidt(
-        input_basis_vectors: List[List[float]], eigen_vectors: Optional[List[List[float]]] = None) -> List[List[float]]:
+    input_basis_vectors: List[List[float]], eigen_vectors: Optional[List[List[float]]] = None
+) -> List[List[float]]:
     """Runs the extended Gram-Schmidt algorithm on the input basis vectors.
 
     Note:
@@ -287,14 +300,42 @@ def extended_gram_schmidt(
     for vector in input_basis_vectors:
         # Gram Schmidt magic
         projected_vector = vector - np.sum(
-            [(np.dot(vector, b) / np.linalg.norm(b) ** 2) * np.array(b) for b in non_normal_vectors], axis=0)
+            [(np.dot(vector, b) / np.linalg.norm(b) ** 2) * np.array(b) for b in non_normal_vectors], axis=0
+        )
         if not (np.absolute(projected_vector) > EPSILON).any():
             continue
 
         non_normal_vectors.append(projected_vector.tolist())
         normal_vectors.append((projected_vector / np.linalg.norm(projected_vector)).tolist())
 
-    if not eigen_vectors:
-        return normal_vectors
-
     return normal_vectors
+
+
+def display_convex_hull(action_name: str, display_mode: bool, hull: ConvexHull) -> None:
+    """Displays the convex hull in as a plot.
+
+    :param action_name: the name of the action with its convex hull displayed.
+    :param display_mode: whether to display the plot.
+    :param hull: the convex hull to display.
+    :param num_dimensions: the number of dimensions of the original data.
+    """
+    if not display_mode:
+        return
+
+    dimensionality = hull.points.shape[1]
+
+    if dimensionality == 2:
+        plt.title(f"{action_name} - convex hull")
+        _ = convex_hull_plot_2d(hull)
+        plt.show()
+        return
+
+    if dimensionality == 3:
+        plt.title(f"{action_name} - convex hull")
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        for simplex in hull.simplices:
+            simplex = np.append(simplex, simplex[0])  # Repeat the first point to create a closed shape
+            ax.plot(hull.points[simplex, 0], hull.points[simplex, 1], hull.points[simplex, 2], "b-")
+
+        plt.show()

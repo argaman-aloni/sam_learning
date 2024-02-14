@@ -1,14 +1,13 @@
 """Constants for the tests."""
-import os
 from pathlib import Path
+from typing import Dict, List
 
 from pddl_plus_parser.models import PDDLType, Predicate, PDDLFunction, ObservedComponent, PDDLObject, \
     MultiAgentComponent, ActionCall, CompoundPrecondition
-from typing import Dict, List
 
 from sam_learning.learners import SAMLearner, MultiAgentSAM
 
-EXAMPLES_DIR_PATH = Path("tests/examples").absolute()
+EXAMPLES_DIR_PATH = Path(__file__).parent / "examples"
 LOGISTICS_DOMAIN_PATH = EXAMPLES_DIR_PATH / "domain-logistics.pddl"
 WOODWORKING_DOMAIN_PATH = EXAMPLES_DIR_PATH / "woodworking-domain.pddl"
 WOODWORKING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_problem.pddl"

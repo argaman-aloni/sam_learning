@@ -34,8 +34,8 @@ from .numeric_learning import (
     prettify_floating_point_number,
     construct_linear_equation_string,
     construct_non_circular_assignment,
+    PolynomialFluentsLearningAlgorithm,
 )
 from .online_learning import EpisodeInfoRecord, NoveltyLearner, BFSFeatureSelector, AbstractAgent, PriorityQueue
-from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
 from .predicates_matcher import PredicatesMatcher
 from .vocabulary_creator import VocabularyCreator
