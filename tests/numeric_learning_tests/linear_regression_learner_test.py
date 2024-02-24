@@ -20,6 +20,34 @@ def linear_regression_learner() -> LinearRegressionLearner:
     return LinearRegressionLearner(TEST_ACTION_NAME, domain_functions)
 
 
+def test_add_new_observation_to_the_previous_state_data_adds_the_data_to_this_dataframe_only(
+    linear_regression_learner: LinearRegressionLearner,
+):
+    pre_state_data = {"(x )": 2.0, "(y )": 3.31, "(z )": -1.12, "(w )": 0.0}
+    linear_regression_learner.add_new_observation(pre_state_data, store_in_prev_state=True)
+    assert len(linear_regression_learner.previous_state_data) == 1
+    assert len(linear_regression_learner.next_state_data) == 0
+
+
+def test_add_new_observation_to_the_next_state_data_adds_the_data_to_this_dataframe_only(
+    linear_regression_learner: LinearRegressionLearner,
+):
+    next_state_data = {"(x )": 2.0, "(y )": 3.31, "(z )": -1.12, "(w )": 0.0}
+    linear_regression_learner.add_new_observation(next_state_data, store_in_prev_state=False)
+    assert len(linear_regression_learner.previous_state_data) == 0
+    assert len(linear_regression_learner.next_state_data) == 1
+
+
+def test_add_new_observation_with_missing_functions_in_the_data_removes_the_columns_from_the_dataframe(
+    linear_regression_learner: LinearRegressionLearner,
+):
+    assert len(linear_regression_learner.next_state_data.columns.tolist()) == 4
+    next_state_data = {"(x )": 2.0, "(y )": 3.31, "(z )": -1.12}
+    linear_regression_learner.add_new_observation(next_state_data, store_in_prev_state=False)
+    assert len(linear_regression_learner.previous_state_data.columns.tolist()) == 4
+    assert len(linear_regression_learner.next_state_data.columns.tolist()) == 3
+
+
 def test_extract_const_conditions_extract_preconditions_that_appear_in_all_samples_as_constant_a_single_time(
     linear_regression_learner: LinearRegressionLearner,
 ):
@@ -146,17 +174,26 @@ def test_action_not_affects_fluent_returns_false_when_action_does_affect_fluent(
 def test_combine_states_data_creates_correct_dataframe_with_correct_values(
     linear_regression_learner: LinearRegressionLearner,
 ):
-    prev_state = {
-        "(x)": [2],
-        "(y)": [3],
-        "(z)": [-1],
+    pre_state_matrix = {
+        "(x )": [2, 1, 3, 0, 1],
+        "(y )": [0, 3, 12, 43, 1],
+        "(z )": [0, 2, 4, 1, 100],
     }
-    next_state = {
-        "(x)": [21],
-        "(y)": [32],
-        "(z)": [-12],
+    next_state_matrix = {
+        "(x )": [2, 6, 19, 44, 102],
+        "(y )": [3, 6, 15, 46, 4],
+        "(z )": [1, 1, 1, 1, 1],
     }
-    combined_state = linear_regression_learner._combine_states_data(prev_state, next_state)
+    function_names = ["(x )", "(y )", "(z )"]
+    for i in range(5):
+        linear_regression_learner.add_new_observation(
+            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
+        )
+        linear_regression_learner.add_new_observation(
+            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
+        )
+
+    combined_state = linear_regression_learner._combine_states_data()
     assert len(combined_state.columns) == 6
 
 
@@ -183,14 +220,21 @@ def test_construct_assignment_equations_returns_correct_equations_for_all_fluent
     linear_regression_learner: LinearRegressionLearner,
 ):
     pre_state_matrix = {
-        "(x)": [2, 1, 3, 0, 1],
-        "(y)": [0, 3, 12, 43, 1],
-        "(z)": [0, 2, 4, 1, 100],
+        "(x )": [2, 1, 3, 0, 1],
+        "(y )": [0, 3, 12, 43, 1],
+        "(z )": [0, 2, 4, 1, 100],
     }
-    next_state_matrix = {"(x)": [2, 6, 19, 44, 102], "(y)": [3, 6, 15, 46, 4], "(z)": [1, 1, 1, 1, 1]}
-    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations(
-        pre_state_matrix, next_state_matrix
-    )
+    next_state_matrix = {"(x )": [2, 6, 19, 44, 102], "(y )": [3, 6, 15, 46, 4], "(z )": [1, 1, 1, 1, 1]}
+    function_names = ["(x )", "(y )", "(z )"]
+    for i in range(5):
+        linear_regression_learner.add_new_observation(
+            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
+        )
+        linear_regression_learner.add_new_observation(
+            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
+        )
+
+    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert learned_correctly
     assert len(numeric_effects) == 3
     assert preconditions is None
@@ -202,18 +246,25 @@ def test_construct_assignment_equations_returns_correct_equations_when_no_change
     linear_regression_learner: LinearRegressionLearner,
 ):
     pre_state_matrix = {
-        "(x)": [2, 1, 3, 0, 1],
-        "(y)": [0, 3, 12, 43, 1],
-        "(z)": [0, 2, 4, 1, 100],
+        "(x )": [2, 1, 3, 0, 1],
+        "(y )": [0, 3, 12, 43, 1],
+        "(z )": [0, 2, 4, 1, 100],
     }
     next_state_matrix = {
-        "(x)": [2, 1, 3, 0, 1],
-        "(y)": [0, 3, 12, 43, 1],
-        "(z)": [0, 2, 4, 1, 100],
+        "(x )": [2, 1, 3, 0, 1],
+        "(y )": [0, 3, 12, 43, 1],
+        "(z )": [0, 2, 4, 1, 100],
     }
-    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations(
-        pre_state_matrix, next_state_matrix
-    )
+    function_names = ["(x )", "(y )", "(z )"]
+    for i in range(5):
+        linear_regression_learner.add_new_observation(
+            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
+        )
+        linear_regression_learner.add_new_observation(
+            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
+        )
+
+    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert learned_correctly
     assert len(numeric_effects) == 0
     assert preconditions is None
@@ -223,18 +274,24 @@ def test_construct_assignment_equations_restrictive_preconditions_when_not_enoug
     linear_regression_learner: LinearRegressionLearner,
 ):
     pre_state_matrix = {
-        "(x)": [2, 1],
-        "(y)": [0, 3],
-        "(z)": [0, 2],
+        "(x )": [2, 1],
+        "(y )": [0, 3],
+        "(z )": [0, 2],
     }
     next_state_matrix = {
-        "(x)": [2, 1],
-        "(y)": [0, 3],
-        "(z)": [0, 2],
+        "(x )": [2, 1],
+        "(y )": [0, 3],
+        "(z )": [0, 2],
     }
-    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations(
-        pre_state_matrix, next_state_matrix
-    )
+    function_names = ["(x )", "(y )", "(z )"]
+    for i in range(2):
+        linear_regression_learner.add_new_observation(
+            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
+        )
+        linear_regression_learner.add_new_observation(
+            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
+        )
+    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert not learned_correctly
     assert preconditions is None  # The preconditions will be learned in externally to maintain safety.
     assert len(numeric_effects) == 3
@@ -246,18 +303,23 @@ def test_construct_assignment_equations_restrictive_preconditions_given_only_one
     linear_regression_learner: LinearRegressionLearner,
 ):
     pre_state_matrix = {
-        "(x)": [2],
-        "(y)": [0],
-        "(z)": [1],
+        "(x )": [2],
+        "(y )": [0],
+        "(z )": [1],
     }
     next_state_matrix = {
-        "(x)": [2],
-        "(y)": [2],
-        "(z)": [0],
+        "(x )": [2],
+        "(y )": [2],
+        "(z )": [0],
     }
-    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations(
-        pre_state_matrix, next_state_matrix
+    function_names = ["(x )", "(y )", "(z )"]
+    linear_regression_learner.add_new_observation(
+        {name: pre_state_matrix[name][0] for name in function_names}, store_in_prev_state=True
     )
+    linear_regression_learner.add_new_observation(
+        {name: next_state_matrix[name][0] for name in function_names}, store_in_prev_state=False
+    )
+    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert not learned_correctly
     assert preconditions is None
     assert len(numeric_effects) == 2

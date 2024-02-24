@@ -7,7 +7,6 @@ import numpy as np
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
-from sam_learning.core.numeric_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
 from sam_learning.core.numeric_learning.linear_regression_learner import LinearRegressionLearner
 
 np.seterr(divide="ignore", invalid="ignore")
@@ -24,7 +23,7 @@ class NumericFluentStateStorage:
         self.logger = logging.getLogger(__name__)
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
-        self.convex_hull_learner = IncrementalConvexHullLearner(action_name, domain_functions)
+        self.convex_hull_learner = ConvexHullLearner(action_name, domain_functions)
         self.linear_regression_learner = LinearRegressionLearner(action_name, domain_functions)
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
@@ -32,27 +31,25 @@ class NumericFluentStateStorage:
 
         :param state_fluents: the lifted state fluents that were matched for the action.
         """
-        self.convex_hull_learner.add_new_point(
-            {
-                state_fluent_lifted_str: state_fluent_data.value
-                for state_fluent_lifted_str, state_fluent_data in state_fluents.items()
-            }
-        )
-        for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
-            self.previous_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
+        previous_state_values = {
+            state_fluent_lifted_str: state_fluent_data.value
+            for state_fluent_lifted_str, state_fluent_data in state_fluents.items()
+        }
+        for state_fluent_lifted_str, state_fluent_data in previous_state_values.items():
+            self.previous_state_storage[state_fluent_lifted_str].append(state_fluent_data)
+
+        self.linear_regression_learner.add_new_observation(previous_state_values, store_in_prev_state=True)
 
     def add_to_next_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the next state storage.
 
         :param state_fluents: the lifted state fluents that were matched for the action.
         """
-        for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
-            self.next_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
-            if len(self.previous_state_storage.get(state_fluent_lifted_str, [])) != len(
-                self.next_state_storage[state_fluent_lifted_str]
-            ):
-                self.logger.debug("This is a case where effects create new fluents - should adjust the previous state.")
-                self.previous_state_storage[state_fluent_lifted_str].append(0)
+        next_state_values = {
+            state_fluent_lifted_str: state_fluent_data.value
+            for state_fluent_lifted_str, state_fluent_data in state_fluents.items()
+        }
+        self.linear_regression_learner.add_new_observation(next_state_values, store_in_prev_state=False)
 
     def filter_out_inconsistent_state_variables(self) -> None:
         """Filters out fluents that appear only in part of the states since they are not safe.
@@ -80,17 +77,14 @@ class NumericFluentStateStorage:
         :return: The precondition that contains the linear inequalities.
         """
         self.logger.info("Constructing the safe linear inequalities.")
-        return self.convex_hull_learner.construct_convex_hull_inequalities(relevant_fluents)
+        return self.convex_hull_learner.construct_safe_linear_inequalities(
+            self.previous_state_storage, relevant_fluents
+        )
 
-    def construct_assignment_equations(
-        self, allow_unsafe_learning: bool = False
-    ) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
+    def construct_assignment_equations(self) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
-        :param allow_unsafe_learning: whether to allow learning from unsafe data.
         :return: the constructed assignment statements.
         """
         self.logger.info("Constructing the assignment equations.")
-        return self.linear_regression_learner.construct_assignment_equations(
-            self.previous_state_storage, self.next_state_storage, allow_unsafe_learning=allow_unsafe_learning
-        )
+        return self.linear_regression_learner.construct_assignment_equations()

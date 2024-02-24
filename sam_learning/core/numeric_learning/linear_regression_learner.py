@@ -3,6 +3,7 @@ import logging
 from typing import Optional, List, Dict, Tuple, Set
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame
 from pddl_plus_parser.models import Precondition, NumericalExpressionTree, PDDLFunction
 from sklearn.linear_model import LinearRegression
@@ -33,21 +34,25 @@ class LinearRegressionLearner:
     def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
-        self.domain_functions = domain_functions
+        self.domain_functions = {func.name: func for func in domain_functions.values()}
+        self.previous_state_data = DataFrame(
+            columns=list([function.untyped_representation for function in domain_functions.values()])
+        )
+        self.next_state_data = DataFrame(
+            columns=list([function.untyped_representation for function in domain_functions.values()])
+        )
 
-    @staticmethod
-    def _combine_states_data(prev_state: Dict[str, List[float]], next_state: Dict[str, List[float]]) -> DataFrame:
+    def _combine_states_data(self) -> DataFrame:
         """Combines the previous and next states data into a single dataframe.
 
         :return: the combined dataframe.
         """
-        combined_data = prev_state.copy()
-        combined_data.update(
-            {f"{NEXT_STATE_PREFIX}{fluent_name}": fluent_values for fluent_name, fluent_values in next_state.items()}
-        )
-        dataframe = DataFrame(combined_data).fillna(0)
-        dataframe.drop_duplicates(inplace=True)
-        return dataframe
+        # assuming that if a function is an effect of the action it will always be present in the next state.
+        next_state_df = self.next_state_data.add_prefix(NEXT_STATE_PREFIX)
+        combined_data = pd.concat([self.previous_state_data, next_state_df], axis=1)
+        # getting the columns that contain missing values in the previous state.
+        combined_data.drop_duplicates(inplace=True)
+        return combined_data
 
     def _validate_legal_equations(self, values_df: DataFrame) -> bool:
         """Validates that there are enough independent equations which enable for a single solution for the equation.
@@ -127,11 +132,14 @@ class LinearRegressionLearner:
         return None
 
     def _extract_non_zero_change(self, lifted_function: str, regression_df: DataFrame) -> Tuple[float, float]:
-        """
+        """Extracts the non-zero change in the function.
 
-        :param lifted_function:
-        :param regression_df:
-        :return:
+         Note:
+            The value is extracted  based on the difference between the previous and the next states.
+
+        :param lifted_function: the name of the function to extract the change for.
+        :param regression_df: the matrix containing the previous values of the function and the resulting values.
+        :return: the first non-zero value of the function and the previous value.
         """
         previous_value = next_value = 0.0
         for i in range(len(regression_df)):
@@ -139,6 +147,7 @@ class LinearRegressionLearner:
             next_value = regression_df.iloc[i][LABEL_COLUMN]
             if previous_value != next_value:
                 break
+
         return next_value, previous_value
 
     def _solve_linear_equations(
@@ -224,100 +233,73 @@ class LinearRegressionLearner:
 
         return list(const_preconditions)
 
-    def _construct_restrictive_numeric_preconditions(
-        self, combined_data: DataFrame, additional_conditions: List[str] = None
-    ) -> Precondition:
-        """Constructs the restrictive numeric preconditions for the action.
-
-        Note:
-            if there is only one sample we create an AND condition, otherwise we create an OR condition.
-
-        :param combined_data: the combined data of the previous and next states.
-        :return: the restrictive numeric preconditions.
-        """
-        self.logger.debug(f"Constructing the restrictive numeric preconditions for the action {self.action_name}.")
-        precondition_statements = []
-        for index, row in combined_data.iterrows():
-            current_data_conditions = [
-                f"(= {fluent} {row[fluent]})"
-                for fluent in combined_data.columns
-                if not fluent.startswith(NEXT_STATE_PREFIX)
-            ]
-            precondition_statements.append(current_data_conditions)
-
-        if len(precondition_statements) == 1:
-            return construct_numeric_conditions(
-                precondition_statements[0], ConditionType.conjunctive, self.domain_functions
-            )
-
-        const_preconditions = self._extract_const_conditions(precondition_statements, additional_conditions)
-        combined_preconditions = None
-        if len(const_preconditions) > 0:
-            combined_preconditions = construct_numeric_conditions(
-                const_preconditions, ConditionType.conjunctive, self.domain_functions
-            )
-
-        disjunctive_preconditions = Precondition("or")
-        for precondition_statement in precondition_statements:
-            disjunctive_preconditions.add_condition(
-                construct_numeric_conditions(precondition_statement, ConditionType.conjunctive, self.domain_functions)
-            )
-
-        if combined_preconditions is not None:
-            combined_preconditions.add_condition(disjunctive_preconditions)
-            return combined_preconditions
-
-        return disjunctive_preconditions
-
-    def _construct_effect_from_single_sample(
-        self, prev_state_data: Dict[str, List[float]], next_state_data: Dict[str, List[float]]
-    ) -> Set[NumericalExpressionTree]:
+    def _construct_effect_from_single_sample(self) -> Set[NumericalExpressionTree]:
         """constructs the effect from a single sample.
 
         :return: the constructed numeric effect.
         """
         assignment_statements = []
-        for fluent in next_state_data:
-            if fluent not in prev_state_data:
-                raise ValueError(f"The fluent {fluent} is not in the previous state data.")
+        for fluent in self.next_state_data.columns.tolist():
+            if (
+                fluent in self.previous_state_data.columns.tolist()
+                and self.previous_state_data.iloc[0][fluent] == self.next_state_data.iloc[0][fluent]
+            ):
+                self.logger.debug("The value of the fluent is the same before and after the application of the action.")
+                continue
 
-            if prev_state_data[fluent][0] != next_state_data[fluent][0]:
-                assignment_statements.append(f"(assign {fluent} {next_state_data[fluent][0]})")
+            if fluent not in self.previous_state_data.columns.tolist():
+                self.logger.debug("Assuming that the fluent wasn't initialized and the next state is an assignment.")
+
+            assignment_statements.append(f"(assign {fluent} {self.next_state_data.iloc[0][fluent]})")
 
         return construct_numeric_effects(assignment_statements, self.domain_functions)
 
-    def construct_assignment_equations(
-        self,
-        previous_state_data: Dict[str, List[float]],
-        next_state_data: Dict[str, List[float]],
-        allow_unsafe_learning: bool = False,
-    ) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
+    def add_new_observation(self, state_data: Dict[str, float], store_in_prev_state: bool = True) -> None:
+        """Adds a new point to the convex hull learner.
+
+        Note:
+            This method is supposed to improve the performance of the CH calculations by incrementally adding points.
+
+        :param state_data: the data of the state.
+        :param store_in_prev_state: whether to store the data in the previous state or the next state.
+        """
+
+        state_sample = DataFrame.from_dict(data={k: [v] for k, v in state_data.items()}, orient="columns")
+        if store_in_prev_state:
+            self.previous_state_data = pd.concat([self.previous_state_data, state_sample], ignore_index=True)
+            self.previous_state_data.dropna(axis="columns", inplace=True)
+
+        else:
+            self.next_state_data = pd.concat([self.next_state_data, state_sample], ignore_index=True)
+            self.next_state_data.dropna(axis="columns", inplace=True)
+
+    def construct_assignment_equations(self) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
-        :param previous_state_data: the data of the previous state.
-        :param next_state_data: the data of the next state.
-        :param allow_unsafe_learning: whether to allow unsafe learning.
         :return: the constructed effects with the possibly additional preconditions.
         """
         assignment_statements = []
         self.logger.info(f"Constructing the fluent assignment equations for action {self.action_name}.")
-        combined_data = self._combine_states_data(previous_state_data, next_state_data)
+        combined_data = self._combine_states_data()
         if combined_data.shape[0] == 1:
             self.logger.info(f"The action {self.action_name} contains a single unique observation!")
-            return self._construct_effect_from_single_sample(previous_state_data, next_state_data), None, False
+            return self._construct_effect_from_single_sample(), None, False
 
         # The dataset contains more than one observation.
-        self.logger.debug("Removing fluents that are constant zero...")
-        tagged_next_state_fluents = [f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in next_state_data.keys()]
-        filtered_df, constant_features_conditions, constant_features = filter_constant_features(
+        self.logger.debug("Removing fluents that are constant...")
+        tagged_next_state_fluents = [
+            f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in self.next_state_data.columns.tolist()
+        ]
+        filtered_df, const_features_conditions, const_features = filter_constant_features(
             combined_data, columns_to_ignore=tagged_next_state_fluents
         )
-        features_df = filtered_df.copy()[[k for k in previous_state_data.keys() if k in filtered_df.columns]]
+
+        features_df = filtered_df.copy()[[k for k in self.next_state_data.columns.tolist() if k in filtered_df.columns]]
         regression_df, linear_dep_conditions, dependent_columns = detect_linear_dependent_features(features_df)
-        combined_conditions = linear_dep_conditions + constant_features_conditions
-        tested_fluents_names = [fluent_name for fluent_name in next_state_data.keys()]
+        combined_conditions = linear_dep_conditions + const_features_conditions
+
         is_safe_to_learn = self._validate_legal_equations(regression_df)
-        for feature_fluent, tagged_fluent in zip(tested_fluents_names, tagged_next_state_fluents):
+        for feature_fluent, tagged_fluent in zip(self.next_state_data.columns.tolist(), tagged_next_state_fluents):
             regression_df[LABEL_COLUMN] = combined_data[tagged_fluent]
             if combined_data[feature_fluent].equals(combined_data[tagged_fluent]) and is_safe_to_learn:
                 self.logger.debug(
@@ -326,9 +308,7 @@ class LinearRegressionLearner:
                 )
                 continue
 
-            polynomial_equation = self._solve_linear_equations(
-                feature_fluent, regression_df, allow_unsafe_learning=allow_unsafe_learning
-            )
+            polynomial_equation = self._solve_linear_equations(feature_fluent, regression_df)
 
             if polynomial_equation is not None:
                 assignment_statements.append(polynomial_equation)
@@ -337,7 +317,9 @@ class LinearRegressionLearner:
             return construct_numeric_effects(assignment_statements, self.domain_functions), None, False
 
         return (
-            construct_numeric_effects(assignment_statements, self.domain_functions),
-            construct_numeric_conditions(combined_conditions, ConditionType.conjunctive, self.domain_functions),
+            construct_numeric_effects(assignment_statements, domain_functions=self.domain_functions),
+            construct_numeric_conditions(
+                combined_conditions, ConditionType.conjunctive, domain_functions=self.domain_functions,
+            ),
             True,
         )

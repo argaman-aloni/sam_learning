@@ -1,14 +1,12 @@
 """A module containing the algorithm to calculate the information gain of new samples."""
-import copy
 import logging
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import PDDLFunction, Predicate
 from scipy.spatial import Delaunay, QhullError
 
-from sam_learning.core.consistent_model_validator import NumericConsistencyValidator
+from sam_learning.core.online_learning.consistent_model_validator import NumericConsistencyValidator
 
 
 class InformationGainLearner(NumericConsistencyValidator):

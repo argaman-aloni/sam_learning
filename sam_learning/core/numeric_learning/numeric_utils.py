@@ -167,7 +167,8 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
     :return: the first numeric divisor.
     """
     linear_coeff = 0
-    division_res = np.array(function1_values) / np.array(function2_values)
+    denominator = np.where(function2_values == 0, 1e-9, function2_values)
+    division_res = np.array(function1_values) / np.array(denominator)
     for value in division_res:
         if not math.isnan(value) and not math.isinf(value):
             linear_coeff = value
@@ -311,31 +312,46 @@ def extended_gram_schmidt(
     return normal_vectors
 
 
+def display_convex_hull_2d(action_name: str, hull: ConvexHull) -> None:
+    """Displays the convex hull in 2D as a plot.
+
+    :param action_name: the name of the action with its convex hull displayed.
+    :param hull: the convex hull to display.
+    """
+    plt.title(f"{action_name} - convex hull")
+    _ = convex_hull_plot_2d(hull)
+    plt.show()
+
+
+def display_convex_hull_3d(action_name: str, hull: ConvexHull) -> None:
+    """Displays the convex hull in 3D as a plot.
+
+    :param action_name: the name of the action with its convex hull displayed.
+    :param hull: the convex hull to display.
+    """
+    plt.title(f"{action_name} - convex hull")
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    for simplex in hull.simplices:
+        simplex = np.append(simplex, simplex[0])  # Repeat the first point to create a closed shape
+        ax.plot(hull.points[simplex, 0], hull.points[simplex, 1], hull.points[simplex, 2], "b-")
+
+    plt.show()
+
+
 def display_convex_hull(action_name: str, display_mode: bool, hull: ConvexHull) -> None:
     """Displays the convex hull in as a plot.
 
     :param action_name: the name of the action with its convex hull displayed.
     :param display_mode: whether to display the plot.
     :param hull: the convex hull to display.
-    :param num_dimensions: the number of dimensions of the original data.
     """
     if not display_mode:
         return
 
     dimensionality = hull.points.shape[1]
-
     if dimensionality == 2:
-        plt.title(f"{action_name} - convex hull")
-        _ = convex_hull_plot_2d(hull)
-        plt.show()
-        return
+        display_convex_hull_2d(action_name, hull)
 
-    if dimensionality == 3:
-        plt.title(f"{action_name} - convex hull")
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
-        for simplex in hull.simplices:
-            simplex = np.append(simplex, simplex[0])  # Repeat the first point to create a closed shape
-            ax.plot(hull.points[simplex, 0], hull.points[simplex, 1], hull.points[simplex, 2], "b-")
-
-        plt.show()
+    elif dimensionality == 3:
+        display_convex_hull_3d(action_name, hull)

@@ -1,11 +1,8 @@
 """A greedy algorithm for feature selection."""
 import logging
-from typing import List, Dict, Set
+from typing import List, Set
 
-from pandas import DataFrame
-from pddl_plus_parser.models import PDDLFunction
-
-from sam_learning.core.consistent_model_validator import NumericConsistencyValidator
+from sam_learning.core.online_learning.consistent_model_validator import NumericConsistencyValidator
 
 
 class BFSFeatureSelector(NumericConsistencyValidator):

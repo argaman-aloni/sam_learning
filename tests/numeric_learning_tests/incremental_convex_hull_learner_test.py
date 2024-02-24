@@ -1,5 +1,6 @@
 """Module tests the incremental convex hull learner."""
 import random
+import time
 
 import pytest
 from pddl_plus_parser.models import PDDLFunction
@@ -38,6 +39,13 @@ def test_add_new_point_when_adding_a_point_for_the_first_time_only_adds_it_to_th
     assert convex_hull_learner._gsp_base is None
     assert convex_hull_learner._complementary_base is None
     assert not convex_hull_learner._spanning_standard_base
+
+
+def test_add_new_point_when_adding_a_point_for_the_second_time_does_not_add_it_again(convex_hull_learner):
+    test_sample = {"(x )": 1, "(y )": 2, "(z )": 3}
+    convex_hull_learner.add_new_point(test_sample)
+    convex_hull_learner.add_new_point(test_sample)
+    assert convex_hull_learner.data.shape == (1, 3)
 
 
 def test_add_new_point_when_adding_two_points_creates_a_base_for_the_points_and_an_orthonormal_complementary_base(
@@ -115,6 +123,17 @@ def test_add_new_point_when_adding_four_points_and_the_last_one_is_linearly_depe
     convex_hull_learner.add_new_point(fourth_sample)
     assert len(convex_hull_learner._convex_hull.points) == 4
     display_convex_hull(TEST_ACTION_NAME, True, convex_hull_learner._convex_hull)
+
+
+def test_add_new_point_when_adding_a_point_with_feature_not_existing_in_previous_sample_does_not_add_new_feature_to_dataset(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
+    first_sample = {"(x )": 0, "(y )": 1, "(z )": 0}
+    convex_hull_learner.add_new_point(first_sample)
+    second_sample = {"(x )": 1, "(y )": 0, "(z )": 1, "(w )": 1}
+    convex_hull_learner.add_new_point(second_sample)
+    assert convex_hull_learner.data.shape[0] == 2
+    assert convex_hull_learner.data.shape[1] == 3
 
 
 def test_add_new_point_when_adding_four_points_that_span_the_entire_space_returns_standard_basis(convex_hull_learner):
@@ -220,6 +239,25 @@ def test_construct_safe_linear_inequalities_when_creating_convex_hull_with_large
     inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities(None)
     assert inequality_precondition.binary_operator == "and"
     assert len(convex_hull_learner._convex_hull.points) == 100
+    assert convex_hull_learner._gsp_base == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    assert convex_hull_learner._complementary_base == []
+    display_convex_hull(TEST_ACTION_NAME, True, convex_hull_learner._convex_hull)
+
+
+def test_construct_safe_linear_inequalities_when_adding_extra_large_number_of_samples_does_not_take_extremely_long_to_calculate(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
+    start_time = time.time()
+    for _ in range(1000):
+        convex_hull_learner.add_new_point(
+            {"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)}
+        )
+
+    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities(None)
+    end_time = time.time()
+    assert end_time - start_time < 5 * 60
+    assert inequality_precondition.binary_operator == "and"
+    assert len(convex_hull_learner._convex_hull.points) == 1000
     assert convex_hull_learner._gsp_base == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     assert convex_hull_learner._complementary_base == []
     display_convex_hull(TEST_ACTION_NAME, True, convex_hull_learner._convex_hull)

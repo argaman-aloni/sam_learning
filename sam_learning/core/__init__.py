@@ -12,7 +12,7 @@ from sam_learning.core.propositional_operations.discrete_utilities import (
 )
 from sam_learning.core.propositional_operations.literals_cnf import LiteralCNF
 from sam_learning.core.unsafe_learning.svm_fluents_learning import SVMFluentsLearning
-from .consistent_model_validator import NumericConsistencyValidator
+from sam_learning.core.online_learning.consistent_model_validator import NumericConsistencyValidator
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
 from .environment_snapshot import EnvironmentSnapshot
 from .exceptions import NotSafeActionError

@@ -1,5 +1,6 @@
 from .conditional_sam import ConditionalSAM
 from .extended_sam_learning import ExtendedSAM
+from .incremental_numeric_sam import IncrementalNumericSAMLearner
 from .multi_agent_sam import MultiAgentSAM
 from .numeric_sam import NumericSAMLearner, PolynomialSAMLearning
 from .online_nsam import OnlineNSAMLearner

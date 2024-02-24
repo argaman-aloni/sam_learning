@@ -104,7 +104,13 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :param point: the point to add to the convex hull learner.
         """
         new_sample = DataFrame.from_dict(data={key: [value] for key, value in point.items()}, orient="columns")
-        self.data = pd.concat([self.data, new_sample], ignore_index=True)
+        # assuming that if a feature is relevant to the preconditions it should always appear in the dataframe.
+        concated_data = pd.concat([self.data, new_sample], ignore_index=True).dropna(axis=1)
+        if concated_data.drop_duplicates().shape[0] == self.data.shape[0]:
+            self.logger.debug("The new point is already in the storage, not adding it again.")
+            return
+
+        self.data = concated_data
         if len(self.data) - 1 == 0:
             self.logger.debug("Added the first sample to the points dataframe.")
             return
@@ -194,7 +200,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         )
         return coefficients, border_point, transformed_vars, span_verification_conditions
 
-    def construct_convex_hull_inequalities(self, relevant_fluents: Optional[List[str]] = []) -> Precondition:
+    def construct_convex_hull_inequalities(self) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
@@ -210,7 +216,13 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                 inequalities_strs.extend(additional_projection_conditions)
 
             return construct_numeric_conditions(
-                inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions
+                inequalities_strs,
+                condition_type=ConditionType.conjunctive,
+                domain_functions={
+                    func.name: func
+                    for func in self.domain_functions.values()
+                    if func.untyped_representation in self.data.columns.tolist()
+                },
             )
 
         except (QhullError, ValueError):

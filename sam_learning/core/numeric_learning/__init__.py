@@ -7,3 +7,5 @@ from .numeric_utils import (
 )
 from .polynomial_fluents_learning_algorithm import PolynomialFluentsLearningAlgorithm
 from .convex_hull_learner import ConvexHullLearner
+from .incremental_convex_hull_learner import IncrementalConvexHullLearner
+from .incremental_numeric_fluent_learner_algorithm import IncrementalNumericFluentStateStorage

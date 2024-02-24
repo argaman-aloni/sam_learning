@@ -55,9 +55,13 @@ def test_add_to_next_state_storage_can_add_single_item_to_the_storage(
         "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION,
     }
     load_action_state_fluent_storage.add_to_next_state_storage(simple_state_fluents)
-    assert load_action_state_fluent_storage.next_state_storage["(fuel-cost )"] == [34.0]
-    assert load_action_state_fluent_storage.next_state_storage["(load_limit ?z)"] == [411.0]
-    assert load_action_state_fluent_storage.next_state_storage["(current_load ?z)"] == [121.0]
+    assert load_action_state_fluent_storage.linear_regression_learner.next_state_data.iloc[0]["(fuel-cost )"] == [34.0]
+    assert load_action_state_fluent_storage.linear_regression_learner.next_state_data.iloc[0]["(load_limit ?z)"] == [
+        411.0
+    ]
+    assert load_action_state_fluent_storage.linear_regression_learner.next_state_data.iloc[0]["(current_load ?z)"] == [
+        121.0
+    ]
 
 
 def test_add_to_previous_state_storage_can_add_multiple_state_values_correctly(
@@ -93,9 +97,8 @@ def test_add_to_next_state_storage_can_add_multiple_state_values_correctly(
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_state_fluents)
 
-    assert len(load_action_state_fluent_storage.next_state_storage["(fuel-cost )"]) == 10
-    assert len(load_action_state_fluent_storage.next_state_storage["(load_limit ?z)"]) == 10
-    assert len(load_action_state_fluent_storage.next_state_storage["(current_load ?z)"]) == 10
+    assert len(load_action_state_fluent_storage.linear_regression_learner.next_state_data) == 10
+    assert len(load_action_state_fluent_storage.linear_regression_learner.next_state_data.columns.tolist()) == 3
 
 
 def test_construct_non_circular_assignment_constructs_correct_equation_with_correct_coefficient_sign_on_increase(
@@ -301,9 +304,11 @@ def test_construct_assignment_equations_with_fewer_equations_than_needed_to_crea
         }
         load_action_state_fluent_storage.add_to_next_state_storage(simple_next_state_fluents)
 
-    effects, numeric_preconditions, learned_perfectly = load_action_state_fluent_storage.construct_assignment_equations(
-        allow_unsafe_learning=False
-    )
+    (
+        effects,
+        numeric_preconditions,
+        learned_perfectly,
+    ) = load_action_state_fluent_storage.construct_assignment_equations()
     assert learned_perfectly
     assert numeric_preconditions is not None
     assert effects is not None
@@ -362,7 +367,7 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_s
     numeric_conditions = [
         operand.to_pddl() for operand in output_conditions.operands if isinstance(operand, NumericalExpressionTree)
     ]
-    assert "(= (- (current_load ?z) 121.0) 0.0)" in numeric_conditions  # the condition is shifted
+    assert "(= (+ -121.00 (current_load ?z)) 0.0)" in numeric_conditions  # the condition is shifted
     assert len([condition for condition in numeric_conditions if condition.startswith("(<=")]) == 2
     assert len([condition for condition in numeric_conditions if condition.startswith("(=")]) == 2
     print(str(output_conditions))
@@ -386,9 +391,9 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities()
 
     expected_conditions = [
-        "(<= (* (fuel-cost ) -1.0) 0.0)",
-        "(<= (* (current_load ?z) -1.0) 0.0)",
-        "(<= (+ (* (current_load ?z) 0.7071) (* (fuel-cost ) 0.7071)) 0.7071)",
+        "(<= (* -1.00 (fuel-cost )) 0.0)",
+        "(<= (* -1.00 (current_load ?z)) 0.0)",
+        "(<= (+ (* 0.71 (current_load ?z)) (* 0.71 (fuel-cost ))) 0.7071)",
         "(= (load_limit ?z) 0.0)",
     ]
     for _, precondition in output_conditions:
@@ -413,9 +418,9 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities()
     expected_conditions = [
         "(<= (current_load ?z) 1.0)",
-        "(<= (* (fuel-cost ) -1.0) 0.0)",
+        "(<= (* -1.00 (fuel-cost )) 0.0)",
         "(<= (fuel-cost ) 1.0)",
-        "(<= (* (current_load ?z) -1.0) 0.0)",
+        "(<= (* -1.00 (current_load ?z)) 0.0)",
         "(= (load_limit ?z) 0.0)",
     ]
 
@@ -426,9 +431,7 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
 def test_construct_safe_linear_inequalities_with_one_dimension_variable_select_min_and_max_values(
     load_action_state_fluent_storage: NumericFluentStateStorage,
 ):
-    load_action_state_fluent_storage.convex_hull_learner = IncrementalConvexHullLearner(
-        LOAD_ACTION, {"fuel-cost": FUEL_COST_FUNCTION,}
-    )
+
     pre_state_input_values = [-19.0, 14.0, 28.0, -7.0]
     for fuel_cost_val in pre_state_input_values:
         FUEL_COST_FUNCTION.set_value(fuel_cost_val)
@@ -449,9 +452,6 @@ def test_construct_safe_linear_inequalities_with_one_dimension_variable_select_m
 def test_construct_safe_linear_inequalities_when_not_given_relevant_fluents_uses_all_variables_in_previous_state(
     load_action_state_fluent_storage: NumericFluentStateStorage,
 ):
-    load_action_state_fluent_storage.convex_hull_learner = IncrementalConvexHullLearner(
-        LOAD_ACTION, {"fuel-cost": FUEL_COST_FUNCTION, "current_load": CURRENT_LOAD_TRAJECTORY_FUNCTION,}
-    )
     pre_state_input_values = [(-19.0, 32.0), (14.0, 52.0), (28.0, 12.0), (-7.0, 13.0)]
     for fuel_cost_val, current_limit_val in pre_state_input_values:
         FUEL_COST_FUNCTION.set_value(fuel_cost_val)

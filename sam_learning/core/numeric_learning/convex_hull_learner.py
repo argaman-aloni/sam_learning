@@ -196,8 +196,9 @@ class ConvexHullLearner:
             else []
         )
         state_data = DataFrame(state_storge).drop_duplicates().drop(columns=irrelevant_fluents)
-        if relevant_fluents is not None and len(relevant_fluents) == 1:
+        if (relevant_fluents is not None and len(relevant_fluents) == 1) or state_data.shape[1] == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")
+            relevant_fluents = state_data.columns.tolist() if relevant_fluents is None else relevant_fluents
             return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         try:
