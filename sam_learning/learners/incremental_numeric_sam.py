@@ -109,11 +109,10 @@ class IncrementalNumericSAMLearner(SAMLearner):
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
 
-    def _create_safe_action(self, action_name: str, allow_unsafe_learning: bool = False) -> LearnerAction:
+    def _create_safe_action(self, action_name: str) -> LearnerAction:
         """Creates a safe action that can be executed in the environment.
 
         :param action_name: the name of the action to create.
-        :param allow_unsafe_learning: whether to allow unsafe learning of the effects.
         :return: the safe action that can be executed in the environment.
         """
         action = self.partial_domain.actions[action_name]

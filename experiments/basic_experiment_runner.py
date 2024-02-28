@@ -34,12 +34,14 @@ def configure_logger(args: argparse.Namespace):
         maxBytes=max_bytes,
         backupCount=1,
     )
+    stream_handler = logging.StreamHandler()
 
     # Create a formatter and set it for the handler
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
+    stream_handler.setFormatter(formatter)
 
-    logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
+    logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler, stream_handler])
 
 
 class OfflineBasicExperimentRunner:

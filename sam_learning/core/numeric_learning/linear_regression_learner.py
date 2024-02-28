@@ -265,19 +265,26 @@ class LinearRegressionLearner:
         """
 
         state_sample = DataFrame.from_dict(data={k: [v] for k, v in state_data.items()}, orient="columns")
-        if store_in_prev_state:
-            self.previous_state_data = pd.concat([self.previous_state_data, state_sample], ignore_index=True)
-            self.previous_state_data.dropna(axis="columns", inplace=True)
+        data_to_update = self.previous_state_data if store_in_prev_state else self.next_state_data
+        attribute_name = "previous_state_data" if store_in_prev_state else "next_state_data"
 
-        else:
-            self.next_state_data = pd.concat([self.next_state_data, state_sample], ignore_index=True)
-            self.next_state_data.dropna(axis="columns", inplace=True)
+        if data_to_update.empty:
+            setattr(self, attribute_name, state_sample)
+            return
+
+        data_to_update = pd.concat([data_to_update, state_sample], ignore_index=True)
+        data_to_update.dropna(axis="columns", inplace=True)
+        setattr(self, attribute_name, data_to_update)
 
     def construct_assignment_equations(self) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
         :return: the constructed effects with the possibly additional preconditions.
         """
+        if len(self.next_state_data) == 0:
+            self.logger.debug(f"No observations for the action {self.action_name}.")
+            return set(), None, False
+
         assignment_statements = []
         self.logger.info(f"Constructing the fluent assignment equations for action {self.action_name}.")
         combined_data = self._combine_states_data()

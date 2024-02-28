@@ -218,7 +218,7 @@ def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_cr
 ):
     first_sample = {"(x )": 2, "(y )": 3, "(z )": -1}
     convex_hull_learner.add_new_point(first_sample)
-    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities(None)
+    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 3
     assert {op.to_pddl() for op in inequality_precondition.operands} == {
@@ -236,7 +236,7 @@ def test_construct_safe_linear_inequalities_when_creating_convex_hull_with_large
             {"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)}
         )
 
-    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities(None)
+    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
     assert inequality_precondition.binary_operator == "and"
     assert len(convex_hull_learner._convex_hull.points) == 100
     assert convex_hull_learner._gsp_base == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
@@ -253,7 +253,7 @@ def test_construct_safe_linear_inequalities_when_adding_extra_large_number_of_sa
             {"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)}
         )
 
-    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities(None)
+    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
     end_time = time.time()
     assert end_time - start_time < 5 * 60
     assert inequality_precondition.binary_operator == "and"

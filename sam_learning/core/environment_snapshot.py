@@ -29,8 +29,8 @@ class EnvironmentSnapshot:
         self.partial_domain = partial_domain
 
     def _create_state_discrete_snapshot(
-            self, state: State,
-            relevant_objects: Dict[str, PDDLObject]) -> Set[GroundedPredicate]:
+        self, state: State, relevant_objects: Dict[str, PDDLObject]
+    ) -> Set[GroundedPredicate]:
         """Creates a snapshot of the state predicates.
 
         :param state: the state to create a snapshot of.
@@ -38,14 +38,20 @@ class EnvironmentSnapshot:
         """
         self.logger.debug("Creating a snapshot of the state predicates.")
         positive_state_predicates, negative_state_predicates = set(), set()
-        vocabulary = self.vocabulary_creator.create_vocabulary(domain=self.partial_domain,
-                                                               observed_objects=relevant_objects)
+        vocabulary = self.vocabulary_creator.create_vocabulary(
+            domain=self.partial_domain, observed_objects=relevant_objects
+        )
 
         for lifted_predicate_name, vocabulary_predicates in vocabulary.items():
             if lifted_predicate_name not in state.state_predicates:
-                negative_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
-                                                                    object_mapping=p.object_mapping, is_positive=False)
-                                                  for p in vocabulary_predicates])
+                negative_state_predicates.update(
+                    [
+                        GroundedPredicate(
+                            name=p.name, signature=p.signature, object_mapping=p.object_mapping, is_positive=False
+                        )
+                        for p in vocabulary_predicates
+                    ]
+                )
                 continue
 
             for grounded_vocabulary_predicate in vocabulary_predicates:
@@ -55,14 +61,20 @@ class EnvironmentSnapshot:
                         positive_state_predicates.add(grounded_vocabulary_predicate)
                         break
 
-            negative_state_predicates.update([GroundedPredicate(name=p.name, signature=p.signature,
-                                                                object_mapping=p.object_mapping, is_positive=False)
-                                              for p in vocabulary_predicates.difference(positive_state_predicates)])
+            negative_state_predicates.update(
+                [
+                    GroundedPredicate(
+                        name=p.name, signature=p.signature, object_mapping=p.object_mapping, is_positive=False
+                    )
+                    for p in vocabulary_predicates.difference(positive_state_predicates)
+                ]
+            )
 
         return positive_state_predicates.union(negative_state_predicates)
 
     def _create_state_numeric_snapshot(
-            self, state: State, relevant_objects: Dict[str, PDDLObject]) -> Dict[str, PDDLFunction]:
+        self, state: State, relevant_objects: Dict[str, PDDLObject]
+    ) -> Dict[str, PDDLFunction]:
         """Creating a snapshot of the state functions.
 
         :param state: the state to create a snapshot of.
@@ -72,14 +84,16 @@ class EnvironmentSnapshot:
         self.logger.debug("Creating a snapshot of the state functions.")
         result = {}
         for function_str, pddl_function in state.state_fluents.items():
-            if len(pddl_function.signature.keys()) == 0 or \
-                    set(pddl_function.signature.keys()).issubset(relevant_objects):
+            if len(pddl_function.signature.keys()) == 0 or set(pddl_function.signature.keys()).issubset(
+                relevant_objects
+            ):
                 result[function_str] = pddl_function
 
         return result
 
-    def create_propositional_state_snapshot(self, state: State, current_action: ActionCall,
-                                            observation_objects: Dict[str, PDDLObject]) -> Set[GroundedPredicate]:
+    def create_propositional_state_snapshot(
+        self, state: State, current_action: ActionCall, observation_objects: Dict[str, PDDLObject]
+    ) -> Set[GroundedPredicate]:
         """Creates a propositional snapshot of the current state.
 
         :param state: the state of the environment.
@@ -88,12 +102,16 @@ class EnvironmentSnapshot:
         """
         self.logger.debug("Creating a snapshot of the environment.")
         parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
-        relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
-                            if object_name in parameters_including_consts}
+        relevant_objects = {
+            object_name: object_data
+            for object_name, object_data in observation_objects.items()
+            if object_name in parameters_including_consts
+        }
         return self._create_state_discrete_snapshot(state, relevant_objects)
 
-    def create_numeric_state_snapshot(self, state: State, current_action: ActionCall,
-                                      observation_objects: Dict[str, PDDLObject]) -> Dict[str, PDDLFunction]:
+    def create_numeric_state_snapshot(
+        self, state: State, current_action: ActionCall, observation_objects: Dict[str, PDDLObject]
+    ) -> Dict[str, PDDLFunction]:
         """Creates a numeric snapshot of the current state.
 
         :param state: the state of the environment.
@@ -102,13 +120,21 @@ class EnvironmentSnapshot:
         """
         self.logger.debug("Creating a snapshot of the environment.")
         parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
-        relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
-                            if object_name in parameters_including_consts}
+        relevant_objects = {
+            object_name: object_data
+            for object_name, object_data in observation_objects.items()
+            if object_name in parameters_including_consts
+        }
         return self._create_state_numeric_snapshot(state, relevant_objects)
 
     def create_triplet_snapshot(
-            self, previous_state: State, next_state: State, current_action: ActionCall,
-            observation_objects: Dict[str, PDDLObject], specific_types: Optional[List[str]] = []) -> None:
+        self,
+        previous_state: State,
+        next_state: State,
+        current_action: ActionCall,
+        observation_objects: Dict[str, PDDLObject],
+        specific_types: Optional[List[str]] = [],
+    ) -> None:
         """Creates a snapshot of the environment.
 
         :param previous_state: the previous state of the environment.
@@ -119,8 +145,11 @@ class EnvironmentSnapshot:
         """
         self.logger.debug("Creating a snapshot of the environment.")
         parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
-        relevant_objects = {object_name: object_data for object_name, object_data in observation_objects.items()
-                            if object_name in parameters_including_consts or object_data.type.name in specific_types}
+        relevant_objects = {
+            object_name: object_data
+            for object_name, object_data in {**observation_objects, **self.partial_domain.constants}.items()
+            if object_name in parameters_including_consts or object_data.type.name in specific_types
+        }
 
         self.previous_state_predicates = self._create_state_discrete_snapshot(previous_state, relevant_objects)
         self.next_state_predicates = self._create_state_discrete_snapshot(next_state, relevant_objects)

@@ -29,7 +29,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
     relevant_fluents: Optional[List[str]]
 
     def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
-        super().__init__(action_name, domain_functions)
+        super().__init__(action_name, {function.name: function for function in domain_functions.values()})
         self._convex_hull = None
         self._gsp_base = None
         self._complementary_base = None
@@ -105,12 +105,17 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         """
         new_sample = DataFrame.from_dict(data={key: [value] for key, value in point.items()}, orient="columns")
         # assuming that if a feature is relevant to the preconditions it should always appear in the dataframe.
-        concated_data = pd.concat([self.data, new_sample], ignore_index=True).dropna(axis=1)
-        if concated_data.drop_duplicates().shape[0] == self.data.shape[0]:
+        if len(self.data) == 0:
+            self.data = new_sample  # This is to avoid observing warnings when adding the first sample.
+            self.logger.debug("Added the first sample to the points dataframe.")
+            return
+
+        concat_data = pd.concat([self.data, new_sample], ignore_index=True).dropna(axis=1)
+        if concat_data.drop_duplicates().shape[0] == self.data.shape[0]:
             self.logger.debug("The new point is already in the storage, not adding it again.")
             return
 
-        self.data = concated_data
+        self.data = concat_data
         if len(self.data) - 1 == 0:
             self.logger.debug("Added the first sample to the points dataframe.")
             return
@@ -205,6 +210,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
+        if len(self.data) == 0:
+            self.logger.debug("No observations were given to learn any conditions.")
+            return Precondition("and")
+
         if len(self.data.columns.tolist()) == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")
             return self._construct_single_dimension_inequalities(self.data.loc[:, self.data.columns.tolist()[0]])
