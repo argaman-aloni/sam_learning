@@ -2,11 +2,13 @@
 import random
 import time
 
+import numpy as np
 import pytest
 from pddl_plus_parser.models import PDDLFunction
 
 from sam_learning.core.numeric_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
-from sam_learning.core.numeric_learning.numeric_utils import display_convex_hull
+from sam_learning.core.numeric_learning.numeric_utils import display_convex_hull, create_monomials, \
+    create_polynomial_string
 
 TEST_ACTION_NAME = "test_action"
 
@@ -21,6 +23,16 @@ def convex_hull_learner() -> IncrementalConvexHullLearner:
         "z": PDDLFunction(name="z", signature={}),
     }
     return IncrementalConvexHullLearner(TEST_ACTION_NAME, domain_functions)
+
+
+@pytest.fixture
+def polynomial_convex_hull_learner() -> IncrementalConvexHullLearner:
+    domain_functions = {
+        "(x )": PDDLFunction(name="x", signature={}),
+        "(y )": PDDLFunction(name="y", signature={}),
+        "(z )": PDDLFunction(name="z", signature={}),
+    }
+    return IncrementalConvexHullLearner(TEST_ACTION_NAME, domain_functions, polynom_degree=1)
 
 
 def test_creating_the_convex_hull_learner_creates_the_dataframe_with_the_correct_columns_and_zero_rows(
@@ -150,19 +162,14 @@ def test_add_new_point_when_adding_four_points_that_span_the_entire_space_return
     display_convex_hull(TEST_ACTION_NAME, True, convex_hull_learner._convex_hull)
 
 
-def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_conditions(
-    convex_hull_learner: IncrementalConvexHullLearner,
-):
+def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_conditions(convex_hull_learner: IncrementalConvexHullLearner,):
     first_sample = {"(x )": 0, "(y )": 1, "(z )": 0}
     convex_hull_learner.add_new_point(first_sample)
     second_sample = {"(x )": 1, "(y )": 0, "(z )": 0}
     convex_hull_learner.add_new_point(second_sample)
-    (
-        coefficients,
-        border_point,
-        transformed_vars,
-        span_verification_conditions,
-    ) = convex_hull_learner._incremental_create_ch_inequalities(display_mode=True)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._incremental_create_ch_inequalities(
+        display_mode=True
+    )
     assert coefficients == [[-1], [1]]
     assert border_point == [0, 1.4142]
     assert transformed_vars == ["(+ (* (x ) 0.7071) (* (- (y ) 1) -0.7071))"]
@@ -180,12 +187,9 @@ def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_c
     convex_hull_learner.add_new_point(third_sample)
     fourth_sample = {"(x )": 4, "(y )": 1, "(z )": 0}
     convex_hull_learner.add_new_point(fourth_sample)
-    (
-        coefficients,
-        border_point,
-        transformed_vars,
-        span_verification_conditions,
-    ) = convex_hull_learner._incremental_create_ch_inequalities(display_mode=True)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._incremental_create_ch_inequalities(
+        display_mode=True
+    )
     assert coefficients == [[-1], [1]]
     assert border_point == [0, 4]
     assert set(span_verification_conditions) == {"(= (z ) 0.0)", "(= (- (y ) 1) 0.0)"}
@@ -202,12 +206,9 @@ def test_incremental_create_ch_inequalities_with_point_spanning_standard_base_re
     convex_hull_learner.add_new_point(third_sample)
     fourth_sample = {"(x )": 0, "(y )": 0, "(z )": 1}
     convex_hull_learner.add_new_point(fourth_sample)
-    (
-        coefficients,
-        border_point,
-        transformed_vars,
-        span_verification_conditions,
-    ) = convex_hull_learner._incremental_create_ch_inequalities(display_mode=True)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._incremental_create_ch_inequalities(
+        display_mode=True
+    )
     assert len(coefficients) == 4
     assert len(border_point) == 4
     assert span_verification_conditions == []
@@ -232,9 +233,7 @@ def test_construct_safe_linear_inequalities_when_creating_convex_hull_with_large
     convex_hull_learner: IncrementalConvexHullLearner,
 ):
     for _ in range(100):
-        convex_hull_learner.add_new_point(
-            {"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)}
-        )
+        convex_hull_learner.add_new_point({"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)})
 
     inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
     assert inequality_precondition.binary_operator == "and"
@@ -249,9 +248,7 @@ def test_construct_safe_linear_inequalities_when_adding_extra_large_number_of_sa
 ):
     start_time = time.time()
     for _ in range(1000):
-        convex_hull_learner.add_new_point(
-            {"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)}
-        )
+        convex_hull_learner.add_new_point({"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)})
 
     inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
     end_time = time.time()
@@ -261,3 +258,43 @@ def test_construct_safe_linear_inequalities_when_adding_extra_large_number_of_sa
     assert convex_hull_learner._gsp_base == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     assert convex_hull_learner._complementary_base == []
     display_convex_hull(TEST_ACTION_NAME, True, convex_hull_learner._convex_hull)
+
+
+def test_incremental_create_ch_inequalities_creates_convex_hull_with_all_variables_in_the_vectors_including_polynoms(
+    polynomial_convex_hull_learner: IncrementalConvexHullLearner,
+):
+    k = 50
+    numbers = list(range(100))
+    state_matrix = {
+        "(x )": random.sample(numbers, k=k),
+        "(y )": random.sample(numbers, k=k),
+        "(z )": random.sample(numbers, k=k),
+    }
+    monomials = create_monomials(list(state_matrix.keys()), polynom_degree=1)
+    for i in range(k):
+        polynomial_convex_hull_learner.add_new_point(
+            {create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial]) for monomial in monomials},
+        )
+
+    A, _, _, _ = polynomial_convex_hull_learner._incremental_create_ch_inequalities()
+    assert all([len(item) == 6 for item in A])
+
+
+def test_construct_convex_hull_inequalities_when_given_polynomial_inequalities_returns_convex_hull_with_all_points_as_conditions(
+    polynomial_convex_hull_learner: IncrementalConvexHullLearner,
+):
+    k = 50
+    numbers = list(range(100))
+    state_matrix = {
+        "(x )": random.sample(numbers, k=k),
+        "(y )": random.sample(numbers, k=k),
+        "(z )": random.sample(numbers, k=k),
+    }
+    monomials = create_monomials(list(state_matrix.keys()), polynom_degree=1)
+    for i in range(k):
+        polynomial_convex_hull_learner.add_new_point(
+            {create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial]) for monomial in monomials},
+        )
+
+    precondition = polynomial_convex_hull_learner.construct_convex_hull_inequalities()
+    print(str(precondition))

@@ -19,13 +19,13 @@ class NumericFluentStateStorage:
     previous_state_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
     next_state_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
 
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
+    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
         self.action_name = action_name
         self.logger = logging.getLogger(__name__)
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
         self.convex_hull_learner = ConvexHullLearner(action_name, domain_functions)
-        self.linear_regression_learner = LinearRegressionLearner(action_name, domain_functions)
+        self.linear_regression_learner = LinearRegressionLearner(action_name, domain_functions, polynom_degree=polynom_degree)
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the previous state storage.

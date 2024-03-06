@@ -238,11 +238,15 @@ def construct_numeric_conditions(
 
     precondition_type = "and" if condition_type == ConditionType.conjunctive else "or"
     constructed_precondition = Precondition(precondition_type)
+    precondition_parts = []
     for condition in conditions:
         numeric_tokenizer = PDDLTokenizer(pddl_str=condition)
         tokens = numeric_tokenizer.parse()
         numeric_expression = construct_expression_tree(tokens, domain_functions)
-        constructed_precondition.add_condition(NumericalExpressionTree(numeric_expression))
+        precondition_parts.append(NumericalExpressionTree(numeric_expression))
+
+    for part in precondition_parts:
+        constructed_precondition.add_condition(part)
 
     return constructed_precondition
 

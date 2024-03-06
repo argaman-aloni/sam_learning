@@ -38,8 +38,8 @@ class LinearRegressionLearner:
         self.action_name = action_name
         self.domain_functions = {func.name: func for func in domain_functions.values()}
         functions = list([function.untyped_representation for function in domain_functions.values()])
-        self.monomials = create_monomials(functions, polynom_degree)
-        self.previous_state_data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in self.monomials])
+        monomials = create_monomials(functions, polynom_degree)
+        self.previous_state_data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in monomials])
         self.next_state_data = DataFrame(columns=functions)
 
     def _combine_states_data(self) -> DataFrame:
@@ -105,12 +105,15 @@ class LinearRegressionLearner:
         return coefficients, learning_score
 
     def _calculate_scale_factor(self, coefficient_vector: List[float], regression_df: DataFrame, lifted_function: str) -> Optional[float]:
-        """
+        """Calculates the scale factor for the function.
 
-        :param coefficient_vector:
-        :param regression_df:
-        :param lifted_function:
-        :return:
+        Note:
+            The scale factor defines the number of times a variable increases or decreases in value.
+
+        :param coefficient_vector: the vector of coefficients for the function variables.
+        :param regression_df: the dataframe containing the regression features.
+        :param lifted_function: the function to calculate the scale factor for.
+        :return: the scale factor for the function.
         """
         if (
             lifted_function in regression_df.columns

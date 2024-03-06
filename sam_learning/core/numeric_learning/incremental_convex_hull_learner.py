@@ -15,6 +15,8 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_projected_variable_strings,
     extended_gram_schmidt,
     display_convex_hull,
+    create_monomials,
+    create_polynomial_string,
 )
 
 
@@ -28,19 +30,19 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
     data: DataFrame
     relevant_fluents: Optional[List[str]]
 
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
+    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
         super().__init__(action_name, {function.name: function for function in domain_functions.values()})
         self._convex_hull = None
         self._gsp_base = None
         self._complementary_base = None
         self._spanning_standard_base = False
-        self.data = DataFrame(columns=list([function.untyped_representation for function in domain_functions.values()]))
+        functions = list([function.untyped_representation for function in domain_functions.values()])
+        monomials = create_monomials(functions, polynom_degree)
+        self.data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in monomials])
         self.relevant_fluents = None
 
     @staticmethod
-    def _calculate_orthonormal_complementary_base(
-        orthonormal_base: List[List[float]], num_dimensions: int
-    ) -> List[List[float]]:
+    def _calculate_orthonormal_complementary_base(orthonormal_base: List[List[float]], num_dimensions: int) -> List[List[float]]:
         """Calculates the orthonormal complementary base of the given orthonormal base.
 
         :param orthonormal_base: the orthonormal base spanning the points in the storage dataframe.
@@ -198,10 +200,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             self.data.columns.tolist(), shift_axis, [list(vector) for vector in np.eye(points.shape[1])]
         )
         span_verification_conditions = self._construct_pddl_inequality_scheme(
-            np.array(self._complementary_base),
-            np.zeros(len(self._complementary_base)),
-            transformed_orthonormal_vars,
-            sign_to_use="=",
+            np.array(self._complementary_base), np.zeros(len(self._complementary_base)), transformed_orthonormal_vars, sign_to_use="=",
         )
         return coefficients, border_point, transformed_vars, span_verification_conditions
 
@@ -220,17 +219,17 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         try:
             A, b, column_names, additional_projection_conditions = self._incremental_create_ch_inequalities()
+            self.logger.debug(f"Constructing the PDDL inequality scheme for the action {self.action_name}.")
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
                 inequalities_strs.extend(additional_projection_conditions)
 
+            self.logger.debug("Constructing the precondition object from the constructed strings.")
             return construct_numeric_conditions(
                 inequalities_strs,
                 condition_type=ConditionType.conjunctive,
                 domain_functions={
-                    func.name: func
-                    for func in self.domain_functions.values()
-                    if func.untyped_representation in self.data.columns.tolist()
+                    func.name: func for func in self.domain_functions.values() if func.untyped_representation in self.data.columns.tolist()
                 },
             )
 

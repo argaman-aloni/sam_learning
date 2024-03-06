@@ -11,7 +11,7 @@ from sam_learning.core import (
     NotSafeActionError,
 )
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
-from sam_learning.core.numeric_learning import IncrementalNumericFluentStateStorage, IncrementalPolynomialFluentsLearningAlgorithm
+from sam_learning.core.numeric_learning import IncrementalNumericFluentStateStorage
 from sam_learning.learners.sam_learning import SAMLearner
 
 
@@ -22,9 +22,10 @@ class IncrementalNumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, **kwargs):
+    def __init__(self, partial_domain: Domain, polynom_degree: int = 0, **kwargs):
         super().__init__(partial_domain)
         self.storage = {}
+        self.polynom_degree = polynom_degree
         self.function_matcher = NumericFunctionMatcher(partial_domain)
 
     def _initialize_fluents_learners(self):
@@ -33,7 +34,7 @@ class IncrementalNumericSAMLearner(SAMLearner):
             possible_bounded_functions = self.vocabulary_creator.create_lifted_functions_vocabulary(
                 domain=self.partial_domain, possible_parameters=action.signature
             )
-            self.storage[action.name] = IncrementalNumericFluentStateStorage(action.name, possible_bounded_functions)
+            self.storage[action.name] = IncrementalNumericFluentStateStorage(action.name, possible_bounded_functions, self.polynom_degree)
 
     def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
         """Constructs the safe preconditions for the input action.
@@ -163,27 +164,3 @@ class IncrementalNumericSAMLearner(SAMLearner):
         super().end_measure_learning_time()
         learning_metadata["learning_time"] = str(self.learning_end_time - self.learning_start_time)
         return self.partial_domain, learning_metadata
-
-
-class PolynomialSAMLearning(IncrementalNumericSAMLearner):
-    """The Extension of SAM that is able to learn polynomial state variables."""
-
-    storage: Dict[str, IncrementalPolynomialFluentsLearningAlgorithm]
-    polynom_degree: int
-
-    def __init__(
-        self, partial_domain: Domain, polynomial_degree: int = 1, **kwargs,
-    ):
-        super().__init__(partial_domain, **kwargs)
-        self.polynom_degree = polynomial_degree
-
-    def _initialize_fluents_learners(self):
-        """Initializes the numeric fluents learners based on all the permutations of the actions' parameters."""
-        for action in self.partial_domain.actions.values():
-            possible_bounded_functions = self.vocabulary_creator.create_lifted_functions_vocabulary(
-                domain=self.partial_domain, possible_parameters=action.signature
-            )
-            self.storage[action.name] = IncrementalPolynomialFluentsLearningAlgorithm(
-                action_name=action.name, domain_functions=possible_bounded_functions, polynom_degree=self.polynom_degree
-            )
-            self.storage[action.name].init_numeric_datasets()
