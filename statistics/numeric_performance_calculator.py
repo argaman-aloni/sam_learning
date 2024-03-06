@@ -12,15 +12,27 @@ from statistics.performance_calculation_utils import _ground_tested_operator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from utilities import LearningAlgorithmType
 
-NUMERIC_PERFORMANCE_STATS = ["action_name", "num_trajectories", "precondition_precision", "precondition_recall",
-                             "effects_precision", "effects_recall", "effects_mse"]
+NUMERIC_PERFORMANCE_STATS = [
+    "action_name",
+    "num_trajectories",
+    "precondition_precision",
+    "precondition_recall",
+    "effects_precision",
+    "effects_recall",
+    "effects_mse",
+]
 
 
 class NumericPerformanceCalculator(SemanticPerformanceCalculator):
     """Class responsible for calculating the numeric precision and recall of a model."""
 
-    def __init__(self, model_domain: Domain, observations: List[Union[Observation, MultiAgentObservation]],
-                 working_directory_path: Path, learning_algorithm: LearningAlgorithmType):
+    def __init__(
+        self,
+        model_domain: Domain,
+        observations: List[Union[Observation, MultiAgentObservation]],
+        working_directory_path: Path,
+        learning_algorithm: LearningAlgorithmType,
+    ):
         super().__init__(model_domain, observations, working_directory_path, learning_algorithm)
 
     def calculate_effects_performance(self, learned_domain: Domain) -> Dict[str, float]:
@@ -34,6 +46,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         :return: a mapping between the action name and its MSE value.
         """
         squared_errors = defaultdict(list)
+        mse_values = {action_name: 1 for action_name in self.model_domain.actions.keys()}
         for observation in self.dataset_observations:
             for observation_component in observation.components:
                 action_call = observation_component.grounded_action_call
@@ -54,10 +67,8 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                     self.logger.debug(f"Could not apply action {action_call.name} on the state.")
                     continue
 
-        return {
-            action_name: sum(square_errors) / len(square_errors)
-            for action_name, square_errors in squared_errors.items()
-        }
+        mse_values.update({action_name: sum(square_errors) / len(square_errors) for action_name, square_errors in squared_errors.items()})
+        return mse_values
 
     def calculate_performance(self, learned_domain_path: Path, num_used_observations: int) -> None:
         """Calculates the model's performance with both the precision and the recall values calculated.
@@ -67,8 +78,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
         self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
-        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(
-            learned_domain)
+        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain)
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         effects_mse = self.calculate_effects_performance(learned_domain)
@@ -76,22 +86,27 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
             action_stats = {
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
-                "precondition_precision": preconditions_precision.get(action_name, 0),
-                "precondition_recall": preconditions_recall.get(action_name, 0),
-                "effects_precision": effects_precision.get(action_name, 0),
-                "effects_recall": effects_recall.get(action_name, 0),
-                "effects_mse": effects_mse.get(action_name, 0)
+                "precondition_precision": preconditions_precision[action_name],
+                "precondition_recall": preconditions_recall[action_name],
+                "effects_precision": effects_precision[action_name],
+                "effects_recall": effects_recall[action_name],
+                "effects_mse": effects_mse[action_name],
             }
             self.combined_stats.append(action_stats)
 
-    def export_semantic_performance(self, fold_num: int) -> None:
+        self.logger.info(f"Finished calculating the numeric learning performance for {self.learning_algorithm.name}.")
+
+    def export_semantic_performance(self, fold_num: int, iteration_num: int = 0) -> None:
         """Export the numeric learning statistics to a CSV report file.
 
         :param fold_num: the fold number of the current experiment.
+        :param iteration_num: the iteration number of the current experiment.
         """
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" \
-                                                  f"_numeric_learning_performance_stats_fold_{fold_num}.csv"
-        with open(statistics_path, "wt", newline='') as statistics_file:
+        statistics_path = (
+            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}"
+            f"_numeric_learning_performance_stats_fold_{fold_num}_{iteration_num}.csv"
+        )
+        with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=NUMERIC_PERFORMANCE_STATS)
             stats_writer.writeheader()
             for data_line in self.combined_stats:
@@ -99,9 +114,8 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
 
     def export_combined_semantic_performance(self) -> None:
         """Export the numeric learning statistics to a CSV report file."""
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" \
-                                                  "combined_numeric_performance.csv"
-        with open(statistics_path, "wt", newline='') as statistics_file:
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_numeric_performance.csv"
+        with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=NUMERIC_PERFORMANCE_STATS)
             stats_writer.writeheader()
             for data_line in self.combined_stats:

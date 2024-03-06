@@ -5,8 +5,7 @@ from typing import Dict
 from pddl_plus_parser.models import Domain, Operator, ActionCall, State, PDDLObject
 
 
-def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain,
-                            problem_objects: Dict[str, PDDLObject]) -> Operator:
+def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain, problem_objects: Dict[str, PDDLObject]) -> Operator:
     """Ground the tested action based on the trajectory data.
 
     :param action_call: the grounded action call in the observation component.
@@ -18,15 +17,22 @@ def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain,
         action=learned_domain.actions[action_call.name],
         domain=learned_domain,
         grounded_action_call=action_call.parameters,
-        problem_objects=problem_objects)
+        problem_objects=problem_objects,
+    )
     grounded_operator.ground()
     return grounded_operator
 
 
 def _calculate_single_action_applicability_rate(
-        action_call: ActionCall, learned_domain: Domain, complete_domain: Domain,
-        num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int],
-        num_true_positives: Dict[str, int], observed_state: State, problem_objects: Dict[str, PDDLObject]):
+    action_call: ActionCall,
+    learned_domain: Domain,
+    complete_domain: Domain,
+    num_false_negatives: Dict[str, int],
+    num_false_positives: Dict[str, int],
+    num_true_positives: Dict[str, int],
+    observed_state: State,
+    problem_objects: Dict[str, PDDLObject],
+):
     """
 
     :param action_call: the grounded action that is currently being tested.
@@ -42,6 +48,6 @@ def _calculate_single_action_applicability_rate(
     model_grounded_operator = _ground_tested_operator(action_call, complete_domain, problem_objects)
     is_applicable_in_test = tested_grounded_operator.is_applicable(observed_state)
     is_applicable_in_model = model_grounded_operator.is_applicable(observed_state)
-    num_true_positives[action_call.name] += int(is_applicable_in_test == is_applicable_in_model)
+    num_true_positives[action_call.name] += int(is_applicable_in_test == is_applicable_in_model and is_applicable_in_test)
     num_false_positives[action_call.name] += int(is_applicable_in_test and not is_applicable_in_model)
     num_false_negatives[action_call.name] += int(not is_applicable_in_test and is_applicable_in_model)

@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import pytest
 from pandas import DataFrame
@@ -5,6 +7,7 @@ from pddl_plus_parser.models import PDDLFunction
 
 from sam_learning.core import NotSafeActionError
 from sam_learning.core.numeric_learning.linear_regression_learner import LinearRegressionLearner
+from sam_learning.core.numeric_learning.numeric_utils import create_monomials, create_polynomial_string
 
 TEST_ACTION_NAME = "test_action"
 
@@ -20,18 +23,25 @@ def linear_regression_learner() -> LinearRegressionLearner:
     return LinearRegressionLearner(TEST_ACTION_NAME, domain_functions)
 
 
-def test_add_new_observation_to_the_previous_state_data_adds_the_data_to_this_dataframe_only(
-    linear_regression_learner: LinearRegressionLearner,
-):
+@pytest.fixture
+def polynomial_regression_learner() -> LinearRegressionLearner:
+    domain_functions = {
+        "(x )": PDDLFunction(name="x", signature={}),
+        "(y )": PDDLFunction(name="y", signature={}),
+        "(z )": PDDLFunction(name="z", signature={}),
+        "(w )": PDDLFunction(name="w", signature={}),
+    }
+    return LinearRegressionLearner(TEST_ACTION_NAME, domain_functions, polynom_degree=1)
+
+
+def test_add_new_observation_to_the_previous_state_data_adds_the_data_to_this_dataframe_only(linear_regression_learner: LinearRegressionLearner,):
     pre_state_data = {"(x )": 2.0, "(y )": 3.31, "(z )": -1.12, "(w )": 0.0}
     linear_regression_learner.add_new_observation(pre_state_data, store_in_prev_state=True)
     assert len(linear_regression_learner.previous_state_data) == 1
     assert len(linear_regression_learner.next_state_data) == 0
 
 
-def test_add_new_observation_to_the_next_state_data_adds_the_data_to_this_dataframe_only(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_add_new_observation_to_the_next_state_data_adds_the_data_to_this_dataframe_only(linear_regression_learner: LinearRegressionLearner,):
     next_state_data = {"(x )": 2.0, "(y )": 3.31, "(z )": -1.12, "(w )": 0.0}
     linear_regression_learner.add_new_observation(next_state_data, store_in_prev_state=False)
     assert len(linear_regression_learner.previous_state_data) == 0
@@ -46,6 +56,30 @@ def test_add_new_observation_with_missing_functions_in_the_data_removes_the_colu
     linear_regression_learner.add_new_observation(next_state_data, store_in_prev_state=False)
     assert len(linear_regression_learner.previous_state_data.columns.tolist()) == 4
     assert len(linear_regression_learner.next_state_data.columns.tolist()) == 3
+
+
+def test_add_new_observation_when_the_input_is_a_polynom_with_variable_multiplications_adds_all_permutations_to_previous_state_db_and_only_values_of_variable_to_post_state_db(
+    linear_regression_learner: LinearRegressionLearner,
+):
+    pre_state_matrix = {
+        "(x )": [2],
+        "(y )": [0],
+        "(z )": [1],
+    }
+    next_state_matrix = {
+        "(x )": [2],
+        "(y )": [2],
+        "(z )": [0],
+    }
+    function_names = ["(x )", "(y )", "(z )"]
+    linear_regression_learner.add_new_observation({name: pre_state_matrix[name][0] for name in function_names}, store_in_prev_state=True)
+    linear_regression_learner.add_new_observation({name: next_state_matrix[name][0] for name in function_names}, store_in_prev_state=False)
+    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
+    assert not learned_correctly
+    assert preconditions is None
+    assert len(numeric_effects) == 2
+    for effect in numeric_effects:
+        print(effect.to_pddl())
 
 
 def test_extract_const_conditions_extract_preconditions_that_appear_in_all_samples_as_constant_a_single_time(
@@ -71,33 +105,25 @@ def test_validate_legal_equations_returns_true_when_the_number_of_equations_is_v
     assert linear_regression_learner._validate_legal_equations(dataframe)
 
 
-def test_validate_legal_returns_false_when_there_are_not_enough_independent_equations(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_validate_legal_returns_false_when_there_are_not_enough_independent_equations(linear_regression_learner: LinearRegressionLearner,):
     pre_state_data = {"x": [0, 1, 2, 4], "y": [0, 2, 4, 8], "z": [0, 0, 18, 6]}
     dataframe = DataFrame(pre_state_data)
     assert not linear_regression_learner._validate_legal_equations(dataframe)
 
 
-def test_validate_legal_equations_returns_false_when_the_number_of_equations_is_too_small(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_validate_legal_equations_returns_false_when_the_number_of_equations_is_too_small(linear_regression_learner: LinearRegressionLearner,):
     pre_state_data = {"x": [2, 1, 3], "y": [3, -1, 2], "z": [-1, 2, 4]}
     dataframe = DataFrame(pre_state_data)
     assert not linear_regression_learner._validate_legal_equations(dataframe)
 
 
-def test_solve_function_linear_equations_returns_correct_solution_for_a_solvable_matrix(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_solve_function_linear_equations_returns_correct_solution_for_a_solvable_matrix(linear_regression_learner: LinearRegressionLearner,):
     equation_matrix = {"x": [2, 1, 3, 0], "y": [3, -1, 2, 0], "z": [-1, 2, 4, 1], "label": [4, -1, 9, 15 / 35]}
     dataframe = DataFrame(equation_matrix)
     regression_array = np.array(dataframe.loc[:, dataframe.columns != "label"])
     function_post_values = np.array(dataframe["label"])
     try:
-        coefficients, learning_score = linear_regression_learner._solve_regression_problem(
-            regression_array, function_post_values
-        )
+        coefficients, learning_score = linear_regression_learner._solve_regression_problem(regression_array, function_post_values)
         assert learning_score == 1
         assert len(coefficients) == 4
 
@@ -113,9 +139,7 @@ def test_solve_function_linear_equations_raises_error_when_there_is_no_solution_
     regression_array = np.array(dataframe.loc[:, dataframe.columns != "label"])
     function_post_values = np.array(dataframe["label"])
     with pytest.raises(NotSafeActionError) as e:
-        linear_regression_learner._solve_regression_problem(
-            regression_array, function_post_values, allow_unsafe_learning=False
-        )
+        linear_regression_learner._solve_regression_problem(regression_array, function_post_values, allow_unsafe_learning=False)
 
 
 def test_compute_non_constant_change_returns_correct_pddl_equation_form_for_variable_with_assignment_sign(
@@ -146,9 +170,7 @@ def test_compute_non_constant_change_returns_correct_pddl_equation_form_for_vari
         pytest.fail()
 
 
-def test_action_not_affects_fluent_returns_true_when_action_does_not_affect_fluent(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_action_not_affects_fluent_returns_true_when_action_does_not_affect_fluent(linear_regression_learner: LinearRegressionLearner,):
     equation_matrix = {
         "(x)": [2, 3, 4, 5, 6, 7, 8, 9],
         "label": [2, 3, 4, 5, 6, 7, 8, 9],
@@ -158,9 +180,7 @@ def test_action_not_affects_fluent_returns_true_when_action_does_not_affect_flue
     assert result is None
 
 
-def test_action_not_affects_fluent_returns_false_when_action_does_affect_fluent(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_action_not_affects_fluent_returns_false_when_action_does_affect_fluent(linear_regression_learner: LinearRegressionLearner,):
     equation_matrix = {
         "(x)": [2, 4, 6],
         "label": [4, 6, 8],
@@ -171,9 +191,7 @@ def test_action_not_affects_fluent_returns_false_when_action_does_affect_fluent(
     assert result == "(increase (x) 2)"
 
 
-def test_combine_states_data_creates_correct_dataframe_with_correct_values(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_combine_states_data_creates_correct_dataframe_with_correct_values(linear_regression_learner: LinearRegressionLearner,):
     pre_state_matrix = {
         "(x )": [2, 1, 3, 0, 1],
         "(y )": [0, 3, 12, 43, 1],
@@ -186,12 +204,8 @@ def test_combine_states_data_creates_correct_dataframe_with_correct_values(
     }
     function_names = ["(x )", "(y )", "(z )"]
     for i in range(5):
-        linear_regression_learner.add_new_observation(
-            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
-        )
-        linear_regression_learner.add_new_observation(
-            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
-        )
+        linear_regression_learner.add_new_observation({name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True)
+        linear_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
 
     combined_state = linear_regression_learner._combine_states_data()
     assert len(combined_state.columns) == 6
@@ -207,18 +221,14 @@ def test_solve_safe_independent_equations_returns_correct_pddl_equation_form_for
     assert constant_change == "(increase (x) 19)"
 
 
-def test_solve_safe_independent_equations_equation_form_when_linear_equations_are_solvable(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_solve_safe_independent_equations_equation_form_when_linear_equations_are_solvable(linear_regression_learner: LinearRegressionLearner,):
     equation_matrix = {"(x)": [2, 1, 3, 0], "(y)": [3, -1, 2, 0], "(z)": [-1, 2, 4, 1], "label": [21, 23, 252, 129]}
     dataframe = DataFrame(equation_matrix)
     non_constant_change = linear_regression_learner._solve_linear_equations("(x)", dataframe)
     assert non_constant_change is not None
 
 
-def test_construct_assignment_equations_returns_correct_equations_for_all_fluents(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_construct_assignment_equations_returns_correct_equations_for_all_fluents(linear_regression_learner: LinearRegressionLearner,):
     pre_state_matrix = {
         "(x )": [2, 1, 3, 0, 1],
         "(y )": [0, 3, 12, 43, 1],
@@ -227,12 +237,8 @@ def test_construct_assignment_equations_returns_correct_equations_for_all_fluent
     next_state_matrix = {"(x )": [2, 6, 19, 44, 102], "(y )": [3, 6, 15, 46, 4], "(z )": [1, 1, 1, 1, 1]}
     function_names = ["(x )", "(y )", "(z )"]
     for i in range(5):
-        linear_regression_learner.add_new_observation(
-            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
-        )
-        linear_regression_learner.add_new_observation(
-            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
-        )
+        linear_regression_learner.add_new_observation({name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True)
+        linear_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
 
     numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert learned_correctly
@@ -242,9 +248,7 @@ def test_construct_assignment_equations_returns_correct_equations_for_all_fluent
         print(effect.to_pddl())
 
 
-def test_construct_assignment_equations_returns_correct_equations_when_no_change_happens(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_construct_assignment_equations_returns_correct_equations_when_no_change_happens(linear_regression_learner: LinearRegressionLearner,):
     pre_state_matrix = {
         "(x )": [2, 1, 3, 0, 1],
         "(y )": [0, 3, 12, 43, 1],
@@ -257,12 +261,8 @@ def test_construct_assignment_equations_returns_correct_equations_when_no_change
     }
     function_names = ["(x )", "(y )", "(z )"]
     for i in range(5):
-        linear_regression_learner.add_new_observation(
-            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
-        )
-        linear_regression_learner.add_new_observation(
-            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
-        )
+        linear_regression_learner.add_new_observation({name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True)
+        linear_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
 
     numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert learned_correctly
@@ -270,9 +270,7 @@ def test_construct_assignment_equations_returns_correct_equations_when_no_change
     assert preconditions is None
 
 
-def test_construct_assignment_equations_restrictive_preconditions_when_not_enough_data_is_given(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_construct_assignment_equations_restrictive_preconditions_when_not_enough_data_is_given(linear_regression_learner: LinearRegressionLearner,):
     pre_state_matrix = {
         "(x )": [2, 1],
         "(y )": [0, 3],
@@ -285,12 +283,8 @@ def test_construct_assignment_equations_restrictive_preconditions_when_not_enoug
     }
     function_names = ["(x )", "(y )", "(z )"]
     for i in range(2):
-        linear_regression_learner.add_new_observation(
-            {name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True
-        )
-        linear_regression_learner.add_new_observation(
-            {name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False
-        )
+        linear_regression_learner.add_new_observation({name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True)
+        linear_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
     numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert not learned_correctly
     assert preconditions is None  # The preconditions will be learned in externally to maintain safety.
@@ -299,9 +293,7 @@ def test_construct_assignment_equations_restrictive_preconditions_when_not_enoug
         print(effect.to_pddl())
 
 
-def test_construct_assignment_equations_restrictive_preconditions_given_only_one_sample(
-    linear_regression_learner: LinearRegressionLearner,
-):
+def test_construct_assignment_equations_restrictive_preconditions_given_only_one_sample(polynomial_regression_learner: LinearRegressionLearner,):
     pre_state_matrix = {
         "(x )": [2],
         "(y )": [0],
@@ -313,15 +305,158 @@ def test_construct_assignment_equations_restrictive_preconditions_given_only_one
         "(z )": [0],
     }
     function_names = ["(x )", "(y )", "(z )"]
-    linear_regression_learner.add_new_observation(
-        {name: pre_state_matrix[name][0] for name in function_names}, store_in_prev_state=True
+    monomials = create_monomials(function_names, polynom_degree=1)
+    polynomial_regression_learner.add_new_observation(
+        {create_polynomial_string(monomial): np.prod([pre_state_matrix[name][0] for name in monomial]) for monomial in monomials},
+        store_in_prev_state=True,
     )
-    linear_regression_learner.add_new_observation(
-        {name: next_state_matrix[name][0] for name in function_names}, store_in_prev_state=False
-    )
-    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
-    assert not learned_correctly
-    assert preconditions is None
-    assert len(numeric_effects) == 2
+    polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][0] for name in function_names}, store_in_prev_state=False)
+    assert len(polynomial_regression_learner.previous_state_data) == 1
+    assert len(polynomial_regression_learner.next_state_data) == 1
+    assert len(polynomial_regression_learner.previous_state_data.columns) == 6
+    assert len(polynomial_regression_learner.next_state_data.columns) == 3
+
+
+def test_construct_assignment_equations_with_polynomial_degree_one_returns_correct_equations_when_polynom_is_linear(
+    polynomial_regression_learner: LinearRegressionLearner,
+):
+    numbers = list(range(101))
+    x = random.choices(numbers, k=20)
+    y = random.choices(numbers, k=20)
+    z = random.choices(numbers, k=20)
+    pre_state_matrix = {
+        "(x )": x,
+        "(y )": y,
+        "(z )": z,
+    }
+    next_state_matrix = {
+        "(x )": [2 * x1 + 3 * y1 + 4 * z1 + 5 for x1, y1, z1 in zip(x, y, z)],
+        "(y )": y,
+        "(z )": z,
+    }
+    function_names = ["(x )", "(y )", "(z )"]
+    monomials = create_monomials(function_names, polynom_degree=1)
+    for i in range(20):
+        polynomial_regression_learner.add_new_observation(
+            {create_polynomial_string(monomial): np.prod([pre_state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            store_in_prev_state=True,
+        )
+        polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
+    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations()
+    assert learned_correctly
+    assert len(numeric_effects) == 1
+    effect = numeric_effects.pop()
+    assert effect.to_pddl() == "(increase (x ) (+ (x ) (+ (* (y ) 3.0) (+ (* (z ) 4.0) 5.0))))"
+
+
+def test_construct_assignment_equations_with_polynomial_degree_one_returns_correct_equations_when_polynom_degree_is_also_one(
+    polynomial_regression_learner: LinearRegressionLearner,
+):
+    k = 500
+    numbers = list(range(1000))
+    x = random.sample(numbers, k=k)
+    y = random.sample(numbers, k=k)
+    z = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x )": x,
+        "(y )": y,
+        "(z )": z,
+    }
+    next_state_matrix = {
+        "(x )": [2 * x1 + 3 * y1 * x1 + 4 * z1 + 5 for x1, y1, z1 in zip(x, y, z)],
+        "(y )": y,
+        "(z )": z,
+    }
+    function_names = ["(x )", "(y )", "(z )"]
+    monomials = create_monomials(function_names, polynom_degree=1)
+    for i in range(k):
+        polynomial_regression_learner.add_new_observation(
+            {create_polynomial_string(monomial): np.prod([pre_state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            store_in_prev_state=True,
+        )
+        polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
+    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations()
+    assert learned_correctly
+    assert len(numeric_effects) == 1
+    effect = numeric_effects.pop()
+    assert effect.to_pddl() == "(increase (x ) (+ (x ) (+ (* (z ) 4.0) (+ (* (* (x ) (y )) 3.0) 5.0))))"
+
+
+def test_construct_assignment_equations_with_polynomial_degree_one_returns_correct_equations_when_polynom_degree_is_also_one_and_calculating_multiple_different_equations(
+    polynomial_regression_learner: LinearRegressionLearner,
+):
+    k = 500
+    numbers = list(range(1000))
+    x = random.sample(numbers, k=k)
+    y = random.sample(numbers, k=k)
+    z = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x )": x,
+        "(y )": y,
+        "(z )": z,
+    }
+    next_state_matrix = {
+        "(x )": [2 * x1 + 3 * y1 * x1 + 4 * z1 + 5 for x1, y1, z1 in zip(x, y, z)],
+        "(y )": [y1 + y1 * x1 + 1 for x1, y1, in zip(x, y)],
+        "(z )": [8 * x1 + 3 * y1 + 4 * z1 + 19 for x1, y1, z1 in zip(x, y, z)],
+    }
+    function_names = ["(x )", "(y )", "(z )"]
+    monomials = create_monomials(function_names, polynom_degree=1)
+    for i in range(k):
+        polynomial_regression_learner.add_new_observation(
+            {create_polynomial_string(monomial): np.prod([pre_state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            store_in_prev_state=True,
+        )
+        polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
+    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations()
+    assert learned_correctly
+    assert len(numeric_effects) == 3
+    expected_effects = {
+        "(increase (x ) (+ (x ) (+ (* (z ) 4.0) (+ (* (* (x ) (y )) 3.0) 5.0))))",
+        "(increase (z ) (+ (* (x ) 8.0) (+ (* (y ) 3.0) (+ (* (z ) 3.0) 19.0))))",
+        "(increase (y ) (+ (* (x ) (y )) 1.0))",
+    }
     for effect in numeric_effects:
-        print(effect.to_pddl())
+        assert effect.to_pddl() in expected_effects
+
+
+def test_construct_assignment_equations_with_polynomial_degree_one_returns_correct_equations_when_polynom_degree_is_also_one_and_there_is_and_assignment_equation(
+    polynomial_regression_learner: LinearRegressionLearner,
+):
+    k = 500
+    numbers = list(range(1000))
+    x = random.sample(numbers, k=k)
+    y = random.sample(numbers, k=k)
+    z = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x )": x,
+        "(y )": y,
+        "(z )": z,
+    }
+    next_state_matrix = {
+        "(x )": [2 * x1 + 3 * y1 * x1 + 4 * z1 + 5 for x1, y1, z1 in zip(x, y, z)],
+        "(y )": [y1 + y1 * x1 + 1 for x1, y1, in zip(x, y)],
+        "(z )": [1] * k,
+    }
+    function_names = ["(x )", "(y )", "(z )"]
+    monomials = create_monomials(function_names, polynom_degree=1)
+    for i in range(k):
+        polynomial_regression_learner.add_new_observation(
+            {create_polynomial_string(monomial): np.prod([pre_state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            store_in_prev_state=True,
+        )
+        polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
+    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations()
+    assert learned_correctly
+    assert len(numeric_effects) == 3
+    expected_effects = {
+        "(increase (x ) (+ (x ) (+ (* (z ) 4.0) (+ (* (* (x ) (y )) 3.0) 5.0))))",
+        "(assign (z ) 1.0)",
+        "(increase (y ) (+ (* (x ) (y )) 1.0))",
+    }
+    for effect in numeric_effects:
+        assert effect.to_pddl() in expected_effects

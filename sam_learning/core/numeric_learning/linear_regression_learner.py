@@ -20,6 +20,8 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_numeric_effects,
     filter_constant_features,
     get_num_independent_equations,
+    create_monomials,
+    create_polynomial_string,
 )
 
 LABEL_COLUMN = "label"
@@ -31,16 +33,14 @@ LEGAL_LEARNING_SCORE = 1.00
 
 
 class LinearRegressionLearner:
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
+    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
         self.domain_functions = {func.name: func for func in domain_functions.values()}
-        self.previous_state_data = DataFrame(
-            columns=list([function.untyped_representation for function in domain_functions.values()])
-        )
-        self.next_state_data = DataFrame(
-            columns=list([function.untyped_representation for function in domain_functions.values()])
-        )
+        functions = list([function.untyped_representation for function in domain_functions.values()])
+        self.monomials = create_monomials(functions, polynom_degree)
+        self.previous_state_data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in self.monomials])
+        self.next_state_data = DataFrame(columns=functions)
 
     def _combine_states_data(self) -> DataFrame:
         """Combines the previous and next states data into a single dataframe.
@@ -68,8 +68,7 @@ class LinearRegressionLearner:
             return True
 
         failure_reason = (
-            f"There are too few independent rows of data! "
-            f"cannot create a linear equation from the current data for action - {self.action_name}!"
+            f"There are too few independent rows of data! " f"cannot create a linear equation from the current data for action - {self.action_name}!"
         )
         self.logger.warning(failure_reason)
 
@@ -105,9 +104,7 @@ class LinearRegressionLearner:
         self.logger.debug(f"Learned the coefficients for the numeric equations with r^2 score of {learning_score}")
         return coefficients, learning_score
 
-    def _calculate_scale_factor(
-        self, coefficient_vector: List[float], regression_df: DataFrame, lifted_function: str
-    ) -> Optional[float]:
+    def _calculate_scale_factor(self, coefficient_vector: List[float], regression_df: DataFrame, lifted_function: str) -> Optional[float]:
         """
 
         :param coefficient_vector:
@@ -131,7 +128,8 @@ class LinearRegressionLearner:
 
         return None
 
-    def _extract_non_zero_change(self, lifted_function: str, regression_df: DataFrame) -> Tuple[float, float]:
+    @staticmethod
+    def _extract_non_zero_change(lifted_function: str, regression_df: DataFrame) -> Tuple[float, float]:
         """Extracts the non-zero change in the function.
 
          Note:
@@ -150,9 +148,7 @@ class LinearRegressionLearner:
 
         return next_value, previous_value
 
-    def _solve_linear_equations(
-        self, lifted_function: str, regression_df: DataFrame, allow_unsafe_learning: bool = False
-    ) -> Optional[str]:
+    def _solve_linear_equations(self, lifted_function: str, regression_df: DataFrame, allow_unsafe_learning: bool = False) -> Optional[str]:
         """Computes the change in the function value based on the previous values of the function.
 
         Note: We assume in this stage that the change results from a polynomial function of the previous values.
@@ -164,9 +160,7 @@ class LinearRegressionLearner:
         """
         regression_array = np.array(regression_df.loc[:, regression_df.columns != LABEL_COLUMN])
         function_post_values = np.array(regression_df[LABEL_COLUMN])
-        coefficient_vector, learning_score = self._solve_regression_problem(
-            regression_array, function_post_values, allow_unsafe_learning
-        )
+        coefficient_vector, learning_score = self._solve_regression_problem(regression_array, function_post_values, allow_unsafe_learning)
 
         if all([coef == 0 for coef in coefficient_vector]) and len(regression_df[LABEL_COLUMN].unique()) == 1:
             self.logger.debug(
@@ -186,10 +180,7 @@ class LinearRegressionLearner:
             self.logger.debug("Currently supporting only scaling of the function by a constant value.")
             return f"({scale} {lifted_function} {scale_factor})"
 
-        if (
-            lifted_function in regression_df.columns
-            and coefficient_vector[list(regression_df.columns).index(lifted_function)] != 0
-        ):
+        if lifted_function in regression_df.columns and coefficient_vector[list(regression_df.columns).index(lifted_function)] != 0:
             self.logger.debug("the function is a part of the equation, cannot use circular format!")
             coefficients_map = {lifted_func: coef for lifted_func, coef in zip(functions_and_dummy, coefficient_vector)}
             next_value, previous_value = self._extract_non_zero_change(lifted_function, regression_df)
@@ -198,8 +189,7 @@ class LinearRegressionLearner:
         multiplication_functions = construct_multiplication_strings(coefficient_vector, functions_and_dummy)
         if len(multiplication_functions) == 0:
             self.logger.debug(
-                "The algorithm designated a vector of zeros to the equation "
-                "which means that there are not coefficients. Continuing."
+                "The algorithm designated a vector of zeros to the equation " "which means that there are not coefficients. Continuing."
             )
             return None
 
@@ -207,9 +197,7 @@ class LinearRegressionLearner:
         return f"(assign {lifted_function} {constructed_right_side})"
 
     @staticmethod
-    def _extract_const_conditions(
-        precondition_statements: List[List[str]], additional_conditions: List[str] = None
-    ) -> List[str]:
+    def _extract_const_conditions(precondition_statements: List[List[str]], additional_conditions: List[str] = None) -> List[str]:
         """Extract conditions that are constant for all the samples.
 
         Note:
@@ -294,14 +282,10 @@ class LinearRegressionLearner:
 
         # The dataset contains more than one observation.
         self.logger.debug("Removing fluents that are constant...")
-        tagged_next_state_fluents = [
-            f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in self.next_state_data.columns.tolist()
-        ]
-        filtered_df, const_features_conditions, const_features = filter_constant_features(
-            combined_data, columns_to_ignore=tagged_next_state_fluents
-        )
+        tagged_next_state_fluents = [f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in self.next_state_data.columns.tolist()]
+        filtered_df, const_features_conditions, const_features = filter_constant_features(combined_data, columns_to_ignore=tagged_next_state_fluents)
 
-        features_df = filtered_df.copy()[[k for k in self.next_state_data.columns.tolist() if k in filtered_df.columns]]
+        features_df = filtered_df.copy()[[k for k in self.previous_state_data.columns.tolist() if k in filtered_df.columns]]
         regression_df, linear_dep_conditions, dependent_columns = detect_linear_dependent_features(features_df)
         combined_conditions = linear_dep_conditions + const_features_conditions
 
@@ -325,8 +309,6 @@ class LinearRegressionLearner:
 
         return (
             construct_numeric_effects(assignment_statements, domain_functions=self.domain_functions),
-            construct_numeric_conditions(
-                combined_conditions, ConditionType.conjunctive, domain_functions=self.domain_functions,
-            ),
+            construct_numeric_conditions(combined_conditions, ConditionType.conjunctive, domain_functions=self.domain_functions,),
             True,
         )

@@ -4,7 +4,7 @@ from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Grounded
     construct_expression_tree
 from pytest import fixture
 
-from experiments.ipc_agent import IPCAgent
+from experiments.online_learning_agents.ipc_agent import IPCAgent
 from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, MINECRAFT_LARGE_DOMAIN_PATH
 
 

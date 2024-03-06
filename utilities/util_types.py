@@ -22,6 +22,7 @@ class LearningAlgorithmType(Enum):
     naive_polysam = 16
     raw_naive_nsam = 17
     raw_naive_polysam = 18
+    incremental_nsam = 19
 
 
 class SolverType(Enum):

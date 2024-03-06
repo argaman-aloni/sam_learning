@@ -11,7 +11,7 @@ from sam_learning.core import (
     NotSafeActionError,
 )
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
-from sam_learning.core.numeric_learning import IncrementalNumericFluentStateStorage
+from sam_learning.core.numeric_learning import IncrementalNumericFluentStateStorage, IncrementalPolynomialFluentsLearningAlgorithm
 from sam_learning.learners.sam_learning import SAMLearner
 
 
@@ -78,12 +78,8 @@ class IncrementalNumericSAMLearner(SAMLearner):
         """
         super().add_new_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.previous_state_functions
-        )
-        next_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.next_state_functions
-        )
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.previous_state_functions)
+        next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.next_state_functions)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
@@ -99,12 +95,8 @@ class IncrementalNumericSAMLearner(SAMLearner):
         action_name = grounded_action.name
         super().update_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Adding the numeric state variables to the numeric storage of action - {action_name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.previous_state_functions
-        )
-        next_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.next_state_functions
-        )
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.previous_state_functions)
+        next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.next_state_functions)
         self.storage[action_name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
@@ -173,41 +165,25 @@ class IncrementalNumericSAMLearner(SAMLearner):
         return self.partial_domain, learning_metadata
 
 
-# class PolynomialSAMLearning(NumericSAMLearner):
-#     """The Extension of SAM that is able to learn polynomial state variables."""
-#
-#     storage: Dict[str, PolynomialFluentsLearningAlgorithm]
-#     polynom_degree: int
-#
-#     def __init__(
-#         self,
-#         partial_domain: Domain,
-#         preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-#         polynomial_degree: int = 1,
-#         **kwargs,
-#     ):
-#         super().__init__(partial_domain, preconditions_fluent_map, **kwargs)
-#         self.polynom_degree = polynomial_degree
-#
-#     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
-#         """Adds a new action to the learned domain.
-#
-#         :param grounded_action: the grounded action that was executed according to the observation.
-#         :param previous_state: the state that the action was executed on.
-#         :param next_state: the state that was created after executing the action on the previous
-#             state.
-#         """
-#         super().add_new_action(grounded_action, previous_state, next_state)
-#         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
-#         previous_state_lifted_matches = self.function_matcher.match_state_functions(
-#             grounded_action, previous_state.state_fluents
-#         )
-#         next_state_lifted_matches = self.function_matcher.match_state_functions(
-#             grounded_action, next_state.state_fluents
-#         )
-#         self.storage[grounded_action.name] = PolynomialFluentsLearningAlgorithm(
-#             grounded_action.name, self.polynom_degree, self.partial_domain.functions, is_verbose=True
-#         )
-#         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
-#         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
-#         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
+class PolynomialSAMLearning(IncrementalNumericSAMLearner):
+    """The Extension of SAM that is able to learn polynomial state variables."""
+
+    storage: Dict[str, IncrementalPolynomialFluentsLearningAlgorithm]
+    polynom_degree: int
+
+    def __init__(
+        self, partial_domain: Domain, polynomial_degree: int = 1, **kwargs,
+    ):
+        super().__init__(partial_domain, **kwargs)
+        self.polynom_degree = polynomial_degree
+
+    def _initialize_fluents_learners(self):
+        """Initializes the numeric fluents learners based on all the permutations of the actions' parameters."""
+        for action in self.partial_domain.actions.values():
+            possible_bounded_functions = self.vocabulary_creator.create_lifted_functions_vocabulary(
+                domain=self.partial_domain, possible_parameters=action.signature
+            )
+            self.storage[action.name] = IncrementalPolynomialFluentsLearningAlgorithm(
+                action_name=action.name, domain_functions=possible_bounded_functions, polynom_degree=self.polynom_degree
+            )
+            self.storage[action.name].init_numeric_datasets()

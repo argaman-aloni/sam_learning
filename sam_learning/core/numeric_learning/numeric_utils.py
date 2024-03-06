@@ -39,9 +39,7 @@ def prettify_floating_point_number(number: float) -> float:
     return int(number) if abs(number - int(number)) < EPSILON else number
 
 
-def construct_multiplication_strings(
-    coefficients_vector: Union[np.ndarray, List[float]], function_variables: List[str]
-) -> List[str]:
+def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List[float]], function_variables: List[str]) -> List[str]:
     """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
     :param coefficients_vector: the coefficient that multiplies the function vector.
@@ -77,9 +75,7 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
 
 
 def construct_projected_variable_strings(
-    function_variables: List[str],
-    shift_point: Union[np.ndarray, List[float]],
-    projection_basis: Union[np.ndarray, List[List[float]]],
+    function_variables: List[str], shift_point: Union[np.ndarray, List[float]], projection_basis: Union[np.ndarray, List[List[float]]],
 ) -> List[str]:
     """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
@@ -90,9 +86,7 @@ def construct_projected_variable_strings(
     """
     shifted_by_mean = []
     for func, shift_value in zip(function_variables, shift_point):
-        component_function = (
-            func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, 2))})"
-        )
+        component_function = func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, 2))})"
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
@@ -126,9 +120,7 @@ def construct_linear_equation_string(multiplication_parts: List[str]) -> str:
     return f"(+ {multiplication_parts[0]} {inner_layer})"
 
 
-def construct_non_circular_assignment(
-    lifted_function: str, coefficients_map: Dict[str, float], previous_value: float, next_value: float
-) -> str:
+def construct_non_circular_assignment(lifted_function: str, coefficients_map: Dict[str, float], previous_value: float, next_value: float) -> str:
     """Changes circular assignment statements to be non-circular.
 
     Note:
@@ -148,9 +140,7 @@ def construct_non_circular_assignment(
         coefficients_map = {k: -v for k, v in coefficients_map.items()}
         coefficients_map[lifted_function] = coefficients_map[lifted_function] + 1
 
-    multiplication_functions = construct_multiplication_strings(
-        list(coefficients_map.values()), list(coefficients_map.keys())
-    )
+    multiplication_functions = construct_multiplication_strings(list(coefficients_map.values()), list(coefficients_map.keys()))
     constructed_right_side = construct_linear_equation_string(multiplication_functions)
 
     if previous_value < next_value:
@@ -177,9 +167,7 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
     return prettify_floating_point_number(round(linear_coeff, 4))
 
 
-def filter_constant_features(
-    input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []
-) -> Tuple[DataFrame, List[str], List[str]]:
+def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[DataFrame, List[str], List[str]]:
     """Filters out fluents that contain only constant values since they do not contribute to the convex hull.
 
     :param input_df: the matrix of the previous state values.
@@ -227,9 +215,7 @@ def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame,
             continue  # The columns are independent
 
         independent_column, dependent_column = col1, col2
-        linear_coeff = extract_numeric_linear_coefficient(
-            data_matrix_copy[dependent_column], data_matrix_copy[independent_column]
-        )
+        linear_coeff = extract_numeric_linear_coefficient(data_matrix_copy[dependent_column], data_matrix_copy[independent_column])
         additional_conditions.append(f"(= {dependent_column} (* {linear_coeff} {independent_column}))")
         dependent_columns[dependent_column] = independent_column
 
@@ -261,9 +247,7 @@ def construct_numeric_conditions(
     return constructed_precondition
 
 
-def construct_numeric_effects(
-    effects: List[str], domain_functions: Dict[str, PDDLFunction]
-) -> Set[NumericalExpressionTree]:
+def construct_numeric_effects(effects: List[str], domain_functions: Dict[str, PDDLFunction]) -> Set[NumericalExpressionTree]:
     """Construct the numeric effects for the given set of input strings.
 
     :param effects: the effect strings to create the numeric effects from.
@@ -283,9 +267,7 @@ def construct_numeric_effects(
     return {NumericalExpressionTree(expr) for expr in numeric_effects}
 
 
-def extended_gram_schmidt(
-    input_basis_vectors: List[List[float]], eigen_vectors: Optional[List[List[float]]] = None
-) -> List[List[float]]:
+def extended_gram_schmidt(input_basis_vectors: List[List[float]], eigen_vectors: Optional[List[List[float]]] = None) -> List[List[float]]:
     """Runs the extended Gram-Schmidt algorithm on the input basis vectors.
 
     Note:
@@ -300,9 +282,7 @@ def extended_gram_schmidt(
     normal_vectors = []
     for vector in input_basis_vectors:
         # Gram Schmidt magic
-        projected_vector = vector - np.sum(
-            [(np.dot(vector, b) / np.linalg.norm(b) ** 2) * np.array(b) for b in non_normal_vectors], axis=0
-        )
+        projected_vector = vector - np.sum([(np.dot(vector, b) / np.linalg.norm(b) ** 2) * np.array(b) for b in non_normal_vectors], axis=0)
         if not (np.absolute(projected_vector) > EPSILON).any():
             continue
 
@@ -355,3 +335,47 @@ def display_convex_hull(action_name: str, display_mode: bool, hull: ConvexHull) 
 
     elif dimensionality == 3:
         display_convex_hull_3d(action_name, hull)
+
+
+def create_monomials(domain_functions: List[str], polynom_degree: int = 0) -> List[List[str]]:
+    """Creates the monomials from the state fluents.
+
+    :return: the monomials from the state fluents.
+    """
+    monomials = list([item] for item in domain_functions)
+    if polynom_degree == 0:
+        return monomials
+
+    if polynom_degree == 1:
+        for first_fluent, second_fluent in itertools.combinations(domain_functions, r=2):
+            monomial = sorted([first_fluent, second_fluent])
+            monomials.append(monomial)
+
+    else:
+        for degree in range(2, polynom_degree + 1):
+            for fluent_combination in itertools.combinations_with_replacement(domain_functions, r=degree):
+                monomial = sorted(list(fluent_combination))
+                monomials.append(monomial)
+
+    return monomials
+
+
+def _create_polynomial_string_recursive(fluents: List[str]) -> str:
+    """Creates the polynomial string representing the equation recursively.
+
+    :param fluents: the numeric fluents to create the polynomial string from.
+    :return: the polynomial string representing the equation.
+    """
+    if len(fluents) == 1:
+        return fluents[0]
+
+    return f"(* {fluents[0]} {_create_polynomial_string_recursive(fluents[1:])})"
+
+
+def create_polynomial_string(fluents: List[str]) -> str:
+    """The auxiliary function that creates the polynomial string representing the equation.
+
+    :param fluents: the numeric fluents to create the polynomial string from.
+    :return: the polynomial string representing the equation.
+    """
+    return _create_polynomial_string_recursive(fluents)

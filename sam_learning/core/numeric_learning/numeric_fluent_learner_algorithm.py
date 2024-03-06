@@ -20,6 +20,7 @@ class NumericFluentStateStorage:
     next_state_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
 
     def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
+        self.action_name = action_name
         self.logger = logging.getLogger(__name__)
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
@@ -32,8 +33,7 @@ class NumericFluentStateStorage:
         :param state_fluents: the lifted state fluents that were matched for the action.
         """
         previous_state_values = {
-            state_fluent_lifted_str: state_fluent_data.value
-            for state_fluent_lifted_str, state_fluent_data in state_fluents.items()
+            state_fluent_lifted_str: state_fluent_data.value for state_fluent_lifted_str, state_fluent_data in state_fluents.items()
         }
         for state_fluent_lifted_str, state_fluent_data in previous_state_values.items():
             self.previous_state_storage[state_fluent_lifted_str].append(state_fluent_data)
@@ -45,10 +45,7 @@ class NumericFluentStateStorage:
 
         :param state_fluents: the lifted state fluents that were matched for the action.
         """
-        next_state_values = {
-            state_fluent_lifted_str: state_fluent_data.value
-            for state_fluent_lifted_str, state_fluent_data in state_fluents.items()
-        }
+        next_state_values = {state_fluent_lifted_str: state_fluent_data.value for state_fluent_lifted_str, state_fluent_data in state_fluents.items()}
         self.linear_regression_learner.add_new_observation(next_state_values, store_in_prev_state=False)
 
     def filter_out_inconsistent_state_variables(self) -> None:
@@ -77,9 +74,7 @@ class NumericFluentStateStorage:
         :return: The precondition that contains the linear inequalities.
         """
         self.logger.info("Constructing the safe linear inequalities.")
-        return self.convex_hull_learner.construct_safe_linear_inequalities(
-            self.previous_state_storage, relevant_fluents
-        )
+        return self.convex_hull_learner.construct_safe_linear_inequalities(self.previous_state_storage, relevant_fluents)
 
     def construct_assignment_equations(self) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.

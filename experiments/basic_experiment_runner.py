@@ -30,9 +30,7 @@ def configure_logger(args: argparse.Namespace):
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
-        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}",
-        maxBytes=max_bytes,
-        backupCount=1,
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}", maxBytes=max_bytes, backupCount=1,
     )
     stream_handler = logging.StreamHandler()
 
@@ -67,9 +65,7 @@ class OfflineBasicExperimentRunner:
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(
-            working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT
-        )
+        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self.learning_statistics_manager = LearningStatisticsManager(
             working_directory_path=working_directory_path,
@@ -101,9 +97,7 @@ class OfflineBasicExperimentRunner:
     ) -> Tuple[LearnerDomain, Dict[str, str]]:
         raise NotImplementedError
 
-    def export_learned_domain(
-        self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None
-    ) -> Path:
+    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
@@ -129,6 +123,7 @@ class OfflineBasicExperimentRunner:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_observations = []
+        learned_domain_path = None
         for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
@@ -142,22 +137,16 @@ class OfflineBasicExperimentRunner:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            learned_model, learning_report = self._apply_learning_algorithm(
-                partial_domain, allowed_observations, test_set_dir_path
-            )
+            learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(
-                allowed_observations, learned_model, test_set_dir_path, fold_num
-            )
-            self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, fold_num)
 
+        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
-    def _run_classical_solvers_and_validate(
-        self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path
-    ) -> None:
+    def _run_classical_solvers_and_validate(self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path) -> None:
         self.domain_validator.solver = FFADLSolver()
         self.domain_validator._solver_name = "fast_forward"
         self.domain_validator.validate_domain(
@@ -177,9 +166,7 @@ class OfflineBasicExperimentRunner:
             timeout=60,
         )
 
-    def _run_numeric_solvers_and_validate(
-        self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path
-    ) -> None:
+    def _run_numeric_solvers_and_validate(self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path) -> None:
         self.domain_validator.solver = MetricFFSolver()
         self.domain_validator._solver_name = "metric_ff"
         self.domain_validator.validate_domain(
@@ -200,11 +187,7 @@ class OfflineBasicExperimentRunner:
         )
 
     def validate_learned_domain(
-        self,
-        allowed_observations: List[Observation],
-        learned_model: LearnerDomain,
-        test_set_dir_path: Path,
-        fold_number: int,
+        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int,
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
@@ -220,8 +203,7 @@ class OfflineBasicExperimentRunner:
         self.export_learned_domain(
             learned_model,
             domains_backup_dir_path,
-            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
-            f"_{len(allowed_observations)}_trajectories.pddl",
+            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
         )
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")

@@ -7,6 +7,8 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     extract_numeric_linear_coefficient,
     construct_projected_variable_strings,
     extended_gram_schmidt,
+    create_monomials,
+    create_polynomial_string,
 )
 
 
@@ -131,13 +133,7 @@ def test_extended_gram_schmidt_on_no_shift_with_base_with_more_rows_than_columns
     projections = extended_gram_schmidt([[-19.0, 32.0], [14.0, 52.0], [28.0, 12.0], [-7.0, 13.0]])
     assert len(projections) == 2
     assert all([len(vector) == 2 for vector in projections])
-    assert (
-        np.sum(
-            np.array(projections)
-            - np.array([[-0.510538754155436, 0.859854743840735], [0.859854743840735, 0.510538754155436]])
-        )
-        < 0.0001
-    )
+    assert np.sum(np.array(projections) - np.array([[-0.510538754155436, 0.859854743840735], [0.859854743840735, 0.510538754155436]])) < 0.0001
     print(projections)
 
 
@@ -163,3 +159,42 @@ def test_extended_gram_schmidt_with_paper_example_returns_correct_values():
     projections = extended_gram_schmidt([[0, 0, 0], [-1, 1, 0], [-1, 0, 1]])
     print(projections)
     assert len(projections) == 2
+
+
+def test_create_monomials_creates_correct_monomials_when_given_polynom_degree_one():
+    test_functions = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
+    monomials = create_monomials(test_functions, polynom_degree=1)
+    assert len(monomials) == 3 + 3
+    assert sum([len(monomial) for monomial in monomials]) == 3 + 3 * 2
+
+
+def test_create_monomials_creates_correct_monomials_when_given_polynom_degree_zero():
+    test_functions = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
+    monomials = create_monomials(test_functions, polynom_degree=0)
+    assert len(monomials) == 3
+
+
+def test_create_monomials_creates_correct_monomials_when_given_polynom_degree_two():
+    test_functions = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
+    monomials = create_monomials(test_functions, polynom_degree=2)
+    assert len(monomials) == 3 + 3 + 3
+    print(monomials)
+
+
+def test_create_polynomial_string_when_calling_with_a_single_function_returns_the_function_string():
+    monomial = ["(fuel-cost )"]
+    polynomial_string = create_polynomial_string(monomial)
+    assert polynomial_string == "(fuel-cost )"
+
+
+def test_create_polynomial_string_when_calling_with_two_functions_returns_the_multiplication_of_the_two_functions():
+    monomial = ["(fuel-cost )", "(load_limit ?z)"]
+    polynomial_string = create_polynomial_string(monomial)
+    assert polynomial_string == "(* (fuel-cost ) (load_limit ?z))"
+
+
+def test_create_polynomial_string_when_calling_with_three_functions_returns_the_multiplication_of_the_three_functions():
+    monomial = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
+    polynomial_string = create_polynomial_string(monomial)
+    assert polynomial_string == "(* (fuel-cost ) (* (load_limit ?z) (current_load ?z)))"
+

@@ -9,8 +9,7 @@ from typing import Optional
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import State
 
-from experiments.ipc_agent import IPCAgent
-from experiments.minecraft_agent import MinecraftAgent
+from experiments.online_learning_agents.minecraft_agent import MinecraftAgent
 from sam_learning.core import LearnerDomain, EpisodeInfoRecord
 from sam_learning.learners import OnlineNSAMLearner
 from solvers import MetricFFSolver

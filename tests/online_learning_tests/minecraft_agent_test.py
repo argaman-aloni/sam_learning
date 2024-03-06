@@ -3,7 +3,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Problem, State, ActionCall
 from pytest import fixture
 
-from experiments.minecraft_agent import MinecraftAgent
+from experiments.online_learning_agents.minecraft_agent import MinecraftAgent
 from tests.consts import MINECRAFT_LARGE_DOMAIN_PATH
 
 
