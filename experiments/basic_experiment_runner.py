@@ -133,7 +133,7 @@ class OfflineBasicExperimentRunner:
                 # stopping all the experiments after 50 trajectories so that the experiments will not take too long
                 break
 
-            if index != 0 and (index + 1) % 5 != 0:
+            if index != 0 and (index + 1) % 70 != 0:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
@@ -144,6 +144,7 @@ class OfflineBasicExperimentRunner:
 
         self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
+        self.semantic_performance_calc.export_semantic_performance(fold_num + 1)
         self.domain_validator.write_statistics(fold_num)
 
     def _run_classical_solvers_and_validate(self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path) -> None:
@@ -224,7 +225,6 @@ class OfflineBasicExperimentRunner:
             self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
             self.domain_validator.clear_statistics()
             self.learning_statistics_manager.clear_statistics()
-            self.semantic_performance_calc.export_semantic_performance(fold_num + 1)
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
         self.domain_validator.write_complete_joint_statistics()

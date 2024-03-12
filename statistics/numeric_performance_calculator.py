@@ -8,7 +8,7 @@ import math
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
 
-from statistics.performance_calculation_utils import _ground_tested_operator
+from statistics.performance_calculation_utils import _ground_executed_action
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from utilities import LearningAlgorithmType
 
@@ -54,7 +54,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                 if action_call.name not in learned_domain.actions:
                     continue
 
-                grounded_operator = _ground_tested_operator(action_call, learned_domain, observation.grounded_objects)
+                grounded_operator = _ground_executed_action(action_call, learned_domain, observation.grounded_objects)
                 try:
                     next_state = grounded_operator.apply(previous_state)
                     learned_next_state_fluents = next_state.state_fluents

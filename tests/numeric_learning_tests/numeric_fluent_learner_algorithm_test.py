@@ -6,7 +6,6 @@ from pddl_plus_parser.models import NumericalExpressionTree
 from pytest import fixture
 
 from sam_learning.core import NumericFluentStateStorage, construct_non_circular_assignment
-from sam_learning.core.numeric_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
 from sam_learning.core.numeric_learning.numeric_utils import detect_linear_dependent_features, filter_constant_features
 from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, CURRENT_LOAD_TRAJECTORY_FUNCTION
 
@@ -367,7 +366,7 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_s
     numeric_conditions = [
         operand.to_pddl() for operand in output_conditions.operands if isinstance(operand, NumericalExpressionTree)
     ]
-    assert "(= (+ -121.00 (current_load ?z)) 0.0)" in numeric_conditions  # the condition is shifted
+    assert "(= (+ -121 (current_load ?z)) 0.0)" in numeric_conditions  # the condition is shifted
     assert len([condition for condition in numeric_conditions if condition.startswith("(<=")]) == 2
     assert len([condition for condition in numeric_conditions if condition.startswith("(=")]) == 2
     print(str(output_conditions))
@@ -391,9 +390,9 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities()
 
     expected_conditions = [
-        "(<= (* -1.00 (fuel-cost )) 0.0)",
-        "(<= (* -1.00 (current_load ?z)) 0.0)",
-        "(<= (+ (* 0.71 (current_load ?z)) (* 0.71 (fuel-cost ))) 0.7071)",
+        "(<= (* -1 (fuel-cost )) 0.0)",
+        "(<= (* -1 (current_load ?z)) 0.0)",
+        "(<= (+ (* 0.7071 (current_load ?z)) (* 0.7071 (fuel-cost ))) 0.7071)",
         "(= (load_limit ?z) 0.0)",
     ]
     for _, precondition in output_conditions:
@@ -418,9 +417,9 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities()
     expected_conditions = [
         "(<= (current_load ?z) 1.0)",
-        "(<= (* -1.00 (fuel-cost )) 0.0)",
+        "(<= (* -1 (fuel-cost )) 0.0)",
         "(<= (fuel-cost ) 1.0)",
-        "(<= (* -1.00 (current_load ?z)) 0.0)",
+        "(<= (* -1 (current_load ?z)) 0.0)",
         "(= (load_limit ?z) 0.0)",
     ]
 

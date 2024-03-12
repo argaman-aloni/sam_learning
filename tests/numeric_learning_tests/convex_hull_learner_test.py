@@ -23,16 +23,12 @@ def convex_hull_learner() -> ConvexHullLearner:
     return ConvexHullLearner(TEST_ACTION_NAME, domain_functions)
 
 
-def test_construct_pddl_inequality_scheme_with_simple_2d_four_equations_returns_correct_representation(
-    convex_hull_learner: ConvexHullLearner,
-):
+def test_construct_pddl_inequality_scheme_with_simple_2d_four_equations_returns_correct_representation(convex_hull_learner: ConvexHullLearner,):
     np.random.seed(42)
     left_side_coefficients = np.random.randint(10, size=(4, 2))
     right_side_points = np.random.randint(10, size=4)
 
-    inequalities = convex_hull_learner._construct_pddl_inequality_scheme(
-        left_side_coefficients, right_side_points, ["(x)", "(y)"]
-    )
+    inequalities = convex_hull_learner._construct_pddl_inequality_scheme(left_side_coefficients, right_side_points, ["(x)", "(y)"])
     assert len(inequalities) == 4
     for ineq in inequalities:
         assert ineq.startswith("(<=")
@@ -69,13 +65,11 @@ def test_create_disjunctive_preconditions_with_input_dataframe_of_size_two_retur
 def test_create_disjunctive_preconditions_with_input_dataframe_of_size_one_and_equality_condition_creates_combined_condition_correctly(
     convex_hull_learner: ConvexHullLearner,
 ):
-    pre_state_data = {"(x)": [2], "(y)": [3], "(z)": [-1]}
+    pre_state_data = {"(x)": [20], "(y)": [39], "(z)": [-12]}
     test_equality_conditions = ["(= (x ) 2)", "(= (y ) 3)", "(= (z ) -1)"]
     dataframe = DataFrame(pre_state_data)
-    equality_condition = convex_hull_learner._create_disjunctive_preconditions(
-        dataframe, equality_conditions=test_equality_conditions
-    )
-    assert len(equality_condition.operands) == len(test_equality_conditions)
+    equality_condition = convex_hull_learner._create_disjunctive_preconditions(dataframe, equality_conditions=test_equality_conditions)
+    assert len(equality_condition.operands) == 2 * len(test_equality_conditions)
     assert equality_condition.binary_operator == "and"
     for operand in equality_condition.operands:
         assert operand.to_pddl().startswith("(=")
@@ -87,9 +81,7 @@ def test_create_disjunctive_preconditions_with_input_dataframe_of_size_two_and_e
     pre_state_data = {"(x)": [2, 18], "(y)": [3, 32], "(z)": [-1, 17]}
     dataframe = DataFrame(pre_state_data)
     test_equality_conditions = ["(= (x ) 97)", "(= (y ) 21)"]
-    result_condition = convex_hull_learner._create_disjunctive_preconditions(
-        dataframe, equality_conditions=test_equality_conditions
-    )
+    result_condition = convex_hull_learner._create_disjunctive_preconditions(dataframe, equality_conditions=test_equality_conditions)
     assert len(result_condition.operands) == 3
     assert len([op for op in result_condition.operands if isinstance(op, NumericalExpressionTree)]) == 2
     assert len([op for op in result_condition.operands if isinstance(op, Precondition)]) == 1
@@ -120,9 +112,7 @@ def test_construct_single_dimension_inequalities_with_input_lower_bound_equal_to
     assert "(= (x ) 2.0)" == equality.to_pddl()
 
 
-def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_creates_a_single_condition(
-    convex_hull_learner: ConvexHullLearner,
-):
+def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_creates_a_single_condition(convex_hull_learner: ConvexHullLearner,):
     pre_state_data = {"(x)": [2], "(y)": [3], "(z)": [-1]}
     inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(pre_state_data, None)
     assert inequality_precondition.binary_operator == "and"
@@ -162,17 +152,12 @@ def test_construct_safe_linear_inequalities_when_the_number_of_is_smaller_than_n
     print(str(inequality_precondition))
 
 
-def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_constant_is_observed(
-    convex_hull_learner: ConvexHullLearner,
-):
+def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_constant_is_observed(convex_hull_learner: ConvexHullLearner,):
     pre_state_data = {"(x)": [1, 0, 0], "(y)": [0, 1, 0], "(z)": [0, 0, 0]}
     pre_state_df = DataFrame(pre_state_data)
-    (
-        coefficients,
-        border_point,
-        transformed_vars,
-        span_verification_conditions,
-    ) = convex_hull_learner._create_convex_hull_linear_inequalities(pre_state_df, display_mode=False)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._create_convex_hull_linear_inequalities(
+        pre_state_df, display_mode=False
+    )
     assert span_verification_conditions == ["(= (z) 0.0)"]
     print(span_verification_conditions)
 
@@ -182,12 +167,9 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_
 ):
     pre_state_data = {"(x)": [1, 0, 0, 1], "(y)": [0, 1, 0, 1], "(z)": [0, 0, 1, 1]}
     pre_state_df = DataFrame(pre_state_data)
-    (
-        coefficients,
-        border_point,
-        transformed_vars,
-        span_verification_conditions,
-    ) = convex_hull_learner._create_convex_hull_linear_inequalities(pre_state_df, display_mode=False)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._create_convex_hull_linear_inequalities(
+        pre_state_df, display_mode=False
+    )
     assert span_verification_conditions == []
 
 
@@ -199,33 +181,25 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_
         "(y)": [1, 1, 1, 1],
     }
     pre_state_df = DataFrame(pre_state_data)
-    (
-        coefficients,
-        border_point,
-        transformed_vars,
-        span_verification_conditions,
-    ) = convex_hull_learner._create_convex_hull_linear_inequalities(pre_state_df, display_mode=False)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._create_convex_hull_linear_inequalities(
+        pre_state_df, display_mode=False
+    )
     assert span_verification_conditions == ["(= (- (y) 1) 0.0)"]
     assert coefficients == [[-1], [1]]
     assert transformed_vars == ["(* (- (x) 2) -1)"]
     assert border_point == [2, 1]
 
 
-def test_create_convex_hull_linear_inequalities_returns_correct_conditions_with_paper_example(
-    convex_hull_learner: ConvexHullLearner,
-):
+def test_create_convex_hull_linear_inequalities_returns_correct_conditions_with_paper_example(convex_hull_learner: ConvexHullLearner,):
     pre_state_data = {
         "(x)": [1, 0, 0],
         "(y)": [0, 1, 0],
         "(z)": [0, 0, 1],
     }
     pre_state_df = DataFrame(pre_state_data)
-    (
-        coefficients,
-        border_point,
-        transformed_vars,
-        span_verification_conditions,
-    ) = convex_hull_learner._create_convex_hull_linear_inequalities(pre_state_df, display_mode=False)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._create_convex_hull_linear_inequalities(
+        pre_state_df, display_mode=False
+    )
     print(span_verification_conditions)
     assert len(span_verification_conditions) == 1  # One dimension was reduced.
     assert len(coefficients) == 3

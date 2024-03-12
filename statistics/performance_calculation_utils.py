@@ -5,7 +5,7 @@ from typing import Dict
 from pddl_plus_parser.models import Domain, Operator, ActionCall, State, PDDLObject
 
 
-def _ground_tested_operator(action_call: ActionCall, learned_domain: Domain, problem_objects: Dict[str, PDDLObject]) -> Operator:
+def _ground_executed_action(action_call: ActionCall, learned_domain: Domain, problem_objects: Dict[str, PDDLObject]) -> Operator:
     """Ground the tested action based on the trajectory data.
 
     :param action_call: the grounded action call in the observation component.
@@ -33,7 +33,7 @@ def _calculate_single_action_applicability_rate(
     observed_state: State,
     problem_objects: Dict[str, PDDLObject],
 ):
-    """
+    """Calculates the applicability rate for a single action.
 
     :param action_call: the grounded action that is currently being tested.
     :param learned_domain: the domain that was learned using the action model learning algorithm.
@@ -44,10 +44,10 @@ def _calculate_single_action_applicability_rate(
     :param observed_state: the state that was observed in the trajectory data.
     :param problem_objects: the objects that were used in the problem definition.
     """
-    tested_grounded_operator = _ground_tested_operator(action_call, learned_domain, problem_objects)
-    model_grounded_operator = _ground_tested_operator(action_call, complete_domain, problem_objects)
-    is_applicable_in_test = tested_grounded_operator.is_applicable(observed_state)
-    is_applicable_in_model = model_grounded_operator.is_applicable(observed_state)
+    learned_grounded_action = _ground_executed_action(action_call, learned_domain, problem_objects)
+    model_grounded_action = _ground_executed_action(action_call, complete_domain, problem_objects)
+    is_applicable_in_test = learned_grounded_action.is_applicable(observed_state)
+    is_applicable_in_model = model_grounded_action.is_applicable(observed_state)
     num_true_positives[action_call.name] += int(is_applicable_in_test == is_applicable_in_model and is_applicable_in_test)
     num_false_positives[action_call.name] += int(is_applicable_in_test and not is_applicable_in_model)
     num_false_negatives[action_call.name] += int(not is_applicable_in_test and is_applicable_in_model)

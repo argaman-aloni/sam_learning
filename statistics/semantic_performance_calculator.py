@@ -160,6 +160,7 @@ class SemanticPerformanceCalculator:
         """
         if isinstance(action_call, JointActionCall):
             for action in action_call.actions:
+                self.logger.debug(f"Calculating the applicability rate for the action - {action.name}")
                 _calculate_single_action_applicability_rate(
                     action,
                     learned_domain,
@@ -179,6 +180,7 @@ class SemanticPerformanceCalculator:
             num_true_positives[action_call.name] += 0
             return
 
+        self.logger.debug(f"Calculating the applicability rate for the action - {action_call.name}")
         _calculate_single_action_applicability_rate(
             action_call,
             learned_domain,
@@ -270,6 +272,9 @@ class SemanticPerformanceCalculator:
             observation_objects = observation.grounded_objects
             for component in observation.components:
                 possible_ground_actions.append(component.grounded_action_call)
+                self.logger.info(
+                    f"Calculating the preconditions' semantic performance for the action the state - {component.previous_state.serialize()}"
+                )
                 for action in possible_ground_actions:
                     if action.name not in learned_domain.actions:
                         continue

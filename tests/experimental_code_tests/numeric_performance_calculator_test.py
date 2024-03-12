@@ -8,7 +8,7 @@ from pddl_plus_parser.models import Domain, Problem, Observation, ActionCall
 from pytest import fixture
 
 from experiments import NumericPerformanceCalculator
-from statistics.performance_calculation_utils import _ground_tested_operator
+from statistics.performance_calculation_utils import _ground_executed_action
 from tests.consts import SAILING_EXPECTED_DOMAIN_PATH, SAILING_PROBLEM_PATH, SAILING_TRAJECTORY_PATH, \
     SAILING_LEARNED_DOMAIN_PATH
 from utilities import LearningAlgorithmType
@@ -51,7 +51,7 @@ def test_ground_tested_operator_is_able_to_ground_properly_with_negative_precond
         numeric_performance_calculator: NumericPerformanceCalculator, sailing_learned_domain: Domain):
     test_action_call = ActionCall(name="save_person", grounded_parameters=["b3", "p2"])
     try:
-        _ground_tested_operator(action_call=test_action_call, learned_domain=sailing_learned_domain)
+        _ground_executed_action(action_call=test_action_call, learned_domain=sailing_learned_domain)
     except Exception as e:
         pytest.fail(f"Failed to ground the tested action properly. Exception: {e}")
 

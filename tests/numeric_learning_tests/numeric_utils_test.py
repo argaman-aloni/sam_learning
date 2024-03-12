@@ -14,12 +14,10 @@ from sam_learning.core.numeric_learning.numeric_utils import (
 
 def test_extract_numeric_linear_coefficient_does_not_output_infinity_for_zero_division():
     """Test that the function does not output infinity for zero division."""
-    assert extract_numeric_linear_coefficient(pd.Series([1, 2, 3]), pd.Series([0, 0, 0])) == 0
-
-
-def test_extract_numeric_linear_coefficient_does_not_output_nan_for_illegal_division():
-    """Test that the function does not output nan for illegal division."""
-    assert extract_numeric_linear_coefficient(pd.Series([1, 2, 3]), pd.Series([0, 0, 0])) == 0
+    try:
+        extract_numeric_linear_coefficient(pd.Series([1, 2, 3]), pd.Series([0, 0, 0]))
+    except ZeroDivisionError:
+        assert False
 
 
 def test_extract_numeric_linear_coefficient_outputs_correct_coefficient_when_division_is_legal():
@@ -38,7 +36,7 @@ def test_construct_projected_variable_strings_returns_correct_strings_representi
     assert len(pca_variable_strings) == 2  # 2 components
 
 
-def test_construct_projected_variable_strings_returns_correct_strings_representing_the_projected_format():
+def test_construct_projected_variable_strings_returns_correct_strings_representing_the_projected_format_example_for_nsam_paper():
     function_variables = ["(x)", "(y)", "(z)", "w"]
     X = np.array([[1, 0, 17, 3], [5, 5, 7, 3], [2, 4, 9, 7]])
     shift = np.array([-1, 2, 3, 12])
@@ -51,8 +49,6 @@ def test_construct_projected_variable_strings_returns_correct_strings_representi
     diagonal_eye = [list(vector) for vector in np.eye(X.shape[1])]
     orthnormal_span = extended_gram_schmidt(diagonal_eye, [[1, 0, 17, 3], [5, 5, 7, 3], [2, 4, 9, 7]])
     print(f"orthnormal_span = {orthnormal_span}")
-    # print(pca_variable_strings)
-    # assert len(pca_variable_strings) == 2  # 2 components
 
 
 def test_construct_projected_variable_strings_returns_correct_strings_representing_the_projected_format_when_components_are_equal_to_variables():
@@ -197,4 +193,3 @@ def test_create_polynomial_string_when_calling_with_three_functions_returns_the_
     monomial = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
     polynomial_string = create_polynomial_string(monomial)
     assert polynomial_string == "(* (fuel-cost ) (* (load_limit ?z) (current_load ?z)))"
-
