@@ -12,17 +12,19 @@ class LearningAlgorithmType(Enum):
     ma_sam_baseline = 8
     conditional_sam = 9
     universal_sam = 10
+    online_nsam = 13
+    raw_polynomial_nsam = 14
+    incremental_nsam = 19
+
     # learning algorithms relating to fault repair not to be used for POL
     oblique_tree = 11
     extended_svc = 12
-    online_nsam = 13
-    raw_polynomial_nsam = 14
+
     # To remove
     naive_nsam = 15
     naive_polysam = 16
     raw_naive_nsam = 17
     raw_naive_polysam = 18
-    incremental_nsam = 19
 
 
 class SolverType(Enum):
@@ -30,6 +32,7 @@ class SolverType(Enum):
     metric_ff = 2
     enhsp = 3
     fast_forward = 4
+
 
 class SolutionOutputTypes(Enum):
     ok = 1

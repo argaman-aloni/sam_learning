@@ -29,11 +29,12 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
     def __init__(
         self,
         model_domain: Domain,
+        model_domain_path: Path,
         observations: List[Union[Observation, MultiAgentObservation]],
         working_directory_path: Path,
         learning_algorithm: LearningAlgorithmType,
     ):
-        super().__init__(model_domain, observations, working_directory_path, learning_algorithm)
+        super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
 
     def calculate_effects_performance(self, learned_domain: Domain) -> Dict[str, float]:
         """Calculates the effects MSE value using the actual state fluents and the ones generated using the learned
@@ -78,7 +79,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
         self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
-        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain)
+        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         effects_mse = self.calculate_effects_performance(learned_domain)

@@ -23,13 +23,12 @@ class NumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(
-        self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None, **kwargs
-    ):
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None, allow_unsafe: bool = False, **kwargs):
         super().__init__(partial_domain)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)
         self.preconditions_fluent_map = preconditions_fluent_map
+        self._allow_unsafe = allow_unsafe
 
     def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
         """Constructs the safe preconditions for the input action.
@@ -45,9 +44,7 @@ class NumericSAMLearner(SAMLearner):
             return
 
         else:
-            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(
-                self.preconditions_fluent_map[action_name]
-            )
+            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(self.preconditions_fluent_map[action_name])
 
         if learned_numeric_preconditions.binary_operator == "and":
             self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
@@ -111,15 +108,9 @@ class NumericSAMLearner(SAMLearner):
         """
         super().add_new_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.previous_state_functions
-        )
-        next_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.next_state_functions
-        )
-        self.storage[grounded_action.name] = NumericFluentStateStorage(
-            grounded_action.name, self.partial_domain.functions
-        )
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.previous_state_functions)
+        next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.next_state_functions)
+        self.storage[grounded_action.name] = NumericFluentStateStorage(grounded_action.name, self.partial_domain.functions)
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
@@ -135,12 +126,8 @@ class NumericSAMLearner(SAMLearner):
         action_name = grounded_action.name
         super().update_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Adding the numeric state variables to the numeric storage of action - {action_name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.previous_state_functions
-        )
-        next_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, self.triplet_snapshot.next_state_functions
-        )
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.previous_state_functions)
+        next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.next_state_functions)
         self.storage[action_name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
@@ -220,9 +207,10 @@ class PolynomialSAMLearning(NumericSAMLearner):
         partial_domain: Domain,
         preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
         polynomial_degree: int = 1,
+        allow_unsafe: bool = False,
         **kwargs,
     ):
-        super().__init__(partial_domain, preconditions_fluent_map, **kwargs)
+        super().__init__(partial_domain, preconditions_fluent_map, allow_unsafe, **kwargs)
         self.polynom_degree = polynomial_degree
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -235,12 +223,8 @@ class PolynomialSAMLearning(NumericSAMLearner):
         """
         super().add_new_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, previous_state.state_fluents
-        )
-        next_state_lifted_matches = self.function_matcher.match_state_functions(
-            grounded_action, next_state.state_fluents
-        )
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, previous_state.state_fluents)
+        next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, next_state.state_fluents)
         self.storage[grounded_action.name] = PolynomialFluentsLearningAlgorithm(
             grounded_action.name, self.polynom_degree, self.partial_domain.functions, is_verbose=True
         )

@@ -3,7 +3,7 @@ import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Any
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import Observation, Domain
@@ -29,8 +29,7 @@ def configure_iteration_logger(args: argparse.Namespace):
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
-        logs_directory_path
-        / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}_{iteration_number}.log",
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}_{iteration_number}.log",
         maxBytes=max_bytes,
         backupCount=1,
     )
@@ -63,9 +62,7 @@ class ParallelExperimentRunner:
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(
-            working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT
-        )
+        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self._learning_algorithm = learning_algorithm
         self.domain_validator = DomainValidator(
@@ -81,9 +78,7 @@ class ParallelExperimentRunner:
     ) -> Tuple[LearnerDomain, Dict[str, str]]:
         raise NotImplementedError
 
-    def export_learned_domain(
-        self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None
-    ) -> Path:
+    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
@@ -97,9 +92,7 @@ class ParallelExperimentRunner:
 
         return domain_path
 
-    def learn_model_offline(
-        self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int = 0
-    ) -> None:
+    def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int = 0) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
@@ -121,9 +114,7 @@ class ParallelExperimentRunner:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            learned_model, learning_report = self._apply_learning_algorithm(
-                partial_domain, allowed_observations, test_set_dir_path
-            )
+            learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
             self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, fold_num)
             break
@@ -151,8 +142,7 @@ class ParallelExperimentRunner:
         self.export_learned_domain(
             learned_model,
             domains_backup_dir_path,
-            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
-            f"_{len(allowed_observations)}_trajectories.pddl",
+            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
         )
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")

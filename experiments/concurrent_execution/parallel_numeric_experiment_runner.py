@@ -16,7 +16,7 @@ from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 
 
-class SingleIterationNSAMEExperimentRunner(ParallelExperimentRunner):
+class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
     """Class to conduct offline numeric action model learning experiments."""
 
     def __init__(
@@ -122,7 +122,7 @@ def main():
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
     working_directory_path = Path(args.working_directory_path)
     iteration_number = int(args.iteration_number)
-    offline_learner = SingleIterationNSAMEExperimentRunner(
+    offline_learner = SingleIterationNSAMExperimentRunner(
         working_directory_path=working_directory_path,
         domain_file_name=args.domain_file_name,
         learning_algorithm=learning_algorithm,

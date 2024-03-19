@@ -41,26 +41,24 @@ def init_semantic_performance_calculator(
     for test_problem_path in selected_paths:
         trajectory_file_path = working_directory_path / f"{test_problem_path.stem}.trajectory"
         problem = ProblemParser(test_problem_path, partial_domain).parse_problem()
-        trajectory = TrajectoryParser(partial_domain, problem).parse_trajectory(
-            trajectory_file_path, executing_agents=executing_agents
-        )
+        trajectory = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path, executing_agents=executing_agents)
         sampled_observation = Observation()
         sampled_observation.grounded_objects = trajectory.grounded_objects
-        sampled_observation.components = random.sample(
-            trajectory.components, k=min(DEFAULT_SIZE, len(trajectory.components))
-        )
+        sampled_observation.components = random.sample(trajectory.components, k=min(DEFAULT_SIZE, len(trajectory.components)))
         observations.append(sampled_observation)
 
     if is_numeric:
         return NumericPerformanceCalculator(
             model_domain=model_domain,
             observations=observations,
+            model_domain_path=domain_path,
             working_directory_path=working_directory_path,
             learning_algorithm=learning_algorithm,
         )
 
     return SemanticPerformanceCalculator(
         model_domain=model_domain,
+        model_domain_path=domain_path,
         observations=observations,
         working_directory_path=working_directory_path,
         learning_algorithm=learning_algorithm,

@@ -2,11 +2,13 @@
 import csv
 import logging
 import random
+import uuid
 from collections import defaultdict
 from itertools import permutations
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Union
 
+from pddl_plus_parser.exporters import ProblemExporter
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import (
     Domain,
@@ -14,16 +16,14 @@ from pddl_plus_parser.models import (
     ActionCall,
     State,
     MultiAgentObservation,
-    JointActionCall,
     Operator,
     PDDLObject,
-    PDDLType,
-    Action,
+    Problem,
 )
 
 from sam_learning.core import VocabularyCreator
-from statistics.performance_calculation_utils import _calculate_single_action_applicability_rate
 from utilities import LearningAlgorithmType
+from validators import run_validate_script, VALID_PLAN
 
 SEMANTIC_PRECISION_STATS = [
     "action_name",
@@ -87,33 +87,21 @@ class SemanticPerformanceCalculator:
     def __init__(
         self,
         model_domain: Domain,
+        model_domain_path: Path,
         observations: List[Union[Observation, MultiAgentObservation]],
         working_directory_path: Path,
         learning_algorithm: LearningAlgorithmType,
     ):
         self.logger = logging.getLogger(__name__)
         self.model_domain = model_domain
+        self.model_domain_path = model_domain_path
         self.dataset_observations = observations
         self.learning_algorithm = learning_algorithm
         self.combined_stats = []
         self.results_dir_path = working_directory_path / "results_directory"
+        self.temp_dir_path = working_directory_path / "temp"
+        self.temp_dir_path.mkdir(exist_ok=True)
         self.vocabulary_creator = VocabularyCreator()
-
-    def _validate_type_matching(self, grounded_signatures: Dict[str, PDDLType], action: Action) -> bool:
-        """Validates that the types of the grounded signature match the types of the predicate signature.
-
-        :param grounded_signatures: the grounded predicate signature.
-        :param action: the lifted action.
-        :return: whether the types match.
-        """
-        for object_name, predicate_parameter in zip(grounded_signatures, action.signature):
-            parameter_type = action.signature[predicate_parameter]
-            grounded_type = grounded_signatures[object_name]
-            if not grounded_type.is_sub_type(parameter_type):
-                self.logger.debug(f"The combination of objects - {grounded_signatures}" f" does not fit {action.name}'s signature")
-                return False
-
-        return True
 
     def _create_grounded_action_vocabulary(self, domain: Domain, observed_objects: Dict[str, PDDLObject]) -> List[ActionCall]:
         """Create a vocabulary of random combinations of the predicates parameters and objects.
@@ -131,66 +119,67 @@ class SemanticPerformanceCalculator:
         for action in domain.actions.values():
             self.logger.info(f"Creating grounded action vocabulary for action {action.name} and sampling 10 ground actions")
             action_vocabulary = [action_call for action_call in possible_ground_actions if action_call.name == action.name]
-            sampled_action_vocabulary = random.choices(action_vocabulary, k=10)
+            sampled_action_vocabulary = random.sample(action_vocabulary, k=min(5, len(action_vocabulary)))
             vocabulary.extend(sampled_action_vocabulary)
 
         return vocabulary
 
     def _calculate_action_applicability_rate(
-        self,
-        action_call: Union[ActionCall, JointActionCall],
-        learned_domain: Domain,
-        num_false_negatives: Dict[str, int],
-        num_false_positives: Dict[str, int],
-        num_true_positives: Dict[str, int],
-        observed_state: State,
-        problem_objects: Dict[str, PDDLObject],
-    ) -> None:
+        self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
+    ) -> Tuple[int, int, int]:
         """Test whether an action is applicable in both the model domain and the generated domain.
 
         :param action_call: the action call that is tested for applicability.
-        :param learned_domain: the domain that was learned using the action model learning algorithm.
-        :param num_false_negatives: the dictionary mapping between the action name and the number of false negative
-            executions.
-        :param num_false_positives: the dictionary mapping between the action name and the number of false positive
-            executions.
-        :param num_true_positives: the dictionary mapping between the action name and the number of true positive
-            executions.
-        :param observed_state: the state that is currently being tested.
+        :param learned_domain_path: the domain that was learned using the action model learning algorithm.
+        :param observed_state: the state that was observed in the trajectory data.
+        :param problem_objects: the objects that were used in the problem definition.
+        :return: a tuple containing the number of true positives, false positives and false negatives.
         """
-        if isinstance(action_call, JointActionCall):
-            for action in action_call.actions:
-                self.logger.debug(f"Calculating the applicability rate for the action - {action.name}")
-                _calculate_single_action_applicability_rate(
-                    action,
-                    learned_domain,
-                    self.model_domain,
-                    num_false_negatives,
-                    num_false_positives,
-                    num_true_positives,
-                    observed_state,
-                    problem_objects,
-                )
-
-            return
-
-        if action_call.name not in learned_domain.actions:
-            num_false_negatives[action_call.name] += 1
-            num_false_positives[action_call.name] += 0
-            num_true_positives[action_call.name] += 0
-            return
-
         self.logger.debug(f"Calculating the applicability rate for the action - {action_call.name}")
-        _calculate_single_action_applicability_rate(
-            action_call,
-            learned_domain,
-            self.model_domain,
-            num_false_negatives,
-            num_false_positives,
-            num_true_positives,
-            observed_state,
-            problem_objects,
+        applicability_validation_problem = Problem(domain=self.model_domain)
+        applicability_validation_problem.name = f"instance_{uuid.uuid4()}"
+        applicability_validation_problem.objects = problem_objects
+        applicability_validation_problem.initial_state_predicates = observed_state.state_predicates
+        applicability_validation_problem.initial_state_fluents = observed_state.state_fluents
+        self.logger.debug(
+            f"Exporting a problem with the initial state as in {str(observed_state)} and no goals to validate whether the action is applicable."
         )
+        current_problem_file_path = self.temp_dir_path / f"applicability_validation_problem_{uuid.uuid4()}.pddl"
+        current_solution_file_path = self.temp_dir_path / f"applicability_validation_solution_{uuid.uuid4()}.solution"
+        with open(current_solution_file_path, "wt") as solution_file:
+            solution_file.write(str(action_call))
+
+        ProblemExporter().export_problem(problem=applicability_validation_problem, export_path=current_problem_file_path)
+
+        self.logger.debug(f"Exported the problem to {current_problem_file_path}, now validating the action's applicability.")
+        applicable_in_model = self._calculate_applicability_in_state(current_problem_file_path, current_solution_file_path, self.model_domain_path)
+        applicable_in_learned = self._calculate_applicability_in_state(current_problem_file_path, current_solution_file_path, learned_domain_path)
+
+        current_problem_file_path.unlink()
+        current_solution_file_path.unlink()
+        return (
+            int(applicable_in_learned == applicable_in_model and applicable_in_learned),
+            int(applicable_in_learned and not applicable_in_model),
+            int(not applicable_in_learned and applicable_in_model),
+        )
+
+    @staticmethod
+    def _calculate_applicability_in_state(problem_file_path: Path, solution_file_path: Path, domain_file_path: Path) -> bool:
+        """Calculate whether the action is applicable in the state.
+
+        :param problem_file_path: the path to the problem file.
+        :param solution_file_path: the path to the solution file.
+        :param domain_file_path: the path to the domain file.
+        :return: whether the action is applicable in the state.
+        """
+        validation_file_path = run_validate_script(
+            domain_file_path=domain_file_path, problem_file_path=problem_file_path, solution_file_path=solution_file_path
+        )
+        with open(validation_file_path, "r", encoding="utf-8") as validation_file:
+            validation_file_content = validation_file.read()
+
+        validation_file_path.unlink()
+        return VALID_PLAN in validation_file_content
 
     def _calculate_effects_difference_rate(
         self,
@@ -208,7 +197,7 @@ class SemanticPerformanceCalculator:
         :param num_false_positives: the dictionary mapping between the action name and the number of false positive
         :param num_true_positives: the dictionary mapping between the action name and the number of true positive
         """
-        self.logger.info("Calculating effects difference rate")
+        self.logger.info("Calculating effects difference rate for the observation.")
         for observation_triplet in observation.components:
             model_previous_state = observation_triplet.previous_state
             executed_action = observation_triplet.grounded_action_call
@@ -226,49 +215,40 @@ class SemanticPerformanceCalculator:
                 learned_next_state = learned_operator.apply(model_previous_state)
 
                 self.logger.debug("Validating if there are any false negatives.")
-                for lifted_predicate in model_next_state.state_predicates:
-                    if lifted_predicate not in learned_next_state.state_predicates:
-                        num_false_negatives[executed_action.name] += 1
-                        break
+                model_state_predicates = {
+                    predicate.untyped_representation
+                    for grounded_predicate in model_next_state.state_predicates.values()
+                    for predicate in grounded_predicate
+                }
+                learned_state_predicates = {
+                    predicate.untyped_representation
+                    for grounded_predicate in learned_next_state.state_predicates.values()
+                    for predicate in grounded_predicate
+                }
 
-                    for grounded_predicate in model_next_state.state_predicates[lifted_predicate]:
-                        if grounded_predicate.untyped_representation not in learned_next_state.serialize():
-                            num_false_negatives[executed_action.name] += 1
-                            break
-
-                        num_true_positives[executed_action.name] += 1
-
-                self.logger.debug("Trying to validate that there are no false positives.")
-                for lifted_predicate in learned_next_state.state_predicates:
-                    if len(learned_next_state.state_predicates[lifted_predicate]) == 0:
-                        continue
-
-                    if lifted_predicate not in model_next_state.state_predicates:
-                        num_false_positives[executed_action.name] += 1
-                        break
-
-                    for grounded_predicate in learned_next_state.state_predicates[lifted_predicate]:
-                        if grounded_predicate.untyped_representation not in model_next_state.serialize():
-                            num_false_positives[executed_action.name] += 1
-                            break
+                num_true_positives[executed_action.name] += len(model_state_predicates.intersection(learned_state_predicates))
+                num_false_positives[executed_action.name] += len(learned_state_predicates.difference(model_state_predicates))
+                num_false_negatives[executed_action.name] += len(model_state_predicates.difference(learned_state_predicates))
 
             except ValueError:
                 self.logger.debug("The action is not applicable in the state.")
                 continue
 
-    def calculate_preconditions_semantic_performance(self, learned_domain: Domain) -> Tuple[Dict[str, float], Dict[str, float]]:
+    def calculate_preconditions_semantic_performance(
+        self, learned_domain: Domain, learned_domain_path: Path
+    ) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Calculates the precision recall values of the learned preconditions.
 
         :param learned_domain: the action model that was learned using the action model learning algorithm
+        :param learned_domain_path: the path to the learned domain.
         :return: the precision and recall dictionaries.
         """
         num_true_positives = defaultdict(int)
         num_false_negatives = defaultdict(int)
         num_false_positives = defaultdict(int)
-        all_objects = {k: v for obs in self.dataset_observations for k, v in obs.grounded_objects.items()}
-        possible_ground_actions = self._create_grounded_action_vocabulary(self.model_domain, all_objects)
         self.logger.debug("Starting to calculate the semantic preconditions performance")
         for observation in self.dataset_observations:
+            possible_ground_actions = self._create_grounded_action_vocabulary(self.model_domain, observation.grounded_objects)
             observation_objects = observation.grounded_objects
             for component in observation.components:
                 possible_ground_actions.append(component.grounded_action_call)
@@ -279,15 +259,12 @@ class SemanticPerformanceCalculator:
                     if action.name not in learned_domain.actions:
                         continue
 
-                    self._calculate_action_applicability_rate(
-                        action,
-                        learned_domain,
-                        num_false_negatives,
-                        num_false_positives,
-                        num_true_positives,
-                        component.previous_state,
-                        observation_objects,
+                    true_positive, false_positive, false_negative = self._calculate_action_applicability_rate(
+                        action, learned_domain_path, component.previous_state, observation_objects,
                     )
+                    num_true_positives[action.name] += true_positive
+                    num_false_positives[action.name] += false_positive
+                    num_false_negatives[action.name] += false_negative
 
         return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
 
@@ -314,7 +291,7 @@ class SemanticPerformanceCalculator:
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
         self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
-        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain)
+        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         for action_name in self.model_domain.actions:

@@ -1,7 +1,9 @@
 import logging
 import os
 import subprocess
+import uuid
 from pathlib import Path
+from typing import Optional
 
 VALIDATOR_DIRECTORY = Path(os.environ["VALIDATOR_DIRECTORY"])
 
@@ -25,7 +27,7 @@ def run_validate_script(domain_file_path: Path, problem_file_path: Path, solutio
     """
     os.chdir(VALIDATOR_DIRECTORY)
     logger.info("Running VAL to validate the plan's correctness.")
-    validation_file_path = domain_file_path.parent / "validation_log.txt"
+    validation_file_path = domain_file_path.parent / f"validation_log_{uuid.uuid4()}.txt"
     run_command = f"./Validate -v -t 0.1 {domain_file_path} {problem_file_path} " \
                   f"{solution_file_path} > {validation_file_path}"
     try:

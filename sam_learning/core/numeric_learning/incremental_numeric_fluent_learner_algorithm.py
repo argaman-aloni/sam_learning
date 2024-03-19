@@ -28,6 +28,9 @@ class IncrementalNumericFluentStateStorage(NumericFluentStateStorage):
         """
         sample_dataset = {}
         for monomial in self.monomials:
+            if any([component not in state_fluents for component in monomial]):
+                continue
+
             sample_dataset[create_polynomial_string(monomial)] = np.prod([state_fluents[fluent].value for fluent in monomial])
 
         self.convex_hull_learner.add_new_point(sample_dataset)

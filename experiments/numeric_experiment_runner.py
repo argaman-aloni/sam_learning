@@ -1,13 +1,12 @@
 """Runs experiments for the numeric model learning algorithms."""
 import argparse
-import json
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple
+from typing import List, Dict, Tuple
 
 from pddl_plus_parser.models import Observation, Domain
 
 from experiments.basic_experiment_runner import OfflineBasicExperimentRunner, configure_logger
-from experiments.experiments_consts import NO_INSIGHT_NUMERIC_ALGORITHMS, NUMERIC_SAM_ALGORITHM_VERSIONS
+from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
 from sam_learning.core import LearnerDomain
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
@@ -21,7 +20,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         working_directory_path: Path,
         domain_file_name: str,
         learning_algorithm: LearningAlgorithmType,
-        fluents_map_path: Optional[Path],
+        polynom_degree: int,
         solver_type: SolverType,
         problem_prefix: str = "pfile",
     ):
@@ -32,12 +31,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
             solver_type=solver_type,
             problem_prefix=problem_prefix,
         )
-        with open(fluents_map_path, "rt") as json_file:
-            self.fluents_map = json.load(json_file)
-
-        if learning_algorithm.value in NO_INSIGHT_NUMERIC_ALGORITHMS:
-            self.fluents_map = None
-
+        self.polynom_degree = polynom_degree
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path,
@@ -59,7 +53,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         """
 
         learner = NUMERIC_SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
-            partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map
+            partial_domain=partial_domain, polynom_degree=self.polynom_degree
         )
         return learner.learn_action_model(allowed_observations)
 
@@ -85,14 +79,14 @@ def parse_arguments() -> argparse.Namespace:
         "--learning_algorithm",
         required=True,
         type=int,
-        choices=[3, 4, 6, 14, 15, 16, 17, 18],
-        help="The type of learning algorithm. " "\n3: numeric_sam\n4: raw_numeric_sam\n 6: polynomial_sam\n ",
+        choices=[3, 15, 19],
+        help="The type of learning algorithm.",
     )
     parser.add_argument(
-        "--fluents_map_path",
+        "--polynom_degree",
         required=False,
-        help="The path to the file mapping to the preconditions' " "fluents",
-        default=None,
+        help="The degree of the polynomial to set in the learning algorithm.",
+        default=0,
     )
     parser.add_argument(
         "--solver_type",
@@ -119,7 +113,7 @@ def main():
         working_directory_path=working_directory_path,
         domain_file_name=args.domain_file_name,
         learning_algorithm=learning_algorithm,
-        fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
+        polynom_degree=int(args.polynom_degree),
         solver_type=SolverType(args.solver_type),
         problem_prefix=args.problems_prefix,
     )
