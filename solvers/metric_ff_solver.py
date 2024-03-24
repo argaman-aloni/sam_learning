@@ -34,12 +34,7 @@ class MetricFFSolver:
             return solution_content.decode("utf-8", errors="ignore")
 
     def _run_metric_ff_process(
-        self,
-        run_command: str,
-        solution_path: Path,
-        problem_file_path: Path,
-        solving_stats: Dict[str, str],
-        solving_timeout: int = MAX_RUNNING_TIME,
+        self, run_command: str, solution_path: Path, problem_file_path: Path, solving_stats: Dict[str, str], solving_timeout: int = MAX_RUNNING_TIME,
     ) -> None:
         """Runs the metric-ff process."""
         self.logger.info(f"Metric-FF solver is working on - {problem_file_path.stem}")
@@ -116,13 +111,8 @@ class MetricFFSolver:
 
 if __name__ == "__main__":
     args = sys.argv
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO
-    )
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
     solver = MetricFFSolver()
     solver.execute_solver(
-        problems_directory_path=Path(args[1]),
-        domain_file_path=Path(args[2]),
-        problems_prefix=args[3],
-        solving_timeout=int(args[4]),
+        problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]), problems_prefix=args[3], solving_timeout=int(args[4]),
     )

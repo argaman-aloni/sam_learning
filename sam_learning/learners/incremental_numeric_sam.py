@@ -22,10 +22,10 @@ class IncrementalNumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, polynom_degree: int = 0, **kwargs):
+    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, **kwargs):
         super().__init__(partial_domain)
         self.storage = {}
-        self.polynom_degree = polynom_degree
+        self.polynom_degree = polynomial_degree
         self.function_matcher = NumericFunctionMatcher(partial_domain)
 
     def _initialize_fluents_learners(self):

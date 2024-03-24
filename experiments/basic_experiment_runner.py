@@ -133,7 +133,7 @@ class OfflineBasicExperimentRunner:
                 # stopping all the experiments after 50 trajectories so that the experiments will not take too long
                 break
 
-            if index != 0 and (index + 1) % 70 != 0:
+            if (index + 1) % 10 != 0:
                 continue
 
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")

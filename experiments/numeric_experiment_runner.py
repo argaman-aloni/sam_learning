@@ -1,5 +1,6 @@
 """Runs experiments for the numeric model learning algorithms."""
 import argparse
+import json
 from pathlib import Path
 from typing import List, Dict, Tuple
 
@@ -23,6 +24,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         polynom_degree: int,
         solver_type: SolverType,
         problem_prefix: str = "pfile",
+        fluent_map_path: Path = None,
     ):
         super().__init__(
             working_directory_path=working_directory_path,
@@ -31,6 +33,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
             solver_type=solver_type,
             problem_prefix=problem_prefix,
         )
+        self.fluents_map_path = fluent_map_path
         self.polynom_degree = polynom_degree
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
@@ -51,9 +54,13 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the directory containing the test problems.
         :return: the learned action model and the learned action model's learning statistics.
         """
+        fluents_map = None
+        if self.fluents_map_path is not None:
+            with open(self.fluents_map_path, "r") as fluents_map_file:
+                fluents_map = json.load(fluents_map_file)
 
         learner = NUMERIC_SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
-            partial_domain=partial_domain, polynom_degree=self.polynom_degree
+            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, preconditions_fluent_map=fluents_map
         )
         return learner.learn_action_model(allowed_observations)
 
@@ -70,24 +77,16 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
 
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Runs the numeric action model learning algorithms evaluation experiments."
-    )
+    parser = argparse.ArgumentParser(description="Runs the numeric action model learning algorithms evaluation experiments.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
-        "--learning_algorithm",
-        required=True,
-        type=int,
-        choices=[3, 15, 19],
-        help="The type of learning algorithm.",
+        "--learning_algorithm", required=True, type=int, choices=[3, 15, 19], help="The type of learning algorithm.",
     )
     parser.add_argument(
-        "--polynom_degree",
-        required=False,
-        help="The degree of the polynomial to set in the learning algorithm.",
-        default=0,
+        "--polynom_degree", required=False, help="The degree of the polynomial to set in the learning algorithm.", default=0,
     )
+    parser.add_argument("--fluents_map_path", help="The path to the fluent map file.", required=False, type=Path, default=None)
     parser.add_argument(
         "--solver_type",
         required=False,
@@ -96,9 +95,7 @@ def parse_arguments() -> argparse.Namespace:
         help="The solver that should be used for the sake of validation.\nMetric-FF - 2, ENHSP - 3.",
         default=3,
     )
-    parser.add_argument(
-        "--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile"
-    )
+    parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     args = parser.parse_args()
     return args
@@ -116,6 +113,7 @@ def main():
         polynom_degree=int(args.polynom_degree),
         solver_type=SolverType(args.solver_type),
         problem_prefix=args.problems_prefix,
+        fluent_map_path=args.fluents_map_path,
     )
     offline_learner.run_fold(
         fold_num=args.fold_number,

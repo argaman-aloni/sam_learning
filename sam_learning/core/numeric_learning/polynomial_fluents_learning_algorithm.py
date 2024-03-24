@@ -20,9 +20,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
     polynom_degree: int
     is_verbose: bool
 
-    def __init__(
-        self, action_name: str, polynom_degree: int, domain_functions: Dict[str, PDDLFunction], is_verbose: bool = False
-    ):
+    def __init__(self, action_name: str, polynom_degree: int, domain_functions: Dict[str, PDDLFunction], is_verbose: bool = False):
         super().__init__(action_name, domain_functions)
         self.polynom_degree = polynom_degree
         self.is_verbose = is_verbose
@@ -52,27 +50,35 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
         :param state_fluents: the numeric fluents present in the input state.
         :param storage: the storage to update.
         """
+
+        for state_fluent_lifted_str, state_fluent_data in state_fluents.items():
+            self.previous_state_storage[state_fluent_lifted_str].append(state_fluent_data.value)
+
         if self.polynom_degree == 1:
             for first_fluent, second_fluent in itertools.combinations(list(state_fluents.keys()), r=2):
                 multiplied_fluent = self.create_polynomial_string([first_fluent, second_fluent])
-                storage[multiplied_fluent].append(
-                    state_fluents[first_fluent].value * state_fluents[second_fluent].value
-                )
-            return
+                storage[multiplied_fluent].append(state_fluents[first_fluent].value * state_fluents[second_fluent].value)
 
-        for degree in range(2, self.polynom_degree + 1):
-            for fluent_combination in itertools.combinations_with_replacement(list(state_fluents.keys()), r=degree):
-                polynomial_fluent = self.create_polynomial_string(list(fluent_combination))
-                values = [state_fluents[fluent].value for fluent in fluent_combination]
-                self.previous_state_storage[polynomial_fluent].append(numpy.prod(values))
+        else:
+            for degree in range(2, self.polynom_degree + 1):
+                for fluent_combination in itertools.combinations_with_replacement(list(state_fluents.keys()), r=degree):
+                    polynomial_fluent = self.create_polynomial_string(list(fluent_combination))
+                    values = [state_fluents[fluent].value for fluent in fluent_combination]
+                    self.previous_state_storage[polynomial_fluent].append(numpy.prod(values))
+
+        previous_state_values = {
+            state_fluent_lifted_str: state_fluent_data[-1] for state_fluent_lifted_str, state_fluent_data in self.previous_state_storage.items()
+        }
+
+        self.linear_regression_learner.add_new_observation(previous_state_values, store_in_prev_state=True)
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the previous state storage.
 
         :param state_fluents: the lifted state fluents that were matched for the action.
         """
-        super().add_to_previous_state_storage(state_fluents)
         if self.polynom_degree == 0:
+            super().add_to_previous_state_storage(state_fluents)
             return
 
         self._add_polynom_to_storage(state_fluents, self.previous_state_storage)
