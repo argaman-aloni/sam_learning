@@ -23,6 +23,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         self,
         working_directory_path: Path,
         domain_file_name: str,
+        polynom_degree: int,
         learning_algorithm: LearningAlgorithmType,
         fluents_map_path: Optional[Path],
         solver_type: SolverType,
@@ -41,6 +42,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         if learning_algorithm.value in NO_INSIGHT_NUMERIC_ALGORITHMS:
             self.fluents_map = None
 
+        self.polynom_degree = polynom_degree
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path,
@@ -62,13 +64,11 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         """
 
         learner = NUMERIC_SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
-            partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map
+            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, preconditions_fluent_map=self.fluents_map
         )
         return learner.learn_action_model(allowed_observations)
 
-    def run_fold_iteration(
-        self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int
-    ) -> None:
+    def run_fold_iteration(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int) -> None:
         """Runs the numeric action model learning algorithms on the input fold.
 
         :param fold_num: the number of the fold to run.
@@ -81,23 +81,17 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
 
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Runs the numeric action model learning algorithms evaluation experiments."
-    )
+    parser = argparse.ArgumentParser(description="Runs the numeric action model learning algorithms evaluation experiments.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
         "--learning_algorithm",
         required=True,
         type=int,
-        choices=[3, 4, 6, 14, 15, 16, 17, 18],
-        help="The type of learning algorithm. " "\n3: numeric_sam\n4: raw_numeric_sam\n 6: polynomial_sam\n ",
+        choices=[3, 15, 19],
     )
     parser.add_argument(
-        "--fluents_map_path",
-        required=False,
-        help="The path to the file mapping to the preconditions' " "fluents",
-        default=None,
+        "--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' " "fluents", default=None,
     )
     parser.add_argument(
         "--solver_type",
@@ -108,8 +102,9 @@ def parse_arguments() -> argparse.Namespace:
         default=3,
     )
     parser.add_argument(
-        "--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile"
+        "--polynom_degree", required=False, help="The degree of the polynomial to set in the learning algorithm.", default=0,
     )
+    parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     parser.add_argument("--iteration_number", required=True, help="The current iteration to execute", type=int)
     args = parser.parse_args()
@@ -128,14 +123,13 @@ def main():
         learning_algorithm=learning_algorithm,
         fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
         solver_type=SolverType(args.solver_type),
+        polynom_degree=int(args.polynom_degree),
         problem_prefix=args.problems_prefix,
     )
     offline_learner.run_fold_iteration(
         fold_num=args.fold_number,
-        train_set_dir_path=(working_directory_path / "train")
-        / f"fold_{args.fold_number}_{args.learning_algorithm}_{iteration_number}",
-        test_set_dir_path=(working_directory_path / "test")
-        / f"fold_{args.fold_number}_{args.learning_algorithm}_{iteration_number}",
+        train_set_dir_path=(working_directory_path / "train") / f"fold_{args.fold_number}_{args.learning_algorithm}_{iteration_number}",
+        test_set_dir_path=(working_directory_path / "test") / f"fold_{args.fold_number}_{args.learning_algorithm}_{iteration_number}",
         iteration_number=int(args.iteration_number),
     )
 
