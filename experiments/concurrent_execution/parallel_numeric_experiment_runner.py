@@ -10,7 +10,7 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
     ParallelExperimentRunner,
     configure_iteration_logger,
 )
-from experiments.experiments_consts import NO_INSIGHT_NUMERIC_ALGORITHMS, NUMERIC_SAM_ALGORITHM_VERSIONS
+from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
 from sam_learning.core import LearnerDomain
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
@@ -36,11 +36,10 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             solver_type=solver_type,
             problem_prefix=problem_prefix,
         )
-        with open(fluents_map_path, "rt") as json_file:
-            self.fluents_map = json.load(json_file)
-
-        if learning_algorithm.value in NO_INSIGHT_NUMERIC_ALGORITHMS:
-            self.fluents_map = None
+        self.fluents_map = None
+        if fluents_map_path is not None:
+            with open(fluents_map_path, "rt") as json_file:
+                self.fluents_map = json.load(json_file)
 
         self.polynom_degree = polynom_degree
         self.semantic_performance_calc = None
