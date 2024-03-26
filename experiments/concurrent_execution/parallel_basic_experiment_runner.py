@@ -12,11 +12,12 @@ from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_SPLIT, DEFAULT_N
 from sam_learning.core import LearnerDomain
 from solvers import ENHSPSolver, MetricFFSolver
 from statistics.learning_statistics_manager import LearningStatisticsManager
+from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
-PLANNER_EXECUTION_TIMEOUT = 300
+PLANNER_EXECUTION_TIMEOUT = 600
 
 
 def configure_iteration_logger(args: argparse.Namespace):
@@ -65,12 +66,23 @@ class ParallelExperimentRunner:
         self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self._learning_algorithm = learning_algorithm
+        self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path,
             learning_algorithm,
             self.working_directory_path / domain_file_name,
             solver_type=solver_type,
             problem_prefix=problem_prefix,
+        )
+
+    def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
+        """Initializes the algorithm of the semantic precision / recall calculator."""
+        self.semantic_performance_calc = init_semantic_performance_calculator(
+            self.working_directory_path,
+            self.domain_file_name,
+            self._learning_algorithm,
+            test_set_dir_path=test_set_path,
+            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
         )
 
     def _apply_learning_algorithm(
@@ -85,10 +97,11 @@ class ParallelExperimentRunner:
         :param test_set_path: the path to the test set directory where the domain would be exported to.
         :param file_name: the name of the file to export the domain to.
         """
+        legacy_algorithms = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.naive_nsam]
         domain_file_name = file_name or self.domain_file_name
         domain_path = test_set_path / domain_file_name
         with open(domain_path, "wt") as domain_file:
-            domain_file.write(learned_domain.to_pddl())
+            domain_file.write(learned_domain.to_pddl(should_simplify=(self._learning_algorithm not in legacy_algorithms)))
 
         return domain_path
 
@@ -116,17 +129,15 @@ class ParallelExperimentRunner:
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
-            self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, fold_num)
+            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, fold_num)
+            self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
             break
 
         self.domain_validator.write_statistics(fold_num, iteration_number)
+        self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
 
     def validate_learned_domain(
-        self,
-        allowed_observations: List[Observation],
-        learned_model: LearnerDomain,
-        test_set_dir_path: Path,
-        fold_number: int,
+        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int,
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 

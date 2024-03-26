@@ -139,9 +139,14 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         else:
             projected_new_point = np.dot(self._shift_new_point(), np.array(self._gsp_base).T)
             if self._convex_hull is not None:
-                self._convex_hull.add_points([projected_new_point])
+                try:
+                    self._convex_hull.add_points([projected_new_point])
+                    return
 
-            return
+                except QhullError:
+                    print("Failed to add a new point to the convex hull.")
+                    self._convex_hull.close()
+                    self._convex_hull = None
 
         self.logger.debug("Creating the convex hull for the first time (or in case that the base had changed).")
         points = self.data.to_numpy()
