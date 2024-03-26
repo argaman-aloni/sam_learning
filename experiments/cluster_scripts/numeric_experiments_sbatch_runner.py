@@ -19,7 +19,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
         mem="6G",
-        python_file=f"{code_directory}/concurrent_execution/folder_creation_for_parallel_execution.py",
+        python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
         suppress_output=False,
         arguments=[
