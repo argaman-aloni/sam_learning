@@ -19,7 +19,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
         mem="6G",
-        python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
+        python_file=f"{code_directory}/concurrent_execution/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
         suppress_output=False,
         arguments=[
@@ -91,6 +91,7 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
     internal_iterations = list(range(FIRST_BREAKPOINT)) + list(
         range(FIRST_BREAKPOINT, parallelization_data["max_index"], parallelization_data["hop"])
     )
+    print(f"Internal iterations: {internal_iterations}")
     sid = setup_experiments_folds_job(
         code_directory=code_directory, environment_variables=environment_variables, experiment=experiment, internal_iterations=internal_iterations,
     )
@@ -105,6 +106,7 @@ def main():
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         internal_iterations, fold_creation_sid = create_experiment_folders(code_directory, environment_variables, experiment)
         experiment_sids = []
+        print(f"Submitted fold datasets folder creation job with the id {fold_creation_sid} for the experiment with domain {experiment['domain_file_name']}\n")
         for fold in range(configurations["num_folds"]):
             print(f"Working on fold {fold} of the experiment with domain {experiment['domain_file_name']}\n")
             for version_index, compared_version in enumerate(experiment["compared_versions"]):
