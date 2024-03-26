@@ -5,7 +5,7 @@ import sys
 import time
 from datetime import datetime
 
-from experiments.cluster_scripts.common import submit_job, progress_bar, sigint_handler
+from .common import submit_job, progress_bar, sigint_handler
 
 FIRST_BREAKPOINT = 6
 
