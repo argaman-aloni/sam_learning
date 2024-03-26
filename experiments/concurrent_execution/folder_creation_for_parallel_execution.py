@@ -37,6 +37,7 @@ class FoldsCreator:
 
     def create_folds_from_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
+        (self.working_directory_path / "results_directory").mkdir(exist_ok=True)
         self.logger.info("Removing the old folds directories if exist.")
         self.k_fold.remove_created_directories()
         self.logger.info("Done removing the old folds directories!")

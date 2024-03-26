@@ -7,7 +7,7 @@ from datetime import datetime
 
 from experiments.cluster_scripts.common import submit_job, progress_bar, sigint_handler
 
-FIRST_BREAKPOINT = 6
+FIRST_BREAKPOINT = 5
 
 EXPERIMENTS_CONFIG_STR = "experiment_configurations"
 

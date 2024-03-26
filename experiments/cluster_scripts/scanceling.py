@@ -13,4 +13,4 @@ def main(min_id, max_id):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(int(sys.argv[1]), int(sys.argv[2]))
