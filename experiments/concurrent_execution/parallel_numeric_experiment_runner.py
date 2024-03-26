@@ -75,6 +75,8 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param iteration_number: the current iteration number.
         """
+        self.logger.info(f"Running fold {fold_num} iteration {iteration_number}")
+        self._init_semantic_performance_calculator(test_set_dir_path)
         self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path, iteration_number)
         self.domain_validator.clear_statistics()
 
