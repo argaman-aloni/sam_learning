@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Union
 
 import math
+import sklearn
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
 
@@ -41,7 +42,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
             action.
 
         Note:
-            MSE is calculated as follows - 1/n * Sum((x-x')^2)
+            The final value is averaged over the number of states per action.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
         :return: a mapping between the action name and its MSE value.
@@ -52,21 +53,19 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
             for observation_component in observation.components:
                 action_call = observation_component.grounded_action_call
                 previous_state = observation_component.previous_state
+                model_next_state = observation_component.next_state
                 if action_call.name not in learned_domain.actions:
                     continue
 
                 grounded_operator = _ground_executed_action(action_call, learned_domain, observation.grounded_objects)
-                try:
-                    next_state = grounded_operator.apply(previous_state)
-                    learned_next_state_fluents = next_state.state_fluents
-                    actual_next_state = observation_component.next_state
-                    for fluent_name, fluent_data in actual_next_state.state_fluents.items():
-                        learned_value = learned_next_state_fluents[fluent_name].value
-                        squared_errors[action_call.name].append(math.pow(fluent_data.value - learned_value, 2))
-
-                except ValueError:
-                    self.logger.debug(f"Could not apply action {action_call.name} on the state.")
-                    continue
+                next_state = grounded_operator.apply(previous_state, allow_inapplicable_actions=True)
+                values = [
+                    (next_state.state_fluents[fluent].value, model_next_state.state_fluents[fluent].value)
+                    for fluent in next_state.state_fluents.keys()
+                ]
+                actual_values, expected_values = zip(*values)
+                state_mse = sklearn.metrics.mean_squared_error(expected_values, actual_values)
+                squared_errors[action_call.name].append(state_mse)
 
         mse_values.update({action_name: sum(square_errors) / len(square_errors) for action_name, square_errors in squared_errors.items()})
         return mse_values

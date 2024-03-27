@@ -212,7 +212,7 @@ class SemanticPerformanceCalculator:
                     grounded_action_call=executed_action.parameters,
                     problem_objects=observation.grounded_objects,
                 )
-                learned_next_state = learned_operator.apply(model_previous_state)
+                learned_next_state = learned_operator.apply(model_previous_state, allow_inapplicable_actions=True)
 
                 self.logger.debug("Validating if there are any false negatives.")
                 model_state_predicates = {
@@ -278,6 +278,12 @@ class SemanticPerformanceCalculator:
         num_true_positives = defaultdict(int)
         num_false_negatives = defaultdict(int)
         num_false_positives = defaultdict(int)
+        if len(self.model_domain.predicates) == 0:
+            return (
+                {action_name: 1 for action_name in self.model_domain.actions.keys()},
+                {action_name: 1 for action_name in self.model_domain.actions.keys()},
+            )
+
         for observation in self.dataset_observations:
             self._calculate_effects_difference_rate(observation, learned_domain, num_false_negatives, num_false_positives, num_true_positives)
 

@@ -22,10 +22,11 @@ class IncrementalNumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, **kwargs):
+    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, allow_unsafe: bool = False, **kwargs):
         super().__init__(partial_domain)
         self.storage = {}
         self.polynom_degree = polynomial_degree
+        self._allow_unsafe = allow_unsafe
         self.function_matcher = NumericFunctionMatcher(partial_domain)
 
     def _initialize_fluents_learners(self):
@@ -60,7 +61,7 @@ class IncrementalNumericSAMLearner(SAMLearner):
         :param action: the action that its effects are constructed for.
         :return: whether the effects were learned perfectly.
         """
-        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations()
+        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations(allow_unsafe=self._allow_unsafe)
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
 

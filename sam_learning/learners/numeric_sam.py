@@ -63,7 +63,7 @@ class NumericSAMLearner(SAMLearner):
         :param action: the action that its effects are constructed for.
         :return: whether the effects were learned perfectly.
         """
-        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations()
+        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations(allow_unsafe=self._allow_unsafe)
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
 

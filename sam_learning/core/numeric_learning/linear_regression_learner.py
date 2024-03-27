@@ -267,9 +267,10 @@ class LinearRegressionLearner:
         data_to_update.dropna(axis="columns", inplace=True)
         setattr(self, attribute_name, data_to_update)
 
-    def construct_assignment_equations(self) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
+    def construct_assignment_equations(self, allow_unsafe: bool = False) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
+        :param allow_unsafe: whether to allow unsafe learning.
         :return: the constructed effects with the possibly additional preconditions.
         """
         if len(self.next_state_data) == 0:
@@ -302,7 +303,7 @@ class LinearRegressionLearner:
                 )
                 continue
 
-            polynomial_equation = self._solve_linear_equations(feature_fluent, regression_df)
+            polynomial_equation = self._solve_linear_equations(feature_fluent, regression_df, allow_unsafe_learning=allow_unsafe)
 
             if polynomial_equation is not None:
                 assignment_statements.append(polynomial_equation)
