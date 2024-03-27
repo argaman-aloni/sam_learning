@@ -7,8 +7,7 @@ import pytest
 from pddl_plus_parser.models import PDDLFunction
 
 from sam_learning.core.numeric_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
-from sam_learning.core.numeric_learning.numeric_utils import display_convex_hull, create_monomials, \
-    create_polynomial_string
+from sam_learning.core.numeric_learning.numeric_utils import display_convex_hull, create_monomials, create_polynomial_string
 
 TEST_ACTION_NAME = "test_action"
 
@@ -146,6 +145,17 @@ def test_add_new_point_when_adding_a_point_with_feature_not_existing_in_previous
     convex_hull_learner.add_new_point(second_sample)
     assert convex_hull_learner.data.shape[0] == 2
     assert convex_hull_learner.data.shape[1] == 3
+
+
+def test_add_new_point_when_adding_multiple_points_with_single_dimension_does_not_try_to_create_a_convex_hull(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
+    try:
+        for i in range(10):
+            sample = {"(x )": i}
+            convex_hull_learner.add_new_point(sample)
+    except Exception as e:
+        pytest.fail(f"Exception was raised: {e}")
 
 
 def test_add_new_point_when_adding_four_points_that_span_the_entire_space_returns_standard_basis(convex_hull_learner):
@@ -298,3 +308,20 @@ def test_construct_convex_hull_inequalities_when_given_polynomial_inequalities_r
 
     precondition = polynomial_convex_hull_learner.construct_convex_hull_inequalities()
     print(str(precondition))
+
+
+def test_construct_convex_hull_inequalities_when_adding_multiple_points_with_single_dimension_creates_min_max_conditions_and_does_not_raise_an_error(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
+    try:
+        for i in range(10):
+            sample = {"(x )": i}
+            convex_hull_learner.add_new_point(sample)
+
+        precondition = convex_hull_learner.construct_convex_hull_inequalities()
+        assert precondition.binary_operator == "and"
+        assert len(precondition.operands) == 2
+        assert {op.to_pddl() for op in precondition.operands} == {"(>= (x ) 0.00)", "(<= (x ) 9.00)"}
+
+    except Exception as e:
+        pytest.fail(f"Exception was raised: {e}")

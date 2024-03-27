@@ -148,6 +148,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                     self._convex_hull.close()
                     self._convex_hull = None
 
+        if len(self._gsp_base) == 1:
+            self.logger.debug("The created base is one dimensional, cannot create a convex hull.")
+            return
+
         self.logger.debug("Creating the convex hull for the first time (or in case that the base had changed).")
         points = self.data.to_numpy()
         shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
