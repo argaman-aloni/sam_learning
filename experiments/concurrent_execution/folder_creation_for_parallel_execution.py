@@ -33,7 +33,7 @@ class FoldsCreator:
         )
         self.domain_file_name = domain_file_name
         self.working_directory_path = working_directory_path
-        self.logger = logging.getLogger("ClusterRunner")
+        self.logger = logging.getLogger("cluster-folder-creator")
 
     def create_folds_from_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
@@ -51,6 +51,9 @@ if __name__ == "__main__":
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     internal_iterations = [int(val) for val in args.internal_iterations.split(",")]
+    if len(internal_iterations) > 0:
+        print(f"Internal iterations: {internal_iterations}")
+
     FoldsCreator(
         working_directory_path=Path(args.working_directory_path),
         domain_file_name=args.domain_file_name,
