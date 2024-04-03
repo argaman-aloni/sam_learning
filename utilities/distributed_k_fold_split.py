@@ -95,18 +95,18 @@ class DistributedKFoldSplit:
             test_set_problems = [problem_paths[i] for i in test_set_indices]
             train_set_trajectories = [trajectory_paths[i] for i in range(len(trajectory_paths)) if i not in test_set_indices]
             training_data = {"internal_iterations": {}}
-            for iteration in self._internal_iterations:
-                selected_trajectories = random.sample(train_set_trajectories, k=len(iteration))
+            for num_used_trajectories in self._internal_iterations:
+                selected_trajectories = random.sample(train_set_trajectories, k=num_used_trajectories)
                 for learning_algorithm in self._learning_algorithms:
                     self.create_directories_content(
                         test_set_problems=test_set_problems,
                         selected_training_trajectories=selected_trajectories,
                         fold_index=fold_index,
                         learning_algorithm=learning_algorithm,
-                        internal_iteration=iteration,
+                        internal_iteration=num_used_trajectories,
                     )
 
-                training_data["internal_iterations"][iteration] = [str(p.absolute()) for p in selected_trajectories]
+                training_data["internal_iterations"][num_used_trajectories] = [str(p.absolute()) for p in selected_trajectories]
 
             folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
                 "train": training_data,
@@ -135,12 +135,13 @@ class DistributedKFoldSplit:
             self.logger.info("Loading the folds settings from the configuration file.")
             for index, (fold_name, fold_content) in enumerate(folds_data.items()):
                 for iteration_num, selected_trajectories in fold_content["train"]["internal_iterations"].items():
+                    selected_trajectories_paths = [Path(p) for p in selected_trajectories]
                     for learning_algorithm in self._learning_algorithms:
                         self.logger.debug("Creating fold directories content for each learning algorithm.")
                         train_test_paths.append(
                             self.create_directories_content(
                                 test_set_problems=fold_content["test"],
-                                selected_training_trajectories=selected_trajectories,
+                                selected_training_trajectories=selected_trajectories_paths,
                                 fold_index=index,
                                 learning_algorithm=learning_algorithm,
                                 internal_iteration=iteration_num,
