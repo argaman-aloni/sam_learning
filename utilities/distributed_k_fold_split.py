@@ -104,7 +104,7 @@ class DistributedKFoldSplit:
                         internal_iteration=num_used_trajectories,
                     )
 
-                training_data["internal_iterations"][num_used_trajectories] = [str(p.absolute()) for p in selected_trajectories]
+                training_data["internal_iterations"][int(num_used_trajectories)] = [str(p.absolute()) for p in selected_trajectories]
 
             folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
                 "train": training_data,
@@ -142,7 +142,7 @@ class DistributedKFoldSplit:
                                 selected_training_trajectories=selected_trajectories_paths,
                                 fold_index=index,
                                 learning_algorithm=learning_algorithm,
-                                internal_iteration=iteration_num,
+                                internal_iteration=int(iteration_num),
                             )
                         )
 
