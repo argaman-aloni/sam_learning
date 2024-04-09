@@ -88,8 +88,8 @@ def create_execution_arguments(experiment, fold, compared_version):
 def create_experiment_folders(code_directory, environment_variables, experiment):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
-    internal_iterations = list(range(FIRST_BREAKPOINT)) + list(
-        range(FIRST_BREAKPOINT, parallelization_data["max_index"], parallelization_data["hop"])
+    internal_iterations = list(range(1, FIRST_BREAKPOINT)) + list(
+        range(FIRST_BREAKPOINT, parallelization_data["max_index"] + 1, parallelization_data["hop"])
     )
     print(f"Internal iterations: {internal_iterations}")
     sid = setup_experiments_folds_job(

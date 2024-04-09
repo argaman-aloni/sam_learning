@@ -3,7 +3,7 @@ import logging
 import random
 import shutil
 from pathlib import Path
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Any, Dict
 
 from utilities.k_fold_split import create_test_set_indices, save_fold_settings, FOLDS_LABEL, load_fold_settings
 
@@ -81,7 +81,7 @@ class DistributedKFoldSplit:
 
         return fold_train_dir_path, fold_test_dir_path
 
-    def create_fold_from_scratch(self, folds_data, max_items, trajectory_suffix):
+    def create_fold_from_scratch(self, folds_data: Dict[str, Any], max_items: int, trajectory_suffix: str) -> None:
         trajectory_paths = list(self.working_directory_path.glob(trajectory_suffix))
         problem_paths = [self.working_directory_path / f"{trajectory_file_path.stem}.pddl" for trajectory_file_path in trajectory_paths]
         trajectory_paths.sort()  # sort the trajectories so that the same order is used each time the algorithm runs
