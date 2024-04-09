@@ -7,6 +7,9 @@ from typing import List
 from utilities import DistributedKFoldSplit
 
 
+DEFAULT_EXPERIMENT_SIZE = 100
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Creates the folds directories for the slurm tasks to work on.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
@@ -42,7 +45,7 @@ class FoldsCreator:
         self.k_fold.remove_created_directories()
         self.logger.info("Done removing the old folds directories!")
         self.logger.info("Creating the folds directories.")
-        self.k_fold.create_k_fold()
+        self.k_fold.create_k_fold(max_items=DEFAULT_EXPERIMENT_SIZE)
         self.logger.info("Done creating the folds directories!")
 
 

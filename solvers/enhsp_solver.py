@@ -108,7 +108,8 @@ class ENHSPSolver:
                 str(problem_file_path.absolute()),
                 "-planner",
                 "sat-hmrphj",
-                "-tolerance", f"{tolerance}",
+                "-tolerance",
+                f"{tolerance}",
                 "-sp",
                 str(solution_path.absolute()),
             ]
@@ -124,46 +125,11 @@ class ENHSPSolver:
 
         return solving_stats
 
-    def solve_single_problem(self, problem_file_path: Path, domain_file_path: Path, solving_timeout: int = MAX_RUNNING_TIME) -> Dict[str, str]:
-        """Solves numeric and PDDL+ problems using the ENHSP algorithm, automatically outputs the solution into a file.
-
-        :param problems_directory_path: the path to the problems directory.
-        :param domain_file_path: the path to the domain file.
-        :param solving_timeout: the timeout for the solver.
-        :param tolerance: the numeric tolerance to use.
-        :param problems_prefix: the prefix of the problems to solve.
-        """
-        solving_stats = {}
-        self.logger.info("Starting to solve the input problems using ENHSP solver.")
-        num_retries = 0
-        self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
-        solution_path = problem_file_path.parent / f"{problem_file_path.stem}.solution"
-        running_options = [
-            "-o",
-            str(domain_file_path.absolute()),
-            "-f",
-            str(problem_file_path.absolute()),
-            "-planner",
-            "sat-hmrphj",
-            # "-tolerance", f"{tolerance}",
-            "-sp",
-            str(solution_path.absolute()),
-        ]
-        run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
-        solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
-        while not solver_output_ok and num_retries < 3:
-            solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
-            num_retries += 1
-
-        if not solver_output_ok:
-            # in any other case the value is set correctly.
-            solving_stats[problem_file_path.stem] = "solver_error"
-
-        return solving_stats
-
 
 if __name__ == "__main__":
     args = sys.argv
     logging.basicConfig(format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
     solver = ENHSPSolver()
-    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]), problems_prefix=args[3], solving_timeout=600)
+    solver.execute_solver(
+        problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]), problems_prefix=args[3], solving_timeout=int(args[4])
+    )
