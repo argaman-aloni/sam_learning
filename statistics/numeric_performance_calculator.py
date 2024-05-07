@@ -14,6 +14,7 @@ from statistics.semantic_performance_calculator import SemanticPerformanceCalcul
 from utilities import LearningAlgorithmType
 
 NUMERIC_PERFORMANCE_STATS = [
+    "learning_algorithm",
     "action_name",
     "num_trajectories",
     "precondition_precision",
@@ -84,6 +85,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         effects_mse = self.calculate_effects_performance(learned_domain)
         for action_name in self.model_domain.actions:
             action_stats = {
+                "learning_algorithm": self.learning_algorithm.name,
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
                 "precondition_precision": preconditions_precision[action_name],
