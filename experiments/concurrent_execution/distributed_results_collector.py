@@ -75,7 +75,7 @@ class StatisticsCollector:
         self.logger.info("Collecting the numeric performance statistics from the results directory.")
         combined_statistics_file_path = self.working_directory_path / "results_directory" / "numeric_performance_combined_statistics.csv"
         combined_statistics_data = []
-        file_path_template = "{learning_algorithm}_" + self.domain_file_name.split(".")[0] + "_numeric_learning_performance_stats_fold_{fold}_{iteration}.csv"
+        file_path_template = "{learning_algorithm}_" + self.domain_file_name.split(".")[0] + "_learning_performance_stats_fold_{fold}_{iteration}.csv"
         self._combine_statistics_data(file_path_template, combined_statistics_data)
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *NUMERIC_PERFORMANCE_STATS])

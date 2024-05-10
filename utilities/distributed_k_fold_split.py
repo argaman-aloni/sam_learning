@@ -124,7 +124,6 @@ class DistributedKFoldSplit:
         :return: a generator for the train and test set directories.
         """
         self.logger.info("Starting to create the folds for the cross validation process.")
-        self.logger.info("")
         self.train_set_dir_path.mkdir(exist_ok=True)
         self.test_set_dir_path.mkdir(exist_ok=True)
         folds_data = load_fold_settings(self.working_directory_path)
