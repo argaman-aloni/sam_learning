@@ -227,6 +227,7 @@ class DomainValidator:
         used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None,
         tolerance: float = 0.01,
         timeout: int = 5,
+        learning_time: float = 0
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -235,6 +236,7 @@ class DomainValidator:
         :param used_observations: the observations that were used to learn the domain.
         :param timeout: the timeout for the solver.
         :param tolerance: the numeric tolerance to use.
+        :param learning_time: the time it took to learn the domain (in seconds).
         """
         num_triplets = self._extract_num_triplets(used_observations)
         self.logger.info("Solving the test set problems using the learned domain!")
@@ -284,6 +286,7 @@ class DomainValidator:
                 "learning_algorithm": self.learning_algorithm.name,
                 "num_trajectories": num_trajectories,
                 "num_trajectory_triplets": num_triplets,
+                "learning_time": learning_time,
                 "solver": self._solver_name,
                 **solving_stats,
             }

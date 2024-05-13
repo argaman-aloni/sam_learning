@@ -141,14 +141,18 @@ class OfflineBasicExperimentRunner:
             learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, fold_num)
+            learned_domain_path = self.validate_learned_domain(
+                allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
+            )
 
         self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.semantic_performance_calc.export_semantic_performance(fold_num + 1)
         self.domain_validator.write_statistics(fold_num)
 
-    def _run_classical_solvers_and_validate(self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path) -> None:
+    def _run_classical_solvers_and_validate(
+        self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path, learning_time: float
+    ) -> None:
         self.domain_validator.solver = FFADLSolver()
         self.domain_validator._solver_name = "fast_forward"
         self.domain_validator.validate_domain(
@@ -157,6 +161,7 @@ class OfflineBasicExperimentRunner:
             used_observations=allowed_observations,
             tolerance=DEFAULT_NUMERIC_TOLERANCE,
             timeout=60,
+            learning_time=learning_time,
         )
         self.domain_validator.solver = FastDownwardSolver()
         self.domain_validator._solver_name = "fast_downward"
@@ -166,9 +171,12 @@ class OfflineBasicExperimentRunner:
             used_observations=allowed_observations,
             tolerance=DEFAULT_NUMERIC_TOLERANCE,
             timeout=60,
+            learning_time=learning_time,
         )
 
-    def _run_numeric_solvers_and_validate(self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path) -> None:
+    def _run_numeric_solvers_and_validate(
+        self, allowed_observations: List[Observation], domain_file_path: Path, test_set_dir_path: Path, learning_time: float
+    ) -> None:
         self.domain_validator.solver = MetricFFSolver()
         self.domain_validator._solver_name = "metric_ff"
         self.domain_validator.validate_domain(
@@ -177,6 +185,7 @@ class OfflineBasicExperimentRunner:
             used_observations=allowed_observations,
             tolerance=DEFAULT_NUMERIC_TOLERANCE,
             timeout=60,
+            learning_time=learning_time,
         )
         self.domain_validator.solver = ENHSPSolver()
         self.domain_validator._solver_name = "enhsp"
@@ -186,10 +195,11 @@ class OfflineBasicExperimentRunner:
             used_observations=allowed_observations,
             tolerance=DEFAULT_NUMERIC_TOLERANCE,
             timeout=60,
+            learning_time=learning_time,
         )
 
     def validate_learned_domain(
-        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int,
+        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int, learning_time: float
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
@@ -197,6 +207,7 @@ class OfflineBasicExperimentRunner:
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param fold_number: the number of the fold that is currently running.
+        :param learning_time: the time it took to learn the domain (in seconds).
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
@@ -210,10 +221,10 @@ class OfflineBasicExperimentRunner:
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self._run_numeric_solvers_and_validate(allowed_observations, domain_file_path, test_set_dir_path)
+            self._run_numeric_solvers_and_validate(allowed_observations, domain_file_path, test_set_dir_path, learning_time)
 
         else:
-            self._run_classical_solvers_and_validate(allowed_observations, domain_file_path, test_set_dir_path)
+            self._run_classical_solvers_and_validate(allowed_observations, domain_file_path, test_set_dir_path, learning_time)
 
         return domain_file_path
 

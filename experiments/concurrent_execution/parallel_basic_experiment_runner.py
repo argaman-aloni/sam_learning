@@ -87,7 +87,7 @@ class ParallelExperimentRunner:
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
-    ) -> Tuple[LearnerDomain, Dict[str, str]]:
+    ) -> Tuple[LearnerDomain, Dict[str, Any]]:
         raise NotImplementedError
 
     def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None) -> Path:
@@ -129,7 +129,9 @@ class ParallelExperimentRunner:
             self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
             learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
-            learned_domain_path = self.validate_learned_domain(allowed_observations, learned_model, test_set_dir_path, fold_num)
+            learned_domain_path = self.validate_learned_domain(
+                allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
+            )
             self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
             break
 
@@ -137,7 +139,7 @@ class ParallelExperimentRunner:
         self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
 
     def validate_learned_domain(
-        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int,
+        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int, learning_time: float
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
@@ -145,6 +147,7 @@ class ParallelExperimentRunner:
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param fold_number: the number of the fold that is currently running.
+        :param learning_time: the time it took to learn the domain (in seconds).
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
@@ -166,6 +169,7 @@ class ParallelExperimentRunner:
                 used_observations=allowed_observations,
                 tolerance=DEFAULT_NUMERIC_TOLERANCE,
                 timeout=PLANNER_EXECUTION_TIMEOUT,
+                learning_time=learning_time,
             )
 
             self.domain_validator.solver = ENHSPSolver()
@@ -176,6 +180,7 @@ class ParallelExperimentRunner:
                 used_observations=allowed_observations,
                 tolerance=DEFAULT_NUMERIC_TOLERANCE,
                 timeout=PLANNER_EXECUTION_TIMEOUT,
+                learning_time=learning_time,
             )
 
         return domain_file_path
