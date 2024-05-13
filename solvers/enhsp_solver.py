@@ -108,6 +108,10 @@ class ENHSPSolver:
                 str(problem_file_path.absolute()),
                 "-planner",
                 "sat-hmrphj",
+                "-tolerance",
+                f"{tolerance}",
+                "-gro",
+                "naive",
                 "-sp",
                 str(solution_path.absolute()),
             ]
