@@ -108,12 +108,10 @@ class ENHSPSolver:
                 str(problem_file_path.absolute()),
                 "-planner",
                 "sat-hmrphj",
-                "-tolerance",
-                f"{tolerance}",
                 "-sp",
                 str(solution_path.absolute()),
             ]
-            run_command = f"{str(JAVA)} -jar {'-Xmx16g' if 'SLURM_JOB_ID' in os.environ else ''} {ENHSP_FILE_PATH} {' '.join(running_options)}"               
+            run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
             solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
             while not solver_output_ok and num_retries < 3:
                 solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
