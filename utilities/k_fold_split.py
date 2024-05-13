@@ -59,7 +59,7 @@ def load_fold_settings(workdir_path: Path) -> Dict[str, Dict[str, List[Path]]]:
         config_data = json.load(folds_file)
         for fold_name, fold in config_data.items():
             folds_configurations[fold_name] = {
-                "train": [Path(problem) for problem in fold["train"]],
+                "train": fold["train"],
                 "test": [Path(problem) for problem in fold["test"]]
             }
 
