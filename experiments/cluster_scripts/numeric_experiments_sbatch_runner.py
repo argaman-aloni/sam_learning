@@ -112,8 +112,8 @@ def submit_job_and_validate_execution(
         arguments=arguments,
         environment_variables=environment_variables,
     )
+    time.sleep(20)
     job_exists_command = ["squeue", "--job", f"{sid}"]
-    time.sleep(10)
     try:
         subprocess.check_output(job_exists_command, shell=True).decode()
     except subprocess.CalledProcessError:
