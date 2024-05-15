@@ -1,6 +1,7 @@
 import json
 import pathlib
 import signal
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -98,6 +99,29 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
     return internal_iterations, sid
 
 
+def submit_job_and_validate_execution(
+    code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+):
+    sid = submit_job(
+        conda_env="online_nsam",
+        mem="64G",
+        python_file=f"{code_directory}/{configurations['experiments_script_path']}",
+        jobname=f"{experiment['domain_file_name']}_{fold}_{internal_iteration}_run_experiments",
+        dependency=f"afterok:{fold_creation_sid}",
+        suppress_output=False,
+        arguments=arguments,
+        environment_variables=environment_variables,
+    )
+    job_exists_command = ["squeue", "--job", f"{sid}"]
+    time.sleep(10)
+    try:
+        subprocess.check_output(job_exists_command, shell=True).decode()
+    except subprocess.CalledProcessError:
+        return None
+
+    return sid
+
+
 def main():
     configurations = get_configurations()
     environment_variables = get_environment_variables(configurations)
@@ -106,7 +130,9 @@ def main():
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         internal_iterations, fold_creation_sid = create_experiment_folders(code_directory, environment_variables, experiment)
         experiment_sids = []
-        print(f"Submitted fold datasets folder creation job with the id {fold_creation_sid} for the experiment with domain {experiment['domain_file_name']}\n")
+        print(
+            f"Submitted fold datasets folder creation job with the id {fold_creation_sid} for the experiment with domain {experiment['domain_file_name']}\n"
+        )
         for fold in range(configurations["num_folds"]):
             print(f"Working on fold {fold} of the experiment with domain {experiment['domain_file_name']}\n")
             for version_index, compared_version in enumerate(experiment["compared_versions"]):
@@ -114,20 +140,17 @@ def main():
                 arguments = create_execution_arguments(experiment, fold, compared_version)
                 for internal_iteration in internal_iterations:
                     arguments.append(f"--iteration_number {internal_iteration}")
-                    sid = submit_job(
-                        conda_env="online_nsam",
-                        mem="64G",
-                        python_file=f"{code_directory}/{configurations['experiments_script_path']}",
-                        jobname=f"{experiment['domain_file_name']}_{fold}_{internal_iteration}_run_experiments",
-                        dependency=f"afterok:{fold_creation_sid}",
-                        suppress_output=False,
-                        arguments=arguments,
-                        environment_variables=environment_variables,
+                    sid = submit_job_and_validate_execution(
+                        code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
                     )
+                    while sid is None:
+                        sid = submit_job_and_validate_execution(
+                            code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+                        )
+
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(f"{formatted_date_time} - submitted job with sid {sid}")
-                    time.sleep(5)
                     pathlib.Path("temp.sh").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
