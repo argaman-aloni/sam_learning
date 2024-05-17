@@ -1,6 +1,6 @@
 {
   "environment_variables_file_path": "/sise/home/mordocha/numeric_planning/domains/environment.json",
-  "code_directory_path": "/sise/home/mordocha/code/sam_learning/experiments",
+  "code_directory_path": "/sise/home/mordocha/code/sam_learning/experiments/cluster_scripts",
   "experiments_script_path": "parallel_numeric_experiment_runner.py",
   "num_folds": 5,
   "experiment_configurations": [
@@ -12,159 +12,14 @@
       },
       "compared_versions": [
         3,
-        4,
-        15,
-        17
+        19,
+        15
       ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/sailing/",
-      "domain_file_name": "sailing_domain.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/sailing/sailing_fluents_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 75,
-        "hop": 5
-      },
-      "compared_versions": [
-        3,
-        4,
-        15,
-        17
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/counters/",
+      "working_directory_path": "/sise/home/mordocha/numeric_planning/new_nsam_domains/counters/",
       "domain_file_name": "counters_domain.pddl",
       "solver_type": 3,
       "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/counters/counters_fluents_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 75,
-        "hop": 5
-      },
-      "compared_versions": [
-        3,
-        4,
-        15,
-        17
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/depot/",
-      "domain_file_name": "depot_numeric.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/depot/depot_fluents_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 75,
-        "hop": 5
-      },
-      "compared_versions": [
-        3,
-        4,
-        15,
-        17
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/driverlog_linear/",
-      "domain_file_name": "driverlogNumeric.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/driverlog_linear/driverlog_fluents_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 75,
-        "hop": 5
-      },
-      "compared_versions": [
-        6,
-        14,
-        16,
-        18
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/driverlog_polynomial/",
-      "domain_file_name": "driverlogHardNumeric.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/driverlog_polynomial/driverlog_fluents_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 75,
-        "hop": 5
-      },
-      "compared_versions": [
-        3,
-        4,
-        15,
-        17
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/farmland/",
-      "domain_file_name": "farmland.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/farmland/farmland_fluents_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 75,
-        "hop": 5
-      },
-      "compared_versions": [
-        3,
-        4,
-        15,
-        17
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/rovers_linear/",
-      "domain_file_name": "NumRover.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/rovers_linear/rovers_fluent_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 45,
-        "hop": 5
-      },
-      "compared_versions": [
-        3,
-        4,
-        15,
-        17
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/satellite_linear/",
-      "domain_file_name": "metricSat.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/satellite_linear/satellite_fluents_map.json"
-    },
-    {
-      "parallelization_data": {
-        "min_index": 0,
-        "max_index": 75,
-        "hop": 5
-      },
-      "compared_versions": [
-        6,
-        14,
-        16,
-        18
-      ],
-      "working_directory_path": "/sise/home/mordocha/numeric_planning/domains/zenotravel/",
-      "domain_file_name": "zenonumeric.pddl",
-      "solver_type": 3,
-      "problems_prefix": "pfile",
-      "fluents_map_path": "/sise/home/mordocha/numeric_planning/domains/zenotravel/zenotravel_fluents_map.json"
+      "polynom_degree": 0
     }
   ]
 }
