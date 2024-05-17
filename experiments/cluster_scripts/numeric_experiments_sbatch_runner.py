@@ -112,7 +112,7 @@ def submit_job_and_validate_execution(
         arguments=arguments,
         environment_variables=environment_variables,
     )
-    time.sleep(20)
+    time.sleep(5)
     job_exists_command = ["squeue", "--job", f"{sid}"]
     try:
         subprocess.check_output(job_exists_command, shell=True).decode()
