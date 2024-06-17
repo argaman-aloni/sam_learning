@@ -71,7 +71,7 @@ Next we provide some information on the external tools and their installation pr
 The SAM-Learning framework is designed to be used in a wide range of scenarios.
 We divide the usage of the framework into two main categories:
 * Lifted discrete action models.
-* Continuous action models.
+* Continuous action models [here](documentation/numeric-sam.md).
 * Multi-Agent action models (learned as a combined model) [here](documentation/ma-sam.md).
 * Models containing conditional and universal effects.
 
