@@ -1,5 +1,6 @@
 import pathlib
 import signal
+import string
 import subprocess
 
 
@@ -35,62 +36,27 @@ def submit_job(
     arguments=None,
     environment_variables=None,
 ):
-    with open("temp.sh", "w+", newline="\n") as f:
-        f.write("#!/bin/bash\n")
+    with open("template.sbatch", "rt", newline="\n") as template_file:
+        text = template_file.read()
+        sbatch_template = string.Template(text)
 
-        f.write("#SBATCH --partition main\n")
+    # Complete the template code with the correct values
+    template_mapping = {
+        "job_name": jobname if jobname else "job",
+        "cpus_per_task": cpus_per_task if cpus_per_task else 1,
+        "dependency_exists": "#" if not dependency else "",
+        "dependency": dependency or "",
+        "mem": mem or "8G",
+        "conda_env": conda_env or "online_nsam",
+        "script": python_file,
+        "arguments": " ".join(arguments) if arguments else "",
+        "environment_variables": "\n".join([f"export {env_variable}={value}" for env_variable, value in environment_variables.items()]) if environment_variables else "",
+    }
 
-        if runtime:
-            f.write(f"#SBATCH --time {runtime}\n")
-        else:
-            f.write("#SBATCH --time 7-00:00:00\n")
+    sbatch_code = sbatch_template.substitute(template_mapping)
 
-        if jobname:
-            f.write(f"#SBATCH --job-name {jobname}\n")
+    with open("template.sbatch", "w+", newline="\n") as output_file:
+        output_file.write(sbatch_code)
 
-        if cpus_per_task:
-            f.write(f"#SBATCH --cpus-per-task={cpus_per_task}\n")
-        else:
-            f.write("#SBATCH --cpus-per-task=1\n")
-
-        if dependency:
-            f.write(f"#SBATCH --dependency={dependency}")
-
-        if mem:
-            f.write(f"#SBATCH --mem={mem}")
-
-        if suppress_output:
-            f.write("#SBATCH --output /dev/null\n")
-        else:
-            if output_file:
-                f.write(f"#SBATCH --output {output_file}\n")
-
-        if suppress_error:
-            f.write("#SBATCH --error /dev/null\n")
-        else:
-            if error_file:
-                f.write(f"#SBATCH --error {error_file}\n")
-
-        f.write("\n\n")
-
-        f.write("echo `date`\n")
-        f.write('echo -e "\\nSLURM_JOBID:\\t\\t" $SLURM_JOBID\n')
-        f.write('echo -e "SLURM_JOB_NODELIST:\\t" $SLURM_JOB_NODELIST "\\n"\n')
-
-        f.write("\n\n")
-
-        # setting up environment variables
-        if environment_variables:
-            for env_variable, value in environment_variables.items():
-                f.write(f"export {env_variable}={value}\n")
-
-        f.write("\n\n")
-
-        if conda_env:
-            f.write("module load anaconda\n")
-            f.write(f"source activate {conda_env}\n")
-
-        f.write(f"python {python_file} {' '.join(arguments)}\n")
-
-    data = subprocess.check_output(["sbatch", "temp.sh", "--parsable"]).decode()
+    data = subprocess.check_output(["sbatch", "template.sbatch", "--parsable"]).decode()
     return int(data.split()[-1])
