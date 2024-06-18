@@ -62,8 +62,8 @@ def submit_job(
 
     sbatch_code = sbatch_template.substitute(template_mapping)
 
-    with open("template.sbatch", "w+", newline="\n") as output_file:
+    with open("temp.sbatch", "w+", newline="\n") as output_file:
         output_file.write(sbatch_code)
 
-    data = subprocess.check_output(["sbatch", "template.sbatch", "--parsable"]).decode()
+    data = subprocess.check_output(["sbatch", "temp.sbatch", "--parsable"]).decode()
     return int(data.split()[-1])
