@@ -2,7 +2,7 @@ import pathlib
 import signal
 import string
 import subprocess
-
+import time
 
 JOB_ID_MESSAGE = 'echo -e "\\nSLURM_JOBID:\\t\\t" $SLURM_JOBID'
 JOB_NODELIST_MESSAGE = 'echo -e "SLURM_JOB_NODELIST:\\t" $SLURM_JOB_NODELIST "\\n\\n"'
@@ -66,4 +66,5 @@ def submit_job(
         output_file.write(sbatch_code)
 
     data = subprocess.check_output(["sbatch", "temp.sbatch", "--parsable"]).decode()
+    time.sleep(1)
     return int(data.split()[-1])
