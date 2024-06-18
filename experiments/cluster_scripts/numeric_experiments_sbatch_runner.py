@@ -33,8 +33,8 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
     )
     print(f"Submitted job with sid {fold_creation_sid}\n")
     time.sleep(1)
-    print("Removing the temp.sh file")
-    pathlib.Path("temp.sh").unlink()
+    print("Removing the temp.sbatch file")
+    pathlib.Path("temp.sbatch").unlink()
     return fold_creation_sid
 
 

@@ -29,8 +29,6 @@ ${environment_variables}
 module load anaconda				### load anaconda module (must be present when working with conda environments)
 source activate ${conda_env}				### activate a conda environment, replace my_env with your conda environment
 python ${script}	${arguments}			### this command executes python script – replace with your own command
-#jupyter lab					### this command executes jupyter lab – replace with your own command
-#python tf.py
 
 
 
