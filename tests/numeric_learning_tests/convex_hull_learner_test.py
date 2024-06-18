@@ -96,8 +96,8 @@ def test_construct_single_dimension_inequalities_with_input_dataframe_of_size_on
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 2
     inequalities = [op.to_pddl() for op in inequality_precondition.operands]
-    assert "(>= (x ) 2.0)" in inequalities
-    assert "(<= (x ) 18.0)" in inequalities
+    assert "(>= (x ) 2.00)" in inequalities
+    assert "(<= (x ) 18.00)" in inequalities
 
 
 def test_construct_single_dimension_inequalities_with_input_lower_bound_equal_to_upper_bound_returns_correct_condition(
@@ -109,7 +109,7 @@ def test_construct_single_dimension_inequalities_with_input_lower_bound_equal_to
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 1
     equality = inequality_precondition.operands.pop()
-    assert "(= (x ) 2.0)" == equality.to_pddl()
+    assert "(= (x ) 2.00)" == equality.to_pddl()
 
 
 def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_creates_a_single_condition(convex_hull_learner: ConvexHullLearner,):
@@ -118,9 +118,9 @@ def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_cr
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 3
     assert {op.to_pddl() for op in inequality_precondition.operands} == {
-        "(= (x ) 2.0)",
-        "(= (y ) 3.0)",
-        "(= (z ) -1.0)",
+        "(= (x ) 2.00)",
+        "(= (y ) 3.00)",
+        "(= (z ) -1.00)",
     }
 
 
