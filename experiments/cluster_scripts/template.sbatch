@@ -21,8 +21,7 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 
 ### Print some data to output file ###
 echo `date`
-echo -e "\nSLURM_JOBID:\t\t" $SLURM_JOBID
-echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
+${job_info_print}
 
 ${environment_variables}
 

@@ -4,6 +4,9 @@ import string
 import subprocess
 
 
+JOB_ID_MESSAGE = 'echo -e "\nSLURM_JOBID:\t\t" $SLURM_JOBID'
+JOB_NODELIST_MESSAGE = 'echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"'
+
 def sigint_handler(sig_num, frame):
     signal.signal(signal.SIGINT, sigint_handler)
     print("\nCtrl-C pressed. Do you want to quit? (y/n): ", end="")
@@ -51,6 +54,7 @@ def submit_job(
         "script": python_file,
         "arguments": " ".join(arguments) if arguments else "",
         "environment_variables": "\n".join([f"export {env_variable}={value}" for env_variable, value in environment_variables.items()]) if environment_variables else "",
+        "job_info_print": JOB_ID_MESSAGE + "\n" + JOB_NODELIST_MESSAGE
     }
 
     sbatch_code = sbatch_template.substitute(template_mapping)
