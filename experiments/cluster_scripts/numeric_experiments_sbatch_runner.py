@@ -151,7 +151,7 @@ def main():
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(f"{formatted_date_time} - submitted job with sid {sid}")
-                    pathlib.Path("template.sbatch").unlink()
+                    pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
 
