@@ -36,7 +36,7 @@ def submit_job(
     arguments=None,
     environment_variables=None,
 ):
-    with open("template.sbatch", "rt", newline="\n") as template_file:
+    with open("experiments/cluster_scripts/template.sbatch", "rt", newline="\n") as template_file:
         text = template_file.read()
         sbatch_template = string.Template(text)
 
