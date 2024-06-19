@@ -109,7 +109,9 @@ def validate_job_running(sid):
     return sid
 
 
-def submit_job_and_validate_execution(code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None):
+def submit_job_and_validate_execution(
+    code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None
+):
     job_name = f"{experiment['domain_file_name']}_runner"
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
@@ -124,6 +126,7 @@ def submit_job_and_validate_execution(code_directory, configurations, experiment
     )
     time.sleep(5)
     return validate_job_running(sid)
+
 
 
 def main():
@@ -148,6 +151,10 @@ def main():
                     sid = submit_job_and_validate_execution(
                         code_directory, configurations, experiment, fold, arguments, environment_variables, dependency_sid
                     )
+                    while sid is None:
+                        sid = submit_job_and_validate_execution(
+                            code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+                        )
 
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
