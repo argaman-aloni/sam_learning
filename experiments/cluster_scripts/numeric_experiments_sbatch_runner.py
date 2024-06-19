@@ -100,14 +100,16 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
 
 
 def submit_job_and_validate_execution(
-    code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+    code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid
 ):
+    job_name = f"{experiment['domain_file_name']}_runner"
+    dependency_argument = f"singleton --job-name={job_name}" if fold > 1 else f"afterok:{fold_creation_sid}"
     sid = submit_job(
         conda_env="online_nsam",
         mem="64G",
         python_file=f"{code_directory}/{configurations['experiments_script_path']}",
-        jobname=f"{experiment['domain_file_name']}_{fold}_{internal_iteration}_run_experiments",
-        dependency=f"afterok:{fold_creation_sid}",
+        jobname=job_name,
+        dependency=dependency_argument,
         suppress_output=False,
         arguments=arguments,
         environment_variables=environment_variables,
@@ -141,11 +143,11 @@ def main():
                 for internal_iteration in internal_iterations:
                     arguments.append(f"--iteration_number {internal_iteration}")
                     sid = submit_job_and_validate_execution(
-                        code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+                        code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid
                     )
                     while sid is None:
                         sid = submit_job_and_validate_execution(
-                            code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+                            code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid
                         )
 
                     experiment_sids.append(sid)
