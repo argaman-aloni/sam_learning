@@ -33,8 +33,8 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
     )
     print(f"Submitted job with sid {fold_creation_sid}\n")
     time.sleep(1)
-    print("Removing the temp.sh file")
-    pathlib.Path("temp.sh").unlink()
+    print("Removing the temp.sbatch file")
+    pathlib.Path("temp.sbatch").unlink()
     return fold_creation_sid
 
 
@@ -58,8 +58,8 @@ def execute_statistics_collection_job(code_directory, configuration, environment
     )
     print(f"Submitted job with sid {statistics_collection_job}\n")
     time.sleep(1)
-    print("Removing the temp.sh for the statistics collection file")
-    pathlib.Path("temp.sh").unlink()
+    print("Removing the temp.sbatch for the statistics collection file")
+    pathlib.Path("temp.sbatch").unlink()
 
 
 def get_configurations():
@@ -99,20 +99,7 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
     return internal_iterations, sid
 
 
-def submit_job_and_validate_execution(
-    code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
-):
-    sid = submit_job(
-        conda_env="online_nsam",
-        mem="64G",
-        python_file=f"{code_directory}/{configurations['experiments_script_path']}",
-        jobname=f"{experiment['domain_file_name']}_{fold}_{internal_iteration}_run_experiments",
-        dependency=f"afterok:{fold_creation_sid}",
-        suppress_output=False,
-        arguments=arguments,
-        environment_variables=environment_variables,
-    )
-    time.sleep(5)
+def validate_job_running(sid):
     job_exists_command = ["squeue", "--job", f"{sid}"]
     try:
         subprocess.check_output(job_exists_command, shell=True).decode()
@@ -120,6 +107,26 @@ def submit_job_and_validate_execution(
         return None
 
     return sid
+
+
+def submit_job_and_validate_execution(
+    code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None
+):
+    job_name = f"{experiment['domain_file_name']}_{fold}_runner"
+    dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
+    sid = submit_job(
+        conda_env="online_nsam",
+        mem="64G",
+        python_file=f"{code_directory}/{configurations['experiments_script_path']}",
+        jobname=job_name,
+        dependency=dependency_argument,
+        suppress_output=False,
+        arguments=arguments,
+        environment_variables=environment_variables,
+    )
+    time.sleep(2)
+    return validate_job_running(sid)
+
 
 
 def main():
@@ -140,8 +147,9 @@ def main():
                 arguments = create_execution_arguments(experiment, fold, compared_version)
                 for internal_iteration in internal_iterations:
                     arguments.append(f"--iteration_number {internal_iteration}")
+                    dependency_sid = None if validate_job_running(fold_creation_sid) is None else fold_creation_sid
                     sid = submit_job_and_validate_execution(
-                        code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+                        code_directory, configurations, experiment, fold, arguments, environment_variables, dependency_sid
                     )
                     while sid is None:
                         sid = submit_job_and_validate_execution(
@@ -151,11 +159,11 @@ def main():
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(f"{formatted_date_time} - submitted job with sid {sid}")
-                    pathlib.Path("temp.sh").unlink()
+                    pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
 
-            time.sleep(60)
+            time.sleep(5)
 
         print("Finished building the experiment folds!")
         execute_statistics_collection_job(
