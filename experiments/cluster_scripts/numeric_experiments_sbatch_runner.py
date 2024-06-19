@@ -112,7 +112,7 @@ def validate_job_running(sid):
 def submit_job_and_validate_execution(
     code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None
 ):
-    job_name = f"{experiment['domain_file_name']}_runner"
+    job_name = f"{experiment['domain_file_name']}_{fold}_runner"
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
         conda_env="online_nsam",
@@ -124,7 +124,7 @@ def submit_job_and_validate_execution(
         arguments=arguments,
         environment_variables=environment_variables,
     )
-    time.sleep(5)
+    time.sleep(2)
     return validate_job_running(sid)
 
 
@@ -163,7 +163,7 @@ def main():
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
 
-            time.sleep(60)
+            time.sleep(5)
 
         print("Finished building the experiment folds!")
         execute_statistics_collection_job(
