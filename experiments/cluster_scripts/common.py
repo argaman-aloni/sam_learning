@@ -13,8 +13,8 @@ def sigint_handler(sig_num, frame):
     print("\nCtrl-C pressed. Do you want to quit? (y/n): ", end="")
     response = input().strip().lower()
     if response in ["y", "yes"]:
-        print("Deleting temp.sh file.")
-        pathlib.Path("temp.sh").unlink()
+        print("Deleting temp.sbatch file.")
+        pathlib.Path("temp.sbatch").unlink()
         exit(0)
 
 

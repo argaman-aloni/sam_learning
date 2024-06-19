@@ -99,11 +99,19 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
     return internal_iterations, sid
 
 
-def submit_job_and_validate_execution(
-    code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid
-):
+def validate_job_running(sid):
+    job_exists_command = ["squeue", "--job", f"{sid}"]
+    try:
+        subprocess.check_output(job_exists_command, shell=True).decode()
+    except subprocess.CalledProcessError:
+        return None
+
+    return sid
+
+
+def submit_job_and_validate_execution(code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None):
     job_name = f"{experiment['domain_file_name']}_runner"
-    dependency_argument = f"singleton --job-name={job_name}" if fold > 1 else f"afterok:{fold_creation_sid}"
+    dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
         conda_env="online_nsam",
         mem="64G",
@@ -115,13 +123,7 @@ def submit_job_and_validate_execution(
         environment_variables=environment_variables,
     )
     time.sleep(5)
-    job_exists_command = ["squeue", "--job", f"{sid}"]
-    try:
-        subprocess.check_output(job_exists_command, shell=True).decode()
-    except subprocess.CalledProcessError:
-        return None
-
-    return sid
+    return validate_job_running(sid)
 
 
 def main():
@@ -142,13 +144,10 @@ def main():
                 arguments = create_execution_arguments(experiment, fold, compared_version)
                 for internal_iteration in internal_iterations:
                     arguments.append(f"--iteration_number {internal_iteration}")
+                    dependency_sid = None if validate_job_running(fold_creation_sid) is None else fold_creation_sid
                     sid = submit_job_and_validate_execution(
-                        code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid
+                        code_directory, configurations, experiment, fold, arguments, environment_variables, dependency_sid
                     )
-                    while sid is None:
-                        sid = submit_job_and_validate_execution(
-                            code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid
-                        )
 
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
