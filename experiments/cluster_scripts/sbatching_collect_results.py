@@ -28,8 +28,8 @@ def execute_statistics_collection_job(code_directory, configuration, environment
     )
     print(f"Submitted job with sid {statistics_collection_job}\n")
     time.sleep(1)
-    print("Removing the temp.sh for the statistics collection file")
-    pathlib.Path("temp.sh").unlink()
+    print("Removing the temp.sbatch for the statistics collection file")
+    pathlib.Path("temp.sbatch").unlink()
 
 
 def main():

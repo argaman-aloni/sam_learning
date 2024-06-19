@@ -25,8 +25,8 @@ def execute_experiment_setup_batch(code_directory, configuration, environment_va
     print(f"Submitted job with sid {fold_creation_sid}\n")
     progress_bar(experiment_index * configuration["num_folds"] + 1, total_run_time)
     time.sleep(1)
-    print("Removing the temp.sh file")
-    pathlib.Path("temp.sh").unlink()
+    print("Removing the temp.sbatch file")
+    pathlib.Path("temp.sbatch").unlink()
     return fold_creation_sid
 
 
