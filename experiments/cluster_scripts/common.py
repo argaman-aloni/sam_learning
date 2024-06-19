@@ -25,6 +25,15 @@ def progress_bar(progress, total):
     print(f"\r|{bar}| {percent:.2f}%", end="\r")
 
 
+def write_sbatch_and_submit_job(sbatch_code: str):
+    with open("temp.sbatch", "w+", newline="\n") as output_file:
+        output_file.write(sbatch_code)
+
+    data = subprocess.check_output(["sbatch", "temp.sbatch", "--parsable"]).decode()
+    time.sleep(1)
+    return int(data.split()[-1])
+
+
 def submit_job(
     dependency=None,
     mem=None,
@@ -61,10 +70,12 @@ def submit_job(
     }
 
     sbatch_code = sbatch_template.substitute(template_mapping)
+    try:
+        return write_sbatch_and_submit_job(sbatch_code)
 
-    with open("temp.sbatch", "w+", newline="\n") as output_file:
-        output_file.write(sbatch_code)
+    except subprocess.CalledProcessError as e:
+        template_mapping["dependency_exists"] = "#"  # Remove the dependency if it exists
+        template_mapping["dependency"] = ""  # Remove the dependency if it exists
+        sbatch_code = sbatch_template.substitute(template_mapping)
+        return write_sbatch_and_submit_job(sbatch_code)
 
-    data = subprocess.check_output(["sbatch", "temp.sbatch", "--parsable"]).decode()
-    time.sleep(1)
-    return int(data.split()[-1])
