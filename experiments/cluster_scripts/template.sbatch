@@ -15,7 +15,7 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 
 # Note: the following 4 lines are commented out
 ##SBATCH --mail-type=ALL			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
-#SBATCH --mem=${mem}				### ammount of RAM memory, allocating more than 60G requires IT team's permission
+#SBATCH --mem=${mem}				### amount of RAM memory, allocating more than 60G requires IT team's permission
 
 ################  Following lines will be executed by a compute node    #######################
 
