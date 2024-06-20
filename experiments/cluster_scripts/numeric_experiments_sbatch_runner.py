@@ -103,7 +103,7 @@ def validate_job_running(sid):
     job_exists_command = ["squeue", "--job", f"{sid}"]
     try:
         result = subprocess.check_output(job_exists_command, shell=True).decode()
-        if sid in result:
+        if str(sid) in result:
             return sid
 
         return None
