@@ -10,8 +10,8 @@
 #SBATCH --job-name ${job_name}				### name of the job
 #SBATCH --cpus-per-task=${cpus_per_task}
 #SBATCH --output slurm-%J.out			### output log for running job - %J for job number
+#SBATCH --error slurm-error-%J.out			### output log for running job - %J for job number
 ${dependency_exists}#SBATCH --dependency=${dependency}
-#SBATCH --error /dev/null
 
 # Note: the following 4 lines are commented out
 ##SBATCH --mail-type=ALL			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
