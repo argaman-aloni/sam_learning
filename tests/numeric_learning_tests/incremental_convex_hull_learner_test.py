@@ -233,9 +233,9 @@ def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_cr
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 3
     assert {op.to_pddl() for op in inequality_precondition.operands} == {
-        "(= (x ) 2.0)",
-        "(= (y ) 3.0)",
-        "(= (z ) -1.0)",
+        "(= (x ) 2)",
+        "(= (y ) 3)",
+        "(= (z ) -1)",
     }
 
 
@@ -321,7 +321,7 @@ def test_construct_convex_hull_inequalities_when_adding_multiple_points_with_sin
         precondition = convex_hull_learner.construct_convex_hull_inequalities()
         assert precondition.binary_operator == "and"
         assert len(precondition.operands) == 2
-        assert {op.to_pddl() for op in precondition.operands} == {"(>= (x ) 0.00)", "(<= (x ) 9.00)"}
+        assert {op.to_pddl() for op in precondition.operands} == {"(>= (x ) 0)", "(<= (x ) 9)"}
 
     except Exception as e:
         pytest.fail(f"Exception was raised: {e}")

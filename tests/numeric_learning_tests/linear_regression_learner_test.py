@@ -347,7 +347,7 @@ def test_construct_assignment_equations_with_polynomial_degree_one_returns_corre
     assert learned_correctly
     assert len(numeric_effects) == 1
     effect = numeric_effects.pop()
-    assert effect.to_pddl() == "(increase (x ) (+ (x ) (+ (* (y ) 3.0) (+ (* (z ) 4.0) 5.0))))"
+    assert effect.to_pddl() == "(increase (x ) (+ (x ) (+ (* (y ) 3) (+ (* (z ) 4) 5))))"
 
 
 def test_construct_assignment_equations_with_polynomial_degree_one_returns_correct_equations_when_polynom_degree_is_also_one(
@@ -381,7 +381,7 @@ def test_construct_assignment_equations_with_polynomial_degree_one_returns_corre
     assert learned_correctly
     assert len(numeric_effects) == 1
     effect = numeric_effects.pop()
-    assert effect.to_pddl() == "(increase (x ) (+ (x ) (+ (* (z ) 4.0) (+ (* (* (x ) (y )) 3.0) 5.0))))"
+    assert effect.to_pddl() == "(increase (x ) (+ (x ) (+ (* (z ) 4) (+ (* (* (x ) (y )) 3) 5))))"
 
 
 def test_construct_assignment_equations_with_polynomial_degree_one_returns_correct_equations_when_polynom_degree_is_also_one_and_calculating_multiple_different_equations(
@@ -415,9 +415,9 @@ def test_construct_assignment_equations_with_polynomial_degree_one_returns_corre
     assert learned_correctly
     assert len(numeric_effects) == 3
     expected_effects = {
-        "(increase (x ) (+ (x ) (+ (* (z ) 4.0) (+ (* (* (x ) (y )) 3.0) 5.0))))",
-        "(increase (z ) (+ (* (x ) 8.0) (+ (* (y ) 3.0) (+ (* (z ) 3.0) 19.0))))",
-        "(increase (y ) (+ (* (x ) (y )) 1.0))",
+        "(increase (x ) (+ (x ) (+ (* (z ) 4) (+ (* (* (x ) (y )) 3) 5))))",
+        "(increase (z ) (+ (* (x ) 8) (+ (* (y ) 3) (+ (* (z ) 3) 19))))",
+        "(increase (y ) (+ (* (x ) (y )) 1))",
     }
     for effect in numeric_effects:
         assert effect.to_pddl() in expected_effects
@@ -454,9 +454,9 @@ def test_construct_assignment_equations_with_polynomial_degree_one_returns_corre
     assert learned_correctly
     assert len(numeric_effects) == 3
     expected_effects = {
-        "(increase (x ) (+ (x ) (+ (* (z ) 4.0) (+ (* (* (x ) (y )) 3.0) 5.0))))",
-        "(assign (z ) 1.0)",
-        "(increase (y ) (+ (* (x ) (y )) 1.0))",
+        "(increase (x ) (+ (x ) (+ (* (z ) 4) (+ (* (* (x ) (y )) 3) 5))))",
+        "(assign (z ) 1)",
+        "(increase (y ) (+ (* (x ) (y )) 1))",
     }
     for effect in numeric_effects:
         assert effect.to_pddl() in expected_effects
