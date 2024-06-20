@@ -102,12 +102,14 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
 def validate_job_running(sid):
     job_exists_command = ["squeue", "--job", f"{sid}"]
     try:
-        subprocess.check_output(job_exists_command, shell=True).decode()
-    except subprocess.CalledProcessError:
+        result = subprocess.check_output(job_exists_command, shell=True).decode()
+        if sid in result:
+            return sid
+
         return None
 
-    return sid
-
+    except subprocess.CalledProcessError:
+        return None
 
 def submit_job_and_validate_execution(
     code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None
