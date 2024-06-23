@@ -170,9 +170,12 @@ def main():
                 arguments = create_execution_arguments(experiment, fold, compared_version)
                 for internal_iteration in internal_iterations:
                     arguments.append(f"--iteration_number {internal_iteration}")
-                    sid = submit_job_and_validate_execution(
-                        code_directory, configurations, experiment, fold, arguments, environment_variables, None
-                    )
+                    sid = None
+                    while sid is None:
+                        sid = submit_job_and_validate_execution(
+                            code_directory, configurations, experiment, fold, arguments, environment_variables, None
+                        )
+                        
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(f"{formatted_date_time} - submitted job with sid {sid} for fold {fold} and iteration {internal_iteration}.")
