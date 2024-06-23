@@ -111,9 +111,8 @@ def validate_job_running(sid):
     except subprocess.CalledProcessError:
         return None
 
-def submit_job_and_validate_execution(
-    code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None
-):
+
+def submit_job_and_validate_execution(code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None):
     job_name = f"{experiment['domain_file_name']}_{fold}_runner"
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
@@ -130,14 +129,12 @@ def submit_job_and_validate_execution(
     return validate_job_running(sid)
 
 
-
 def create_all_experiments_folders(code_directory, environment_variables, configurations):
     print("Creating the directories containing the folds datasets for the experiments.")
     jobs_sids = []
     output_internal_iterations = []
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
-        internal_iterations, fold_creation_sid = create_experiment_folders(
-            code_directory, environment_variables, experiment)
+        internal_iterations, fold_creation_sid = create_experiment_folders(code_directory, environment_variables, experiment)
         jobs_sids.append(fold_creation_sid)
         output_internal_iterations.append(internal_iterations)
         print(
@@ -150,8 +147,6 @@ def create_all_experiments_folders(code_directory, environment_variables, config
 
     print("Finished building the experiment folds!")
     return output_internal_iterations
-
-
 
 
 def main():
@@ -175,7 +170,7 @@ def main():
                         sid = submit_job_and_validate_execution(
                             code_directory, configurations, experiment, fold, arguments, environment_variables, None
                         )
-                        
+
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(f"{formatted_date_time} - submitted job with sid {sid} for fold {fold} and iteration {internal_iteration}.")

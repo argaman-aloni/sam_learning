@@ -186,13 +186,15 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             self.logger.debug("The base is not yet learned since didn't receive enough points.")
             raise ValueError()
 
-        if len(self._gsp_base) == self.data.shape[1]:
-            self.logger.debug("The points are spanning the original space and the basis is full rank.")
-            coefficients, border_point = self._create_ch_coefficients_data(display_mode)
-            return coefficients, border_point, self.data.columns.tolist(), []
-
         points = self.data.to_numpy()
         shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
+
+        if len(self._gsp_base) == self.data.shape[1]:
+            self.logger.debug("The points are spanning the original space and the basis is full rank.")
+            transformed_vars = construct_projected_variable_strings(self.data.columns.tolist(), shift_axis, self._gsp_base)
+            coefficients, border_point = self._create_ch_coefficients_data(display_mode)
+            return coefficients, border_point, transformed_vars, []
+
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
 
         if self._convex_hull is None:
