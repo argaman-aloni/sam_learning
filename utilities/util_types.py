@@ -13,7 +13,6 @@ class LearningAlgorithmType(Enum):
     conditional_sam = 9
     universal_sam = 10
     online_nsam = 13
-    raw_polynomial_nsam = 14
     incremental_nsam = 19
 
     # learning algorithms relating to fault repair not to be used for POL
@@ -25,6 +24,7 @@ class LearningAlgorithmType(Enum):
     naive_polysam = 16
     raw_naive_nsam = 17
     raw_naive_polysam = 18
+    raw_polynomial_nsam = 14
 
 
 class SolverType(Enum):

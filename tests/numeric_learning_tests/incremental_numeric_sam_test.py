@@ -15,7 +15,7 @@ from tests.consts import (
     MINECRAFT_SMALL_TRAJECTORY_PATH,
     COUNTERS_POLYNOMIAL_DOMAIN_PATH,
     COUNTERS_POLYNOMIAL_PROBLEMS_PATH,
-    EXAMPLES_DIR_PATH,
+    EXAMPLES_DIR_PATH, FARMLAND_DOMAIN_PATH, FARMLAND_TRAJECTORIES_DIRECTORY,
 )
 
 
@@ -32,6 +32,12 @@ def satellite_observation_problematic(satellite_numeric_domain: Domain, satellit
 @fixture()
 def minecraft_medium_domain() -> Domain:
     return DomainParser(MINECRAFT_MEDIUM_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+
+@fixture()
+def farmland_domain() -> Domain:
+    return DomainParser(FARMLAND_DOMAIN_PATH, partial_parsing=True).parse_domain()
 
 
 @fixture()
@@ -95,6 +101,12 @@ def counters_poly_nsam(counters_poly_domain: Domain) -> IncrementalNumericSAMLea
     nsam._initialize_fluents_learners()
     return nsam
 
+
+@fixture()
+def farmland_nsam(farmland_domain: Domain) -> IncrementalNumericSAMLearner:
+    nsam = IncrementalNumericSAMLearner(farmland_domain, polynomial_degree=0)
+    nsam._initialize_fluents_learners()
+    return nsam
 
 def test_add_new_action_adds_sets_the_dataset_with_new_observation_for_the_previous_state(
     depot_nsam: IncrementalNumericSAMLearner, depot_observation: Observation
@@ -292,6 +304,28 @@ def test_learn_action_model_with_counters_poly_domain_enables_learning_polynomia
         learned_model, learning_metadata = counters_poly_nsam.learn_action_model(observations)
         print()
         print(learning_metadata)
+        print(learned_model.to_pddl())
+
+    except Exception:
+        pytest.fail()
+
+
+def test_learn_action_model_when_learning_farmland_domain_from_large_number_of_samples_returns_correct_domain_with_condition_shifted_according_to_the_first_sample(
+    farmland_nsam: IncrementalNumericSAMLearner, farmland_domain: Domain
+):
+    observations = []
+    for problem_path in FARMLAND_TRAJECTORIES_DIRECTORY.glob("*.pddl"):
+        trajectory_path = FARMLAND_TRAJECTORIES_DIRECTORY / f"{problem_path.stem}.trajectory"
+        problem = ProblemParser(problem_path, farmland_domain).parse_problem()
+        observation = TrajectoryParser(farmland_domain, problem).parse_trajectory(trajectory_path)
+        observations.append(observation)
+
+    try:
+        learned_model, learning_metadata = farmland_nsam.learn_action_model(observations)
+        farmland_move_slow_action = learned_model.actions["move-slow"]
+        move_slow_schema = farmland_move_slow_action.to_pddl()
+        assert '(<= (+ 1 (* -1 (x ?f1))) 0)' in move_slow_schema
+        print()
         print(learned_model.to_pddl())
 
     except Exception:
