@@ -19,7 +19,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
-        mem="6G",
+        mem="4G",
         python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
         suppress_output=False,
@@ -42,7 +42,7 @@ def execute_statistics_collection_job(code_directory, configuration, environment
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
     statistics_collection_job = submit_job(
         conda_env="online_nsam",
-        mem="6G",
+        mem="4G",
         python_file=f"{code_directory}/distributed_results_collector.py",
         dependency=f"afterok:{':'.join([str(e) for e in job_ids])}",
         jobname=f"collect_statistics_{experiment['domain_file_name']}",
