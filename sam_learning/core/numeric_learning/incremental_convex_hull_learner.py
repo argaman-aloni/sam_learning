@@ -144,7 +144,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                     return
 
                 except QhullError:
-                    print("Failed to add a new point to the convex hull.")
+                    self.logger.debug(f"Failed to add a new point to the convex hull. \n\tPrevious data - {self._convex_hull.points}, new point - {projected_new_point}")
                     self._convex_hull.close()
                     self._convex_hull = None
 
