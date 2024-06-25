@@ -166,8 +166,9 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
         display_convex_hull(self.action_name, display_mode, self._convex_hull)
-        A = self._convex_hull.equations[:, : self._convex_hull.points.shape[1]]
-        b = -self._convex_hull.equations[:, self._convex_hull.points.shape[1]]
+        equations = np.unique(self._convex_hull.equations, axis=0)
+        A = equations[:, : self._convex_hull.points.shape[1]]
+        b = -equations[:, self._convex_hull.points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
         border_point = prettify_coefficients(b)
         return coefficients, border_point
