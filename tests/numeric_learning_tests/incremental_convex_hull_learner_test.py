@@ -2,16 +2,26 @@
 import random
 import time
 
+import numpy
 import numpy as np
 import pytest
-from pddl_plus_parser.models import PDDLFunction
+import pandas as pd
+from pddl_plus_parser.lisp_parsers import DomainParser
+from pddl_plus_parser.models import PDDLFunction, Domain
 
+from sam_learning.core import VocabularyCreator
 from sam_learning.core.numeric_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
 from sam_learning.core.numeric_learning.numeric_utils import display_convex_hull, create_monomials, create_polynomial_string
+from tests.consts import FARMLAND_EXAMPLES_PATH, FARMLAND_DOMAIN_PATH
 
 TEST_ACTION_NAME = "test_action"
 
 random.seed(42)
+
+
+@pytest.fixture
+def farmland_domain() -> Domain:
+    return DomainParser(FARMLAND_DOMAIN_PATH, partial_parsing=True).parse_domain()
 
 
 @pytest.fixture
@@ -136,6 +146,18 @@ def test_add_new_point_when_adding_four_points_and_the_last_one_is_linearly_depe
     display_convex_hull(TEST_ACTION_NAME, True, convex_hull_learner._convex_hull)
 
 
+def test_add_new_point_when_adding_one_point_at_a_time_returns_correct_number_of_equations_in_each_iteration(farmland_domain: Domain):
+    dataframe = pd.read_csv(FARMLAND_EXAMPLES_PATH)
+    learner = IncrementalConvexHullLearner(TEST_ACTION_NAME, domain_functions=farmland_domain.functions)
+    first_row_data = [dataframe.iloc[0][key] for key in dataframe.columns.tolist()]
+    for index, (_, row) in enumerate(dataframe.iterrows()):
+        if learner._spanning_standard_base:
+            assert (learner._convex_hull.points == (dataframe[:index].to_numpy(dtype=numpy.float32) - first_row_data)).all()
+
+        point_data = {key: row[key] for key in dataframe.columns.tolist()}
+        learner.add_new_point(point_data)
+
+
 def test_add_new_point_when_adding_a_point_with_feature_not_existing_in_previous_sample_does_not_add_new_feature_to_dataset(
     convex_hull_learner: IncrementalConvexHullLearner,
 ):
@@ -221,7 +243,7 @@ def test_incremental_create_ch_inequalities_with_point_spanning_standard_base_re
     )
     assert len(coefficients) == 4
     assert len(border_point) == 4
-    assert span_verification_conditions == []
+    assert span_verification_conditions is None
 
 
 def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_creates_a_single_condition(
@@ -325,3 +347,22 @@ def test_construct_convex_hull_inequalities_when_adding_multiple_points_with_sin
 
     except Exception as e:
         pytest.fail(f"Exception was raised: {e}")
+
+
+def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns_correct_number_of_equations(farmland_domain: Domain):
+    dataframe = pd.read_csv(FARMLAND_EXAMPLES_PATH)
+    vocabulary_creator = VocabularyCreator()
+    possible_bounded_functions = vocabulary_creator.create_lifted_functions_vocabulary(
+        domain=farmland_domain, possible_parameters=farmland_domain.actions["move-slow"].signature
+    )
+    learner = IncrementalConvexHullLearner("move-slow", domain_functions=possible_bounded_functions)
+    first_row_data = [dataframe.iloc[0][key] for key in dataframe.columns.tolist()]
+    for index, (_, row) in enumerate(dataframe.iterrows()):
+        if learner._spanning_standard_base:
+            assert (learner._convex_hull.points == (dataframe[:index].to_numpy(dtype=numpy.float32) - first_row_data)).all()
+
+        point_data = {key: row[key] for key in dataframe.columns.tolist()}
+        learner.add_new_point(point_data)
+
+    precondition = learner.construct_convex_hull_inequalities()
+    assert len(precondition.operands) == 7

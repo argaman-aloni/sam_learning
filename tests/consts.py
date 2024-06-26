@@ -93,6 +93,7 @@ COUNTERS_POLYNOMIAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "counters_poly.pddl"
 COUNTERS_POLYNOMIAL_PROBLEMS_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.pddl")]
 COUNTERS_POLYNOMIAL_TRAJECTORIES_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.trajectory")]
 
+FARMLAND_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data.csv"
 
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
