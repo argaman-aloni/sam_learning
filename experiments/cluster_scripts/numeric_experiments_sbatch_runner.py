@@ -40,11 +40,12 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
 
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids, internal_iterations):
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
+    filtered_sids = [sid for sid in job_ids if validate_job_running(sid) is not None]
     statistics_collection_job = submit_job(
         conda_env="online_nsam",
         mem="4G",
         python_file=f"{code_directory}/distributed_results_collector.py",
-        dependency=f"afterok:{':'.join([str(e) for e in job_ids])}",
+        dependency=f"afterok:{':'.join([str(e) for e in filtered_sids])}",
         jobname=f"collect_statistics_{experiment['domain_file_name']}",
         suppress_output=False,
         arguments=[
