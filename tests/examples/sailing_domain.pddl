@@ -1,73 +1,59 @@
+;; Enrico Scala (enricos83@gmail.com) and Miquel Ramirez (miquel.ramirez@gmail.com)
 (define (domain sailing)
-(:requirements :typing :fluents :disjunctive-preconditions)
-(:types 	boat person - object
-)
-
-(:predicates (saved ?t - person)
-)
-
-(:functions (x ?b - boat)
-	(y ?b - boat)
-	(d ?t - person)
-)
-
-(:action go_north_east
-	:parameters (?b - boat)
-	:precondition ()
-	:effect (and
-		(increase (x ?b) 1.5)
-(increase (y ?b) 1.5)
-))
-
-(:action go_north_west
-	:parameters (?b - boat)
-	:precondition ()
-	:effect (and
-		(decrease (x ?b) 1.5)
-(increase (y ?b) 1.5)
-))
-
-(:action go_est
-     :parameters (?b - boat)
-     :precondition (and )
-     :effect (and(increase (x ?b) 3))
-)
-
-(:action save_person
-	:parameters (?b - boat ?t - person)
-	:precondition (and
-		(not (saved ?t))
-				(<= (+ (* (x ?b) -0.64) (+ (* (y ?b) 0.3) (* (d ?t) -0.71))) 0.12)
-(<= (+ (* (x ?b) 0.58) (+ (* (y ?b) -0.58) (* (d ?t) 0.58))) 0.0)
-(<= (+ (* (x ?b) -0.25) (+ (* (y ?b) 0.35) (* (d ?t) -0.9))) 0.4)
-(<= (+ (* (x ?b) -0.58) (+ (* (y ?b) -0.58) (* (d ?t) 0.58))) 0.0)
-(<= (+ (* (x ?b) 0.58) (+ (* (y ?b) 0.58) (* (d ?t) -0.57))) 15.38)
-(<= (+ (* (x ?b) 1.0) (* (y ?b) 0.05)) 15.55)
-(<= (+ (* (x ?b) -1.0) (+ (* (y ?b) -0.05) (* (d ?t) 0.05))) 0.95)
-(<= (+ (* (x ?b) -0.87) (+ (* (y ?b) 0.23) (* (d ?t) -0.44))) 0.69)
-(<= (+ (* (x ?b) -1.0) (+ (* (y ?b) 0.02) (* (d ?t) -0.01))) 3.02)
-(<= (+ (* (x ?b) 0.76) (* (y ?b) -0.65)) -0.59)
-(<= (+ (* (x ?b) 0.37) (+ (* (y ?b) 0.6) (* (d ?t) -0.71))) 12.09)
-(<= (+ (* (x ?b) -0.65) (+ (* (y ?b) 0.54) (* (d ?t) -0.53))) 14.15)
-(<= (+ (* (x ?b) 1.0) (* (y ?b) 0.07)) 16.96)
-(<= (+ (* (x ?b) -0.58) (+ (* (y ?b) 0.58) (* (d ?t) -0.58))) 14.43)
-(<= (+ (* (x ?b) 0.3) (+ (* (y ?b) 0.6) (* (d ?t) -0.74))) 11.09)
-(<= (+ (* (x ?b) 0.98) (+ (* (y ?b) -0.06) (* (d ?t) 0.19))) 19.81)
-(<= (+ (* (x ?b) 0.96) (+ (* (y ?b) 0.26) (* (d ?t) -0.07))) 27.49)
-(<= (+ (* (y ?b) 0.97) (* (d ?t) -0.26)) 100.17)
-(<= (+ (* (x ?b) 0.74) (+ (* (y ?b) -0.66) (* (d ?t) 0.12))) -0.62)
-(<= (+ (* (x ?b) 0.46) (+ (* (y ?b) -0.76) (* (d ?t) 0.46))) -0.91)
-(<= (+ (* (x ?b) 0.1) (+ (* (y ?b) -0.71) (* (d ?t) 0.7))) -0.41)
-(<= (+ (* (x ?b) 0.58) (+ (* (y ?b) 0.58) (* (d ?t) -0.58))) 14.43)
-(<= (+ (* (x ?b) -0.77) (+ (* (y ?b) 0.42) (* (d ?t) -0.49))) 8.36)
-(<= (+ (* (x ?b) -0.96) (+ (* (y ?b) 0.15) (* (d ?t) -0.26))) 0.88)
-(<= (+ (* (x ?b) 0.25) (+ (* (y ?b) -0.7) (* (d ?t) 0.67))) -0.5)
-(<= (+ (* (x ?b) 0.67) (+ (* (y ?b) -0.67) (* (d ?t) 0.33))) -0.67)
-(<= (+ (* (x ?b) 1.0) (* (y ?b) -0.04)) 11.44)
-(<= (+ (* (x ?b) -0.69) (+ (* (y ?b) 0.23) (* (d ?t) -0.69))) 0.0)
-(<= (+ (* (y ?b) -0.7) (* (d ?t) 0.72)) 1.69)
-(<= (+ (* (x ?b) 0.97) (+ (* (y ?b) -0.11) (* (d ?t) 0.22))) 17.15)
-(<= (+ (* (y ?b) 0.72) (* (d ?t) -0.69)) 19.99))
-	:effect (and (saved ?t) ))
+	(:requirements :typing :fluents) 
+    (:types boat person - object)
+    (:predicates 
+        (saved ?t - person)
+    )
+    (:functions
+        (x ?b - boat)
+        (y ?b - boat)
+        (d ?t - person)
+    )
+    ;; Increment the value in the given counter by one
+    (:action go_north_east
+         :parameters (?b - boat)
+		 :precondition (and )
+         :effect (and(increase (x ?b) 1.5) (increase (y ?b) 1.5))
+    )
+    (:action go_north_west
+         :parameters (?b - boat)
+		 :precondition (and )
+         :effect (and(decrease (x ?b) 1.5) (increase (y ?b) 1.5))
+    )
+    (:action go_est
+         :parameters (?b - boat)
+		 :precondition (and )
+         :effect (and(increase (x ?b) 3))
+    )
+    (:action go_west
+         :parameters (?b - boat)
+		 :precondition (and )
+         :effect (and(decrease (x ?b) 3))
+    )
+    (:action go_south_west
+         :parameters(?b - boat)
+		 :precondition (and )
+         :effect (and(increase (x ?b) 2) (decrease (y ?b) 2))
+    )
+    (:action go_south_east
+         :parameters(?b - boat)
+		 :precondition (and )
+         :effect (and(decrease (x ?b) 2) (decrease (y ?b) 2))
+    )
+    (:action go_south
+         :parameters(?b - boat)
+		 :precondition (and )
+         :effect (and (decrease (y ?b) 2))
+    )
+    (:action save_person
+        :parameters(?b - boat ?t - person)
+        :precondition ( and  (>= (+ (x ?b) (y ?b)) (d ?t)) 
+                             (>= (- (y ?b) (x ?b)) (d ?t)) 
+                             (<= (+ (x ?b) (y ?b)) (+ (d ?t) 25)) 
+                             (<= (- (y ?b) (x ?b)) (+ (d ?t) 25))
+                      )
+        :effect (and(saved ?t))
+    )
 
 )

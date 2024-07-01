@@ -1,4 +1,5 @@
 """module tests for the Numeric SAM learning algorithm"""
+import numpy
 import pytest
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser, DomainParser
 from pddl_plus_parser.models import Domain, Problem, Observation, Predicate
@@ -15,7 +16,11 @@ from tests.consts import (
     MINECRAFT_SMALL_TRAJECTORY_PATH,
     COUNTERS_POLYNOMIAL_DOMAIN_PATH,
     COUNTERS_POLYNOMIAL_PROBLEMS_PATH,
-    EXAMPLES_DIR_PATH, FARMLAND_DOMAIN_PATH, FARMLAND_TRAJECTORIES_DIRECTORY,
+    EXAMPLES_DIR_PATH,
+    FARMLAND_DOMAIN_PATH,
+    FARMLAND_TRAJECTORIES_DIRECTORY,
+    SAILING_LEARNED_DOMAIN_PATH,
+    SAILING_TRAJECTORIES_DIRECTORY,
 )
 
 
@@ -34,10 +39,14 @@ def minecraft_medium_domain() -> Domain:
     return DomainParser(MINECRAFT_MEDIUM_DOMAIN_PATH, partial_parsing=True).parse_domain()
 
 
-
 @fixture()
 def farmland_domain() -> Domain:
     return DomainParser(FARMLAND_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def sailing_domain() -> Domain:
+    return DomainParser(SAILING_LEARNED_DOMAIN_PATH, partial_parsing=True).parse_domain()
 
 
 @fixture()
@@ -107,6 +116,14 @@ def farmland_nsam(farmland_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(farmland_domain, polynomial_degree=0)
     nsam._initialize_fluents_learners()
     return nsam
+
+
+@fixture()
+def sailing_nsam(sailing_domain: Domain) -> IncrementalNumericSAMLearner:
+    nsam = IncrementalNumericSAMLearner(sailing_domain, polynomial_degree=0)
+    nsam._initialize_fluents_learners()
+    return nsam
+
 
 def test_add_new_action_adds_sets_the_dataset_with_new_observation_for_the_previous_state(
     depot_nsam: IncrementalNumericSAMLearner, depot_observation: Observation
@@ -310,7 +327,7 @@ def test_learn_action_model_with_counters_poly_domain_enables_learning_polynomia
         pytest.fail()
 
 
-def test_learn_action_model_when_learning_farmland_domain_from_large_number_of_samples_returns_correct_domain_with_condition_shifted_according_to_the_first_sample(
+def test_learn_action_model_when_learning_farmland_domain_from_large_number_of_samples_returns_correct_domain_with_condition_not_shifted_for_all_samples_and_with_correct_naming_of_fluents(
     farmland_nsam: IncrementalNumericSAMLearner, farmland_domain: Domain
 ):
     observations = []
@@ -320,13 +337,32 @@ def test_learn_action_model_when_learning_farmland_domain_from_large_number_of_s
         observation = TrajectoryParser(farmland_domain, problem).parse_trajectory(trajectory_path)
         observations.append(observation)
 
-    try:
-        learned_model, learning_metadata = farmland_nsam.learn_action_model(observations)
-        farmland_move_slow_action = learned_model.actions["move-slow"]
-        move_slow_schema = farmland_move_slow_action.to_pddl()
-        assert '(<= (+ 1 (* -1 (x ?f1))) 0)' in move_slow_schema
-        print()
-        print(learned_model.to_pddl())
+    learned_model, learning_metadata = farmland_nsam.learn_action_model(observations)
+    farmland_move_slow_action = learned_model.actions["move-slow"]
+    move_slow_schema = farmland_move_slow_action.to_pddl()
+    assert "(<= (* (x ?f1) -1) -1)" in move_slow_schema  # in original domain the condition is (>= (x ?f1) 1) which holds
+    print()
+    print(learned_model.to_pddl())
 
-    except Exception:
-        pytest.fail()
+
+def test_learn_action_model_when_learning_sailing_domain_from_test_dataset_returns_correct_domain_with_unshifted_conditions(
+    sailing_nsam: IncrementalNumericSAMLearner, sailing_domain: Domain
+):
+    observations = []
+    for problem_path in SAILING_TRAJECTORIES_DIRECTORY.glob("pfile*.pddl"):
+        trajectory_path = SAILING_TRAJECTORIES_DIRECTORY / f"{problem_path.stem}.trajectory"
+        problem = ProblemParser(problem_path, sailing_domain).parse_problem()
+        observation = TrajectoryParser(sailing_domain, problem).parse_trajectory(trajectory_path)
+        observations.append(observation)
+
+    learned_model, learning_metadata = sailing_nsam.learn_action_model(observations)
+    for action in learned_model.actions:
+        if sailing_nsam.storage[action].convex_hull_learner._spanning_standard_base:
+            assert sailing_nsam.storage[action].convex_hull_learner._convex_hull is not None
+            assert (
+                sailing_nsam.storage[action].convex_hull_learner._convex_hull.points
+                == sailing_nsam.storage[action].convex_hull_learner.data.to_numpy(dtype=numpy.float32)
+            ).all()
+
+    print()
+    print(learned_model.to_pddl())
