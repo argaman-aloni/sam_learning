@@ -72,7 +72,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :return: the shifted point based on the first sample in the dataframe.
         """
         last_sample = self.data.iloc[-1].to_numpy()
-        shifted_last_sample = last_sample - self.data.iloc[0]
+        shifted_last_sample = last_sample - self.data.iloc[0] if not self._spanning_standard_base else last_sample
         return shifted_last_sample
 
     def _is_spanned_in_base(self) -> bool:
@@ -153,7 +153,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         self.logger.debug("Creating the convex hull for the first time (or in case that the base had changed).")
         points = self.data.to_numpy()
-        shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
+        shift_axis = points[0].tolist() if not self._spanning_standard_base else [0] * len(self.data.columns.tolist())
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
         self._convex_hull = ConvexHull(projected_points, incremental=True)
 
@@ -191,9 +191,8 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         if len(self._gsp_base) == self.data.shape[1]:
             self.logger.debug("The points are spanning the original space and the basis is full rank.")
-            transformed_vars = construct_projected_variable_strings(self.data.columns.tolist(), shift_axis, self._gsp_base)
             coefficients, border_point = self._create_ch_coefficients_data(display_mode)
-            return coefficients, border_point, transformed_vars, None
+            return coefficients, border_point, self.data.columns.tolist(), None
 
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
 

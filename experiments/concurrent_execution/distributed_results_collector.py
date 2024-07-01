@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from typing import List
 
+from pddl_plus_parser.lisp_parsers import DomainParser
+
 from statistics.numeric_performance_calculator import NUMERIC_PERFORMANCE_STATS
 from utilities import LearningAlgorithmType
 from validators.safe_domain_validator import SOLVING_STATISTICS
@@ -73,9 +75,10 @@ class StatisticsCollector:
 
     def _collect_numeric_performance_statistics(self) -> None:
         self.logger.info("Collecting the numeric performance statistics from the results directory.")
+        domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
         combined_statistics_file_path = self.working_directory_path / "results_directory" / "numeric_performance_combined_statistics.csv"
         combined_statistics_data = []
-        file_path_template = "{learning_algorithm}_" + self.domain_file_name.split(".")[0] + "_numeric_learning_performance_stats_fold_{fold}_{iteration}.csv"
+        file_path_template = "{learning_algorithm}_" + domain.name + "_numeric_learning_performance_stats_fold_{fold}_{iteration}.csv"
         self._combine_statistics_data(file_path_template, combined_statistics_data)
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *NUMERIC_PERFORMANCE_STATS])
