@@ -70,6 +70,7 @@ def submit_job(
         "arguments": " ".join(arguments) if arguments else "",
         "environment_variables": "\n".join(all_environment_variables) if environment_variables else "",
         "job_info_print": JOB_ID_MESSAGE + "\n" + JOB_NODELIST_MESSAGE,
+        "cluster_temp_logs_path": "$LOCAL_LOGS_PATH",
         "logs_dir": logs_directory or "/dev/null",
     }
 
