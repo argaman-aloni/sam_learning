@@ -55,6 +55,10 @@ def submit_job(
         sbatch_template = string.Template(text)
 
     # Complete the template code with the correct values
+    all_environment_variables = [
+        "export LOCAL_LOGS_PATH=/scratch/${SLURM_JOB_USER}/${SLURM_JOB_ID}",
+        *[f"export {env_variable}={value}" for env_variable, value in environment_variables.items()],
+    ]
     template_mapping = {
         "job_name": jobname if jobname else "job",
         "cpus_per_task": cpus_per_task if cpus_per_task else 1,
@@ -64,9 +68,7 @@ def submit_job(
         "conda_env": conda_env or "online_nsam",
         "script": python_file,
         "arguments": " ".join(arguments) if arguments else "",
-        "environment_variables": "\n".join([f"export {env_variable}={value}" for env_variable, value in environment_variables.items()])
-        if environment_variables
-        else "",
+        "environment_variables": "\n".join(all_environment_variables) if environment_variables else "",
         "job_info_print": JOB_ID_MESSAGE + "\n" + JOB_NODELIST_MESSAGE,
         "logs_dir": logs_directory or "/dev/null",
     }
@@ -80,4 +82,3 @@ def submit_job(
         template_mapping["dependency"] = ""  # Remove the dependency if it exists
         sbatch_code = sbatch_template.substitute(template_mapping)
         return write_sbatch_and_submit_job(sbatch_code)
-

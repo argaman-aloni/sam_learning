@@ -27,8 +27,6 @@ ${job_info_print}
 
 ${environment_variables}
 
-export LOCAL_LOGS_PATH=/scratch/${SLURM_JOB_USER}/${SLURM_JOB_ID}
-
 ### Start your code below ####
 module load anaconda				### load anaconda module (must be present when working with conda environments)
 source activate ${conda_env}				### activate a conda environment, replace my_env with your conda environment
