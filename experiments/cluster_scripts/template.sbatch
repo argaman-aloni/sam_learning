@@ -16,6 +16,8 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 # Note: the following 4 lines are commented out
 ##SBATCH --mail-type=ALL			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
 #SBATCH --mem=${mem}				### amount of RAM memory, allocating more than 60G requires IT team's permission
+#SBATCH --tmp=100G        ### amount of temporary storage space, used for node's local storage
+
 
 ################  Following lines will be executed by a compute node    #######################
 
@@ -25,10 +27,13 @@ ${job_info_print}
 
 ${environment_variables}
 
+export LOCAL_LOGS_PATH=/scratch/${SLURM_JOB_USER}/${SLURM_JOB_ID}
+
 ### Start your code below ####
 module load anaconda				### load anaconda module (must be present when working with conda environments)
 source activate ${conda_env}				### activate a conda environment, replace my_env with your conda environment
 python ${script}	${arguments}			### this command executes python script – replace with your own command
 
+cp -r $LOCAL_LOGS_PATH/logs/* ${logs_dir}		### copy logs to the logs directory
 
 

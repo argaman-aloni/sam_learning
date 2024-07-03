@@ -48,6 +48,7 @@ def submit_job(
     python_file=None,
     arguments=None,
     environment_variables=None,
+    logs_directory=None,
 ):
     with open("experiments/cluster_scripts/template.sbatch", "rt", newline="\n") as template_file:
         text = template_file.read()
@@ -67,6 +68,7 @@ def submit_job(
         if environment_variables
         else "",
         "job_info_print": JOB_ID_MESSAGE + "\n" + JOB_NODELIST_MESSAGE,
+        "logs_dir": logs_directory or "/dev/null",
     }
 
     sbatch_code = sbatch_template.substitute(template_mapping)
