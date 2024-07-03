@@ -30,6 +30,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
             f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
         ],
         environment_variables=environment_variables,
+        logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",
     )
     print(f"Submitted job with sid {fold_creation_sid}\n")
     time.sleep(1)

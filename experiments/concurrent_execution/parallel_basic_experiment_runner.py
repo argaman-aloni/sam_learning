@@ -1,6 +1,7 @@
 """The POL main framework - Compile, Learn and Plan."""
 import argparse
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
@@ -24,7 +25,8 @@ def configure_iteration_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
     iteration_number = int(args.iteration_number)
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
-    working_directory_path = Path(args.working_directory_path)
+    local_logs_parent_path = os.environ.get("LOCAL_LOGS_PATH", args.working_directory_path)
+    working_directory_path = Path(local_logs_parent_path)
     logs_directory_path = working_directory_path / "logs"
     logs_directory_path.mkdir(exist_ok=True)
     # Create a rotating file handler
