@@ -126,6 +126,7 @@ def submit_job_and_validate_execution(code_directory, configurations, experiment
         suppress_output=False,
         arguments=arguments,
         environment_variables=environment_variables,
+        logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",
     )
     time.sleep(2)
     return validate_job_running(sid)
