@@ -35,6 +35,11 @@ class VocabularyCreator:
         :param lifted_variable_to_match: the lifted predicate.
         :return: whether the types match.
         """
+
+        if len(grounded_signatures) != len(lifted_variable_to_match.signature):
+            self.logger.debug(f"The number of objects - {grounded_signatures} does not match {lifted_variable_to_match.name}")
+            return False
+
         for object_name, predicate_parameter in zip(grounded_signatures, lifted_variable_to_match.signature):
             parameter_type = lifted_variable_to_match.signature[predicate_parameter]
             grounded_type = grounded_signatures[object_name]
