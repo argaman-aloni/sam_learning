@@ -1,6 +1,7 @@
 import argparse
 import csv
 import logging
+import pandas as pd
 from pathlib import Path
 from typing import List
 
@@ -11,6 +12,7 @@ from utilities import LearningAlgorithmType
 from validators.safe_domain_validator import SOLVING_STATISTICS
 
 FOLD_FIELD = "fold"
+MAX_SOLVED_FIELD = "max_percent_solved"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -42,6 +44,15 @@ class StatisticsCollector:
         self.iterations = iterations
         self.logger = logging.getLogger("ClusterRunner")
 
+    @staticmethod
+    def _process_combined_data(combined_statistics_data: List[dict]) -> pd.DataFrame:
+        # Load the CSV file into a DataFrame
+        df = pd.DataFrame(combined_statistics_data)
+        numeric_columns = ["percent_ok", "fold", "num_trajectories"]
+        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric)
+        aggragated_df = df.groupby(["fold", "num_trajectories", "learning_algorithm"]).agg(max_percent_ok=("percent_ok", "max"))
+        return aggragated_df
+
     def _combine_statistics_data(self, file_path_template: str, combined_statistics_data: List[dict]) -> None:
         """
 
@@ -64,13 +75,17 @@ class StatisticsCollector:
         """Collects the statistics from the statistics files in the results directory and combines them."""
         self.logger.info("Collecting the solving statistics from the results directory.")
         combined_statistics_file_path = self.working_directory_path / "results_directory" / "solving_combined_statistics.csv"
+        combined_aggragated_stats = self.working_directory_path / "results_directory" / "solving_aggregated_statistics.csv"
         combined_statistics_data = []
         file_path_template = "{learning_algorithm}_problem_solving_stats_fold_{fold}_{iteration}_trajectories.csv"
         self._combine_statistics_data(file_path_template, combined_statistics_data)
+        combined_and_augmented_df = self._process_combined_data(combined_statistics_data)
+        combined_and_augmented_df.to_csv(combined_aggragated_stats)
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SOLVING_STATISTICS])
             writer.writeheader()
             writer.writerows(combined_statistics_data)
+
         self.logger.info("Done collecting the solving statistics from the results directory!")
 
     def _collect_numeric_performance_statistics(self) -> None:
