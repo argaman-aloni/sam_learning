@@ -10,7 +10,7 @@ import seaborn as sns
 
 def main(results_directory_path: Path):
     """Plot the results of the experiments."""
-    for file_path in results_directory_path.glob('*.csv'):
+    for file_path in results_directory_path.glob('solving_aggregated*.csv'):
         df = pd.read_csv(file_path)
 
         # Define color-blind friendly palette
@@ -19,18 +19,13 @@ def main(results_directory_path: Path):
         color_cycle = cycle(color_palette)
 
         # Group the data by 'num_trajectories', 'learning_algorithm' and calculate the mean and std of 'percent_ok'
-        grouped_data = df.groupby(['num_trajectories', 'learning_algorithm'])['percent_ok'].agg(
+        df = df[df['learning_algorithm'] != "incremental_nsam"]  # Remove max_percent_ok from the plot
+        grouped_data = df.groupby(['num_trajectories', 'learning_algorithm'])['max_percent_ok'].agg(
             ['mean', 'std']).reset_index()
 
         labels = {
-            "numeric_sam": "NSAM* with RV",
-            "raw_numeric_sam": "NSAM* without RV",
-            "naive_nsam": "NSAM with RV",
-            "raw_naive_nsam": "NSAM without RV",
-            "polynomial_sam": "NSAM* with RV",
-            "raw_polynomial_nsam": "NSAM* without RV",
-            "naive_polysam": "NSAM with RV",
-            "raw_naive_polysam": "NSAM without RV",
+            "numeric_sam": "NSAM*",
+            "naive_nsam": "NSAM",
         }
 
         # Plotting
