@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def main(results_directory_path: Path):
+def plot_results(results_directory_path: Path):
     """Plot the results of the experiments."""
-    for file_path in results_directory_path.glob('solving_aggregated*.csv'):
+    for file_path in results_directory_path.glob('*solving_aggregated*.csv'):
         df = pd.read_csv(file_path)
 
         # Define color-blind friendly palette
@@ -49,13 +49,13 @@ def main(results_directory_path: Path):
                              alpha=0.2)
 
         # Set plot labels and title
-        plt.xlabel('# Observations', fontsize=16)
-        plt.ylabel('Average % of problems solved', fontsize=16)
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
+        plt.xlabel('# Observations', fontsize=24)
+        plt.ylabel('AVG % of solved', fontsize=24)
+        plt.xticks(fontsize=24)
+        plt.yticks(fontsize=24)
 
         # Add a legend
-        plt.legend(fontsize=16)
+        plt.legend(fontsize=24)
         plt.grid(True)
 
         output_file_path = file_path.parent / f'{file_path.stem}_plot.png'
@@ -67,4 +67,4 @@ def main(results_directory_path: Path):
 
 if __name__ == '__main__':
     results_path = Path(sys.argv[1])
-    main(results_path)
+    plot_results(results_path)

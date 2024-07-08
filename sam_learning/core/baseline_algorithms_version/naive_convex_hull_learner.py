@@ -12,8 +12,9 @@ from scipy.spatial import ConvexHull, convex_hull_plot_2d, QhullError
 
 from sam_learning.core import NotSafeActionError
 from sam_learning.core.learning_types import ConditionType, EquationSolutionType
-from sam_learning.core.numeric_learning.numeric_utils import construct_multiplication_strings, construct_linear_equation_string, \
-    prettify_coefficients, construct_numeric_conditions
+from sam_learning.core.numeric_learning.numeric_utils import construct_multiplication_strings, \
+    construct_linear_equation_string, \
+    prettify_coefficients, construct_numeric_conditions, filter_constant_features, detect_linear_dependent_features
 
 EPSILON = 1e-10
 
@@ -61,15 +62,22 @@ class NaiveConvexHullLearner:
         Note: the returned values represents the linear inequalities of the convex hull, i.e.,  Ax <= b.
         """
         self.logger.debug(f"Creating convex hull for action {self.action_name}.")
-        points = points_df.to_numpy()
-        if points.shape[1] == 1:
+        extra_conditions = []
+        columns_to_use = points_df.columns.tolist()
+        if points_df.shape[1] == 1:
+            points = points_df.to_numpy()
             self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
             coefficients = [[-1], [1]]
             border_point = prettify_coefficients([-points.min(), points.max()])
 
         else:
-            coefficients, border_point = self._execute_convex_hull(points, display_mode)
-        return coefficients, border_point, points_df.columns.tolist(), []
+            no_constant_columns_matrix, equality_strs, removed_fluents = filter_constant_features(points_df)
+            filtered_previous_state_matrix, column_equality_strs, removed_fluents = detect_linear_dependent_features(no_constant_columns_matrix)
+            coefficients, border_point = self._execute_convex_hull(filtered_previous_state_matrix.to_numpy(), display_mode)
+            extra_conditions = [*equality_strs, *column_equality_strs]
+            columns_to_use = filtered_previous_state_matrix.columns.tolist()
+
+        return coefficients, border_point, columns_to_use, extra_conditions
 
     @staticmethod
     def _construct_pddl_inequality_scheme(

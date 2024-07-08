@@ -7,6 +7,7 @@ from typing import List
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 
+from experiments.plotting.plot_nsam_results import plot_results
 from statistics.numeric_performance_calculator import NUMERIC_PERFORMANCE_STATS
 from utilities import LearningAlgorithmType
 from validators.safe_domain_validator import SOLVING_STATISTICS
@@ -74,13 +75,16 @@ class StatisticsCollector:
     def _collect_solving_statistics(self) -> None:
         """Collects the statistics from the statistics files in the results directory and combines them."""
         self.logger.info("Collecting the solving statistics from the results directory.")
-        combined_statistics_file_path = self.working_directory_path / "results_directory" / "solving_combined_statistics.csv"
-        combined_aggragated_stats = self.working_directory_path / "results_directory" / "solving_aggregated_statistics.csv"
+        results_directory = self.working_directory_path / "results_directory"
+        combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
+        combined_aggragated_stats = results_directory / "solving_aggregated_statistics.csv"
         combined_statistics_data = []
         file_path_template = "{learning_algorithm}_problem_solving_stats_fold_{fold}_{iteration}_trajectories.csv"
         self._combine_statistics_data(file_path_template, combined_statistics_data)
         combined_and_augmented_df = self._process_combined_data(combined_statistics_data)
         combined_and_augmented_df.to_csv(combined_aggragated_stats)
+        plot_results(results_directory)
+
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SOLVING_STATISTICS])
             writer.writeheader()
