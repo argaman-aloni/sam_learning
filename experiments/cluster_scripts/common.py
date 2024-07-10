@@ -72,6 +72,7 @@ def submit_job(
         "job_info_print": JOB_ID_MESSAGE + "\n" + JOB_NODELIST_MESSAGE,
         "cluster_temp_logs_path": "$LOCAL_LOGS_PATH",
         "logs_dir": logs_directory or "/dev/null",
+        "error": "#" if suppress_error else ""
     }
 
     sbatch_code = sbatch_template.substitute(template_mapping)
