@@ -50,6 +50,8 @@ class VocabularyCreator:
 
         return True
 
+
+    #TODO: vocabulary to allow duplicates in grounded_signature for future use
     def create_vocabulary(self, domain: Union[LearnerDomain, Domain],
                           observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
         """Create a vocabulary of random combinations of the predicates parameters and objects.
