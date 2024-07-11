@@ -366,7 +366,7 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_s
     numeric_conditions = [
         operand.to_pddl() for operand in output_conditions.operands if isinstance(operand, NumericalExpressionTree)
     ]
-    assert "(= (+ -121 (current_load ?z)) 0)" in numeric_conditions  # the condition is shifted
+    assert "(= (+ (current_load ?z) -121) 0)" in numeric_conditions  # the condition is shifted
     assert len([condition for condition in numeric_conditions if condition.startswith("(<=")]) == 2
     assert len([condition for condition in numeric_conditions if condition.startswith("(=")]) == 2
     print(str(output_conditions))
@@ -390,9 +390,9 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities()
 
     expected_conditions = [
-        "(<= (* -1 (fuel-cost )) 0)",
-        "(<= (* -1 (current_load ?z)) 0)",
-        "(<= (+ (* 0.71 (current_load ?z)) (* 0.71 (fuel-cost ))) 0.71)",
+        "(<= (* (fuel-cost ) -1) 0)",
+        "(<= (* (current_load ?z) -1) 0)",
+        "(<= (+ (* (current_load ?z) 0.71) (* (fuel-cost ) 0.71)) 0.71)",
         "(= (load_limit ?z) 0)",
     ]
     for _, precondition in output_conditions:
@@ -417,9 +417,9 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     output_conditions = load_action_state_fluent_storage.construct_safe_linear_inequalities()
     expected_conditions = [
         "(<= (current_load ?z) 1)",
-        "(<= (* -1 (fuel-cost )) 0)",
+        "(<= (* (fuel-cost ) -1) 0)",
         "(<= (fuel-cost ) 1)",
-        "(<= (* -1 (current_load ?z)) 0)",
+        "(<= (* (current_load ?z) -1) 0)",
         "(= (load_limit ?z) 0)",
     ]
 
