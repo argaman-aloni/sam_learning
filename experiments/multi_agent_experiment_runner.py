@@ -99,7 +99,8 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.export_learned_domain(
             learned_model, self.working_directory_path / "results_directory",
             f"ma_baseline_domain_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
-        self.validate_learned_domain(allowed_filtered_observations, learned_model, test_set_dir_path)
+        self.validate_learned_domain("ma_baseline_domain", allowed_filtered_observations, learned_model,
+                                     test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def learn_ma_action_model(
             self, allowed_complete_observations: List[MultiAgentObservation],
@@ -120,7 +121,8 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.ma_domain_path = self.working_directory_path / "results_directory" / \
                               f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories_fold_{fold_num}.pddl"
         self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
-        self.validate_learned_domain(allowed_complete_observations, learned_model, test_set_dir_path)
+        self.validate_learned_domain(self._learning_algorithm.name, allowed_complete_observations, learned_model,
+                                     test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""

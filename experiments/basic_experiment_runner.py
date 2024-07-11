@@ -141,8 +141,10 @@ class OfflineBasicExperimentRunner:
             learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
+
             learned_domain_path = self.validate_learned_domain(
-                allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
+                self._learning_algorithm.name, allowed_observations, learned_model, test_set_dir_path,
+                fold_num, float(learning_report["learning_time"])
             )
 
         self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
@@ -199,10 +201,12 @@ class OfflineBasicExperimentRunner:
         )
 
     def validate_learned_domain(
-        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int, learning_time: float
+        self, learning_algorithm_name: str, allowed_observations: List[Observation], learned_model: LearnerDomain,
+            test_set_dir_path: Path, fold_number: int, learning_time: float
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
+        :param learning_algorithm_name: the name of the learning algorithm.
         :param allowed_observations: the observations that were used in the learning process.
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
@@ -216,7 +220,7 @@ class OfflineBasicExperimentRunner:
         self.export_learned_domain(
             learned_model,
             domains_backup_dir_path,
-            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
+            f"{learning_algorithm_name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
         )
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
