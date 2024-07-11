@@ -194,20 +194,21 @@ def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[Li
         return DataFrame(), equal_fluent_strs, input_df.columns
 
 
-def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame, List[str], Dict[str, str]]:
+def detect_linear_dependent_features(data_matrix: DataFrame, columns_to_ignore: List[str] = []) -> Tuple[DataFrame, List[str], Dict[str, str]]:
     """Detects linear dependent features and adds the equality constraints to the problem.
 
     The idea is: put together these column vectors as a matrix and calculate its row-echelon form.
     If the row-echelon form is diagonal with only ones, the set of vectors is independent, otherwise, it is dependent.
 
     :param data_matrix: the matrix of the previous state values.
+    :param columns_to_ignore: the list of columns that are already composed of linear combinations of other columns and should be ignored.
     :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal and the
         column to column mapping.
     """
     additional_conditions = []
     dependent_columns = {}
 
-    data_matrix_copy = data_matrix.copy()
+    data_matrix_copy = data_matrix[[col for col in data_matrix.columns.tolist() if col not in columns_to_ignore]].copy()
     for col1, col2 in itertools.combinations(data_matrix_copy.columns, 2):
         reduced_form, _ = sympy.Matrix(data_matrix_copy[[col1, col2]].values).rref()
         diagonal_required_result = np.array([[1, 0], [0, 1]])
@@ -216,10 +217,13 @@ def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame,
 
         independent_column, dependent_column = col1, col2
         linear_coeff = extract_numeric_linear_coefficient(data_matrix_copy[dependent_column], data_matrix_copy[independent_column])
+        if linear_coeff == 0:
+            continue
+
         additional_conditions.append(f"(= {dependent_column} (* {linear_coeff} {independent_column}))")
         dependent_columns[dependent_column] = independent_column
 
-    filtered_matrix = data_matrix_copy[[col for col in data_matrix_copy.columns if col not in dependent_columns]]
+    filtered_matrix = data_matrix[[col for col in data_matrix.columns.tolist() if col not in dependent_columns]]
     return filtered_matrix, additional_conditions, dependent_columns
 
 
