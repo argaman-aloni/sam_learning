@@ -35,6 +35,11 @@ class VocabularyCreator:
         :param lifted_variable_to_match: the lifted predicate.
         :return: whether the types match.
         """
+
+        if len(grounded_signatures) != len(lifted_variable_to_match.signature):
+            self.logger.debug(f"The number of objects - {grounded_signatures} does not match {lifted_variable_to_match.name}")
+            return False
+
         for object_name, predicate_parameter in zip(grounded_signatures, lifted_variable_to_match.signature):
             parameter_type = lifted_variable_to_match.signature[predicate_parameter]
             grounded_type = grounded_signatures[object_name]
@@ -45,6 +50,8 @@ class VocabularyCreator:
 
         return True
 
+
+    #TODO: vocabulary to allow duplicates in grounded_signature for future use
     def create_vocabulary(self, domain: Union[LearnerDomain, Domain],
                           observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
         """Create a vocabulary of random combinations of the predicates parameters and objects.
