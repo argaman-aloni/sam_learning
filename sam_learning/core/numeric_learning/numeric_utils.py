@@ -208,8 +208,8 @@ def detect_linear_dependent_features(data_matrix: DataFrame, columns_to_ignore: 
     additional_conditions = []
     dependent_columns = {}
 
-    if len(data_matrix) == 1:
-        # cannot detect linear dependency with only one row
+    if len(data_matrix) < 2:
+        # cannot detect linear dependency with less than two samples
         return data_matrix, additional_conditions, dependent_columns
 
     data_matrix_copy = data_matrix[[col for col in data_matrix.columns.tolist() if col not in columns_to_ignore]].copy()
