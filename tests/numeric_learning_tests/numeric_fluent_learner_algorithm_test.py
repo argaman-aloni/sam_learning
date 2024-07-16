@@ -423,16 +423,14 @@ def test_construct_safe_linear_inequalities_when_not_given_relevant_fluents_uses
         assert "(current_load ?z)" in precondition.to_pddl()
 
 
-def test_detect_linear_dependent_features_when_given_only_one_sample_returns_that_the_features_are_dependent_except_for_ignored_column():
+def test_detect_linear_dependent_features_when_given_only_one_sample_returns_that_no_column_is_dependent_since_there_are_not_enough_samples_to_guarantee_correctness():
     pre_state_data = {
         "(fuel-cost )": [1.0],
         "(current_load ?z)": [1.0],
     }
     linear_dependant_matrix = DataFrame(pre_state_data)
     output_matrix, linear_dependent_fluents, remained_fluents = detect_linear_dependent_features(linear_dependant_matrix)
-    assert list(output_matrix.columns) == ["(fuel-cost )"]
-    assert linear_dependent_fluents == ["(= (current_load ?z) (* 1 (fuel-cost )))"]
-    assert remained_fluents == {"(current_load ?z)": "(fuel-cost )"}
+    assert list(output_matrix.columns) == ["(fuel-cost )", "(current_load ?z)"]
 
 
 def test_detect_linear_dependent_features_detects_that_two_equal_features_are_linear_dependant():
