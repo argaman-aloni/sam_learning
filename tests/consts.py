@@ -85,6 +85,10 @@ MINECRAFT_LARGE_PROBLEM_PATH = EXAMPLES_DIR_PATH / "advanced_map_instance_0.pddl
 MINECRAFT_LARGE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "advanced_map_instance_0.trajectory"
 
 
+DRIVERLOG_POLY_DOMAIN_PATH = EXAMPLES_DIR_PATH / "driverlogHardNumeric.pddl"
+DRIVERLOG_POLY_PROBLEM_PATH = EXAMPLES_DIR_PATH / "driverlog_poly_problem.pddl"
+DRIVERLOG_POLY_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "driverlog_poly_problem.trajectory"
+
 FARMLAND_DOMAIN_PATH = EXAMPLES_DIR_PATH / "farmland.pddl"
 FARMLAND_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" /  "farmland"
 SAILING_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" /  "sailing"

@@ -22,6 +22,8 @@ from sam_learning.core.numeric_learning.numeric_utils import (
 )
 
 
+np.set_printoptions(precision=2)
+
 class ConvexHullLearner:
     """Class that learns the convex hull of the preconditions of an action."""
 
@@ -45,9 +47,10 @@ class ConvexHullLearner:
         """
         hull = ConvexHull(points)
         display_convex_hull(self.action_name, display_mode, hull)
+        equations = np.unique(hull.equations, axis=0)
 
-        A = hull.equations[:, : points.shape[1]]
-        b = -hull.equations[:, points.shape[1]]
+        A = equations[:, : points.shape[1]]
+        b = -equations[:, points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
         border_point = prettify_coefficients(b)
         return coefficients, border_point

@@ -17,11 +17,14 @@ def plot_results(results_directory_path: Path):
         color_palette = sns.color_palette("colorblind", n_colors=len(df['learning_algorithm'].unique()))
         line_styles = cycle(['-', '--', '-.', ':', '--', '-.', ':'])
         color_cycle = cycle(color_palette)
+        markers = cycle(['o', 's', 'D', 'v', '^', '>', '<', 'p', 'P', '*', 'X', 'd'])
 
         # Group the data by 'num_trajectories', 'learning_algorithm' and calculate the mean and std of 'percent_ok'
         df = df[df['learning_algorithm'] != "incremental_nsam"]  # Remove max_percent_ok from the plot
-        grouped_data = df.groupby(['num_trajectories', 'learning_algorithm'])['max_percent_ok'].agg(
-            ['mean', 'std']).reset_index()
+        grouped_data = df.groupby(['num_trajectories', 'learning_algorithm']).agg(
+            avg_max_percent_ok=('max_percent_ok', 'mean'),
+            std_max_percent_ok=('max_percent_ok', 'std'),
+            goal_not_achieved=('percent_goal_not_achieved', 'first')).reset_index()
 
         labels = {
             "numeric_sam": "NSAM*",
@@ -35,17 +38,20 @@ def plot_results(results_directory_path: Path):
         # Plot a line for each learning algorithm
         for algo in df['learning_algorithm'].unique():
             algo_data = grouped_data[grouped_data['learning_algorithm'] == algo]
-            plt.plot(algo_data['num_trajectories'],
-                     algo_data['mean'],
-                     linestyle=next(line_styles),
-                     label=labels[algo],
-                     color=next(color_cycle),
-                     linewidth=3)
+            plt.errorbar(algo_data['num_trajectories'],
+                         algo_data['avg_max_percent_ok'],
+                         yerr=algo_data['goal_not_achieved'],
+                         linestyle=next(line_styles),
+                         label=labels[algo],
+                         marker=next(markers),
+                         color=next(color_cycle),
+                         lolims=True,
+                         linewidth=3)
 
             # Plot standard deviation as shaded area around the mean line
             plt.fill_between(algo_data['num_trajectories'],
-                             np.clip(algo_data['mean'] - algo_data['std'], 0, 100),
-                             np.clip(algo_data['mean'] + algo_data['std'], 0, 100),
+                             np.clip(algo_data['avg_max_percent_ok'] - algo_data['std_max_percent_ok'], 0, 100),
+                             np.clip(algo_data['avg_max_percent_ok'] + algo_data['std_max_percent_ok'], 0, 100),
                              alpha=0.2)
 
         # Set plot labels and title

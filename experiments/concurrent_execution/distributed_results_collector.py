@@ -3,7 +3,7 @@ import csv
 import logging
 import pandas as pd
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 
@@ -46,13 +46,14 @@ class StatisticsCollector:
         self.logger = logging.getLogger("ClusterRunner")
 
     @staticmethod
-    def _process_combined_data(combined_statistics_data: List[dict]) -> pd.DataFrame:
+    def _process_combined_data(combined_statistics_data: List[Dict]) -> pd.DataFrame:
         # Load the CSV file into a DataFrame
         df = pd.DataFrame(combined_statistics_data)
         numeric_columns = ["percent_ok", "fold", "num_trajectories"]
         df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric)
-        aggragated_df = df.groupby(["fold", "num_trajectories", "learning_algorithm"]).agg(max_percent_ok=("percent_ok", "max"))
-        return aggragated_df
+        aggregated_df = df.groupby(["fold", "num_trajectories", "learning_algorithm"]).agg(max_percent_ok=("percent_ok", "max"),
+                                                                                           percent_goal_not_achieved=("percent_goal_not_achieved", "max"))
+        return aggregated_df
 
     def _combine_statistics_data(self, file_path_template: str, combined_statistics_data: List[dict]) -> None:
         """
