@@ -204,3 +204,18 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_with_
     assert len(span_verification_conditions) == 1  # One dimension was reduced.
     assert len(coefficients) == 3
     assert len(transformed_vars) == 2
+
+
+
+def test_create_convex_hull_linear_creates_convex_hull_with_no_duplicate_equations_due_to_numeric_precision_restriction(convex_hull_learner: ConvexHullLearner,):
+    pre_state_data = {
+        "(x)": [0, 0, 0, 7, 7, 1.2300056, 1.2300057],
+        "(y)": [0, 1, 0, 0, 7, 2.5600057, 2.5600058],
+        "(z)": [0, 0, 1, 0, 7, 3.8900058, 3.8900059],
+    }
+    pre_state_df = DataFrame(pre_state_data)
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._create_convex_hull_linear_inequalities(
+        pre_state_df, display_mode=False
+    )
+    assert len(span_verification_conditions) == 0
+    assert len([str(c) for c in coefficients]) == len(set([str(c) for c in coefficients]))

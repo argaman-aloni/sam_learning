@@ -35,14 +35,18 @@ SEMANTIC_PRECISION_STATS = [
 ]
 
 
+ACTION_VOCABULARY_MIN_SIZE = 20
+
+
 def _calculate_precision_recall(
-    num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int]
+    num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int], learned_actions: List[str]
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """Calculates the precision and recall values for each action.
 
     :param num_false_negatives: the number of false negatives for each action.
     :param num_false_positives: the number of false positives for each action.
     :param num_true_positives: the number of true positives for each action.
+    :param learned_actions: the list of actions that were learned in the action model learning process.
     :return: a tuple of two dictionaries, one for the precision values and one for the recall values.
     """
     precision_dict = defaultdict(float)
@@ -55,7 +59,7 @@ def _calculate_precision_recall(
             precision_dict[action_name] = 1
 
         if tp_rate == 0:
-            precision_dict[action_name] = 0
+            precision_dict[action_name] = 0 if action_name in learned_actions else 1
             recall_dict[action_name] = 0
             continue
 
@@ -83,6 +87,7 @@ class SemanticPerformanceCalculator:
     combined_stats: List[Dict[str, Any]]
     logger: logging.Logger
     results_dir_path: Path
+    _random_actions: List[List[ActionCall]]
 
     def __init__(
         self,
@@ -102,6 +107,7 @@ class SemanticPerformanceCalculator:
         self.temp_dir_path = working_directory_path / "temp"
         self.temp_dir_path.mkdir(exist_ok=True)
         self.vocabulary_creator = VocabularyCreator()
+        self._random_actions = []
 
     def _create_grounded_action_vocabulary(self, domain: Domain, observed_objects: Dict[str, PDDLObject]) -> List[ActionCall]:
         """Create a vocabulary of random combinations of the predicates parameters and objects.
@@ -119,7 +125,7 @@ class SemanticPerformanceCalculator:
         for action in domain.actions.values():
             self.logger.info(f"Creating grounded action vocabulary for action {action.name} and sampling 10 ground actions")
             action_vocabulary = [action_call for action_call in possible_ground_actions if action_call.name == action.name]
-            sampled_action_vocabulary = random.sample(action_vocabulary, k=min(5, len(action_vocabulary)))
+            sampled_action_vocabulary = random.sample(action_vocabulary, k=min(ACTION_VOCABULARY_MIN_SIZE, len(action_vocabulary)))
             vocabulary.extend(sampled_action_vocabulary)
 
         return vocabulary
@@ -212,8 +218,8 @@ class SemanticPerformanceCalculator:
                     grounded_action_call=executed_action.parameters,
                     problem_objects=observation.grounded_objects,
                 )
-                learned_next_state = learned_operator.apply(model_previous_state, allow_inapplicable_actions=True)
-
+                # cannot apply when the action is inapplicable since the linear regression is fitted on applicable numeric points.
+                learned_next_state = learned_operator.apply(model_previous_state)
                 self.logger.debug("Validating if there are any false negatives.")
                 model_state_predicates = {
                     predicate.untyped_representation
@@ -247,8 +253,8 @@ class SemanticPerformanceCalculator:
         num_false_negatives = defaultdict(int)
         num_false_positives = defaultdict(int)
         self.logger.debug("Starting to calculate the semantic preconditions performance")
-        for observation in self.dataset_observations:
-            possible_ground_actions = self._create_grounded_action_vocabulary(self.model_domain, observation.grounded_objects)
+        for index, observation in enumerate(self.dataset_observations):
+            possible_ground_actions = self._random_actions[index]
             observation_objects = observation.grounded_objects
             for component in observation.components:
                 possible_ground_actions.append(component.grounded_action_call)
@@ -266,7 +272,16 @@ class SemanticPerformanceCalculator:
                     num_false_positives[action.name] += false_positive
                     num_false_negatives[action.name] += false_negative
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, learned_domain.actions.keys())
+
+
+    def generate_random_actions_dataset(self):
+        """Generates the random actions dataset prior to the domain creation so the evaluation would be symmetric."""
+        self.logger.info("Generating random actions dataset")
+        for observation in self.dataset_observations:
+            possible_ground_actions = self._create_grounded_action_vocabulary(self.model_domain, observation.grounded_objects)
+            self._random_actions.append(possible_ground_actions)
+
 
     def calculate_effects_semantic_performance(self, learned_domain: Domain) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Calculates the precision recall values of the learned effects.

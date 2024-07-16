@@ -209,6 +209,9 @@ def detect_linear_dependent_features(data_matrix: DataFrame, columns_to_ignore: 
     dependent_columns = {}
 
     data_matrix_copy = data_matrix[[col for col in data_matrix.columns.tolist() if col not in columns_to_ignore]].copy()
+    # Ignoring constant columns since they add noise to the matrix
+    data_matrix_copy = data_matrix_copy.loc[:, (data_matrix_copy != data_matrix_copy.iloc[0]).any()]
+
     for col1, col2 in itertools.combinations(data_matrix_copy.columns, 2):
         reduced_form, _ = sympy.Matrix(data_matrix_copy[[col1, col2]].values).rref()
         diagonal_required_result = np.array([[1, 0], [0, 1]])
