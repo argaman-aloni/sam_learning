@@ -23,6 +23,7 @@ from pddl_plus_parser.models import (
 
 from sam_learning.core import VocabularyCreator
 from utilities import LearningAlgorithmType
+from utilities.observation_extensions import get_grounded_actions
 from validators import run_validate_script, VALID_PLAN
 
 SEMANTIC_PRECISION_STATS = [
@@ -198,41 +199,43 @@ class SemanticPerformanceCalculator:
         :param num_true_positives: the dictionary mapping between the action name and the number of true positive
         """
         self.logger.info("Calculating effects difference rate for the observation.")
+
         for observation_triplet in observation.components:
             model_previous_state = observation_triplet.previous_state
-            executed_action = observation_triplet.grounded_action_call
             model_next_state = observation_triplet.next_state
-            if executed_action.name not in learned_domain.actions:
-                continue
 
-            try:
-                learned_operator = Operator(
-                    action=learned_domain.actions[executed_action.name],
-                    domain=learned_domain,
-                    grounded_action_call=executed_action.parameters,
-                    problem_objects=observation.grounded_objects,
-                )
-                learned_next_state = learned_operator.apply(model_previous_state, allow_inapplicable_actions=True)
+            for executed_action in get_grounded_actions(observation_triplet):
+                if executed_action.name not in learned_domain.actions:
+                    continue
 
-                self.logger.debug("Validating if there are any false negatives.")
-                model_state_predicates = {
-                    predicate.untyped_representation
-                    for grounded_predicate in model_next_state.state_predicates.values()
-                    for predicate in grounded_predicate
-                }
-                learned_state_predicates = {
-                    predicate.untyped_representation
-                    for grounded_predicate in learned_next_state.state_predicates.values()
-                    for predicate in grounded_predicate
-                }
+                try:
+                    learned_operator = Operator(
+                        action=learned_domain.actions[executed_action.name],
+                        domain=learned_domain,
+                        grounded_action_call=executed_action.parameters,
+                        problem_objects=observation.grounded_objects,
+                    )
+                    learned_next_state = learned_operator.apply(model_previous_state, allow_inapplicable_actions=True)
 
-                num_true_positives[executed_action.name] += len(model_state_predicates.intersection(learned_state_predicates))
-                num_false_positives[executed_action.name] += len(learned_state_predicates.difference(model_state_predicates))
-                num_false_negatives[executed_action.name] += len(model_state_predicates.difference(learned_state_predicates))
+                    self.logger.debug("Validating if there are any false negatives.")
+                    model_state_predicates = {
+                        predicate.untyped_representation
+                        for grounded_predicate in model_next_state.state_predicates.values()
+                        for predicate in grounded_predicate
+                    }
+                    learned_state_predicates = {
+                        predicate.untyped_representation
+                        for grounded_predicate in learned_next_state.state_predicates.values()
+                        for predicate in grounded_predicate
+                    }
 
-            except ValueError:
-                self.logger.debug("The action is not applicable in the state.")
-                continue
+                    num_true_positives[executed_action.name] += len(model_state_predicates.intersection(learned_state_predicates))
+                    num_false_positives[executed_action.name] += len(learned_state_predicates.difference(model_state_predicates))
+                    num_false_negatives[executed_action.name] += len(model_state_predicates.difference(learned_state_predicates))
+
+                except ValueError:
+                    self.logger.debug("The action is not applicable in the state.")
+                    continue
 
     def calculate_preconditions_semantic_performance(
         self, learned_domain: Domain, learned_domain_path: Path
@@ -251,7 +254,7 @@ class SemanticPerformanceCalculator:
             possible_ground_actions = self._create_grounded_action_vocabulary(self.model_domain, observation.grounded_objects)
             observation_objects = observation.grounded_objects
             for component in observation.components:
-                possible_ground_actions.append(component.grounded_action_call)
+                possible_ground_actions.extend(get_grounded_actions(component))
                 self.logger.info(
                     f"Calculating the preconditions' semantic performance for the action the state - {component.previous_state.serialize()}"
                 )
