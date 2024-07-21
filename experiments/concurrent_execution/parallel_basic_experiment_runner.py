@@ -86,6 +86,7 @@ class ParallelExperimentRunner:
             test_set_dir_path=test_set_path,
             is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
         )
+        self.semantic_performance_calc.generate_random_actions_dataset()
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path

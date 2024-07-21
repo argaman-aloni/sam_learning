@@ -38,7 +38,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
     ):
         super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
 
-    def calculate_effects_performance(self, learned_domain: Domain) -> Dict[str, float]:
+    def calculate_effects_mse(self, learned_domain: Domain) -> Dict[str, float]:
         """Calculates the effects MSE value using the actual state fluents and the ones generated using the learned
             action.
 
@@ -82,7 +82,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
-        effects_mse = self.calculate_effects_performance(learned_domain)
+        effects_mse = self.calculate_effects_mse(learned_domain)
         for action_name in self.model_domain.actions:
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,

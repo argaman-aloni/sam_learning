@@ -272,7 +272,7 @@ class SemanticPerformanceCalculator:
                     num_false_positives[action.name] += false_positive
                     num_false_negatives[action.name] += false_negative
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, learned_domain.actions.keys())
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
 
 
     def generate_random_actions_dataset(self):
