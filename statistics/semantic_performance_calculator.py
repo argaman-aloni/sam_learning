@@ -302,7 +302,7 @@ class SemanticPerformanceCalculator:
         for observation in self.dataset_observations:
             self._calculate_effects_difference_rate(observation, learned_domain, num_false_negatives, num_false_positives, num_true_positives)
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
 
     def calculate_performance(self, learned_domain_path: Path, num_used_observations: int) -> None:
         """Calculate the semantic precision and recall of the learned domain.
