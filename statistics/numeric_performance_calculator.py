@@ -59,14 +59,19 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                     continue
 
                 grounded_operator = _ground_executed_action(action_call, learned_domain, observation.grounded_objects)
-                next_state = grounded_operator.apply(previous_state, allow_inapplicable_actions=False)
-                values = [
-                    (next_state.state_fluents[fluent].value, model_next_state.state_fluents[fluent].value)
-                    for fluent in next_state.state_fluents.keys()
-                ]
-                actual_values, expected_values = zip(*values)
-                state_mse = sklearn.metrics.mean_squared_error(expected_values, actual_values)
-                squared_errors[action_call.name].append(state_mse)
+                try:
+                    next_state = grounded_operator.apply(previous_state, allow_inapplicable_actions=False)
+                    values = [
+                        (next_state.state_fluents[fluent].value, model_next_state.state_fluents[fluent].value)
+                        for fluent in next_state.state_fluents.keys()
+                    ]
+                    actual_values, expected_values = zip(*values)
+                    state_mse = sklearn.metrics.mean_squared_error(expected_values, actual_values)
+                    squared_errors[action_call.name].append(state_mse)
+
+                except ValueError:
+                    self.logger.debug("The action is not applicable in the state.")
+                    continue
 
         mse_values.update({action_name: sum(square_errors) / len(square_errors) for action_name, square_errors in squared_errors.items()})
         return mse_values
