@@ -28,6 +28,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
             f"--domain_file_name {experiment['domain_file_name']}",
             f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
             f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
+            f"--problem_prefix {experiment['problems_prefix']}",
         ],
         environment_variables=environment_variables,
         logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",

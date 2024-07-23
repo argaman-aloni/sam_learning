@@ -82,16 +82,15 @@ class OfflineBasicExperimentRunner:
             problem_prefix=problem_prefix,
         )
 
-    def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
+    def _init_semantic_performance_calculator(self) -> None:
         """Initializes the algorithm of the semantic precision / recall calculator."""
         self.semantic_performance_calc = init_semantic_performance_calculator(
             self.working_directory_path,
             self.domain_file_name,
             self._learning_algorithm,
-            test_set_dir_path=test_set_path,
+            test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories",
             is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
         )
-        self.semantic_performance_calc.generate_random_actions_dataset()
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
@@ -236,7 +235,7 @@ class OfflineBasicExperimentRunner:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
-            self._init_semantic_performance_calculator(test_set_path=test_dir_path)
+            self._init_semantic_performance_calculator()
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_model_offline(fold_num, train_dir_path, test_dir_path)
             self.domain_validator.clear_statistics()
