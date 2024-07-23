@@ -49,7 +49,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         :return: a mapping between the action name and its MSE value.
         """
         squared_errors = defaultdict(list)
-        mse_values = {action_name: 1 for action_name in self.model_domain.actions.keys()}
+        mse_values = {action_name: 1 for action_name in learned_domain.actions.keys()}
         for observation in self.dataset_observations:
             for observation_component in observation.components:
                 action_call = observation_component.grounded_action_call
@@ -61,17 +61,21 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                 grounded_operator = _ground_executed_action(action_call, learned_domain, observation.grounded_objects)
                 try:
                     next_state = grounded_operator.apply(previous_state, allow_inapplicable_actions=False)
-                    values = [
-                        (next_state.state_fluents[fluent].value, model_next_state.state_fluents[fluent].value)
-                        for fluent in next_state.state_fluents.keys()
-                    ]
-                    actual_values, expected_values = zip(*values)
-                    state_mse = sklearn.metrics.mean_squared_error(expected_values, actual_values)
-                    squared_errors[action_call.name].append(state_mse)
 
                 except ValueError:
                     self.logger.debug("The action is not applicable in the state.")
-                    continue
+                    next_state = previous_state.copy()
+                    # since the learned action is not applicable in the state there is no point to compare
+                    # with an action that is not applicable in the model domain.
+                    model_next_state = previous_state.copy()
+
+                values = [
+                    (next_state.state_fluents[fluent].value, model_next_state.state_fluents[fluent].value)
+                    for fluent in next_state.state_fluents.keys()
+                ]
+                actual_values, expected_values = zip(*values)
+                state_mse = sklearn.metrics.mean_squared_error(expected_values, actual_values)
+                squared_errors[action_call.name].append(state_mse)
 
         mse_values.update({action_name: sum(square_errors) / len(square_errors) for action_name, square_errors in squared_errors.items()})
         return mse_values
@@ -93,11 +97,11 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                 "learning_algorithm": self.learning_algorithm.name,
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
-                "precondition_precision": preconditions_precision[action_name],
-                "precondition_recall": preconditions_recall[action_name],
-                "effects_precision": effects_precision[action_name],
-                "effects_recall": effects_recall[action_name],
-                "effects_mse": effects_mse[action_name],
+                "precondition_precision": preconditions_precision.get(action_name, 1),
+                "precondition_recall": preconditions_recall.get(action_name, 0),
+                "effects_precision": effects_precision.get(action_name, 0),
+                "effects_recall": effects_recall.get(action_name, 0),
+                "effects_mse": effects_mse.get(action_name, 0),
             }
             self.combined_stats.append(action_stats)
 

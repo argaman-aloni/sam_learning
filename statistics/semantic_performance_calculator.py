@@ -109,27 +109,6 @@ class SemanticPerformanceCalculator:
         self.vocabulary_creator = VocabularyCreator()
         self._random_actions = []
 
-    def _create_grounded_action_vocabulary(self, domain: Domain, observed_objects: Dict[str, PDDLObject]) -> List[ActionCall]:
-        """Create a vocabulary of random combinations of the predicates parameters and objects.
-
-        :param domain: the domain containing the predicates and the action signatures.
-        :param observed_objects: the objects that were observed in the trajectory.
-        :return: list containing all the predicates with the different combinations of parameters.
-        """
-        self.logger.info("Creating grounded action vocabulary with sampled ground actions")
-        possible_ground_actions = self.vocabulary_creator.create_grounded_actions_vocabulary(
-            domain=self.model_domain, observed_objects=observed_objects
-        )
-
-        vocabulary = []
-        for action in domain.actions.values():
-            self.logger.info(f"Creating grounded action vocabulary for action {action.name} and sampling 10 ground actions")
-            action_vocabulary = [action_call for action_call in possible_ground_actions if action_call.name == action.name]
-            sampled_action_vocabulary = random.sample(action_vocabulary, k=min(ACTION_VOCABULARY_MIN_SIZE, len(action_vocabulary)))
-            vocabulary.extend(sampled_action_vocabulary)
-
-        return vocabulary
-
     def _calculate_action_applicability_rate(
         self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
     ) -> Tuple[int, int, int]:
@@ -219,7 +198,13 @@ class SemanticPerformanceCalculator:
                     problem_objects=observation.grounded_objects,
                 )
                 # cannot apply when the action is inapplicable since the linear regression is fitted on applicable numeric points.
-                learned_next_state = learned_operator.apply(model_previous_state)
+                try:
+                    learned_next_state = learned_operator.apply(model_previous_state)
+                except ValueError:
+                    self.logger.debug("The action is not applicable in the state.")
+                    learned_next_state = model_previous_state.copy()
+                    model_next_state = model_previous_state.copy()
+
                 self.logger.debug("Validating if there are any false negatives.")
                 model_state_predicates = {
                     predicate.untyped_representation
@@ -231,6 +216,9 @@ class SemanticPerformanceCalculator:
                     for grounded_predicate in learned_next_state.state_predicates.values()
                     for predicate in grounded_predicate
                 }
+                if len(model_state_predicates) == 0 and len(learned_state_predicates) == 0:
+                    num_true_positives[executed_action.name] += 1
+                    continue
 
                 num_true_positives[executed_action.name] += len(model_state_predicates.intersection(learned_state_predicates))
                 num_false_positives[executed_action.name] += len(learned_state_predicates.difference(model_state_predicates))
@@ -254,34 +242,20 @@ class SemanticPerformanceCalculator:
         num_false_positives = defaultdict(int)
         self.logger.debug("Starting to calculate the semantic preconditions performance")
         for index, observation in enumerate(self.dataset_observations):
-            possible_ground_actions = self._random_actions[index]
             observation_objects = observation.grounded_objects
             for component in observation.components:
-                possible_ground_actions.append(component.grounded_action_call)
-                self.logger.info(
-                    f"Calculating the preconditions' semantic performance for the action the state - {component.previous_state.serialize()}"
-                )
-                for action in possible_ground_actions:
-                    if action.name not in learned_domain.actions:
-                        continue
+                action = component.grounded_action_call
+                if action.name not in learned_domain.actions:
+                    continue
 
-                    true_positive, false_positive, false_negative = self._calculate_action_applicability_rate(
-                        action, learned_domain_path, component.previous_state, observation_objects,
-                    )
-                    num_true_positives[action.name] += true_positive
-                    num_false_positives[action.name] += false_positive
-                    num_false_negatives[action.name] += false_negative
+                true_positive, false_positive, false_negative = self._calculate_action_applicability_rate(
+                    action, learned_domain_path, component.previous_state, observation_objects,
+                )
+                num_true_positives[action.name] += true_positive
+                num_false_positives[action.name] += false_positive
+                num_false_negatives[action.name] += false_negative
 
         return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
-
-
-    def generate_random_actions_dataset(self):
-        """Generates the random actions dataset prior to the domain creation so the evaluation would be symmetric."""
-        self.logger.info("Generating random actions dataset")
-        for observation in self.dataset_observations:
-            possible_ground_actions = self._create_grounded_action_vocabulary(self.model_domain, observation.grounded_objects)
-            self._random_actions.append(possible_ground_actions)
-
 
     def calculate_effects_semantic_performance(self, learned_domain: Domain) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Calculates the precision recall values of the learned effects.
@@ -319,7 +293,7 @@ class SemanticPerformanceCalculator:
             action_stats = {
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
-                "precondition_precision": preconditions_precision.get(action_name, 0),
+                "precondition_precision": preconditions_precision.get(action_name, 1),
                 "precondition_recall": preconditions_recall.get(action_name, 0),
                 "effects_precision": effects_precision.get(action_name, 0),
                 "effects_recall": effects_recall.get(action_name, 0),
