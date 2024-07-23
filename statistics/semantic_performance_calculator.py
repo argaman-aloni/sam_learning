@@ -295,8 +295,8 @@ class SemanticPerformanceCalculator:
                 "num_trajectories": num_used_observations,
                 "precondition_precision": preconditions_precision.get(action_name, 1),
                 "precondition_recall": preconditions_recall.get(action_name, 0),
-                "effects_precision": effects_precision.get(action_name, 0),
-                "effects_recall": effects_recall.get(action_name, 0),
+                "effects_precision": effects_precision.get(action_name, 1),
+                "effects_recall": effects_recall.get(action_name, 1),
             }
             self.combined_stats.append(action_stats)
 
