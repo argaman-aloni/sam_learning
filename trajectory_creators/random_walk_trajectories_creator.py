@@ -89,17 +89,21 @@ class RandomWalkTrajectoriesCreator:
     def create_domain_trajectories(self, problems_prefix: str = "pfile", output_directory_path: Optional[Path] = None) -> None:
         """Creates the domain trajectory files."""
         domain_file_path = self.working_directory_path / self.domain_file_name
+        output_dir = output_directory_path or self.working_directory_path
         domain = DomainParser(domain_file_path).parse_domain()
         trajectory_exporter = TrajectoryExporter(domain=domain, allow_invalid_actions=False)
         for problem_file_path in self.working_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.logger.info(f"Creating the trajectory for the problem - {problem_file_path.stem}")
+            output_trajectory_path = output_dir / f"{problem_file_path.stem}_random_walk.trajectory"
+            if output_trajectory_path.exists():
+                continue
+
             problem = ProblemParser(problem_path=problem_file_path, domain=domain).parse_problem()
             grounded_actions = self.create_all_grounded_actions(
                 observed_objects=problem.objects, domain=domain, initial_state_fluents=list(problem.initial_state_fluents.keys())
             )
             random_walk_triplets, plan = self.create_random_plan(domain, problem, grounded_actions, trajectory_exporter)
             self.logger.debug("Creating a copy of the problem file with the trajectory as well as a solution_file.")
-            output_dir = output_directory_path or self.working_directory_path
             with open(output_dir / f"{problem_file_path.stem}_random_walk.solution", "wt") as plan_file:
                 plan_file.write("\n".join(plan))
 
