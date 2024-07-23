@@ -77,7 +77,7 @@ class FoldsCreator:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     internal_iterations = [int(val) for val in args.internal_iterations.split(",")]
