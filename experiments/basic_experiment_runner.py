@@ -201,7 +201,7 @@ class OfflineBasicExperimentRunner:
         )
 
     def validate_learned_domain(
-        self, learning_algorithm_name: str, allowed_observations: List[Observation], learned_model: LearnerDomain,
+        self, allowed_observations: List[Observation], learned_model: LearnerDomain,
             test_set_dir_path: Path, fold_number: int, learning_time: float
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
@@ -220,7 +220,7 @@ class OfflineBasicExperimentRunner:
         self.export_learned_domain(
             learned_model,
             domains_backup_dir_path,
-            f"{learning_algorithm_name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
+            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
         )
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
