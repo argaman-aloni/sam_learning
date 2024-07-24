@@ -91,6 +91,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param fold_num: the index of the current fold in the cross validation process.
         """
         learner = SAMLearner(partial_domain=partial_domain)
+        self._learning_algorithm = LearningAlgorithmType.sam_learning
         self.domain_validator.learning_algorithm = LearningAlgorithmType.sam_learning
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.sam_learning
         learned_model, learning_report = learner.learn_action_model(allowed_filtered_observations)
@@ -99,7 +100,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.export_learned_domain(
             learned_model, self.working_directory_path / "results_directory",
             f"ma_baseline_domain_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
-        self.validate_learned_domain("ma_baseline_domain", allowed_filtered_observations, learned_model,
+        self.validate_learned_domain(allowed_filtered_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def learn_ma_action_model(
@@ -113,6 +114,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param fold_num: the index of the current fold in the cross validation process.
         """
         learner = MultiAgentSAM(partial_domain=partial_domain)
+        self._learning_algorithm = LearningAlgorithmType.ma_sam
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam
         learned_model, learning_report = learner.learn_combined_action_model(allowed_complete_observations)
@@ -121,7 +123,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.ma_domain_path = self.working_directory_path / "results_directory" / \
                               f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories_fold_{fold_num}.pddl"
         self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
-        self.validate_learned_domain(self._learning_algorithm.name, allowed_complete_observations, learned_model,
+        self.validate_learned_domain(allowed_complete_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def run_cross_validation(self) -> None:
@@ -140,6 +142,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             self.learning_statistics_manager.clear_statistics()
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
+        self._learning_algorithm = LearningAlgorithmType.ma_sam
         self.domain_validator.write_complete_joint_statistics()
         self.semantic_performance_calc.export_combined_semantic_performance()
         self.learning_statistics_manager.export_all_folds_action_stats()
