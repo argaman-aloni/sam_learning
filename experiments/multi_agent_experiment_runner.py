@@ -91,7 +91,6 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param fold_num: the index of the current fold in the cross validation process.
         """
         learner = SAMLearner(partial_domain=partial_domain)
-        self._learning_algorithm = LearningAlgorithmType.sam_learning
         self.domain_validator.learning_algorithm = LearningAlgorithmType.sam_learning
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.sam_learning
         learned_model, learning_report = learner.learn_action_model(allowed_filtered_observations)
@@ -113,7 +112,6 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param fold_num: the index of the current fold in the cross validation process.
         """
         learner = MultiAgentSAM(partial_domain=partial_domain)
-        self._learning_algorithm = LearningAlgorithmType.ma_sam
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam
         learned_model, learning_report = learner.learn_combined_action_model(allowed_complete_observations)
@@ -140,7 +138,6 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             self.learning_statistics_manager.clear_statistics()
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
-        self._learning_algorithm = LearningAlgorithmType.ma_sam
         self.domain_validator.write_complete_joint_statistics()
         self.semantic_performance_calc.export_combined_semantic_performance()
         self.learning_statistics_manager.export_all_folds_action_stats()
