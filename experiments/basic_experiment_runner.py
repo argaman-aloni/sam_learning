@@ -143,7 +143,7 @@ class OfflineBasicExperimentRunner:
             self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
 
             learned_domain_path = self.validate_learned_domain(
-                self._learning_algorithm.name, allowed_observations, learned_model, test_set_dir_path,
+                allowed_observations, learned_model, test_set_dir_path,
                 fold_num, float(learning_report["learning_time"])
             )
 
@@ -206,7 +206,6 @@ class OfflineBasicExperimentRunner:
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
-        :param learning_algorithm_name: the name of the learning algorithm.
         :param allowed_observations: the observations that were used in the learning process.
         :param learned_model: the domain that was learned using POL.
         :param test_set_dir_path: the path to the directory containing the test set problems.
