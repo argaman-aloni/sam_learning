@@ -9,6 +9,7 @@ from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import Observation
 
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
+from statistics.ma_performance_calculator import MaSamPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from utilities import LearningAlgorithmType
 
@@ -49,6 +50,15 @@ def init_semantic_performance_calculator(
 
     if is_numeric:
         return NumericPerformanceCalculator(
+            model_domain=model_domain,
+            observations=observations,
+            model_domain_path=domain_path,
+            working_directory_path=working_directory_path,
+            learning_algorithm=learning_algorithm,
+        )
+
+    if learning_algorithm == LearningAlgorithmType.ma_sam:
+        return MaSamPerformanceCalculator(
             model_domain=model_domain,
             observations=observations,
             model_domain_path=domain_path,
