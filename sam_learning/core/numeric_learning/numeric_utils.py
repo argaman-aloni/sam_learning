@@ -14,6 +14,7 @@ from sklearn.feature_selection import VarianceThreshold
 
 from sam_learning.core.learning_types import ConditionType
 
+DECIMAL_DIGITS = 2
 EPSILON = 1e-4
 
 
@@ -48,17 +49,17 @@ def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List
     """
     product_components = []
     for func, coefficient in zip(function_variables, coefficients_vector):
-        if abs(round(coefficient, 4)) <= EPSILON:
+        if abs(round(coefficient, DECIMAL_DIGITS)) <= EPSILON:
             continue
 
         if func == "(dummy)":
-            product_components.append(f"{prettify_floating_point_number(round(coefficient, 4))}")
+            product_components.append(f"{prettify_floating_point_number(round(coefficient, DECIMAL_DIGITS))}")
 
         elif coefficient == 1.0:
             product_components.append(func)
 
         else:
-            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 4))})")
+            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, DECIMAL_DIGITS))})")
 
     return product_components
 
@@ -70,7 +71,7 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     :return: the prettified version of the coefficients.
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = [round(value, 4) for value in coefficients]
+    prettified_coefficients = [round(value, DECIMAL_DIGITS) for value in coefficients]
     return prettified_coefficients
 
 
@@ -93,14 +94,14 @@ def construct_projected_variable_strings(
     for row in range(len(projection_basis)):
         product_by_components_row = []
         for shifted, component in zip(shifted_by_mean, projection_basis[row]):
-            if abs(round(component, 4)) <= EPSILON:
+            if abs(round(component, DECIMAL_DIGITS)) <= EPSILON:
                 continue
 
             if component == 1.0:
                 product_by_components_row.append(shifted)
                 continue
 
-            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 4))})")
+            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, DECIMAL_DIGITS))})")
 
         sum_of_product_by_components.append(construct_linear_equation_string(product_by_components_row))
 
@@ -164,7 +165,7 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
             linear_coeff = value
             break
 
-    return prettify_floating_point_number(round(linear_coeff, 4))
+    return prettify_floating_point_number(round(linear_coeff, DECIMAL_DIGITS))
 
 
 def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[DataFrame, List[str], List[str]]:
