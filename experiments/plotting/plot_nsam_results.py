@@ -58,7 +58,7 @@ def plot_results(results_directory_path: Path):
         plt.xlabel('# Observations', fontsize=24)
         plt.ylabel('AVG % of solved', fontsize=24)
         plt.xticks(fontsize=24)
-        plt.yticks(fontsize=24)
+        plt.yticks(ticks=list(range(0, 101, 10)),fontsize=24)
 
         # Add a legend
         plt.legend(fontsize=24)

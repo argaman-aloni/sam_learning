@@ -18,7 +18,7 @@ from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
-PLANNER_EXECUTION_TIMEOUT = 600
+PLANNER_EXECUTION_TIMEOUT = 1800
 
 
 def configure_iteration_logger(args: argparse.Namespace):
