@@ -12,7 +12,7 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
 )
 from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
 from sam_learning.core import LearnerDomain
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 

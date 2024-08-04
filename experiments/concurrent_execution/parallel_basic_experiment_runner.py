@@ -68,7 +68,7 @@ class ParallelExperimentRunner:
         )
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
-        """Initializes the algorithm of the semantic precision / recall calculator."""
+        """Initializes the algorithm of the semantic precision - recall calculator."""
         self.semantic_performance_calc = init_semantic_performance_calculator(
             self.working_directory_path,
             self.domain_file_name,
