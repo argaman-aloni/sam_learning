@@ -22,7 +22,6 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         domain_file_name: str,
         learning_algorithm: LearningAlgorithmType,
         polynom_degree: int,
-        solver_type: SolverType,
         problem_prefix: str = "pfile",
         fluent_map_path: Path = None,
     ):
@@ -30,7 +29,6 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
             working_directory_path=working_directory_path,
             domain_file_name=domain_file_name,
             learning_algorithm=learning_algorithm,
-            solver_type=solver_type,
             problem_prefix=problem_prefix,
         )
         self.fluents_map_path = fluent_map_path
@@ -40,7 +38,6 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
             self.working_directory_path,
             learning_algorithm,
             self.working_directory_path / domain_file_name,
-            solver_type=solver_type,
             problem_prefix=problem_prefix,
         )
 
@@ -111,7 +108,6 @@ def main():
         domain_file_name=args.domain_file_name,
         learning_algorithm=learning_algorithm,
         polynom_degree=int(args.polynom_degree),
-        solver_type=SolverType(args.solver_type),
         problem_prefix=args.problems_prefix,
         fluent_map_path=args.fluents_map_path,
     )

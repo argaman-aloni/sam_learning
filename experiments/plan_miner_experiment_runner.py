@@ -21,6 +21,7 @@ PLAN_MINER_DIR_PATH = os.environ["PLAN_MINER_DIR_PATH"]
 
 class PlanMinerExperimentRunner:
     """Runs the experiment using PlanMiner algorithm."""
+
     logger: logging.Logger
     working_directory_path: Path
     k_fold: KFoldSplit
@@ -31,15 +32,12 @@ class PlanMinerExperimentRunner:
     def __init__(self, working_directory_path: Path, domain_file_name: str):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(working_directory_path=working_directory_path,
-                                 domain_file_name=domain_file_name,
-                                 n_split=DEFAULT_SPLIT)
+        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
         self.domain_file_name = domain_file_name
         self.domain_validator = DomainValidator(
-            self.working_directory_path, LearningAlgorithmType.plan_miner,
-            self.working_directory_path / domain_file_name)
-        self.base_domain = DomainParser(domain_path=self.working_directory_path / domain_file_name,
-                                        partial_parsing=True).parse_domain()
+            self.working_directory_path, LearningAlgorithmType.plan_miner, self.working_directory_path / domain_file_name
+        )
+        self.base_domain = DomainParser(domain_path=self.working_directory_path / domain_file_name, partial_parsing=True).parse_domain()
 
     def _create_fixed_domain(self, plan_miner_domain: Domain) -> str:
         """Fixes the domain created by plan miner to be a readable domain.
@@ -57,11 +55,11 @@ class PlanMinerExperimentRunner:
             else:
                 learner_domain.actions[action_name].numeric_preconditions = (
                     [precondition.to_pddl() for precondition in action_data.numeric_preconditions],
-                    ConditionType.conjunctive)
+                    ConditionType.conjunctive,
+                )
             learner_domain.actions[action_name].add_effects = action_data.add_effects
             learner_domain.actions[action_name].delete_effects = action_data.delete_effects
-            learner_domain.actions[action_name].numeric_effects = [effect.to_pddl() for effect in
-                                                                   action_data.numeric_effects]
+            learner_domain.actions[action_name].numeric_effects = [effect.to_pddl() for effect in action_data.numeric_effects]
         return learner_domain.to_pddl()
 
     def concatenate_trajectories(self, train_set_dir_path: Path, allowed_observations: List[Path]) -> Path:
@@ -110,8 +108,7 @@ class PlanMinerExperimentRunner:
         :return: the path to the copied domain file.
         """
         self.logger.info("Fixing a bug in the PlanMiner algorithm domain generation!")
-        plan_miner_domain = DomainParser(domain_path=learned_domain_path,
-                                         partial_parsing=False, enable_conjunctions=True).parse_domain()
+        plan_miner_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False, enable_conjunctions=True).parse_domain()
         pddl_domain_str = self._create_fixed_domain(plan_miner_domain)
         print(pddl_domain_str)
         with open(learned_domain_path, "wt") as domain_file:
@@ -122,8 +119,7 @@ class PlanMinerExperimentRunner:
         learned_domain_path.unlink()
         return test_set_dir_path / learned_domain_path.name
 
-    def learn_model_using_plan_miner(self, fold_num: int, train_set_dir_path: Path,
-                                     test_set_dir_path: Path) -> NoReturn:
+    def learn_model_using_plan_miner(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> NoReturn:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
@@ -150,8 +146,7 @@ class PlanMinerExperimentRunner:
 
         self.domain_validator.write_statistics(fold_num)
 
-    def validate_learned_domain(self, allowed_observations: List[Path], learned_domain_path: Path,
-                                test_set_dir_path: Path) -> NoReturn:
+    def validate_learned_domain(self, allowed_observations: List[Path], learned_domain_path: Path, test_set_dir_path: Path) -> NoReturn:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
@@ -160,16 +155,15 @@ class PlanMinerExperimentRunner:
         """
         domain_file_path = self.copy_domain(learned_domain_path, test_set_dir_path)
         self.logger.debug("Checking that the test set problems can solved using the learned domain.")
-        self.domain_validator.validate_domain(tested_domain_file_path=domain_file_path,
-                                              test_set_directory_path=test_set_dir_path,
-                                              used_observations=allowed_observations)
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=domain_file_path, test_set_directory_path=test_set_dir_path, used_observations=allowed_observations
+        )
 
         domain_file_path.unlink()
 
     def run_cross_validation(self) -> NoReturn:
         """Runs that cross validation process on the domain's working directory and validates the results."""
-        for fold_num, (train_dir_path, test_dir_path) in enumerate(
-                self.k_fold.create_k_fold(trajectory_suffix="*.pts")):
+        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold(trajectory_suffix="*.pts")):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.learn_model_using_plan_miner(fold_num, train_dir_path, test_dir_path)
             self.domain_validator.clear_statistics()
@@ -182,13 +176,9 @@ def main():
     args = sys.argv
     working_directory_path = Path(args[1])
     domain_file_name = args[2]
-    PlanMinerExperimentRunner(working_directory_path=working_directory_path,
-                              domain_file_name=domain_file_name).run_cross_validation()
+    PlanMinerExperimentRunner(working_directory_path=working_directory_path, domain_file_name=domain_file_name).run_cross_validation()
 
 
-if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
+if __name__ == "__main__":
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
     main()

@@ -79,6 +79,50 @@ class ENHSPSolver:
             self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDERR - {stderr}")
             return False
 
+    def solve_problem(
+        self,
+        domain_file_path: Path,
+        problem_file_path: Path,
+        problems_directory_path: Path,
+        solving_stats: Dict[str, str],
+        solving_timeout: int,
+        tolerance: float,
+    ) -> None:
+        """Solves a single problem using the ENHSP algorithm.
+
+        :param domain_file_path: the path to the domain file.
+        :param problem_file_path: the path to the problem file.
+        :param problems_directory_path: the path to the problems' directory.
+        :param solving_stats: the statistics of the solving process.
+        :param solving_timeout: the timeout for the solver.
+        :param tolerance: the numeric tolerance to use.
+        """
+        num_retries = 0
+        self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
+        solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
+        running_options = [
+            "-o",
+            str(domain_file_path.absolute()),
+            "-f",
+            str(problem_file_path.absolute()),
+            "-planner",
+            "sat-hmrphj",
+            "-tolerance",
+            f"{tolerance}",
+            "-gro",
+            "naive",
+            "-sp",
+            str(solution_path.absolute()),
+        ]
+        run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
+        solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
+        while not solver_output_ok and num_retries < 3:
+            solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
+            num_retries += 1
+        if not solver_output_ok:
+            # in any other case the value is set correctly.
+            solving_stats[problem_file_path.stem] = "solver_error"
+
     def execute_solver(
         self,
         problems_directory_path: Path,
@@ -98,32 +142,7 @@ class ENHSPSolver:
         solving_stats = {}
         self.logger.info("Starting to solve the input problems using ENHSP solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
-            num_retries = 0
-            self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
-            solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            running_options = [
-                "-o",
-                str(domain_file_path.absolute()),
-                "-f",
-                str(problem_file_path.absolute()),
-                "-planner",
-                "sat-hmrphj",
-                "-tolerance",
-                f"{tolerance}",
-                "-gro",
-                "naive",
-                "-sp",
-                str(solution_path.absolute()),
-            ]
-            run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
-            solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
-            while not solver_output_ok and num_retries < 3:
-                solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
-                num_retries += 1
-
-            if not solver_output_ok:
-                # in any other case the value is set correctly.
-                solving_stats[problem_file_path.stem] = "solver_error"
+            self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout, tolerance)
 
         return solving_stats
 
