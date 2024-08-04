@@ -71,16 +71,18 @@ class NumericFluentStateStorage:
     def construct_safe_linear_inequalities(self, relevant_fluents: Optional[List[str]] = None) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
+        :param relevant_fluents: the fluents that are part of the action's preconditions and effects.
         :return: The precondition that contains the linear inequalities.
         """
         self.logger.info("Constructing the safe linear inequalities.")
         return self.convex_hull_learner.construct_safe_linear_inequalities(self.previous_state_storage, relevant_fluents)
 
-    def construct_assignment_equations(self, allow_unsafe: bool = False) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
+    def construct_assignment_equations(self, allow_unsafe: bool = False, relevant_fluents: Optional[List[str]] = None) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
         :param allow_unsafe: whether to allow unsafe fluents in the assignment equations.
+        :param relevant_fluents: the fluents that are part of the action's preconditions and effects.
         :return: the constructed assignment statements.
         """
         self.logger.info("Constructing the assignment equations.")
-        return self.linear_regression_learner.construct_assignment_equations(allow_unsafe=allow_unsafe)
+        return self.linear_regression_learner.construct_assignment_equations(allow_unsafe=allow_unsafe, relevant_fluents=relevant_fluents)

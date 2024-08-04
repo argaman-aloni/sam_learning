@@ -31,7 +31,7 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
                  episode_recorder: EpisodeInfoRecord = None,
                  fluents_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree,
-                         preconditions_fluent_map=fluents_map)
+                         relevant_fluents=fluents_map)
         self.ig_learner = {}
         self.agent = agent
         self.applicable_actions = PriorityQueue()
@@ -57,8 +57,8 @@ class OnlineNSAMLearner(PolynomialSAMLearning):
         :param action: the action being applied.
         :return: the features to explore.
         """
-        return self.preconditions_fluent_map[action.name] if \
-            self.preconditions_fluent_map else self.ig_learner[action.name].numeric_positive_samples.columns.tolist()
+        return self.relevant_fluents[action.name] if \
+            self.relevant_fluents else self.ig_learner[action.name].numeric_positive_samples.columns.tolist()
 
     def _get_lifted_bounded_state(
             self, action: ActionCall, state: State) -> Tuple[Dict[str, PDDLFunction], List[Predicate]]:

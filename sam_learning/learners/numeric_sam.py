@@ -21,13 +21,15 @@ class NumericSAMLearner(SAMLearner):
 
     storage: Dict[str, NumericFluentStateStorage]
     function_matcher: NumericFunctionMatcher
-    preconditions_fluent_map: Dict[str, List[str]]
+    relevant_fluents: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None, allow_unsafe: bool = False, **kwargs):
+    def __init__(
+        self, partial_domain: Domain, relevant_fluents: Optional[Dict[str, List[str]]] = None, allow_unsafe: bool = False, **kwargs,
+    ):
         super().__init__(partial_domain)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)
-        self.preconditions_fluent_map = preconditions_fluent_map
+        self.relevant_fluents = relevant_fluents
         self._allow_unsafe = allow_unsafe
 
     def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
@@ -36,15 +38,15 @@ class NumericSAMLearner(SAMLearner):
         :param action: the action that the preconditions are constructed for.
         """
         action_name = action.name
-        if self.preconditions_fluent_map is None:
+        if self.relevant_fluents is None:
             learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
 
-        elif len(self.preconditions_fluent_map[action_name]) == 0:
+        elif len(self.relevant_fluents[action_name]) == 0:
             self.logger.debug(f"The action {action_name} has no numeric preconditions.")
             return
 
         else:
-            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(self.preconditions_fluent_map[action_name])
+            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(self.relevant_fluents[action_name])
 
         if learned_numeric_preconditions.binary_operator == "and":
             self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
@@ -63,7 +65,14 @@ class NumericSAMLearner(SAMLearner):
         :param action: the action that its effects are constructed for.
         :return: whether the effects were learned perfectly.
         """
-        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations(allow_unsafe=self._allow_unsafe)
+        if self.relevant_fluents is not None and len(self.relevant_fluents[action.name]) == 0:
+            self.logger.debug(f"The action - {action.name} has no numeric effects.")
+            action.numeric_effects = set()
+            return True
+
+        effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations(
+            allow_unsafe=self._allow_unsafe, relevant_fluents=self.relevant_fluents[action.name] if self.relevant_fluents is not None else None
+        )
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
 
@@ -71,32 +80,7 @@ class NumericSAMLearner(SAMLearner):
             self.logger.debug(f"The action - {action.name} has no numeric effects.")
             action.numeric_effects = set()
 
-        if self.preconditions_fluent_map is None:
-            self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
-            return learned_perfectly
-
-        if learned_perfectly:
-            self.logger.debug(f"The effect of action - {action.name} were learned perfectly.")
-            if numeric_preconditions is not None:
-                for cond in numeric_preconditions.operands:
-                    if cond in action.preconditions.root:
-                        continue
-
-                    action.preconditions.add_condition(cond)
-
-            return learned_perfectly
-
-        self.logger.debug(f"Creating restrictive numeric preconditions for the action.")
-        restrictive_preconditions = Precondition("and")
-        for precondition in action.preconditions.root.operands:
-            if isinstance(precondition, Predicate):
-                restrictive_preconditions.add_condition(precondition)
-
-        action.preconditions.root = restrictive_preconditions
-        fluents_map_backup = self.preconditions_fluent_map
-        self.preconditions_fluent_map = None
-        self._construct_safe_numeric_preconditions(action)
-        self.preconditions_fluent_map = fluents_map_backup
+        self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
         return learned_perfectly
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -205,12 +189,12 @@ class PolynomialSAMLearning(NumericSAMLearner):
     def __init__(
         self,
         partial_domain: Domain,
-        preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+        relevant_fluents: Optional[Dict[str, List[str]]] = None,
         polynomial_degree: int = 1,
         allow_unsafe: bool = False,
         **kwargs,
     ):
-        super().__init__(partial_domain, preconditions_fluent_map, allow_unsafe, **kwargs)
+        super().__init__(partial_domain, relevant_fluents, allow_unsafe, **kwargs)
         self.polynom_degree = polynomial_degree
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:

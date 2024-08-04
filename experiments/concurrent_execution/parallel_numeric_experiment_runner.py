@@ -60,7 +60,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         """
 
         learner = NUMERIC_SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
-            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, preconditions_fluent_map=self.fluents_map
+            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, relevant_fluents=self.fluents_map
         )
         return learner.learn_action_model(allowed_observations)
 
