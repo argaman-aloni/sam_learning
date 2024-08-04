@@ -11,7 +11,6 @@ from pddl_plus_parser.models import Observation, Domain
 
 from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_SPLIT, DEFAULT_NUMERIC_TOLERANCE, NUMERIC_ALGORITHMS
 from sam_learning.core import LearnerDomain
-from solvers import ENHSPSolver, MetricFFSolver
 from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType
@@ -56,12 +55,7 @@ class ParallelExperimentRunner:
     fluents_map: Dict[str, List[str]]
 
     def __init__(
-        self,
-        working_directory_path: Path,
-        domain_file_name: str,
-        learning_algorithm: LearningAlgorithmType,
-        solver_type: SolverType,
-        problem_prefix: str = "pfile",
+        self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType, problem_prefix: str = "pfile",
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
@@ -70,11 +64,7 @@ class ParallelExperimentRunner:
         self._learning_algorithm = learning_algorithm
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
-            self.working_directory_path,
-            learning_algorithm,
-            self.working_directory_path / domain_file_name,
-            solver_type=solver_type,
-            problem_prefix=problem_prefix,
+            self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
@@ -160,27 +150,19 @@ class ParallelExperimentRunner:
         )
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
-        if self._learning_algorithm in NUMERIC_ALGORITHMS:
-            self.domain_validator.solver = MetricFFSolver()
-            self.domain_validator._solver_name = "metric_ff"
-            self.domain_validator.validate_domain(
-                tested_domain_file_path=domain_file_path,
-                test_set_directory_path=test_set_dir_path,
-                used_observations=allowed_observations,
-                tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                timeout=PLANNER_EXECUTION_TIMEOUT,
-                learning_time=learning_time,
-            )
-
-            self.domain_validator.solver = ENHSPSolver()
-            self.domain_validator._solver_name = "enhsp"
-            self.domain_validator.validate_domain(
-                tested_domain_file_path=domain_file_path,
-                test_set_directory_path=test_set_dir_path,
-                used_observations=allowed_observations,
-                tolerance=DEFAULT_NUMERIC_TOLERANCE,
-                timeout=PLANNER_EXECUTION_TIMEOUT,
-                learning_time=learning_time,
-            )
+        portfolio = (
+            [SolverType.metric_ff, SolverType.enhsp]
+            if self._learning_algorithm in NUMERIC_ALGORITHMS
+            else [SolverType.fast_forward, SolverType.fast_downward]
+        )
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=domain_file_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=allowed_observations,
+            tolerance=DEFAULT_NUMERIC_TOLERANCE,
+            timeout=PLANNER_EXECUTION_TIMEOUT,
+            learning_time=learning_time,
+            solvers_portfolio=portfolio,
+        )
 
         return domain_file_path

@@ -65,6 +65,13 @@ DEBUG_STATISTICS = [
 VALIDATED_AGAINST_EXPERT_PLAN = "validated_against_expert_plan"
 NOT_VALIDATED_AGAINST_EXPERT_PLAN = "not_validated_against_expert_plan"
 
+NUMERIC_STATISTICS_LABELS = [
+    *[solution_type.name for solution_type in SolutionOutputTypes],
+    VALIDATED_AGAINST_EXPERT_PLAN,
+    NOT_VALIDATED_AGAINST_EXPERT_PLAN,
+]
+
+
 ACTION_LINE_REGEX = r"(\[\d+, \d+\]): \(.*\)"
 
 
@@ -76,7 +83,6 @@ class DomainValidator:
     """
 
     logger: logging.Logger
-    solver: Union[ENHSPSolver, MetricFFSolver, FastDownwardSolver, FFADLSolver]
     solving_stats: List[Dict[str, Any]]
     aggregated_solving_stats: List[Dict[str, Any]]
     learning_algorithm: LearningAlgorithmType
@@ -84,19 +90,15 @@ class DomainValidator:
     reference_domain_path: Path
     results_dir_path: Path
     problem_prefix: str
-    _solver_name: str
 
     def __init__(
         self,
         working_directory_path: Path,
         learning_algorithm: LearningAlgorithmType,
         reference_domain_path: Path,
-        solver_type: SolverType,
         problem_prefix: str = "pfile",
     ):
         self.logger = logging.getLogger(__name__)
-        self.solver = SOLVER_TYPES[solver_type]()
-        self._solver_name = solver_type.name
         self.solving_stats = []
         self.aggregated_solving_stats = []
         self.learning_algorithm = learning_algorithm
@@ -227,7 +229,8 @@ class DomainValidator:
         used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None,
         tolerance: float = 0.01,
         timeout: int = 5,
-        learning_time: float = 0
+        learning_time: float = 0,
+        solvers_portfolio: List[SolverType] = None,
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -237,49 +240,53 @@ class DomainValidator:
         :param timeout: the timeout for the solver.
         :param tolerance: the numeric tolerance to use.
         :param learning_time: the time it took to learn the domain (in seconds).
+        :param solvers_portfolio: the solvers to use for the validation, can be one or more and each will try to solve each planning problem at most once..
+        
         """
         num_triplets = self._extract_num_triplets(used_observations)
-        self.logger.info("Solving the test set problems using the learned domain!")
-        solving_report = self.solver.execute_solver(
-            problems_directory_path=test_set_directory_path,
-            domain_file_path=tested_domain_file_path,
-            problems_prefix=self.problem_prefix,
-            tolerance=tolerance,
-            solving_timeout=timeout,
-        )
-
-        solving_stats = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
-        solving_stats[VALIDATED_AGAINST_EXPERT_PLAN] = 0
-        solving_stats[NOT_VALIDATED_AGAINST_EXPERT_PLAN] = 0
-
+        solving_stats: Dict[str, Any] = {label: 0 for label in NUMERIC_STATISTICS_LABELS}
         for debug_statistic in DEBUG_STATISTICS:
             solving_stats[debug_statistic] = []
 
-        for problem_file_name, entry in solving_report.items():
-            expert_plan_path = self.working_directory_path / f"{problem_file_name}.solution"
-            problem_file_path = test_set_directory_path / f"{problem_file_name}.pddl"
-            if entry == SolutionOutputTypes.ok.name:
-                solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
-                self._validate_solution_content(
-                    solution_file_path=solution_file_path, problem_file_path=problem_file_path, iteration_statistics=solving_stats
+        self.logger.info("Solving the test set problems using the learned domain!")
+        for problem_path in test_set_directory_path.glob(f"{self.problem_prefix}*.pddl"):
+            problem_solving_report = {}
+            problem_solved = False
+            problem_file_name = problem_path.stem
+            for solver_type in solvers_portfolio:
+                solver = SOLVER_TYPES[solver_type]()
+                solver.solve_problem(
+                    problems_directory_path=test_set_directory_path,
+                    domain_file_path=tested_domain_file_path,
+                    problem_file_path=problem_path,
+                    tolerance=tolerance,
+                    solving_timeout=timeout,
+                    solving_stats=problem_solving_report,
                 )
+                if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
+                    problem_solved = True
+                    solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
+                    self._validate_solution_content(
+                        solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats
+                    )
+                    break
 
+            if problem_solved:
                 continue
 
-            self.logger.debug(f"Validating the domain against the expert plan: {expert_plan_path}")
+            expert_plan_path = self.working_directory_path / f"{problem_file_name}.solution"
+            solving_outcome = problem_solving_report[problem_file_name]
+            solving_stats[solving_outcome] += 1
+            solving_stats[f"problems_{solving_outcome}"].append(problem_file_name)
             self._validate_against_expert_plan(
                 solution_file_path=expert_plan_path,
-                problem_file_path=problem_file_path,
+                problem_file_path=problem_path,
                 iteration_statistics=solving_stats,
                 tested_domain_path=tested_domain_file_path,
             )
 
-            solving_stats[entry] += 1
-            solving_stats[f"problems_{entry}"].append(problem_file_name)
-
         self._calculate_solving_percentages(solving_stats)
         self._calculate_expert_validation_statistics(solving_stats)
-
         num_trajectories = len(used_observations)
         self.solving_stats.append(
             {
@@ -287,7 +294,7 @@ class DomainValidator:
                 "num_trajectories": num_trajectories,
                 "num_trajectory_triplets": num_triplets,
                 "learning_time": learning_time,
-                "solver": self._solver_name,
+                "solver": [solver.name for solver in solvers_portfolio],
                 **solving_stats,
             }
         )

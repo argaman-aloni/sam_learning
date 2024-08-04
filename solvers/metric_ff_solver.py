@@ -81,6 +81,30 @@ class MetricFFSolver:
             solving_stats[problem_file_path.stem] = "no_solution"
             solution_path.unlink(missing_ok=True)
 
+    def solve_problem(
+        self,
+        domain_file_path: Path,
+        problem_file_path: Path,
+        problems_directory_path: Path,
+        solving_stats: Dict[str, str],
+        solving_timeout: int,
+        tolerance: float,
+    ) -> None:
+        """Solves a single problem using the Metric FF algorithm.
+
+        :param domain_file_path: the path to the domain file.
+        :param problem_file_path: the path to the problem file.
+        :param problems_directory_path: the path to the problems' directory.
+        :param solving_stats: the statistics of the solving process.
+        :param solving_timeout: the timeout for the solver.
+        :param tolerance: the numeric tolerance to use.
+        """
+        os.chdir(METRIC_FF_DIRECTORY)
+        self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
+        solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
+        run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 0 -t {tolerance} > {solution_path}"
+        self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_stats, solving_timeout)
+
     def execute_solver(
         self,
         problems_directory_path: Path,
@@ -98,13 +122,9 @@ class MetricFFSolver:
         :param tolerance: the numeric tolerance for errors in the Metric-FF solver.
         """
         solving_stats = {}
-        os.chdir(METRIC_FF_DIRECTORY)
         self.logger.info("Starting to solve the input problems using Metic-FF solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
-            self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
-            solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 0 -t {tolerance} > {solution_path}"
-            self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_stats, solving_timeout)
+            self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout, tolerance)
 
         return solving_stats
 

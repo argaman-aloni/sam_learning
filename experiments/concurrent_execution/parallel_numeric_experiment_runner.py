@@ -26,14 +26,12 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         polynom_degree: int,
         learning_algorithm: LearningAlgorithmType,
         fluents_map_path: Optional[Path],
-        solver_type: SolverType,
         problem_prefix: str = "pfile",
     ):
         super().__init__(
             working_directory_path=working_directory_path,
             domain_file_name=domain_file_name,
             learning_algorithm=learning_algorithm,
-            solver_type=solver_type,
             problem_prefix=problem_prefix,
         )
         self.fluents_map = None
@@ -47,7 +45,6 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             self.working_directory_path,
             learning_algorithm,
             self.working_directory_path / domain_file_name,
-            solver_type=solver_type,
             problem_prefix=problem_prefix,
         )
 
@@ -123,7 +120,6 @@ def main():
         domain_file_name=args.domain_file_name,
         learning_algorithm=learning_algorithm,
         fluents_map_path=Path(args.fluents_map_path) if args.fluents_map_path else None,
-        solver_type=SolverType(args.solver_type),
         polynom_degree=int(args.polynom_degree),
         problem_prefix=args.problems_prefix,
     )

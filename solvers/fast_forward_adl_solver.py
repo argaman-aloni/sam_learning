@@ -22,9 +22,9 @@ class FFADLSolver:
         self.logger = logging.getLogger(__name__)
         self.parser = MetricFFParser()
 
-    def _run_ff_process(self, run_command: str, solution_path: Path,
-                        problem_file_path: Path, solving_stats: Dict[str, str],
-                        solving_timeout: int = MAX_RUNNING_TIME) -> None:
+    def _run_ff_process(
+        self, run_command: str, solution_path: Path, problem_file_path: Path, solving_stats: Dict[str, str], solving_timeout: int = MAX_RUNNING_TIME
+    ) -> None:
         """Runs the metric-ff process."""
         self.logger.info(f"FF solver is working on - {problem_file_path.stem}")
         process = subprocess.Popen(run_command, shell=True)
@@ -67,9 +67,32 @@ class FFADLSolver:
             solving_stats[problem_file_path.stem] = "no_solution"
             solution_path.unlink(missing_ok=True)
 
-    def execute_solver(self, problems_directory_path: Path, domain_file_path: Path,
-                       problems_prefix: str = "pfile", tolerance: float = 0.1,
-                       solving_timeout: int = MAX_RUNNING_TIME) -> Dict[str, str]:
+    def solve_problem(
+        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_stats: Dict[str, str], solving_timeout: int
+    ) -> None:
+        """Solves a single problem using the FF algorithm.
+
+        :param domain_file_path: the path to the domain file.
+        :param problem_file_path: the path to the problem file.
+        :param problems_directory_path: the path to the problems' directory.
+        :param solving_stats: the statistics of the solving process.
+        :param solving_timeout: the timeout for the solving process.
+        """
+        os.chdir(FF_DIRECTORY)
+        self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
+        solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
+        run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -i 102 > {solution_path}"
+        self._run_ff_process(run_command, solution_path, problem_file_path, solving_stats, solving_timeout)
+        self.logger.debug(f"Finished working on solving problem - {problem_file_path.stem}")
+
+    def execute_solver(
+        self,
+        problems_directory_path: Path,
+        domain_file_path: Path,
+        problems_prefix: str = "pfile",
+        tolerance: float = 0.1,
+        solving_timeout: int = MAX_RUNNING_TIME,
+    ) -> Dict[str, str]:
         """Solves numeric and PDDL+ problems using the FF algorithm and outputs the solution into a file.
 
         :param problems_directory_path: the path to the problems directory.
@@ -78,24 +101,15 @@ class FFADLSolver:
         :param tolerance: the tolerance for the numeric problems (only used for compliance with the interface).
         """
         solving_stats = {}
-        os.chdir(FF_DIRECTORY)
         self.logger.info("Starting to solve the input problems using FF solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
-            self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
-            solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -i 102 > {solution_path}"
-            self._run_ff_process(run_command, solution_path, problem_file_path, solving_stats, solving_timeout)
-            self.logger.debug(f"Finished working on solving problem - {problem_file_path.stem}")
+            self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
 
         return solving_stats
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = sys.argv
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
     solver = FFADLSolver()
-    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]),
-                          problems_prefix=args[3])
+    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]), problems_prefix=args[3])
