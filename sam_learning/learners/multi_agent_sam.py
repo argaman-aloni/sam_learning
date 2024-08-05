@@ -16,8 +16,8 @@ class MultiAgentSAM(SAMLearner):
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
 
-    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
-        super().__init__(partial_domain)
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None, ignore_negative_preconditions: bool = False):
+        super().__init__(partial_domain, ignore_negative_preconditions=ignore_negative_preconditions)
         self.logger = logging.getLogger(__name__)
         self.literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
@@ -284,6 +284,7 @@ class MultiAgentSAM(SAMLearner):
                 self.handle_multi_agent_trajectory_component(component)
 
         self.construct_safe_actions()
+        self.handle_negative_preconditions()
         self.logger.info("Finished learning the action model!")
         super().end_measure_learning_time()
         learning_report = super()._construct_learning_report()
