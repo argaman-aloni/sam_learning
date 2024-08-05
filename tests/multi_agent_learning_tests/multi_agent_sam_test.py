@@ -260,13 +260,13 @@ def test_learn_action_model_returns_learned_model(
 
 
 
-def test_learn_action_model_with_ignore_precondition_keep_positive_preconditions(
+def test_learn_action_model_with_ignore_negative_precondition_keep_positive_preconditions(
         woodworking_ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation,
-        woodworking_ma_sam_ignore_pre: MultiAgentSAM):
+        woodworking_ma_sam_ignore_pre: MultiAgentSAM, multi_agent_observation2: MultiAgentObservation):
     #does not ignore negative precondition
     learned_model, learning_report = woodworking_ma_sam.learn_combined_action_model([multi_agent_observation])
     #does ignore
-    learned_model_ignore, learning_report_ignore = woodworking_ma_sam_ignore_pre.learn_combined_action_model([multi_agent_observation])
+    learned_model_ignore, learning_report_ignore = woodworking_ma_sam_ignore_pre.learn_combined_action_model([multi_agent_observation2])
     for action_name, action in learned_model.actions.items():
         action_ignored = learned_model_ignore.actions[action_name]
         preconds = set([prec for prec in action.preconditions.root.operands if isinstance(prec,Predicate)])
@@ -276,9 +276,8 @@ def test_learn_action_model_with_ignore_precondition_keep_positive_preconditions
         assert len(difference_ignore_from_classic) == 0
         for pre in difference_classic_from_ignore:
             if isinstance(pre, Predicate):
-                assert pre.is_positive == False
+                assert not pre.is_positive
 
-    assert True
 
 def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditions(
         woodworking_ma_sam_ignore_pre: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
@@ -286,6 +285,5 @@ def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditi
     for action in learned_model_ignore.actions.values():
         for pre in action.preconditions.root.operands:
             if isinstance(pre,Predicate):
-                assert pre.is_positive == True
+                assert pre.is_positive
 
-    assert True
