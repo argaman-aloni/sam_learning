@@ -9,7 +9,7 @@ from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import Observation
 
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
-from statistics.ma_performance_calculator import MaSamPerformanceCalculator
+from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from utilities import LearningAlgorithmType
 
@@ -58,7 +58,7 @@ def init_semantic_performance_calculator(
         )
 
     if learning_algorithm == LearningAlgorithmType.ma_sam:
-        return MaSamPerformanceCalculator(
+        return MASamPerformanceCalculator(
             model_domain=model_domain,
             observations=observations,
             model_domain_path=domain_path,

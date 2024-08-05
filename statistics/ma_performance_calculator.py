@@ -1,4 +1,4 @@
-"""Module responsible for calculating our approach for multi_agent precision and recall."""
+"""Module responsible for calculating our approach for Multi-Agent precision and recall."""
 import csv
 from collections import defaultdict
 from pathlib import Path
@@ -13,18 +13,9 @@ from pddl_plus_parser.models import (
 from statistics import SemanticPerformanceCalculator, _calculate_precision_recall
 from utilities import LearningAlgorithmType
 
-MA_PERFORMANCE_STATS = [
-    "learning_algorithm",
-    "action_name",
-    "num_trajectories",
-    "precondition_precision",
-    "precondition_recall",
-    # "effects_precision",
-    # "effects_recall",
-]
 
-class MaSamPerformanceCalculator(SemanticPerformanceCalculator):
-    """Class responsible for calculating the multi_agent precision and recall of a model."""
+class MASamPerformanceCalculator(SemanticPerformanceCalculator):
+    """Class responsible for calculating the Multi-Agent precision and recall of a model."""
 
     def __init__(
         self,
@@ -35,6 +26,15 @@ class MaSamPerformanceCalculator(SemanticPerformanceCalculator):
         learning_algorithm: LearningAlgorithmType,
     ):
         super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
+        self.SEMANTIC_PRECISION_STATS = [
+            "learning_algorithm",
+            "action_name",
+            "num_trajectories",
+            "precondition_precision",
+            "precondition_recall",
+            # "effects_precision",
+            # "effects_recall",
+        ]
 
     def calculate_preconditions_semantic_performance(
         self, learned_domain: Domain, learned_domain_path: Path
@@ -55,7 +55,7 @@ class MaSamPerformanceCalculator(SemanticPerformanceCalculator):
             for component in observation.components:
                 possible_ground_actions.extend(component.grounded_joint_action.actions)
                 self.logger.info(
-                    f"Calculating the preconditions' ma semantic performance for the action the state - {component.previous_state.serialize()}"
+                    f"Calculating the preconditions' semantic performance for the agent's actions - {component.previous_state.serialize()}"
                 )
                 for action in possible_ground_actions:
                     if action.name not in learned_domain.actions:
@@ -77,9 +77,9 @@ class MaSamPerformanceCalculator(SemanticPerformanceCalculator):
         :param num_used_observations: the number of observations used to learn the action model.
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
-        self.logger.info("Starting to calculate the ma semantic preconditions performance of the learned domain.")
+        self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
         preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
-        self.logger.info("Starting to calculate the ma semantic effects performance of the learned domain.")
+        self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         for action_name in self.model_domain.actions:
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,
@@ -90,29 +90,4 @@ class MaSamPerformanceCalculator(SemanticPerformanceCalculator):
             }
             self.combined_stats.append(action_stats)
 
-        self.logger.info(f"Finished calculating the ma learning performance for {self.learning_algorithm.name}.")
-
-    def export_semantic_performance(self, fold_num: int, iteration_num: int = 0) -> None:
-        """Export the ma learning statistics to a CSV report file.
-
-        :param fold_num: the fold number of the current experiment.
-        :param iteration_num: the iteration number of the current experiment.
-        """
-        statistics_path = (
-            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}"
-            f"_ma_learning_performance_stats_fold_{fold_num}_{iteration_num}.csv"
-        )
-        with open(statistics_path, "wt", newline="") as statistics_file:
-            stats_writer = csv.DictWriter(statistics_file, fieldnames=MA_PERFORMANCE_STATS)
-            stats_writer.writeheader()
-            for data_line in self.combined_stats:
-                stats_writer.writerow(data_line)
-
-    def export_combined_semantic_performance(self) -> None:
-        """Export the ma learning statistics to a CSV report file."""
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_ma_performance.csv"
-        with open(statistics_path, "wt", newline="") as statistics_file:
-            stats_writer = csv.DictWriter(statistics_file, fieldnames=MA_PERFORMANCE_STATS)
-            stats_writer.writeheader()
-            for data_line in self.combined_stats:
-                stats_writer.writerow(data_line)
+        self.logger.info(f"Finished calculating the learning performance for {self.learning_algorithm.name}.")
