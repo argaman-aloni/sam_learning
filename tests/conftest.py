@@ -43,6 +43,11 @@ def elevators_sam_learning(elevators_domain: Domain) -> SAMLearner:
 
 
 @fixture()
+def elevators_sam_learning_ignore(elevators_domain: Domain) -> SAMLearner:
+    return SAMLearner(elevators_domain, ignore_negative_preconditions=True)
+
+
+@fixture()
 def elevators_objects(elevators_observation: Observation) -> Dict[str, PDDLObject]:
     return elevators_observation.grounded_objects
 
@@ -82,6 +87,13 @@ def woodworking_ma_combined_problem(woodworking_ma_combined_domain: Domain) -> P
 
 @fixture()
 def multi_agent_observation(woodworking_ma_combined_domain: Domain,
+                            woodworking_ma_combined_problem) -> MultiAgentObservation:
+    return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
+        WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
+
+
+@fixture()
+def multi_agent_observation2(woodworking_ma_combined_domain: Domain,
                             woodworking_ma_combined_problem) -> MultiAgentObservation:
     return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
         WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)

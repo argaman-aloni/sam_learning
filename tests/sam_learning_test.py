@@ -1,7 +1,7 @@
 """module tests for the SAM learning algorithm"""
 
 from pddl_plus_parser.models import ActionCall, Observation, \
-    ObservedComponent
+    ObservedComponent,  Predicate
 
 from sam_learning.learners import SAMLearner
 from tests.consts import sync_snapshot, extract_preconditions_predicates
@@ -426,3 +426,28 @@ def test_learn_action_model_returns_learned_model(elevators_sam_learning: SAMLea
     learned_model, learning_report = elevators_sam_learning.learn_action_model([elevators_observation])
     print(learning_report)
     print(learned_model.to_pddl())
+
+def test_learn_action_model_with_ignore_negative_precondition_keep_positive_preconditions(
+        elevators_sam_learning: SAMLearner, elevators_observation: Observation,
+        elevators_sam_learning_ignore: SAMLearner):
+    #does not ignore negative precondition
+    learned_model, learning_report = elevators_sam_learning.learn_action_model([elevators_observation])
+    #does ignore
+    learned_model_ignore, learning_report_ignore = elevators_sam_learning_ignore.learn_action_model([elevators_observation])
+    for action, action_ignored in zip(learned_model.actions.values(), learned_model_ignore.actions.values()):
+        preconds = set([prec for prec in action.preconditions.root.operands if isinstance(prec,Predicate)])
+        preconds_ignore = set([prec for prec in action_ignored.preconditions.root.operands if isinstance(prec,Predicate)])
+        difference_ignore_from_classic = preconds_ignore.difference(preconds)
+        difference_classic_from_ignore = preconds.difference(preconds_ignore)
+        assert len(difference_ignore_from_classic) == 0
+        for pre in difference_classic_from_ignore:
+            if isinstance(pre, Predicate):
+                assert not pre.is_positive
+
+def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditions(
+        elevators_sam_learning_ignore: SAMLearner, elevators_observation: Observation):
+    learned_model_ignore, learning_report_ignore = elevators_sam_learning_ignore.learn_action_model([elevators_observation])
+    for action in learned_model_ignore.actions.values():
+        for pre in action.preconditions.root.operands:
+            if isinstance(pre,Predicate):
+                assert pre.is_positive
