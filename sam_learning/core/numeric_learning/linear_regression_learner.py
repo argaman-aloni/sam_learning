@@ -49,9 +49,8 @@ class LinearRegressionLearner:
         """
         # assuming that if a function is an effect of the action it will always be present in the next state.
         if relevant_fluents is not None:
-            self.previous_state_data = self.previous_state_data[relevant_fluents]
-            next_state_relevant_fluents = [fluent for fluent in  self.next_state_data.columns.tolist() if fluent in relevant_fluents]
-            self.next_state_data = self.next_state_data[next_state_relevant_fluents]
+            self.previous_state_data = self.previous_state_data[[fluent for fluent in  self.previous_state_data.columns.tolist() if fluent in relevant_fluents]]
+            self.next_state_data = self.next_state_data[[fluent for fluent in  self.next_state_data.columns.tolist() if fluent in relevant_fluents]]
 
         next_state_df = self.next_state_data.add_prefix(NEXT_STATE_PREFIX)
         combined_data = pd.concat([self.previous_state_data, next_state_df], axis=1)
