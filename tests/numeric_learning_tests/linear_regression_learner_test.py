@@ -460,3 +460,49 @@ def test_construct_assignment_equations_with_polynomial_degree_one_returns_corre
     }
     for effect in numeric_effects:
         assert effect.to_pddl() in expected_effects
+
+
+
+def test_construct_assignment_equations_with_polynomial_degree_one_and_relevant_fluents_does_not_fail_and_returns_correct_equations(
+    polynomial_regression_learner: LinearRegressionLearner,
+):
+    k = 500
+    numbers = list(range(1000))
+    x = random.sample(numbers, k=k)
+    y = random.sample(numbers, k=k)
+    z = random.sample(numbers, k=k)
+    w = random.sample(numbers, k=k)
+    q = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x )": x,
+        "(y )": y,
+        "(z )": z,
+        "(w )": w,
+        "(q )": q,
+    }
+    next_state_matrix = {
+        "(x )": [2 * x1 + 3 * y1 * x1 + 4 * z1 + 5 for x1, y1, z1 in zip(x, y, z)],
+        "(y )": [y1 + y1 * x1 + 1 for x1, y1, in zip(x, y)],
+        "(z )": [1] * k,
+        "(w )": [7 * x1 + 82 * w1 + 1 * z1 + 5 for x1, w1, z1 in zip(x, w, z)],
+        "(q )": [2 * w1 + 245 * y1 + 21 * q1 + 5 for w1, y1, q1 in zip(w, y, q)],
+    }
+    function_names = ["(x )", "(y )", "(z )", "(w )", "(q )"]
+    monomials = create_monomials(function_names, polynom_degree=1)
+    for i in range(k):
+        polynomial_regression_learner.add_new_observation(
+            {create_polynomial_string(monomial): np.prod([pre_state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            store_in_prev_state=True,
+        )
+        polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
+    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations(relevant_fluents=["(x )", "(* (x ) (y ))", "(y )", "(z )"])
+    assert learned_correctly
+    assert len(numeric_effects) == 3
+    expected_effects = {
+        "(increase (x ) (+ (x ) (+ (* (* (x ) (y )) 3) (+ (* (z ) 4) 5))))",
+        "(assign (z ) 1)",
+        "(increase (y ) (+ (* (x ) (y )) 1))",
+    }
+    for effect in numeric_effects:
+        assert effect.to_pddl() in expected_effects

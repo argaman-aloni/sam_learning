@@ -36,7 +36,9 @@ class NaiveLinearRegressionLearner:
         self.domain_functions = domain_functions
 
     @staticmethod
-    def _combine_states_data(prev_state: Dict[str, List[float]], next_state: Dict[str, List[float]], relevant_fluents: Optional[List[str]] = None) -> DataFrame:
+    def _combine_states_data(
+        prev_state: Dict[str, List[float]], next_state: Dict[str, List[float]], relevant_fluents: Optional[List[str]] = None
+    ) -> DataFrame:
         """Combines the previous and next states data into a single dataframe.
 
         :param prev_state: the previous state data.
@@ -45,9 +47,17 @@ class NaiveLinearRegressionLearner:
         :return: the combined dataframe.
         """
         pre_state_fluents_to_use = relevant_fluents if relevant_fluents is not None else list(prev_state.keys())
-        next_state_fluents_to_use = relevant_fluents if relevant_fluents is not None else list(next_state.keys())
+        next_state_fluents_to_use = (
+            [fluent for fluent in next_state.keys() if fluent in relevant_fluents] if relevant_fluents is not None else list(next_state.keys())
+        )
         combined_data = {fluent_name: fluent_values for fluent_name, fluent_values in prev_state.items() if fluent_name in pre_state_fluents_to_use}
-        combined_data.update({f"{NEXT_STATE_PREFIX}{fluent_name}": fluent_values for fluent_name, fluent_values in next_state.items() if fluent_name in next_state_fluents_to_use})
+        combined_data.update(
+            {
+                f"{NEXT_STATE_PREFIX}{fluent_name}": fluent_values
+                for fluent_name, fluent_values in next_state.items()
+                if fluent_name in next_state_fluents_to_use
+            }
+        )
         dataframe = DataFrame(combined_data).fillna(0)
         dataframe.drop_duplicates(inplace=True)
         return dataframe
