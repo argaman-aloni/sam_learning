@@ -19,7 +19,7 @@ def woodworking_ma_sam(woodworking_ma_combined_domain: Domain) -> MultiAgentSAM:
 
 @fixture()
 def woodworking_ma_sam_ignore_pre(woodworking_ma_combined_domain: Domain) -> MultiAgentSAM:
-    return MultiAgentSAM(woodworking_ma_combined_domain, ignore_negative_preconditions=True)
+    return MultiAgentSAM(woodworking_ma_combined_domain, True)
 
 
 @fixture()
@@ -287,3 +287,14 @@ def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditi
             if isinstance(pre,Predicate):
                 assert pre.is_positive
 
+
+def test_learn_action_model_with_ignore_precondition_delete_effect_has_positive_precondition(
+        woodworking_ma_sam_ignore_pre: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
+    learned_model_ignore, learning_report_ignore = woodworking_ma_sam_ignore_pre.learn_combined_action_model([multi_agent_observation])
+    for action in learned_model_ignore.actions.values():
+        predicates = [pre.untyped_representation for pre in action.preconditions.root.operands if pre.is_positive and isinstance(pre, Predicate)]
+        del_effects = [eff for eff in action.discrete_effects if not eff.is_positive and isinstance(eff, Predicate)]
+        for del_eff in del_effects:
+            del_eff.is_positive = not del_eff.is_positive
+            assert del_eff.untyped_representation in predicates
+            del_eff.is_positive = not del_eff.is_positive

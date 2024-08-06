@@ -427,6 +427,7 @@ def test_learn_action_model_returns_learned_model(elevators_sam_learning: SAMLea
     print(learning_report)
     print(learned_model.to_pddl())
 
+
 def test_learn_action_model_with_ignore_negative_precondition_keep_positive_preconditions(
         elevators_sam_learning: SAMLearner, elevators_observation: Observation,
         elevators_sam_learning_ignore: SAMLearner):
@@ -444,6 +445,7 @@ def test_learn_action_model_with_ignore_negative_precondition_keep_positive_prec
             if isinstance(pre, Predicate):
                 assert not pre.is_positive
 
+
 def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditions(
         elevators_sam_learning_ignore: SAMLearner, elevators_observation: Observation):
     learned_model_ignore, learning_report_ignore = elevators_sam_learning_ignore.learn_action_model([elevators_observation])
@@ -451,3 +453,15 @@ def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditi
         for pre in action.preconditions.root.operands:
             if isinstance(pre,Predicate):
                 assert pre.is_positive
+
+
+def test_learn_action_model_with_ignore_precondition_delete_effect_has_positive_precondition(
+        elevators_sam_learning_ignore: SAMLearner, elevators_observation: Observation):
+    learned_model_ignore, learning_report_ignore = elevators_sam_learning_ignore.learn_action_model([elevators_observation])
+    for action in learned_model_ignore.actions.values():
+        predicates = [pre.untyped_representation for pre in action.preconditions.root.operands if pre.is_positive and isinstance(pre, Predicate)]
+        del_effects = [eff for eff in action.discrete_effects if not eff.is_positive and isinstance(eff, Predicate)]
+        for del_eff in del_effects:
+            del_eff.is_positive = not del_eff.is_positive
+            assert del_eff.untyped_representation in predicates
+            del_eff.is_positive = not del_eff.is_positive
