@@ -9,6 +9,7 @@ from typing import Dict
 FAST_DOWNWARD_DIR_PATH = os.environ["FAST_DOWNWARD_DIR_PATH"]
 MAX_RUNNING_TIME = 60  # seconds
 
+
 class FastDownwardSolver:
     """Class designated to use to activate the metric-FF solver on the cluster and parse its result."""
 
@@ -38,9 +39,59 @@ class FastDownwardSolver:
         if sas_file_path.exists():
             sas_file_path.unlink()
 
+    def solve_problem(
+        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_stats: Dict[str, str], solving_timeout: int
+    ) -> None:
+        """Solves a single problem using the Fast Downward solver.
+
+        :param domain_file_path: the path to the domain file.
+        :param problem_file_path: the path to the problem file.
+        :param problems_directory_path: the path to the directory containing the problems.
+        :param solving_stats: the statistics of the solving process.
+        :param solving_timeout: the timeout for the solving process.
+        """
+        self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
+        solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
+        running_options = [
+            "--overall-time-limit",
+            f"{solving_timeout}s",
+            "--plan-file",
+            str(solution_path.absolute()),
+            "--sas-file",
+            f"{domain_file_path.stem}_output.sas",
+            str(domain_file_path.absolute()),
+            str(problem_file_path.absolute()),
+            "--evaluator",
+            "'hcea=cea()'",
+            "--search",
+            "'lazy_greedy([hcea], preferred=[hcea])'",
+        ]
+        run_command = f"./fast-downward.py {' '.join(running_options)}"
+        try:
+            subprocess.check_output(run_command, shell=True)
+            self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
+            solving_stats[problem_file_path.stem] = "ok"
+            self._remove_cost_from_file(solution_path)
+
+        except subprocess.CalledProcessError as e:
+            if e.returncode in [21, 23, 247]:
+                self.logger.warning(f"Fast Downward returned status code {e.returncode} - timeout on problem {problem_file_path.stem}.")
+                solving_stats[problem_file_path.stem] = "timeout"
+            elif e.returncode in [11, 12]:
+                self.logger.warning(f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}.")
+                solving_stats[problem_file_path.stem] = "no_solution"
+            else:
+                self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")
+                solving_stats[problem_file_path.stem] = "solver_error"
+
     def execute_solver(
-            self, problems_directory_path: Path, domain_file_path: Path, problems_prefix: str = "pfile",
-            tolerance: float = 0.01, solving_timeout: int = MAX_RUNNING_TIME) -> Dict[str, str]:
+        self,
+        problems_directory_path: Path,
+        domain_file_path: Path,
+        problems_prefix: str = "pfile",
+        tolerance: float = 0.01,
+        solving_timeout: int = MAX_RUNNING_TIME,
+    ) -> Dict[str, str]:
         """Runs the Fast Downward solver on all the problems in the given directory.
 
         :param problems_directory_path: the path to the directory containing the problems.
@@ -53,45 +104,14 @@ class FastDownwardSolver:
         os.chdir(FAST_DOWNWARD_DIR_PATH)
         self.logger.info("Starting to solve the input problems using Fast-Downward solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
-            self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
-            solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
-            running_options = ["--overall-time-limit", f"{solving_timeout}s",
-                               "--plan-file", str(solution_path.absolute()),
-                               "--sas-file", f"{domain_file_path.stem}_output.sas",
-                               str(domain_file_path.absolute()),
-                               str(problem_file_path.absolute()),
-                               "--evaluator", "'hcea=cea()'",
-                               "--search", "'lazy_greedy([hcea], preferred=[hcea])'"]
-            run_command = f"./fast-downward.py {' '.join(running_options)}"
-            try:
-                subprocess.check_output(run_command, shell=True)
-                self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
-                solving_stats[problem_file_path.stem] = "ok"
-                self._remove_cost_from_file(solution_path)
-
-            except subprocess.CalledProcessError as e:
-                if e.returncode in [21, 23, 247]:
-                    self.logger.warning(
-                        f"Fast Downward returned status code {e.returncode} - timeout on problem {problem_file_path.stem}.")
-                    solving_stats[problem_file_path.stem] = "timeout"
-                elif e.returncode in [11, 12]:
-                    self.logger.warning(
-                        f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}.")
-                    solving_stats[problem_file_path.stem] = "no_solution"
-                else:
-                    self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")
-                    solving_stats[problem_file_path.stem] = "solver_error"
+            self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
 
         self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / f"{domain_file_path.stem}_output.sas")
         return solving_stats
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = sys.argv
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.DEBUG)
+    logging.basicConfig(format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
     solver = FastDownwardSolver()
-    solver.execute_solver(problems_directory_path=Path(args[1]),
-                          domain_file_path=Path(args[2]))
+    solver.execute_solver(problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]))
