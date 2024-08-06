@@ -29,6 +29,7 @@ class SAMLearner:
     learning_end_time: float
     vocabulary_creator: VocabularyCreator
     cannot_be_effect: Dict[str, Set[Predicate]]
+    ignore_negative_preconditions: bool
 
     def __init__(self, partial_domain: Domain, ignore_negative_preconditions: bool = False):
         self.logger = logging.getLogger(__name__)

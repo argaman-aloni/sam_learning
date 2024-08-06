@@ -44,7 +44,7 @@ def elevators_sam_learning(elevators_domain: Domain) -> SAMLearner:
 
 @fixture()
 def elevators_sam_learning_ignore(elevators_domain: Domain) -> SAMLearner:
-    return SAMLearner(elevators_domain, ignore_negative_preconditions=True)
+    return SAMLearner(elevators_domain, True)
 
 
 @fixture()
