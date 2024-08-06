@@ -230,7 +230,7 @@ class SAMLearner:
         for a in self.partial_domain.actions.values():
             new_preconditions = set()
             for precondition in a.preconditions.root.operands:
-                if isinstance(precondition, Predicate) and precondition.is_positive == False:
+                if isinstance(precondition, Predicate) and not precondition.is_positive:
                     continue
                 new_preconditions.add(precondition)
             a.preconditions.root.operands = new_preconditions
