@@ -231,11 +231,13 @@ class SAMLearner:
 
         for action in self.partial_domain.actions.values():
             new_preconditions = set()
+
             for precondition in action.preconditions.root.operands:
                 if isinstance(precondition, Predicate) and not precondition.is_positive:
                     continue
 
                 new_preconditions.add(precondition)
+
             action.preconditions.root.operands = new_preconditions
 
     def start_measure_learning_time(self) -> None:
