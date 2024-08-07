@@ -43,8 +43,8 @@ def elevators_sam_learning(elevators_domain: Domain) -> SAMLearner:
 
 
 @fixture()
-def elevators_sam_learning_ignore(elevators_domain: Domain) -> SAMLearner:
-    return SAMLearner(elevators_domain, True)
+def elevators_sam_learning_ignore_negative_preconditions(elevators_domain: Domain) -> SAMLearner:
+    return SAMLearner(elevators_domain, ignore_negative_preconditions=True)
 
 
 @fixture()
@@ -92,6 +92,7 @@ def multi_agent_observation(woodworking_ma_combined_domain: Domain,
         WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
 
 
+# TODO MA-SAM algorithm should not modify observations it gets from the outside. For now it seems like it does.
 @fixture()
 def multi_agent_observation2(woodworking_ma_combined_domain: Domain,
                             woodworking_ma_combined_problem) -> MultiAgentObservation:
