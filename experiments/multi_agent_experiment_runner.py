@@ -21,12 +21,13 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
     ma_domain_path: Path
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 problem_prefix: str = "pfile", executing_agents: List[str] = None):
+                 problem_prefix: str = "pfile", ignore_negative_pre: bool = False,  executing_agents: List[str] = None):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=LearningAlgorithmType.ma_sam,
                          solver_type=SolverType.fast_downward, problem_prefix=problem_prefix)
         self.executing_agents = executing_agents
         self.ma_domain_path = None
+        self.ignore_negative_pre = ignore_negative_pre
 
     def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
         """Create a single agent observation from a multi-agent observation.
@@ -75,6 +76,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
             self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
 
+        self._learning_algorithm = LearningAlgorithmType.ma_sam
         self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations))
         self.semantic_performance_calc.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
@@ -90,7 +92,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
         :param fold_num: the index of the current fold in the cross validation process.
         """
-        learner = SAMLearner(partial_domain=partial_domain)
+        learner = SAMLearner(partial_domain=partial_domain, ignore_negative_preconditions = self.ignore_negative_pre)
         self._learning_algorithm = LearningAlgorithmType.sam_learning
         self.domain_validator.learning_algorithm = LearningAlgorithmType.sam_learning
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.sam_learning
@@ -113,7 +115,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
         :param fold_num: the index of the current fold in the cross validation process.
         """
-        learner = MultiAgentSAM(partial_domain=partial_domain)
+        learner = MultiAgentSAM(partial_domain=partial_domain, ignore_negative_preconditions = self.ignore_negative_pre)
         self._learning_algorithm = LearningAlgorithmType.ma_sam
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam
@@ -157,6 +159,7 @@ def parse_arguments() -> argparse.Namespace:
                              "are executing the actions")
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
+    parser.add_argument("--ignore_negative_pre", required=False)
 
     args = parser.parse_args()
     return args
@@ -170,7 +173,8 @@ def main():
     offline_learner = MultiAgentExperimentRunner(working_directory_path=Path(args.working_directory_path),
                                                  domain_file_name=args.domain_file_name,
                                                  executing_agents=executing_agents,
-                                                 problem_prefix=args.problems_prefix)
+                                                 problem_prefix=args.problems_prefix,
+                                                 ignore_negative_pre = args.ignore_negative_pre)
     offline_learner.run_cross_validation()
 
 

@@ -30,7 +30,7 @@ class SAMLearner:
     vocabulary_creator: VocabularyCreator
     cannot_be_effect: Dict[str, Set[Predicate]]
 
-    def __init__(self, partial_domain: Domain):
+    def __init__(self, partial_domain: Domain, ignore_negative_preconditions: bool = False):
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -42,6 +42,7 @@ class SAMLearner:
         self.learning_start_time = 0
         self.learning_end_time = 0
         self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
+        self.ignore_negative_preconditions = ignore_negative_preconditions
 
     def _remove_unobserved_actions_from_partial_domain(self):
         """Removes the actions that were not observed from the partial domain."""
@@ -222,6 +223,20 @@ class SAMLearner:
         """Constructs the single-agent actions that are safe to execute."""
         pass
 
+    def handle_negative_preconditions(self) -> None:
+        """Function that handles ignoring negative preconditions."""
+        if not self.ignore_negative_preconditions:
+            return
+
+        for action in self.partial_domain.actions.values():
+            new_preconditions = set()
+            for precondition in action.preconditions.root.operands:
+                if isinstance(precondition, Predicate) and precondition.is_positive == False:
+                    continue
+
+                new_preconditions.add(precondition)
+            action.preconditions.root.operands = new_preconditions
+
     def start_measure_learning_time(self) -> None:
         """Starts measuring the learning time."""
         self.logger.info("Starting to measure the time it takes to learn the action model!")
@@ -267,6 +282,7 @@ class SAMLearner:
                 self.handle_single_trajectory_component(component)
 
         self.construct_safe_actions()
+        self.handle_negative_preconditions()
         self.end_measure_learning_time()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report

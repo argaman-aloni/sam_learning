@@ -1,6 +1,6 @@
 """Module test for the multi-agent action model learning."""
 from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, MultiAgentComponent, \
-    GroundedPredicate
+    GroundedPredicate, Predicate
 from pytest import fixture
 
 from sam_learning.core import LiteralCNF
@@ -15,6 +15,11 @@ ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
 @fixture()
 def woodworking_ma_sam(woodworking_ma_combined_domain: Domain) -> MultiAgentSAM:
     return MultiAgentSAM(woodworking_ma_combined_domain)
+
+
+@fixture()
+def woodworking_ma_sam_ignore_pre(woodworking_ma_combined_domain: Domain) -> MultiAgentSAM:
+    return MultiAgentSAM(woodworking_ma_combined_domain, ignore_negative_preconditions=True)
 
 
 @fixture()
@@ -251,3 +256,36 @@ def test_learn_action_model_returns_learned_model(
     learned_model, learning_report = woodworking_ma_sam.learn_combined_action_model([multi_agent_observation])
     print(learning_report)
     print(learned_model.to_pddl())
+
+
+
+
+def test_learn_action_model_with_ignore_precondition_keep_positive_preconditions(
+        woodworking_ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation,
+        woodworking_ma_sam_ignore_pre: MultiAgentSAM):
+    #does not ignore negative precondition
+    learned_model, learning_report = woodworking_ma_sam.learn_combined_action_model([multi_agent_observation])
+    #does ignore
+    learned_model_ignore, learning_report_ignore = woodworking_ma_sam_ignore_pre.learn_combined_action_model([multi_agent_observation])
+    for action_name, action in learned_model.actions.items():
+        action_ignored = learned_model_ignore.actions[action_name]
+        preconds = set([prec for prec in action.preconditions.root.operands if isinstance(prec,Predicate)])
+        preconds_ignore = set([prec for prec in action_ignored.preconditions.root.operands if isinstance(prec,Predicate)])
+        difference_ignore_from_classic = preconds_ignore.difference(preconds)
+        difference_classic_from_ignore = preconds.difference(preconds_ignore)
+        assert len(difference_ignore_from_classic) == 0
+        for pre in difference_classic_from_ignore:
+            if isinstance(pre, Predicate):
+                assert pre.is_positive == False
+
+    assert True
+
+def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditions(
+        woodworking_ma_sam_ignore_pre: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
+    learned_model_ignore, learning_report_ignore = woodworking_ma_sam_ignore_pre.learn_combined_action_model([multi_agent_observation])
+    for action in learned_model_ignore.actions.values():
+        for pre in action.preconditions.root.operands:
+            if isinstance(pre,Predicate):
+                assert pre.is_positive == True
+
+    assert True
