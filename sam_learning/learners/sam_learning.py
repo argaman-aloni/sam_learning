@@ -228,13 +228,17 @@ class SAMLearner:
         """Function that handles ignoring negative preconditions."""
         if not self.ignore_negative_preconditions:
             return
-        for a in self.partial_domain.actions.values():
+
+        for action in self.partial_domain.actions.values():
             new_preconditions = set()
-            for precondition in a.preconditions.root.operands:
+
+            for precondition in action.preconditions.root.operands:
                 if isinstance(precondition, Predicate) and not precondition.is_positive:
                     continue
+
                 new_preconditions.add(precondition)
-            a.preconditions.root.operands = new_preconditions
+
+            action.preconditions.root.operands = new_preconditions
 
     def start_measure_learning_time(self) -> None:
         """Starts measuring the learning time."""
