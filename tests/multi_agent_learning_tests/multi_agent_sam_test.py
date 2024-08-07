@@ -260,14 +260,14 @@ def test_learn_action_model_returns_learned_model(
 
 def test_learn_action_model_with_ignore_negative_precondition_keep_positive_preconditions(
         woodworking_ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation,
-        woodworking_ma_sam_ignore_pre: MultiAgentSAM, multi_agent_observation2: MultiAgentObservation):
-    # does not ignore negative precondition
+        woodworking_ma_sam_ignore_negative_preconditions: MultiAgentSAM, multi_agent_observation2: MultiAgentObservation):
+
     learned_model, _ = woodworking_ma_sam.learn_combined_action_model([multi_agent_observation])
-    # does ignore
-    learned_model_ignore, _ = woodworking_ma_sam_ignore_pre.learn_combined_action_model(
+    learned_model_ignore_negative_pre, _ = woodworking_ma_sam_ignore_negative_preconditions.learn_combined_action_model(
         [multi_agent_observation2])
+
     for action_name, action in learned_model.actions.items():
-        action_ignored = learned_model_ignore.actions[action_name]
+        action_ignored = learned_model_ignore_negative_pre.actions[action_name]
         preconds = {prec for prec in action.preconditions.root.operands if isinstance(prec, Predicate)}
         preconds_ignore = {prec for prec in action_ignored.preconditions.root.operands if isinstance(prec, Predicate)}
         difference_ignore_from_classic = preconds_ignore.difference(preconds)
@@ -281,9 +281,11 @@ def test_learn_action_model_with_ignore_negative_precondition_keep_positive_prec
 def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditions(
         woodworking_ma_sam_ignore_negative_preconditions: MultiAgentSAM,
         multi_agent_observation: MultiAgentObservation):
-    learned_model_ignore, _ = woodworking_ma_sam_ignore_negative_preconditions.learn_combined_action_model(
+
+    learned_model_ignore_negative_pre, _ = woodworking_ma_sam_ignore_negative_preconditions.learn_combined_action_model(
         [multi_agent_observation])
-    for action in learned_model_ignore.actions.values():
+
+    for action in learned_model_ignore_negative_pre.actions.values():
         for pre in action.preconditions.root.operands:
             if isinstance(pre, Predicate):
                 assert pre.is_positive
@@ -293,10 +295,10 @@ def test_learn_action_model_with_ignore_negative_preconditions_no_delete_effect_
         woodworking_ma_sam_ignore_negative_preconditions: MultiAgentSAM,
         multi_agent_observation: MultiAgentObservation):
 
-    learned_model_ignore, _ = woodworking_ma_sam_ignore_negative_preconditions.learn_combined_action_model(
+    learned_model_ignore_negative_pre, _ = woodworking_ma_sam_ignore_negative_preconditions.learn_combined_action_model(
         [multi_agent_observation])
 
-    for action in learned_model_ignore.actions.values():
+    for action in learned_model_ignore_negative_pre.actions.values():
         predicates = {pre.untyped_representation for pre in action.preconditions.root.operands if
                       pre.is_positive and isinstance(pre, Predicate)}
         del_effects = [eff for eff in action.discrete_effects if not eff.is_positive and isinstance(eff, Predicate)]
