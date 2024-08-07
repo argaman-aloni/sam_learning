@@ -143,7 +143,9 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                     return
 
                 except QhullError:
-                    self.logger.debug(f"Failed to add a new point to the convex hull. \n\tPrevious data - {self._convex_hull.points}, new point - {projected_new_point}")
+                    self.logger.debug(
+                        f"Failed to add a new point to the convex hull. \n\tPrevious data - {self._convex_hull.points}, new point - {projected_new_point}"
+                    )
                     self._convex_hull.close()
                     self._convex_hull = None
 
@@ -214,7 +216,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         )
         return coefficients, border_point, transformed_vars, span_verification_conditions
 
-    def construct_convex_hull_inequalities(self) -> Precondition:
+    def construct_safe_linear_inequalities(self, *args, **kwargs) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)

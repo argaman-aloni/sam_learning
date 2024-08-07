@@ -105,6 +105,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     parser.add_argument("--iteration_number", required=True, help="The current iteration to execute", type=int)
+    parser.add_argument("--debug", required=False, help="Whether in debug mode.", type=bool, default=False)
     args = parser.parse_args()
     return args
 

@@ -12,9 +12,9 @@ from tests.consts import FUEL_COST_FUNCTION, LOAD_LIMIT_TRAJECTORY_FUNCTION, CUR
 LOAD_ACTION = "load"
 
 TEST_DOMAIN_FUNCTIONS = {
-    "load_limit": LOAD_LIMIT_TRAJECTORY_FUNCTION,
-    "current_load": CURRENT_LOAD_TRAJECTORY_FUNCTION,
-    "fuel-cost": FUEL_COST_FUNCTION,
+    "(load_limit ?z)": LOAD_LIMIT_TRAJECTORY_FUNCTION,
+    "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION,
+    "(fuel-cost )": FUEL_COST_FUNCTION,
 }
 
 random.seed(0)
@@ -35,9 +35,10 @@ def test_add_to_previous_state_storage_can_add_single_item_to_the_storage(load_a
         "(current_load ?z)": CURRENT_LOAD_TRAJECTORY_FUNCTION,
     }
     load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
-    assert load_action_state_fluent_storage.previous_state_storage["(fuel-cost )"] == [34.0]
-    assert load_action_state_fluent_storage.previous_state_storage["(load_limit ?z)"] == [411.0]
-    assert load_action_state_fluent_storage.previous_state_storage["(current_load ?z)"] == [121.0]
+    assert len(load_action_state_fluent_storage.convex_hull_learner.data) == 1
+    assert load_action_state_fluent_storage.convex_hull_learner.data.iloc[0]["(fuel-cost )"] == [34.0]
+    assert load_action_state_fluent_storage.convex_hull_learner.data.iloc[0]["(load_limit ?z)"] == [411.0]
+    assert load_action_state_fluent_storage.convex_hull_learner.data.iloc[0]["(current_load ?z)"] == [121.0]
 
 
 def test_add_to_next_state_storage_can_add_single_item_to_the_storage(load_action_state_fluent_storage: NumericFluentStateStorage,):
@@ -67,9 +68,7 @@ def test_add_to_previous_state_storage_can_add_multiple_state_values_correctly(l
         }
         load_action_state_fluent_storage.add_to_previous_state_storage(simple_state_fluents)
 
-    assert len(load_action_state_fluent_storage.previous_state_storage["(fuel-cost )"]) == 10
-    assert len(load_action_state_fluent_storage.previous_state_storage["(load_limit ?z)"]) == 10
-    assert len(load_action_state_fluent_storage.previous_state_storage["(current_load ?z)"]) == 10
+    assert len(load_action_state_fluent_storage.convex_hull_learner.data) == 10
 
 
 def test_add_to_next_state_storage_can_add_multiple_state_values_correctly(load_action_state_fluent_storage: NumericFluentStateStorage,):

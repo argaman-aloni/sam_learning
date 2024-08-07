@@ -6,7 +6,7 @@ from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser, Domai
 from pddl_plus_parser.models import Domain, Problem, Observation, Predicate
 from pytest import fixture
 
-from sam_learning.learners.numeric_sam import NumericSAMLearner, PolynomialSAMLearning
+from sam_learning.learners.numeric_sam import NumericSAMLearner
 from tests.consts import (
     DEPOT_FLUENTS_MAP_PATH,
     SATELLITE_FLUENTS_MAP_PATH,
@@ -62,7 +62,7 @@ def driverlog_polynomial_observation(driverlog_polynomial_domain: Domain, driver
 
 @fixture()
 def driverlog_polynomial_nsam(driverlog_polynomial_domain: Domain, minecraft_medium_preconditions_fluents_map: Dict[str, List[str]]) -> NumericSAMLearner:
-    return PolynomialSAMLearning(driverlog_polynomial_domain, {action: [] for action in driverlog_polynomial_domain.actions})
+    return NumericSAMLearner(driverlog_polynomial_domain, {action: [] for action in driverlog_polynomial_domain.actions}, polynomial_degree=1)
 
 
 @fixture()
@@ -253,7 +253,7 @@ def test_learn_action_model_with_minecraft_small_domain_creates_domain_with_corr
 
 
 def test_learn_action_model_with_driverlog_polynomial_domain_returns_non_trivial_polynomial_conditions_to_learned_actions_and_does_not_fail_with_error(
-    driverlog_polynomial_nsam: PolynomialSAMLearning, driverlog_polynomial_observation: Observation
+    driverlog_polynomial_nsam: NumericSAMLearner, driverlog_polynomial_observation: Observation
 ):
     try:
         learned_model, learning_metadata = driverlog_polynomial_nsam.learn_action_model([driverlog_polynomial_observation])

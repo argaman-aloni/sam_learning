@@ -35,11 +35,17 @@ def configure_iteration_logger(args: argparse.Namespace):
         maxBytes=max_bytes,
         backupCount=1,
     )
+    stream_handler = logging.StreamHandler()
 
     # Create a formatter and set it for the handler
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
-    logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
+    if args.debug:
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG, handlers=[file_handler, stream_handler])
+    else:
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
+
+
 
 
 class ParallelExperimentRunner:
@@ -69,13 +75,13 @@ class ParallelExperimentRunner:
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
-        self.semantic_performance_calc = init_semantic_performance_calculator(
-            self.working_directory_path,
-            self.domain_file_name,
-            self._learning_algorithm,
-            test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
-            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
-        )
+        # self.semantic_performance_calc = init_semantic_performance_calculator(
+        #     self.working_directory_path,
+        #     self.domain_file_name,
+        #     self._learning_algorithm,
+        #     test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
+        #     is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
+        # )
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path

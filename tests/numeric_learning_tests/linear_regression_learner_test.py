@@ -500,7 +500,7 @@ def test_construct_assignment_equations_with_polynomial_degree_one_and_relevant_
     assert learned_correctly
     assert len(numeric_effects) == 3
     expected_effects = {
-        "(increase (x ) (+ (x ) (+ (* (* (x ) (y )) 3) (+ (* (z ) 4) 5))))",
+        "(increase (x ) (+ (x ) (+ (* (z ) 4) (+ (* (* (x ) (y )) 3) 5))))",
         "(assign (z ) 1)",
         "(increase (y ) (+ (* (x ) (y )) 1))",
     }

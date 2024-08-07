@@ -204,9 +204,9 @@ def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_c
         display_mode=True
     )
     assert coefficients == [[-1], [1]]
-    assert border_point == [0, 1.4142]
-    assert transformed_vars == ["(+ (* (x ) 0.7071) (* (- (y ) 1) -0.7071))"]
-    assert set(span_verification_conditions) == {"(= (z ) 0.0)", "(= (+ (* (x ) 0.7071) (* (- (y ) 1) 0.7071)) 0.0)"}
+    assert border_point == [0, 1.41]
+    assert transformed_vars == ["(+ (* (x ) 0.71) (* (- (y ) 1) -0.71))"]
+    assert set(span_verification_conditions) == {"(= (z ) 0.0)", "(= (+ (* (x ) 0.71) (* (- (y ) 1) 0.71)) 0.0)"}
 
 
 def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_conditions_and_correct_complementary_conditions(
@@ -252,7 +252,7 @@ def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_cr
 ):
     first_sample = {"(x )": 2, "(y )": 3, "(z )": -1}
     convex_hull_learner.add_new_point(first_sample)
-    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities()
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 3
     assert {op.to_pddl() for op in inequality_precondition.operands} == {
@@ -268,7 +268,7 @@ def test_construct_safe_linear_inequalities_when_creating_convex_hull_with_large
     for _ in range(100):
         convex_hull_learner.add_new_point({"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)})
 
-    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities()
     assert inequality_precondition.binary_operator == "and"
     assert len(convex_hull_learner._convex_hull.points) == 100
     assert convex_hull_learner._gsp_base == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
@@ -283,7 +283,7 @@ def test_construct_safe_linear_inequalities_when_adding_extra_large_number_of_sa
     for _ in range(1000):
         convex_hull_learner.add_new_point({"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)})
 
-    inequality_precondition = convex_hull_learner.construct_convex_hull_inequalities()
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities()
     end_time = time.time()
     assert end_time - start_time < 5 * 60
     assert inequality_precondition.binary_operator == "and"
@@ -329,7 +329,7 @@ def test_construct_convex_hull_inequalities_when_given_polynomial_inequalities_r
             {create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial]) for monomial in monomials},
         )
 
-    precondition = polynomial_convex_hull_learner.construct_convex_hull_inequalities()
+    precondition = polynomial_convex_hull_learner.construct_safe_linear_inequalities()
     print(str(precondition))
 
 
@@ -341,7 +341,7 @@ def test_construct_convex_hull_inequalities_when_adding_multiple_points_with_sin
             sample = {"(x )": i}
             convex_hull_learner.add_new_point(sample)
 
-        precondition = convex_hull_learner.construct_convex_hull_inequalities()
+        precondition = convex_hull_learner.construct_safe_linear_inequalities()
         assert precondition.binary_operator == "and"
         assert len(precondition.operands) == 2
         assert {op.to_pddl() for op in precondition.operands} == {"(>= (x ) 0)", "(<= (x ) 9)"}
@@ -364,7 +364,7 @@ def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns
         point_data = {key: row[key] for key in dataframe.columns.tolist()}
         learner.add_new_point(point_data)
 
-    precondition = learner.construct_convex_hull_inequalities()
+    precondition = learner.construct_safe_linear_inequalities()
     assert len(precondition.operands) == 7
 
 
@@ -383,5 +383,5 @@ def test_construct_convex_hull_inequalities_when_given_too_few_examples_returns_
 
     assert learner._gsp_base is not None
     assert learner._complementary_base is not None
-    precondition = learner.construct_convex_hull_inequalities()
+    precondition = learner.construct_safe_linear_inequalities()
     print(precondition.print(should_simplify=False, decimal_digits=2))

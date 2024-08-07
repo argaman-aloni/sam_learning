@@ -113,8 +113,10 @@ def test_construct_single_dimension_inequalities_with_input_lower_bound_equal_to
 
 
 def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_creates_a_single_condition(convex_hull_learner: ConvexHullLearner,):
-    pre_state_data = {"(x)": [2], "(y)": [3], "(z)": [-1]}
-    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(pre_state_data, None)
+    convex_hull_learner.add_new_point(
+        {"(x )": 2, "(y )": 3, "(z )": -1,}
+    )
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(None)
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 3
     assert {op.to_pddl() for op in inequality_precondition.operands} == {
@@ -127,8 +129,12 @@ def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_one_cr
 def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_two_creates_a_two_conditions_in_or_statement(
     convex_hull_learner: ConvexHullLearner,
 ):
-    pre_state_data = {"(x)": [2, 3], "(y)": [3, 5], "(z)": [-1, 7]}
-    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(pre_state_data, None)
+    pre_state_data = {"(x )": [2, 3], "(y )": [3, 5], "(z )": [-1, 7]}
+    for i in range(2):
+        convex_hull_learner.add_new_point(
+            {"(x )": pre_state_data["(x )"][i], "(y )": pre_state_data["(y )"][i], "(z )": pre_state_data["(z )"][i],}
+        )
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(None)
     print(str(inequality_precondition))
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 2 + 2  # 2 for the CH and 2 for complementing the base
@@ -140,12 +146,12 @@ def test_construct_safe_linear_inequalities_when_the_number_of_samples_is_two_cr
 def test_construct_safe_linear_inequalities_when_the_number_of_is_smaller_than_needed_dimensions_but_larger_than_two_creates_a_convex_hull_from_the_samples(
     convex_hull_learner: ConvexHullLearner,
 ):
-    pre_state_data = {
-        "(x)": random.sample(range(100), 3),
-        "(y)": random.sample(range(100), 3),
-        "(z)": random.sample(range(100), 3),
-    }
-    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(pre_state_data, None)
+
+    for i in range(3):
+        convex_hull_learner.add_new_point(
+            {"(x )": random.randint(0, 100), "(y )": random.randint(0, 100), "(z )": random.randint(0, 100),}
+        )
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(None)
     assert inequality_precondition.binary_operator == "and"
     assert len(inequality_precondition.operands) == 3 + 1  # 3 for the CH and 1 for complementing the base
     assert all([isinstance(op, NumericalExpressionTree) for op in inequality_precondition.operands])
@@ -206,8 +212,9 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_with_
     assert len(transformed_vars) == 2
 
 
-
-def test_create_convex_hull_linear_creates_convex_hull_with_no_duplicate_equations_due_to_numeric_precision_restriction(convex_hull_learner: ConvexHullLearner,):
+def test_create_convex_hull_linear_creates_convex_hull_with_no_duplicate_equations_due_to_numeric_precision_restriction(
+    convex_hull_learner: ConvexHullLearner,
+):
     pre_state_data = {
         "(x)": [0, 0, 0, 7, 7, 1.2300056, 1.2300057],
         "(y)": [0, 1, 0, 0, 7, 2.5600057, 2.5600058],
@@ -219,3 +226,20 @@ def test_create_convex_hull_linear_creates_convex_hull_with_no_duplicate_equatio
     )
     assert len(span_verification_conditions) == 0
     assert len([str(c) for c in coefficients]) == len(set([str(c) for c in coefficients]))
+
+
+def test_construct_safe_linear_inequalities_with_relevant_fluents_ignores_all_variables_that_are_not_in_the_relevant_fluents(
+    convex_hull_learner: ConvexHullLearner,
+):
+    for i in range(10):
+        convex_hull_learner.add_new_point(
+            {"(x )": random.randint(0, 100), "(y )": random.randint(0, 100), "(z )": random.randint(0, 100),}
+        )
+    inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities(["(x )"])
+    print(str(inequality_precondition))
+    assert inequality_precondition.binary_operator == "and"
+    assert len(inequality_precondition.operands) == 2  # One for upper bound and one for lower bound.
+    for operand in inequality_precondition.operands:
+        assert "(x )" in operand.to_pddl()
+        assert "(y )" not in operand.to_pddl()
+        assert "(z )" not in operand.to_pddl()

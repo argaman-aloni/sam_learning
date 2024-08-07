@@ -1,7 +1,7 @@
 {
-  "drive": [],
-  "lift": [],
+  "drive": ["(fuel-cost )"],
+  "lift": ["(fuel-cost )"],
   "drop": [],
   "load": ["(current_load ?z)", "(weight ?y)", "(load_limit ?z)"],
-  "unload": []
+  "unload": ["(current_load ?z)", "(weight ?y)"]
 }

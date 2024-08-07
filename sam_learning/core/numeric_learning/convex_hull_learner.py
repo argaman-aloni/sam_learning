@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from scipy.spatial import ConvexHull, QhullError
@@ -19,10 +20,13 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     extended_gram_schmidt,
     display_convex_hull,
     detect_linear_dependent_features,
+    create_monomials,
+    create_polynomial_string,
 )
 
 
 np.set_printoptions(precision=2)
+
 
 class ConvexHullLearner:
     """Class that learns the convex hull of the preconditions of an action."""
@@ -32,11 +36,36 @@ class ConvexHullLearner:
     domain_functions: Dict[str, PDDLFunction]
     convex_hull_error_file_path: Path
 
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction]):
+    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
         self.logger = logging.getLogger(__name__)
         self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
+        functions = list([function.untyped_representation for function in domain_functions.values()])
+        monomials = create_monomials(functions, polynom_degree)
+        self.data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in monomials])
         self.action_name = action_name
-        self.domain_functions = domain_functions
+        self.domain_functions = {function.name: function for function in domain_functions.values()}
+
+    def add_new_point(self, point: Dict[str, float]) -> None:
+        """Adds a new point to the convex hull learner.
+
+        Note:
+            This method is supposed to improve the performance of the CH calculations by incrementally adding points.
+
+        :param point: the point to add to the convex hull learner.
+        """
+        new_sample = DataFrame.from_dict(data={key: [value] for key, value in point.items()}, orient="columns")
+        # assuming that if a feature is relevant to the preconditions it should always appear in the dataframe.
+        if len(self.data) == 0:
+            self.data = new_sample  # This is to avoid observing warnings when adding the first sample.
+            self.logger.debug("Added the first sample to the points dataframe.")
+            return
+
+        concat_data = pd.concat([self.data, new_sample], ignore_index=True).dropna(axis=1)
+        if concat_data.drop_duplicates().shape[0] == self.data.shape[0]:
+            self.logger.debug("The new point is already in the storage, not adding it again.")
+            return
+
+        self.data = concat_data
 
     def _execute_convex_hull(self, points: np.ndarray, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
         """Runs the convex hull algorithm on the given input points.
@@ -166,13 +195,13 @@ class ConvexHullLearner:
 
         return construct_numeric_conditions(conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
-    def construct_safe_linear_inequalities(self, state_storge: Dict[str, List[float]], relevant_fluents: Optional[List[str]] = []) -> Precondition:
+    def construct_safe_linear_inequalities(self, relevant_fluents: Optional[List[str]] = None) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
-        irrelevant_fluents = [fluent for fluent in state_storge.keys() if fluent not in relevant_fluents] if relevant_fluents is not None else []
-        state_data = DataFrame(state_storge).drop_duplicates().drop(columns=irrelevant_fluents)
+        irrelevant_fluents = [fluent for fluent in self.data.columns.tolist() if fluent not in relevant_fluents] if relevant_fluents is not None else []
+        state_data = self.data.drop(columns=irrelevant_fluents)
         if (relevant_fluents is not None and len(relevant_fluents) == 1) or state_data.shape[1] == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")
             relevant_fluents = state_data.columns.tolist() if relevant_fluents is None else relevant_fluents

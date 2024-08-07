@@ -2,14 +2,13 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, Predicate
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition
 
 from sam_learning.core import (
     LearnerDomain,
     NumericFluentStateStorage,
     NumericFunctionMatcher,
     NotSafeActionError,
-    PolynomialFluentsLearningAlgorithm,
     LearnerAction,
 )
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
@@ -24,13 +23,19 @@ class NumericSAMLearner(SAMLearner):
     relevant_fluents: Dict[str, List[str]]
 
     def __init__(
-        self, partial_domain: Domain, relevant_fluents: Optional[Dict[str, List[str]]] = None, allow_unsafe: bool = False, **kwargs,
+        self,
+        partial_domain: Domain,
+        relevant_fluents: Optional[Dict[str, List[str]]] = None,
+        allow_unsafe: bool = False,
+        polynomial_degree: int = 0,
+        **kwargs,
     ):
         super().__init__(partial_domain)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)
         self.relevant_fluents = relevant_fluents
         self._allow_unsafe = allow_unsafe
+        self.polynom_degree = polynomial_degree
 
     def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
         """Constructs the safe preconditions for the input action.
@@ -94,7 +99,12 @@ class NumericSAMLearner(SAMLearner):
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
         previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.previous_state_functions)
         next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.next_state_functions)
-        self.storage[grounded_action.name] = NumericFluentStateStorage(grounded_action.name, self.partial_domain.functions)
+        possible_bounded_functions = self.vocabulary_creator.create_lifted_functions_vocabulary(
+            domain=self.partial_domain, possible_parameters=self.partial_domain.actions[grounded_action.name].signature
+        )
+        self.storage[grounded_action.name] = NumericFluentStateStorage(
+            action_name=grounded_action.name, domain_functions=possible_bounded_functions, polynom_degree=self.polynom_degree,
+        )
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")
@@ -122,7 +132,6 @@ class NumericSAMLearner(SAMLearner):
         :param action_name: the name of the action to create.
         :return: the safe action that can be executed in the environment.
         """
-        self.storage[action_name].filter_out_inconsistent_state_variables()
         action = self.partial_domain.actions[action_name]
         self._construct_safe_numeric_preconditions(action)
         self._construct_safe_numeric_effects(action)
@@ -178,40 +187,3 @@ class NumericSAMLearner(SAMLearner):
         super().end_measure_learning_time()
         learning_metadata["learning_time"] = str(self.learning_end_time - self.learning_start_time)
         return self.partial_domain, learning_metadata
-
-
-class PolynomialSAMLearning(NumericSAMLearner):
-    """The Extension of SAM that is able to learn polynomial state variables."""
-
-    storage: Dict[str, PolynomialFluentsLearningAlgorithm]
-    polynom_degree: int
-
-    def __init__(
-        self,
-        partial_domain: Domain,
-        relevant_fluents: Optional[Dict[str, List[str]]] = None,
-        polynomial_degree: int = 1,
-        allow_unsafe: bool = False,
-        **kwargs,
-    ):
-        super().__init__(partial_domain, relevant_fluents, allow_unsafe, **kwargs)
-        self.polynom_degree = polynomial_degree
-
-    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
-        """Adds a new action to the learned domain.
-
-        :param grounded_action: the grounded action that was executed according to the observation.
-        :param previous_state: the state that the action was executed on.
-        :param next_state: the state that was created after executing the action on the previous
-            state.
-        """
-        super().add_new_action(grounded_action, previous_state, next_state)
-        self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, previous_state.state_fluents)
-        next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, next_state.state_fluents)
-        self.storage[grounded_action.name] = PolynomialFluentsLearningAlgorithm(
-            grounded_action.name, self.polynom_degree, self.partial_domain.functions, is_verbose=True
-        )
-        self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
-        self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
-        self.logger.debug(f"Done creating the numeric state variable storage for the action - {grounded_action.name}")

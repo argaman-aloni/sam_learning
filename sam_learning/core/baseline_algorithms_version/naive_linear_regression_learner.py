@@ -46,7 +46,9 @@ class NaiveLinearRegressionLearner:
         :param relevant_fluents: the relevant fluents to use.
         :return: the combined dataframe.
         """
-        pre_state_fluents_to_use = relevant_fluents if relevant_fluents is not None else list(prev_state.keys())
+        pre_state_fluents_to_use = (
+            [key for key in prev_state.keys() if key in relevant_fluents] if relevant_fluents is not None else list(next_state.keys())
+        )
         next_state_fluents_to_use = (
             [fluent for fluent in next_state.keys() if fluent in relevant_fluents] if relevant_fluents is not None else list(next_state.keys())
         )
