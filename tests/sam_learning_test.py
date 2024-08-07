@@ -457,11 +457,19 @@ def test_learn_action_model_with_ignore_precondition_deletes_negative_preconditi
 
 def test_learn_action_model_with_ignore_precondition_delete_effect_has_positive_precondition(
         elevators_sam_learning_ignore_negative_preconditions: SAMLearner, elevators_observation: Observation):
-    learned_model_ignore, learning_report_ignore = elevators_sam_learning_ignore_negative_preconditions.learn_action_model([elevators_observation])
+    learned_model_ignore, _ = elevators_sam_learning_ignore_negative_preconditions.learn_action_model(
+        [elevators_observation])
+
     for action in learned_model_ignore.actions.values():
-        predicates = [pre.untyped_representation for pre in action.preconditions.root.operands if pre.is_positive and isinstance(pre, Predicate)]
+        predicates = [pre.untyped_representation for pre in action.preconditions.root.operands if
+                      pre.is_positive and isinstance(pre, Predicate)]
+
         del_effects = [eff for eff in action.discrete_effects if not eff.is_positive and isinstance(eff, Predicate)]
+
         for del_eff in del_effects:
             del_eff.is_positive = not del_eff.is_positive
-            assert del_eff.untyped_representation in predicates
-            del_eff.is_positive = not del_eff.is_positive
+
+        flipped_del_effects = {del_eff.untyped_representation for del_eff in del_effects}
+
+        assert len(del_effects) == len(flipped_del_effects.intersection(predicates))
+
