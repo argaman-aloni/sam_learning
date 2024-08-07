@@ -506,3 +506,42 @@ def test_construct_assignment_equations_with_polynomial_degree_one_and_relevant_
     }
     for effect in numeric_effects:
         assert effect.to_pddl() in expected_effects
+
+
+def test_construct_assignment_equations_with_polynomial_degree_one_with_change_that_increase_by_constant_and_a_variable_calculates_result_correctly(
+    polynomial_regression_learner: LinearRegressionLearner,
+):
+    k = 50
+    numbers = list(range(500))
+    x = random.sample(numbers, k=k)
+    y = random.sample(numbers, k=k)
+    z = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x )": x,
+        "(y )": y,
+        "(z )": z,
+    }
+    next_state_matrix = {
+        "(x )": [x1 + 1 for x1 in x],
+        "(y )": [y1 + x1 + 1 for x1, y1, in zip(x, y)],
+        "(z )": [1] * k,
+    }
+    function_names = ["(x )", "(y )", "(z )"]
+    monomials = create_monomials(function_names, polynom_degree=1)
+    for i in range(k):
+        polynomial_regression_learner.add_new_observation(
+            {create_polynomial_string(monomial): np.prod([pre_state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            store_in_prev_state=True,
+        )
+        polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
+    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations()
+    assert learned_correctly
+    assert len(numeric_effects) == 3
+    expected_effects = {
+        "(increase (x ) 1)",
+        "(assign (z ) 1)",
+        "(increase (y ) (+ (x ) 1))",
+    }
+    for effect in numeric_effects:
+        assert effect.to_pddl() in expected_effects

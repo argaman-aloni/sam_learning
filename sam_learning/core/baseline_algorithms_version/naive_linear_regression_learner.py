@@ -310,6 +310,7 @@ class NaiveLinearRegressionLearner:
         :param previous_state_data: the data of the previous state.
         :param next_state_data: the data of the next state.
         :param allow_unsafe_learning: whether to allow unsafe learning.
+        :param relevant_fluents: the fluents that are part of the action's preconditions and effects.
         :return: the constructed effects with the possibly additional preconditions.
         """
         if relevant_fluents is not None and len(relevant_fluents) == 0:
@@ -317,6 +318,7 @@ class NaiveLinearRegressionLearner:
             return set(), None, False
 
         assignment_statements = []
+        relevant_next_state_fluents = [fluent_name for fluent_name in next_state_data.keys() if fluent_name in relevant_fluents] if relevant_fluents else list(next_state_data.keys())
         self.logger.info(f"Constructing the fluent assignment equations for action {self.action_name}.")
         combined_data = self._combine_states_data(previous_state_data, next_state_data, relevant_fluents)
         if combined_data.shape[0] == 1:
@@ -326,14 +328,14 @@ class NaiveLinearRegressionLearner:
 
         # The dataset contains more than one observation.
         self.logger.debug("Removing fluents that are constant zero...")
-        tagged_next_state_fluents = [f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in next_state_data.keys()]
+        tagged_next_state_fluents = [f"{NEXT_STATE_PREFIX}{fluent_name}" for fluent_name in relevant_next_state_fluents]
         filtered_df, constant_features_conditions, constant_features = filter_constant_features(
             combined_data, columns_to_ignore=tagged_next_state_fluents
         )
         features_df = filtered_df.copy()[[k for k in previous_state_data.keys() if k in filtered_df.columns]]
         regression_df, linear_dep_conditions, dependent_columns = detect_linear_dependent_features(features_df)
         combined_conditions = linear_dep_conditions + constant_features_conditions
-        tested_fluents_names = [fluent_name for fluent_name in next_state_data.keys()]
+        tested_fluents_names = [fluent_name for fluent_name in relevant_next_state_fluents]
         is_safe_to_learn = self._validate_legal_equations(regression_df)
         for feature_fluent, tagged_fluent in zip(tested_fluents_names, tagged_next_state_fluents):
             regression_df[LABEL_COLUMN] = combined_data[tagged_fluent]
