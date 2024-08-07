@@ -57,7 +57,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
                 fluents_map = json.load(fluents_map_file)
 
         learner = NUMERIC_SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
-            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, preconditions_fluent_map=fluents_map
+            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, relevant_fluents=fluents_map
         )
         return learner.learn_action_model(allowed_observations)
 

@@ -1,14 +1,19 @@
 import argparse
 import csv
 import logging
+import pandas as pd
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
+from pddl_plus_parser.lisp_parsers import DomainParser
+
+from experiments.plotting.plot_nsam_results import plot_results
 from statistics.numeric_performance_calculator import NUMERIC_PERFORMANCE_STATS
 from utilities import LearningAlgorithmType
 from validators.safe_domain_validator import SOLVING_STATISTICS
 
 FOLD_FIELD = "fold"
+MAX_SOLVED_FIELD = "max_percent_solved"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -40,6 +45,16 @@ class StatisticsCollector:
         self.iterations = iterations
         self.logger = logging.getLogger("ClusterRunner")
 
+    @staticmethod
+    def _process_combined_data(combined_statistics_data: List[Dict]) -> pd.DataFrame:
+        # Load the CSV file into a DataFrame
+        df = pd.DataFrame(combined_statistics_data)
+        numeric_columns = ["percent_ok", "fold", "num_trajectories"]
+        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric)
+        aggregated_df = df.groupby(["fold", "num_trajectories", "learning_algorithm"]).agg(max_percent_ok=("percent_ok", "max"),
+                                                                                           percent_goal_not_achieved=("percent_goal_not_achieved", "max"))
+        return aggregated_df
+
     def _combine_statistics_data(self, file_path_template: str, combined_statistics_data: List[dict]) -> None:
         """
 
@@ -61,21 +76,29 @@ class StatisticsCollector:
     def _collect_solving_statistics(self) -> None:
         """Collects the statistics from the statistics files in the results directory and combines them."""
         self.logger.info("Collecting the solving statistics from the results directory.")
-        combined_statistics_file_path = self.working_directory_path / "results_directory" / "solving_combined_statistics.csv"
+        results_directory = self.working_directory_path / "results_directory"
+        combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
+        combined_aggregated_stats = results_directory / "solving_aggregated_statistics.csv"
         combined_statistics_data = []
         file_path_template = "{learning_algorithm}_problem_solving_stats_fold_{fold}_{iteration}_trajectories.csv"
         self._combine_statistics_data(file_path_template, combined_statistics_data)
+        combined_and_augmented_df = self._process_combined_data(combined_statistics_data)
+        combined_and_augmented_df.to_csv(combined_aggregated_stats)
+        plot_results(results_directory)
+
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SOLVING_STATISTICS])
             writer.writeheader()
             writer.writerows(combined_statistics_data)
+
         self.logger.info("Done collecting the solving statistics from the results directory!")
 
     def _collect_numeric_performance_statistics(self) -> None:
         self.logger.info("Collecting the numeric performance statistics from the results directory.")
+        domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
         combined_statistics_file_path = self.working_directory_path / "results_directory" / "numeric_performance_combined_statistics.csv"
         combined_statistics_data = []
-        file_path_template = "{learning_algorithm}_" + self.domain_file_name.split(".")[0] + "_learning_performance_stats_fold_{fold}_{iteration}.csv"
+        file_path_template = "{learning_algorithm}_" + domain.name + "_numeric_learning_performance_stats_fold_{fold}_{iteration}.csv"
         self._combine_statistics_data(file_path_template, combined_statistics_data)
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *NUMERIC_PERFORMANCE_STATS])
@@ -89,7 +112,8 @@ class StatisticsCollector:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
+                        level=logging.INFO)
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     internal_iterations = [int(val) for val in args.internal_iterations.split(",")]

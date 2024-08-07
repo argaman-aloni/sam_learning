@@ -243,7 +243,7 @@ class FaultRepair:
         partial_domain = DomainParser(domain_path=self.model_domain_file_path).parse_domain()
         repaired_action = None
         if repair_algorithm_type == RepairAlgorithmType.numeric_sam:
-            learner = NumericSAMLearner(partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map)
+            learner = NumericSAMLearner(partial_domain=partial_domain, relevant_fluents=self.fluents_map)
             learned_model, report = learner.learn_action_model(valid_observations)
             repaired_action = learned_model.actions[faulty_action_name]
 

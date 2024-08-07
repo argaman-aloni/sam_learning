@@ -133,6 +133,12 @@ def test_extended_gram_schmidt_on_no_shift_with_base_with_more_rows_than_columns
     print(projections)
 
 
+def test_extended_gram_schmidt_when_one_variable_is_a_constant_extract_the_constant_and_return_orthonormal_base():
+    # no need to add a non-zero constant since subtracting from the first sample will result in a zero vector
+    projections = extended_gram_schmidt([[8, 2, 0], [72, 33, 0], [11, 8, 0], [1, 1, 0], [17, 13, 0]])
+    assert len(projections) == 2
+
+
 def test_extended_gram_schmidt_with_no_base_returns_correct_orthonormal_matrix():
     projections = extended_gram_schmidt([[1, 1, 1], [2, 1, 0], [5, 1, 3]])
     assert len(projections) == 3

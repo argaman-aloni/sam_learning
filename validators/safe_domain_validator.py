@@ -2,6 +2,7 @@
 import csv
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 
@@ -24,6 +25,7 @@ SOLVING_STATISTICS = [
     "num_trajectories",
     "num_trajectory_triplets",
     "learning_time",
+    "solving_time",
     "solver",
     "ok",
     "no_solution",
@@ -254,6 +256,7 @@ class DomainValidator:
             problem_solved = False
             problem_file_name = problem_path.stem
             for solver_type in solvers_portfolio:
+                start_time = time.time()
                 solver = SOLVER_TYPES[solver_type]()
                 solver.solve_problem(
                     problems_directory_path=test_set_directory_path,
@@ -263,6 +266,8 @@ class DomainValidator:
                     solving_timeout=timeout,
                     solving_stats=problem_solving_report,
                 )
+                end_time = time.time()
+                solving_stats["solving_time"] = end_time - start_time   # time in seconds
                 if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"

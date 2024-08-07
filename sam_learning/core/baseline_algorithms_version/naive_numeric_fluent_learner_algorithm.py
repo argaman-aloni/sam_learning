@@ -82,13 +82,14 @@ class NaiveNumericFluentStateStorage:
                     self.action_name, failure_reason, EquationSolutionType.not_enough_data)
 
     def construct_assignment_equations(
-            self, allow_unsafe_learning: bool = False) -> Tuple[
+            self, allow_unsafe_learning: bool = False, relevant_fluents: Optional[List[str]] = None) -> Tuple[
         Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
         :param allow_unsafe_learning: whether to allow learning from unsafe data.
+        :param relevant_fluents: the fluents that are part of the action's preconditions and effects.
         :return: the constructed assignment statements.
         """
         self._validate_safe_solving()
         return self.linear_regression_learner.construct_assignment_equations(
-            self.previous_state_storage, self.next_state_storage, allow_unsafe_learning=allow_unsafe_learning)
+            self.previous_state_storage, self.next_state_storage, allow_unsafe_learning=allow_unsafe_learning, relevant_fluents=relevant_fluents)

@@ -14,6 +14,7 @@ from sklearn.feature_selection import VarianceThreshold
 
 from sam_learning.core.learning_types import ConditionType
 
+DECIMAL_DIGITS = 2
 EPSILON = 1e-4
 
 
@@ -48,17 +49,17 @@ def construct_multiplication_strings(coefficients_vector: Union[np.ndarray, List
     """
     product_components = []
     for func, coefficient in zip(function_variables, coefficients_vector):
-        if abs(round(coefficient, 4)) <= EPSILON:
+        if abs(round(coefficient, DECIMAL_DIGITS)) <= EPSILON:
             continue
 
         if func == "(dummy)":
-            product_components.append(f"{prettify_floating_point_number(round(coefficient, 4))}")
+            product_components.append(f"{prettify_floating_point_number(round(coefficient, DECIMAL_DIGITS))}")
 
         elif coefficient == 1.0:
             product_components.append(func)
 
         else:
-            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, 4))})")
+            product_components.append(f"(* {func} {prettify_floating_point_number(round(coefficient, DECIMAL_DIGITS))})")
 
     return product_components
 
@@ -70,7 +71,7 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
     :return: the prettified version of the coefficients.
     """
     coefficients = [coef if abs(coef) > EPSILON else 0.0 for coef in coefficients]
-    prettified_coefficients = [round(value, 4) for value in coefficients]
+    prettified_coefficients = [round(value, DECIMAL_DIGITS) for value in coefficients]
     return prettified_coefficients
 
 
@@ -93,14 +94,14 @@ def construct_projected_variable_strings(
     for row in range(len(projection_basis)):
         product_by_components_row = []
         for shifted, component in zip(shifted_by_mean, projection_basis[row]):
-            if abs(round(component, 4)) <= EPSILON:
+            if abs(round(component, DECIMAL_DIGITS)) <= EPSILON:
                 continue
 
             if component == 1.0:
                 product_by_components_row.append(shifted)
                 continue
 
-            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, 4))})")
+            product_by_components_row.append(f"(* {shifted} {prettify_floating_point_number(round(component, DECIMAL_DIGITS))})")
 
         sum_of_product_by_components.append(construct_linear_equation_string(product_by_components_row))
 
@@ -164,7 +165,7 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
             linear_coeff = value
             break
 
-    return prettify_floating_point_number(round(linear_coeff, 4))
+    return prettify_floating_point_number(round(linear_coeff, DECIMAL_DIGITS))
 
 
 def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[List[str]] = []) -> Tuple[DataFrame, List[str], List[str]]:
@@ -194,20 +195,28 @@ def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[Li
         return DataFrame(), equal_fluent_strs, input_df.columns
 
 
-def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame, List[str], Dict[str, str]]:
+def detect_linear_dependent_features(data_matrix: DataFrame, columns_to_ignore: List[str] = []) -> Tuple[DataFrame, List[str], Dict[str, str]]:
     """Detects linear dependent features and adds the equality constraints to the problem.
 
     The idea is: put together these column vectors as a matrix and calculate its row-echelon form.
     If the row-echelon form is diagonal with only ones, the set of vectors is independent, otherwise, it is dependent.
 
     :param data_matrix: the matrix of the previous state values.
+    :param columns_to_ignore: the list of columns that are already composed of linear combinations of other columns and should be ignored.
     :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal and the
         column to column mapping.
     """
     additional_conditions = []
     dependent_columns = {}
 
-    data_matrix_copy = data_matrix.copy()
+    if len(data_matrix) < 2:
+        # cannot detect linear dependency with less than two samples
+        return data_matrix, additional_conditions, dependent_columns
+
+    data_matrix_copy = data_matrix[[col for col in data_matrix.columns.tolist() if col not in columns_to_ignore]].copy()
+    # Ignoring constant columns since they add noise to the matrix
+    data_matrix_copy = data_matrix_copy.loc[:, (data_matrix_copy != data_matrix_copy.iloc[0]).any()]
+
     for col1, col2 in itertools.combinations(data_matrix_copy.columns, 2):
         reduced_form, _ = sympy.Matrix(data_matrix_copy[[col1, col2]].values).rref()
         diagonal_required_result = np.array([[1, 0], [0, 1]])
@@ -216,10 +225,13 @@ def detect_linear_dependent_features(data_matrix: DataFrame) -> Tuple[DataFrame,
 
         independent_column, dependent_column = col1, col2
         linear_coeff = extract_numeric_linear_coefficient(data_matrix_copy[dependent_column], data_matrix_copy[independent_column])
+        if linear_coeff == 0:
+            continue
+
         additional_conditions.append(f"(= {dependent_column} (* {linear_coeff} {independent_column}))")
         dependent_columns[dependent_column] = independent_column
 
-    filtered_matrix = data_matrix_copy[[col for col in data_matrix_copy.columns if col not in dependent_columns]]
+    filtered_matrix = data_matrix[[col for col in data_matrix.columns.tolist() if col not in dependent_columns]]
     return filtered_matrix, additional_conditions, dependent_columns
 
 

@@ -1,7 +1,6 @@
 """Runs experiments for the numeric model learning algorithms."""
 import argparse
 import json
-import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 
@@ -9,7 +8,7 @@ from pddl_plus_parser.models import Observation, Domain
 
 from experiments.basic_experiment_runner import OfflineBasicExperimentRunner, configure_logger
 from sam_learning.core import LearnerDomain
-from sam_learning.learners import NumericSAMLearner, PolynomialSAMLearning, UniversallyConditionalSAM
+from sam_learning.learners import UniversallyConditionalSAM
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
 

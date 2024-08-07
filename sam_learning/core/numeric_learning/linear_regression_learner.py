@@ -42,12 +42,16 @@ class LinearRegressionLearner:
         self.previous_state_data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in monomials])
         self.next_state_data = DataFrame(columns=functions)
 
-    def _combine_states_data(self) -> DataFrame:
+    def _combine_states_data(self, relevant_fluents: Optional[List[str]] = None) -> DataFrame:
         """Combines the previous and next states data into a single dataframe.
 
         :return: the combined dataframe.
         """
         # assuming that if a function is an effect of the action it will always be present in the next state.
+        if relevant_fluents is not None:
+            self.previous_state_data = self.previous_state_data[[fluent for fluent in  self.previous_state_data.columns.tolist() if fluent in relevant_fluents]]
+            self.next_state_data = self.next_state_data[[fluent for fluent in  self.next_state_data.columns.tolist() if fluent in relevant_fluents]]
+
         next_state_df = self.next_state_data.add_prefix(NEXT_STATE_PREFIX)
         combined_data = pd.concat([self.previous_state_data, next_state_df], axis=1)
         # getting the columns that contain missing values in the previous state.
@@ -267,19 +271,26 @@ class LinearRegressionLearner:
         data_to_update.dropna(axis="columns", inplace=True)
         setattr(self, attribute_name, data_to_update)
 
-    def construct_assignment_equations(self, allow_unsafe: bool = False) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
+    def construct_assignment_equations(
+        self, allow_unsafe: bool = False, relevant_fluents: Optional[List[str]] = None
+    ) -> Tuple[Set[NumericalExpressionTree], Optional[Precondition], bool]:
         """Constructs the assignment statements for the action according to the changed value functions.
 
         :param allow_unsafe: whether to allow unsafe learning.
+        :param relevant_fluents: the fluents that are part of the action's preconditions and effects.
         :return: the constructed effects with the possibly additional preconditions.
         """
+        if relevant_fluents is not None and len(relevant_fluents) == 0:
+            self.logger.debug(f"No numeric effects for the action {self.action_name}.")
+            return set(), None, False
+
         if len(self.next_state_data) == 0:
             self.logger.debug(f"No observations for the action {self.action_name}.")
             return set(), None, False
 
         assignment_statements = []
         self.logger.info(f"Constructing the fluent assignment equations for action {self.action_name}.")
-        combined_data = self._combine_states_data()
+        combined_data = self._combine_states_data(relevant_fluents)
         if combined_data.shape[0] == 1:
             self.logger.info(f"The action {self.action_name} contains a single unique observation!")
             return self._construct_effect_from_single_sample(), None, False

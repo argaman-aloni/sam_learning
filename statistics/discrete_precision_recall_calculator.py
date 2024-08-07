@@ -36,7 +36,7 @@ def calculate_number_false_negatives(learned_predicates: Set[str], expected_pred
     return len(expected_predicates.difference(learned_predicates))
 
 
-def calculate_recall(learned_predicates: Set[str], actual_predicates: Set[str]) -> float:
+def calculate_syntactic_recall(learned_predicates: Set[str], actual_predicates: Set[str]) -> float:
     """Calculates the recall value of the input predicates.
 
     :param learned_predicates: the predicates learned using the learning algorithm.
@@ -54,7 +54,7 @@ def calculate_recall(learned_predicates: Set[str], actual_predicates: Set[str]) 
     return true_positives / (true_positives + false_negatives)
 
 
-def calculate_precision(learned_predicates: Set[str], actual_predicates: Set[str]) -> float:
+def calculate_syntactic_precision(learned_predicates: Set[str], actual_predicates: Set[str]) -> float:
     """Calculates the precision value of the input predicates.
 
     :param learned_predicates: the predicates learned using the learning algorithm.
@@ -89,7 +89,7 @@ class PrecisionRecallCalculator:
                                  (self.discrete_effects, self.ground_discrete_effects)]
         self._learned_actions = []
 
-    def add_action_data(self, learned_action: LearnerAction, model_action: Action) -> NoReturn:
+    def add_action_data(self, learned_action: LearnerAction, model_action: Action) -> None:
         """Adds the discrete action's data to the class data to calculate the precision and recall values.
 
         :param learned_action: the action that was learned using the action model learning algorithm.
@@ -137,32 +137,7 @@ class PrecisionRecallCalculator:
 
         return true_positives / (true_positives + false_negatives)
 
-    def export_action_statistics(self, action_name: str) -> Dict[str, float]:
-        """Export the statistics of an action that was observed during the learning process.
-
-        :param action_name: the name of the action that was learned.
-        :return: the dictionary containing the precision and recall statistics of the action.
-        """
-        action_precision = self.calculate_action_precision(action_name)
-        action_recall = self.calculate_action_recall(action_name)
-        action_f1_score = 0 if action_precision == 0 and action_recall == 0 else \
-            2 * (action_precision * action_recall) / (action_precision + action_recall)
-
-        return {
-            "preconditions_precision": calculate_precision(self.preconditions[action_name],
-                                                           self.ground_truth_preconditions[action_name]),
-            "effects_precision": calculate_precision(self.discrete_effects[action_name],
-                                                     self.ground_discrete_effects[action_name]),
-            "preconditions_recall": calculate_recall(self.preconditions[action_name],
-                                                     self.ground_truth_preconditions[action_name]),
-            "effects_recall": calculate_recall(self.discrete_effects[action_name],
-                                               self.ground_discrete_effects[action_name]),
-            "action_precision": action_precision,
-            "action_recall": action_recall,
-            "f1_score": action_f1_score
-        }
-
-    def calculate_model_precision(self) -> float:
+    def calculate_syntactic_precision(self) -> float:
         """calculates the precision value of a learned domain.
 
         :return: the model's precision.
@@ -176,7 +151,7 @@ class PrecisionRecallCalculator:
 
         return true_positives / (true_positives + false_positives)
 
-    def calculate_model_recall(self) -> float:
+    def calculate_syntactic_recall(self) -> float:
         """calculates the recall value of a learned domain.
 
         :return: the model's recall.
@@ -189,3 +164,28 @@ class PrecisionRecallCalculator:
             return 1
 
         return true_positives / (true_positives + false_negatives)
+
+    def export_action_syntactic_statistics(self, action_name: str) -> Dict[str, float]:
+        """Export the statistics of an action that was observed during the learning process.
+
+        :param action_name: the name of the action that was learned.
+        :return: the dictionary containing the precision and recall statistics of the action.
+        """
+        action_precision = self.calculate_action_precision(action_name)
+        action_recall = self.calculate_action_recall(action_name)
+        action_f1_score = 0 if action_precision == 0 and action_recall == 0 else \
+            2 * (action_precision * action_recall) / (action_precision + action_recall)
+
+        return {
+            "preconditions_precision": calculate_syntactic_precision(self.preconditions[action_name],
+                                                                     self.ground_truth_preconditions[action_name]),
+            "effects_precision": calculate_syntactic_precision(self.discrete_effects[action_name],
+                                                               self.ground_discrete_effects[action_name]),
+            "preconditions_recall": calculate_syntactic_recall(self.preconditions[action_name],
+                                                               self.ground_truth_preconditions[action_name]),
+            "effects_recall": calculate_syntactic_recall(self.discrete_effects[action_name],
+                                                         self.ground_discrete_effects[action_name]),
+            "action_precision": action_precision,
+            "action_recall": action_recall,
+            "f1_score": action_f1_score
+        }

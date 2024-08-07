@@ -38,7 +38,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
     ):
         super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
 
-    def calculate_effects_performance(self, learned_domain: Domain) -> Dict[str, float]:
+    def calculate_effects_mse(self, learned_domain: Domain) -> Dict[str, float]:
         """Calculates the effects MSE value using the actual state fluents and the ones generated using the learned
             action.
 
@@ -49,7 +49,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         :return: a mapping between the action name and its MSE value.
         """
         squared_errors = defaultdict(list)
-        mse_values = {action_name: 1 for action_name in self.model_domain.actions.keys()}
+        mse_values = {action_name: 1 for action_name in learned_domain.actions.keys()}
         for observation in self.dataset_observations:
             for observation_component in observation.components:
                 action_call = observation_component.grounded_action_call
@@ -59,7 +59,16 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                     continue
 
                 grounded_operator = _ground_executed_action(action_call, learned_domain, observation.grounded_objects)
-                next_state = grounded_operator.apply(previous_state, allow_inapplicable_actions=True)
+                try:
+                    next_state = grounded_operator.apply(previous_state, allow_inapplicable_actions=False)
+
+                except ValueError:
+                    self.logger.debug("The action is not applicable in the state.")
+                    next_state = previous_state.copy()
+                    # since the learned action is not applicable in the state there is no point to compare
+                    # with an action that is not applicable in the model domain.
+                    model_next_state = previous_state.copy()
+
                 values = [
                     (next_state.state_fluents[fluent].value, model_next_state.state_fluents[fluent].value)
                     for fluent in next_state.state_fluents.keys()
@@ -82,17 +91,17 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
-        effects_mse = self.calculate_effects_performance(learned_domain)
+        effects_mse = self.calculate_effects_mse(learned_domain)
         for action_name in self.model_domain.actions:
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
-                "precondition_precision": preconditions_precision[action_name],
-                "precondition_recall": preconditions_recall[action_name],
-                "effects_precision": effects_precision[action_name],
-                "effects_recall": effects_recall[action_name],
-                "effects_mse": effects_mse[action_name],
+                "precondition_precision": preconditions_precision.get(action_name, 1),
+                "precondition_recall": preconditions_recall.get(action_name, 0),
+                "effects_precision": effects_precision.get(action_name, 1),
+                "effects_recall": effects_recall.get(action_name, 1),
+                "effects_mse": effects_mse.get(action_name, 0),
             }
             self.combined_stats.append(action_stats)
 

@@ -19,7 +19,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
-        mem="6G",
+        mem="4G",
         python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
         suppress_output=False,
@@ -28,8 +28,10 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
             f"--domain_file_name {experiment['domain_file_name']}",
             f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
             f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
+            f"--problem_prefix {experiment['problems_prefix']}",
         ],
         environment_variables=environment_variables,
+        logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",
     )
     print(f"Submitted job with sid {fold_creation_sid}\n")
     time.sleep(1)
@@ -40,11 +42,12 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
 
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids, internal_iterations):
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
+    filtered_sids = [sid for sid in job_ids if validate_job_running(sid) is not None]
     statistics_collection_job = submit_job(
         conda_env="online_nsam",
-        mem="6G",
+        mem="4G",
         python_file=f"{code_directory}/distributed_results_collector.py",
-        dependency=f"afterok:{':'.join([str(e) for e in job_ids])}",
+        dependency=f"afterok:{':'.join([str(e) for e in filtered_sids])}",
         jobname=f"collect_statistics_{experiment['domain_file_name']}",
         suppress_output=False,
         arguments=[
@@ -102,31 +105,53 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
 def validate_job_running(sid):
     job_exists_command = ["squeue", "--job", f"{sid}"]
     try:
-        subprocess.check_output(job_exists_command, shell=True).decode()
+        result = subprocess.check_output(job_exists_command, shell=True).decode()
+        if str(sid) in result:
+            return sid
+
+        return None
+
     except subprocess.CalledProcessError:
         return None
 
-    return sid
 
-
-def submit_job_and_validate_execution(
-    code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None
-):
+def submit_job_and_validate_execution(code_directory, configurations, experiment, fold, arguments, environment_variables, fold_creation_sid=None):
     job_name = f"{experiment['domain_file_name']}_{fold}_runner"
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
         conda_env="online_nsam",
-        mem="64G",
+        mem="16G",
         python_file=f"{code_directory}/{configurations['experiments_script_path']}",
         jobname=job_name,
         dependency=dependency_argument,
         suppress_output=False,
         arguments=arguments,
         environment_variables=environment_variables,
+        logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",
+        suppress_error=True,
     )
     time.sleep(2)
     return validate_job_running(sid)
 
+
+def create_all_experiments_folders(code_directory, environment_variables, configurations):
+    print("Creating the directories containing the folds datasets for the experiments.")
+    jobs_sids = []
+    output_internal_iterations = []
+    for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
+        internal_iterations, fold_creation_sid = create_experiment_folders(code_directory, environment_variables, experiment)
+        jobs_sids.append(fold_creation_sid)
+        output_internal_iterations.append(internal_iterations)
+        print(
+            f"Submitted fold datasets folder creation job with the id {fold_creation_sid} for the experiment with domain {experiment['domain_file_name']}\n"
+        )
+
+    while any([validate_job_running(sid) is not None for sid in jobs_sids]):
+        print("Waiting for the fold creation jobs to finish.")
+        time.sleep(5)
+
+    print("Finished building the experiment folds!")
+    return output_internal_iterations
 
 
 def main():
@@ -134,12 +159,10 @@ def main():
     environment_variables = get_environment_variables(configurations)
     code_directory = configurations["code_directory_path"]
     print("Starting to setup and run the experiments!")
+    iterations_to_use = create_all_experiments_folders(code_directory, environment_variables, configurations)
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
-        internal_iterations, fold_creation_sid = create_experiment_folders(code_directory, environment_variables, experiment)
+        internal_iterations = iterations_to_use[experiment_index]
         experiment_sids = []
-        print(
-            f"Submitted fold datasets folder creation job with the id {fold_creation_sid} for the experiment with domain {experiment['domain_file_name']}\n"
-        )
         for fold in range(configurations["num_folds"]):
             print(f"Working on fold {fold} of the experiment with domain {experiment['domain_file_name']}\n")
             for version_index, compared_version in enumerate(experiment["compared_versions"]):
@@ -147,18 +170,15 @@ def main():
                 arguments = create_execution_arguments(experiment, fold, compared_version)
                 for internal_iteration in internal_iterations:
                     arguments.append(f"--iteration_number {internal_iteration}")
-                    dependency_sid = None if validate_job_running(fold_creation_sid) is None else fold_creation_sid
-                    sid = submit_job_and_validate_execution(
-                        code_directory, configurations, experiment, fold, arguments, environment_variables, dependency_sid
-                    )
+                    sid = None
                     while sid is None:
                         sid = submit_job_and_validate_execution(
-                            code_directory, configurations, experiment, fold, internal_iteration, arguments, environment_variables, fold_creation_sid
+                            code_directory, configurations, experiment, fold, arguments, environment_variables, None
                         )
 
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-                    print(f"{formatted_date_time} - submitted job with sid {sid}")
+                    print(f"{formatted_date_time} - submitted job with sid {sid} for fold {fold} and iteration {internal_iteration}.")
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list

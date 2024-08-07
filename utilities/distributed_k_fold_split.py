@@ -84,7 +84,7 @@ class DistributedKFoldSplit:
     def create_fold_from_scratch(self, folds_data: Dict[str, Any], max_items: int, trajectory_suffix: str) -> None:
         trajectory_paths = list(self.working_directory_path.glob(trajectory_suffix))
         items_per_fold = max_items if (0 < max_items <= len(trajectory_paths)) else len(trajectory_paths)
-        self.logger.info(f"Creating {items_per_fold} items per fold.")
+        self.logger.debug(f"Creating {items_per_fold} items per fold.")
         trajectory_paths = random.sample(trajectory_paths, k=items_per_fold)
         for fold_index, (train_set_indices, test_set_indices) in enumerate(
             create_test_set_indices(items_per_fold, self.n_split, self.only_train_test)
@@ -93,7 +93,7 @@ class DistributedKFoldSplit:
             train_set_trajectories = [trajectory_paths[i] for i in range(len(trajectory_paths)) if i not in test_set_indices]
             training_data = {"internal_iterations": {}}
             for num_used_trajectories in self._internal_iterations:
-                self.logger.info(f"Creating fold {fold_index} with {num_used_trajectories} trajectories.")
+                self.logger.debug(f"Creating fold {fold_index} with {num_used_trajectories} trajectories.")
                 selected_trajectories = random.sample(train_set_trajectories, k=num_used_trajectories)
                 for learning_algorithm in self._learning_algorithms:
                     self.create_directories_content(
@@ -129,7 +129,7 @@ class DistributedKFoldSplit:
         folds_data = load_fold_settings(self.working_directory_path)
         train_test_paths = []
         if load_configuration and len(folds_data) > 0:
-            self.logger.info("Loading the folds settings from the configuration file.")
+            self.logger.debug("Loading the folds settings from the configuration file.")
             for index, (fold_name, fold_content) in enumerate(folds_data.items()):
                 for iteration_num, selected_trajectories in fold_content["train"]["internal_iterations"].items():
                     selected_trajectories_paths = [Path(p) for p in selected_trajectories]

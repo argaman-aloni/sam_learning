@@ -21,7 +21,7 @@ class PolynomialFluentsLearningAlgorithm(NumericFluentStateStorage):
     is_verbose: bool
 
     def __init__(self, action_name: str, polynom_degree: int, domain_functions: Dict[str, PDDLFunction], is_verbose: bool = False):
-        super().__init__(action_name, domain_functions)
+        super().__init__(action_name, domain_functions, polynom_degree)
         self.polynom_degree = polynom_degree
         self.is_verbose = is_verbose
 

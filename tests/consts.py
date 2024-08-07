@@ -85,10 +85,21 @@ MINECRAFT_LARGE_PROBLEM_PATH = EXAMPLES_DIR_PATH / "advanced_map_instance_0.pddl
 MINECRAFT_LARGE_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "advanced_map_instance_0.trajectory"
 
 
+DRIVERLOG_POLY_DOMAIN_PATH = EXAMPLES_DIR_PATH / "driverlogHardNumeric.pddl"
+DRIVERLOG_POLY_PROBLEM_PATH = EXAMPLES_DIR_PATH / "driverlog_poly_problem.pddl"
+DRIVERLOG_POLY_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "driverlog_poly_problem.trajectory"
+
+FARMLAND_DOMAIN_PATH = EXAMPLES_DIR_PATH / "farmland.pddl"
+FARMLAND_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" /  "farmland"
+SAILING_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" /  "sailing"
+
+
 COUNTERS_POLYNOMIAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "counters_poly.pddl"
 COUNTERS_POLYNOMIAL_PROBLEMS_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.pddl")]
 COUNTERS_POLYNOMIAL_TRAJECTORIES_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.trajectory")]
 
+FARMLAND_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data.csv"
+FARMLAND_PAPER_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data_for_paper.csv"
 
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")

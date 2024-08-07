@@ -71,9 +71,8 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         :return: the shifted point based on the first sample in the dataframe.
         """
-        first_sample = self.data.iloc[0] if not self._spanning_standard_base else [0] * self.data.shape[1]
         last_sample = self.data.iloc[-1].to_numpy()
-        shifted_last_sample = last_sample - first_sample
+        shifted_last_sample = last_sample - self.data.iloc[0] if not self._spanning_standard_base else last_sample
         return shifted_last_sample
 
     def _is_spanned_in_base(self) -> bool:
@@ -144,7 +143,9 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                     return
 
                 except QhullError:
-                    print("Failed to add a new point to the convex hull.")
+                    self.logger.debug(
+                        f"Failed to add a new point to the convex hull. \n\tPrevious data - {self._convex_hull.points}, new point - {projected_new_point}"
+                    )
                     self._convex_hull.close()
                     self._convex_hull = None
 
@@ -154,7 +155,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         self.logger.debug("Creating the convex hull for the first time (or in case that the base had changed).")
         points = self.data.to_numpy()
-        shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
+        shift_axis = points[0].tolist() if not self._spanning_standard_base else [0] * len(self.data.columns.tolist())
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
         self._convex_hull = ConvexHull(projected_points, incremental=True)
 
@@ -166,8 +167,9 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
         display_convex_hull(self.action_name, display_mode, self._convex_hull)
-        A = self._convex_hull.equations[:, : self._convex_hull.points.shape[1]]
-        b = -self._convex_hull.equations[:, self._convex_hull.points.shape[1]]
+        equations = np.unique(self._convex_hull.equations, axis=0)
+        A = equations[:, : self._convex_hull.points.shape[1]]
+        b = -equations[:, self._convex_hull.points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
         border_point = prettify_coefficients(b)
         return coefficients, border_point
@@ -186,13 +188,14 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             self.logger.debug("The base is not yet learned since didn't receive enough points.")
             raise ValueError()
 
+        points = self.data.to_numpy()
+        shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
+
         if len(self._gsp_base) == self.data.shape[1]:
             self.logger.debug("The points are spanning the original space and the basis is full rank.")
             coefficients, border_point = self._create_ch_coefficients_data(display_mode)
-            return coefficients, border_point, self.data.columns.tolist(), []
+            return coefficients, border_point, self.data.columns.tolist(), None
 
-        points = self.data.to_numpy()
-        shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
 
         if self._convex_hull is None:
@@ -213,7 +216,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         )
         return coefficients, border_point, transformed_vars, span_verification_conditions
 
-    def construct_convex_hull_inequalities(self) -> Precondition:
+    def construct_safe_linear_inequalities(self, *args, **kwargs) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)

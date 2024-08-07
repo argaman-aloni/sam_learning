@@ -12,7 +12,7 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
 )
 from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
 from sam_learning.core import LearnerDomain
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 
@@ -60,7 +60,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         """
 
         learner = NUMERIC_SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
-            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, preconditions_fluent_map=self.fluents_map
+            partial_domain=partial_domain, polynomial_degree=self.polynom_degree, relevant_fluents=self.fluents_map
         )
         return learner.learn_action_model(allowed_observations)
 
@@ -73,7 +73,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         :param iteration_number: the current iteration number.
         """
         self.logger.info(f"Running fold {fold_num} iteration {iteration_number}")
-        self._init_semantic_performance_calculator(test_set_dir_path)
+        self._init_semantic_performance_calculator(fold_num)
         self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path, iteration_number)
         self.domain_validator.clear_statistics()
 
@@ -105,6 +105,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     parser.add_argument("--iteration_number", required=True, help="The current iteration to execute", type=int)
+    parser.add_argument("--debug", required=False, help="Whether in debug mode.", type=bool, default=False)
     args = parser.parse_args()
     return args
 

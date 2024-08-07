@@ -1,6 +1,7 @@
 """The POL main framework - Compile, Learn and Plan."""
 import argparse
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
@@ -16,14 +17,15 @@ from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
-PLANNER_EXECUTION_TIMEOUT = 600
+PLANNER_EXECUTION_TIMEOUT = 1800 # 30 minutes
 
 
 def configure_iteration_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
     iteration_number = int(args.iteration_number)
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
-    working_directory_path = Path(args.working_directory_path)
+    local_logs_parent_path = os.environ.get("LOCAL_LOGS_PATH", args.working_directory_path)
+    working_directory_path = Path(local_logs_parent_path)
     logs_directory_path = working_directory_path / "logs"
     logs_directory_path.mkdir(exist_ok=True)
     # Create a rotating file handler
@@ -33,11 +35,17 @@ def configure_iteration_logger(args: argparse.Namespace):
         maxBytes=max_bytes,
         backupCount=1,
     )
+    stream_handler = logging.StreamHandler()
 
     # Create a formatter and set it for the handler
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
-    logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
+    if args.debug:
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG, handlers=[file_handler, stream_handler])
+    else:
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
+
+
 
 
 class ParallelExperimentRunner:
@@ -65,15 +73,15 @@ class ParallelExperimentRunner:
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
 
-    def _init_semantic_performance_calculator(self, test_set_path: Path) -> None:
-        """Initializes the algorithm of the semantic precision / recall calculator."""
-        self.semantic_performance_calc = init_semantic_performance_calculator(
-            self.working_directory_path,
-            self.domain_file_name,
-            self._learning_algorithm,
-            test_set_dir_path=test_set_path,
-            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
-        )
+    def _init_semantic_performance_calculator(self, fold_num: int) -> None:
+        """Initializes the algorithm of the semantic precision - recall calculator."""
+        # self.semantic_performance_calc = init_semantic_performance_calculator(
+        #     self.working_directory_path,
+        #     self.domain_file_name,
+        #     self._learning_algorithm,
+        #     test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
+        #     is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
+        # )
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
@@ -87,7 +95,7 @@ class ParallelExperimentRunner:
         :param test_set_path: the path to the test set directory where the domain would be exported to.
         :param file_name: the name of the file to export the domain to.
         """
-        legacy_algorithms = [LearningAlgorithmType.numeric_sam, LearningAlgorithmType.naive_nsam]
+        legacy_algorithms = [LearningAlgorithmType.naive_nsam]
         domain_file_name = file_name or self.domain_file_name
         domain_path = test_set_path / domain_file_name
         with open(domain_path, "wt") as domain_file:
@@ -108,23 +116,21 @@ class ParallelExperimentRunner:
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_observations = []
-        for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
+        sorted_trajectory_paths = sorted(train_set_dir_path.glob("*.trajectory"))
+        for index, trajectory_file_path in enumerate(sorted_trajectory_paths):
+            # assuming that the folders were created so that each folder contains only the correct number of trajectories, i.e., iteration_number
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
             new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
             allowed_observations.append(new_observation)
-            if iteration_number != 0 and index + 1 != iteration_number:
-                continue
 
-            self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
+        self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
+        learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
-            learned_domain_path = self.validate_learned_domain(
-                allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
-            )
-            self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
-            break
-
+        learned_domain_path = self.validate_learned_domain(
+            allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
+        )
+        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.domain_validator.write_statistics(fold_num, iteration_number)
         self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
 

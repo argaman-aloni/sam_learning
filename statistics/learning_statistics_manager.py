@@ -153,7 +153,7 @@ class LearningStatisticsManager:
                 "ground_truth_preconditions": ground_truth_preconditions,
                 "ground_truth_effects": [p.untyped_representation for p in
                                          self.model_domain.actions[action_name].discrete_effects],
-                **precision_recall_calculator.export_action_statistics(action_name)
+                **precision_recall_calculator.export_action_syntactic_statistics(action_name)
             }
             self.action_learning_stats.append(action_stats)
 
@@ -219,8 +219,8 @@ class LearningStatisticsManager:
         """
         num_triplets = sum([len(observation.components) for observation in used_observations])
         actions_stats_counter = Counter(learning_report.values())
-        model_precision = precision_recall_calc.calculate_model_precision()
-        model_recall = precision_recall_calc.calculate_model_recall()
+        model_precision = precision_recall_calc.calculate_syntactic_precision()
+        model_recall = precision_recall_calc.calculate_syntactic_recall()
         model_f1_score = 0 if model_precision + model_recall == 0 else \
             2 * (model_precision * model_recall) / (model_precision + model_recall)
 
