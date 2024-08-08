@@ -338,3 +338,17 @@ def test_learn_action_model_with_soft_policy_delete_preconditions_has_add_effect
                 pre_positive_copy = pre.copy()
                 pre_positive_copy.is_positive = True
                 assert (not pre.is_positive) and (pre_positive_copy.untyped_representation in add_effects)
+
+
+def test_learn_action_model_hard_policy_returns_learned_model_no_negative_precondition(
+        woodworking_ma_sam_hard_policy: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
+    learned_model, learning_report = woodworking_ma_sam_hard_policy.learn_combined_action_model([multi_agent_observation])
+    print(learning_report)
+    print(learned_model.to_pddl())
+
+
+def test_learn_action_model_soft_policy_returns_learned_model_no_negative_precondition_has_add_effect(
+        woodworking_ma_sam_soft_policy: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
+    learned_model, learning_report = woodworking_ma_sam_soft_policy.learn_combined_action_model([multi_agent_observation])
+    print(learning_report)
+    print(learned_model.to_pddl())
