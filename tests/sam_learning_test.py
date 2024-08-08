@@ -1,7 +1,7 @@
 """module tests for the SAM learning algorithm"""
 
 from pddl_plus_parser.models import ActionCall, Observation, \
-    ObservedComponent
+    ObservedComponent, Predicate
 
 from sam_learning.learners import SAMLearner
 from tests.consts import sync_snapshot, extract_preconditions_predicates
@@ -426,3 +426,77 @@ def test_learn_action_model_returns_learned_model(elevators_sam_learning: SAMLea
     learned_model, learning_report = elevators_sam_learning.learn_action_model([elevators_observation])
     print(learning_report)
     print(learned_model.to_pddl())
+
+
+def test_learn_action_model_with_hard_policy_deletes_negative_preconditions(
+        elevators_sam_learning_hard_policy: SAMLearner, elevators_observation: Observation):
+    learned_model_ignore, _ = elevators_sam_learning_hard_policy.learn_action_model(
+        [elevators_observation])
+
+    for action in learned_model_ignore.actions.values():
+        for pre in action.preconditions.root.operands:
+            if isinstance(pre, Predicate):
+                assert pre.is_positive
+
+
+def test_learn_action_model_with_hard_negative_precondition_policy_keep_positive_preconditions(
+        elevators_sam_learning: SAMLearner, elevators_observation: Observation,
+        elevators_sam_learning_hard_policy: SAMLearner):
+    learned_model, _ = elevators_sam_learning.learn_action_model([elevators_observation])
+    learned_model_ignore, _ = elevators_sam_learning_hard_policy.learn_action_model([elevators_observation])
+
+    for action, action_ignored in zip(learned_model.actions.values(), learned_model_ignore.actions.values()):
+        preconds = {prec for prec in action.preconditions.root.operands if isinstance(prec,Predicate)}
+        preconds_ignore = {prec for prec in action_ignored.preconditions.root.operands if isinstance(prec,Predicate)}
+
+        difference_ignore_from_classic = preconds_ignore.difference(preconds)
+        difference_classic_from_ignore = preconds.difference(preconds_ignore)
+
+        assert len(difference_ignore_from_classic) == 0
+
+        for pre in difference_classic_from_ignore:
+            if isinstance(pre, Predicate):
+                assert not pre.is_positive
+
+
+def test_learn_action_model_with_hard_policy_delete_effect_has_positive_precondition(
+        elevators_sam_learning_hard_policy: SAMLearner, elevators_observation: Observation):
+    learned_model, _ = elevators_sam_learning_hard_policy.learn_action_model(
+        [elevators_observation])
+
+    for action in learned_model.actions.values():
+        predicates = [pre.untyped_representation for pre in action.preconditions.root.operands if
+                      pre.is_positive and isinstance(pre, Predicate)]
+
+        del_effects = [eff for eff in action.discrete_effects if not eff.is_positive and isinstance(eff, Predicate)]
+
+        for del_eff in del_effects:
+            del_eff.is_positive = not del_eff.is_positive
+
+        flipped_del_effects = {del_eff.untyped_representation for del_eff in del_effects}
+
+        assert len(del_effects) == len(flipped_del_effects.intersection(predicates))
+
+
+def test_learn_action_model_with_soft_policy_delete_preconditions_has_add_effect(
+    elevators_sam_learning: SAMLearner, elevators_sam_learning_soft_policy: SAMLearner,
+        elevators_observation: Observation):
+    learned_model, _ = elevators_sam_learning.learn_action_model([elevators_observation])
+    learned_model_soft, _ = elevators_sam_learning_soft_policy.learn_action_model(
+        [elevators_observation])
+
+    for action, action_ignored in zip(learned_model.actions.values(), learned_model_soft.actions.values()):
+        preconds = {prec for prec in action.preconditions.root.operands if isinstance(prec,Predicate)}
+        preconds_ignore = {prec for prec in action_ignored.preconditions.root.operands if isinstance(prec,Predicate)}
+
+        difference_ignore_from_classic = preconds_ignore.difference(preconds)
+        difference_classic_from_ignore = preconds.difference(preconds_ignore)
+        add_effects = [effect.untyped_representation for effect in action.discrete_effects if effect.is_positive]
+
+        assert len(difference_ignore_from_classic) == 0
+
+        for pre in difference_classic_from_ignore:
+            if isinstance(pre, Predicate):
+                pre_positive_copy = pre.copy()
+                pre_positive_copy.is_positive = True
+                assert (not pre.is_positive) and (pre_positive_copy.untyped_representation in add_effects)
