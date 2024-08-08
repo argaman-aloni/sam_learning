@@ -17,6 +17,7 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     ADL_SATELLITE_TRAJECTORY_PATH, DEPOTS_DISCRETE_DOMAIN_PATH, DEPOTS_DISCRETE_PROBLEM_PATH, \
     MINECRAFT_LARGE_DOMAIN_PATH, MINECRAFT_LARGE_PROBLEM_PATH, MINECRAFT_LARGE_TRAJECTORY_PATH
 from tests.multi_agent_learning_tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
+from utilities import NegativePreconditionPolicy
 
 os.environ["CONVEX_HULL_ERROR_PATH"] = "tests\\convex_hull_error.txt"
 
@@ -40,6 +41,16 @@ def elevators_observation(elevators_domain: Domain, elevators_problem: Problem) 
 @fixture()
 def elevators_sam_learning(elevators_domain: Domain) -> SAMLearner:
     return SAMLearner(elevators_domain)
+
+
+@fixture()
+def elevators_sam_learning_soft_policy(elevators_domain: Domain) -> SAMLearner:
+    return SAMLearner(elevators_domain, negative_preconditions_policy=NegativePreconditionPolicy.soft)
+
+
+@fixture()
+def elevators_sam_learning_hard_policy(elevators_domain: Domain) -> SAMLearner:
+    return SAMLearner(elevators_domain, negative_preconditions_policy=NegativePreconditionPolicy.hard)
 
 
 @fixture()
@@ -82,6 +93,14 @@ def woodworking_ma_combined_problem(woodworking_ma_combined_domain: Domain) -> P
 
 @fixture()
 def multi_agent_observation(woodworking_ma_combined_domain: Domain,
+                            woodworking_ma_combined_problem) -> MultiAgentObservation:
+    return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
+        WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
+
+
+# TODO MA-SAM should not modify observation. When learning two models on the same observation, problems occur
+@fixture()
+def multi_agent_observation2(woodworking_ma_combined_domain: Domain,
                             woodworking_ma_combined_problem) -> MultiAgentObservation:
     return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
         WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
