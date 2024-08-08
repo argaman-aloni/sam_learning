@@ -6,8 +6,9 @@ from typing import Optional
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 
-from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
+from statistics.numeric_performance_calculator import NumericPerformanceCalculator
+from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from utilities import LearningAlgorithmType
 
 DEFAULT_SIZE = 10
@@ -38,13 +39,22 @@ def init_semantic_performance_calculator(
     observations = []
     problem_files = list(test_set_dir_path.glob(f"{problem_prefix}*.pddl"))
     for test_problem_path in problem_files:
-        trajectory_file_path = working_directory_path / f"{test_problem_path.stem}.trajectory"
+        trajectory_file_path = test_set_dir_path / f"{test_problem_path.stem}.trajectory"
         problem = ProblemParser(test_problem_path, partial_domain).parse_problem()
         observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path, executing_agents=executing_agents)
         observations.append(observation)
 
     if is_numeric:
         return NumericPerformanceCalculator(
+            model_domain=model_domain,
+            observations=observations,
+            model_domain_path=domain_path,
+            working_directory_path=working_directory_path,
+            learning_algorithm=learning_algorithm,
+        )
+
+    if learning_algorithm == LearningAlgorithmType.ma_sam:
+        return MASamPerformanceCalculator(
             model_domain=model_domain,
             observations=observations,
             model_domain_path=domain_path,
