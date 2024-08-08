@@ -7,7 +7,7 @@ from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, Mult
 
 from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners.sam_learning import SAMLearner
-
+from utilities import NegativePreconditionPolicy
 
 class MultiAgentSAM(SAMLearner):
     """Class designated to learning action models from multi-agent trajectories with joint actions."""
@@ -16,8 +16,9 @@ class MultiAgentSAM(SAMLearner):
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
 
-    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
-        super().__init__(partial_domain)
+    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.normal):
+        super().__init__(partial_domain, negative_preconditions_policy=negative_precondition_policy)
         self.logger = logging.getLogger(__name__)
         self.literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
@@ -284,6 +285,7 @@ class MultiAgentSAM(SAMLearner):
                 self.handle_multi_agent_trajectory_component(component)
 
         self.construct_safe_actions()
+        self.handle_negative_preconditions_policy()
         self.logger.info("Finished learning the action model!")
         super().end_measure_learning_time()
         learning_report = super()._construct_learning_report()

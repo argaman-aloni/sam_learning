@@ -41,3 +41,9 @@ class SolutionOutputTypes(Enum):
     not_applicable = 4
     goal_not_achieved = 5
     solver_error = 6
+
+
+class NegativePreconditionPolicy(Enum):
+    normal = 1,
+    soft = 2,
+    hard = 3

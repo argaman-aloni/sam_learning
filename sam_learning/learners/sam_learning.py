@@ -11,6 +11,8 @@ from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, D
 from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, \
     VocabularyCreator, EnvironmentSnapshot
 
+from utilities import NegativePreconditionPolicy
+
 
 class SAMLearner:
     """Class that represents the safe action model learner algorithm.
@@ -29,8 +31,10 @@ class SAMLearner:
     learning_end_time: float
     vocabulary_creator: VocabularyCreator
     cannot_be_effect: Dict[str, Set[Predicate]]
+    negative_preconditions_policy: NegativePreconditionPolicy
 
-    def __init__(self, partial_domain: Domain):
+    def __init__(self, partial_domain: Domain,
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.normal):
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -42,6 +46,7 @@ class SAMLearner:
         self.learning_start_time = 0
         self.learning_end_time = 0
         self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
+        self.negative_preconditions_policy = negative_preconditions_policy
 
     def _remove_unobserved_actions_from_partial_domain(self):
         """Removes the actions that were not observed from the partial domain."""
@@ -218,6 +223,43 @@ class SAMLearner:
                 if action_data.signature[lifted_param1] == action_data.signature[lifted_param2]:
                     action_data.preconditions.root.inequality_preconditions.add((lifted_param1, lifted_param2))
 
+    def hard_remove_negative_preconditions(self):
+        """Removes all negative preconditions"""
+        for action in self.partial_domain.actions.values():
+            new_preconditions = set()
+
+            for precondition in action.preconditions.root.operands:
+                if isinstance(precondition, Predicate) and not precondition.is_positive:
+                    continue
+
+                new_preconditions.add(precondition)
+
+            action.preconditions.root.operands = new_preconditions
+
+    def soft_remove_negative_preconditions(self):
+        """Removes negative preconditions when the fluent is an add effect"""
+        for action in self.partial_domain.actions.values():
+            new_preconditions = set()
+            action_add_effects = [effect for effect in action.discrete_effects if effect.is_positive]
+
+            for precondition in action.preconditions.root.operands:
+                if (isinstance(precondition, Predicate)
+                        and (not precondition.is_positive)
+                        and precondition in action_add_effects):
+                    continue
+
+                new_preconditions.add(precondition)
+
+            action.preconditions.root.operands = new_preconditions
+
+    def handle_negative_preconditions_policy(self):
+        match self.negative_preconditions_policy:
+            case NegativePreconditionPolicy.hard:
+                self.hard_remove_negative_preconditions()
+            case NegativePreconditionPolicy.soft:
+                self.soft_remove_negative_preconditions()
+
+
     def construct_safe_actions(self) -> None:
         """Constructs the single-agent actions that are safe to execute."""
         pass
@@ -267,6 +309,7 @@ class SAMLearner:
                 self.handle_single_trajectory_component(component)
 
         self.construct_safe_actions()
+        self.handle_negative_preconditions_policy()
         self.end_measure_learning_time()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
