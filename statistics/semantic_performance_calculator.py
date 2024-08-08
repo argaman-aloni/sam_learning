@@ -73,7 +73,7 @@ class SemanticPerformanceCalculator:
     """Class responsible for calculating the semantic precision and recall of a model."""
 
     model_domain: Domain
-    dataset_observations: List[Observation, MultiAgentObservation]
+    dataset_observations: List[Observation]
     learning_algorithm: LearningAlgorithmType
     combined_stats: List[Dict[str, Any]]
     logger: logging.Logger
