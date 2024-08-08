@@ -51,7 +51,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
         for index, observation in enumerate(self.dataset_observations):
             observation_objects = observation.grounded_objects
             for component in observation.components:
-                for action in component.grounded_joint_action:
+                for action in component.grounded_joint_action.actions:
                     if action.name not in learned_domain.actions:
                         continue
 
