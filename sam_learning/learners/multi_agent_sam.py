@@ -9,6 +9,7 @@ from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, Learne
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
+
 class MultiAgentSAM(SAMLearner):
     """Class designated to learning action models from multi-agent trajectories with joint actions."""
     logger: logging.Logger

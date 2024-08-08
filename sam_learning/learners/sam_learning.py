@@ -240,13 +240,14 @@ class SAMLearner:
         """Removes negative preconditions when the fluent is an add effect"""
         for action in self.partial_domain.actions.values():
             new_preconditions = set()
-            action_add_effects = [effect for effect in action.discrete_effects if effect.is_positive]
+            action_add_effects = [effect.untyped_representation for effect in action.discrete_effects if effect.is_positive]
 
             for precondition in action.preconditions.root.operands:
-                if (isinstance(precondition, Predicate)
-                        and (not precondition.is_positive)
-                        and precondition in action_add_effects):
-                    continue
+                if isinstance(precondition, Predicate) and not precondition.is_positive:
+                    copy_precondition_positive = precondition.copy()
+                    copy_precondition_positive.is_positive = True
+                    if copy_precondition_positive.untyped_representation in action_add_effects:
+                        continue
 
                 new_preconditions.add(precondition)
 
