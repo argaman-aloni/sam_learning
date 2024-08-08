@@ -5,10 +5,12 @@ from collections import defaultdict
 from itertools import combinations
 from typing import List, Tuple, Dict, Set
 
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
+    GroundedPredicate
 
 from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, \
     VocabularyCreator, EnvironmentSnapshot
+
 from utilities import NegativePreconditionPolicy
 
 
@@ -32,7 +34,7 @@ class SAMLearner:
     negative_preconditions_policy: NegativePreconditionPolicy
 
     def __init__(self, partial_domain: Domain,
-                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.normal):
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -221,26 +223,41 @@ class SAMLearner:
                 if action_data.signature[lifted_param1] == action_data.signature[lifted_param2]:
                     action_data.preconditions.root.inequality_preconditions.add((lifted_param1, lifted_param2))
 
-    def handle_negative_preconditions_policy(self):
-        """Handles removal of negative preconditions"""
-        if self.negative_preconditions_policy == NegativePreconditionPolicy.no_remove:
-            return
-
+    def hard_remove_negative_preconditions(self):
+        """Removes all negative preconditions"""
         for action in self.partial_domain.actions.values():
             new_preconditions = set()
 
             for precondition in action.preconditions.root.operands:
                 if isinstance(precondition, Predicate) and not precondition.is_positive:
-                    action_add_effects = [effect.untyped_representation for effect in action.discrete_effects
-                                          if effect.is_positive]
-                    copy_precondition_positive = precondition.copy(is_negated=True)
-                    if ((not self.negative_preconditions_policy == NegativePreconditionPolicy.soft) or
-                            copy_precondition_positive.untyped_representation in action_add_effects):
-                        continue
+                    continue
 
                 new_preconditions.add(precondition)
 
             action.preconditions.root.operands = new_preconditions
+
+    def soft_remove_negative_preconditions(self):
+        """Removes negative preconditions when the fluent is an add effect"""
+        for action in self.partial_domain.actions.values():
+            new_preconditions = set()
+            action_add_effects = [effect for effect in action.discrete_effects if effect.is_positive]
+
+            for precondition in action.preconditions.root.operands:
+                if (isinstance(precondition, Predicate)
+                        and (not precondition.is_positive)
+                        and precondition in action_add_effects):
+                    continue
+
+                new_preconditions.add(precondition)
+
+            action.preconditions.root.operands = new_preconditions
+
+    def handle_negative_preconditions_policy(self):
+        match self.negative_preconditions_policy:
+            case NegativePreconditionPolicy.hard:
+                self.hard_remove_negative_preconditions()
+            case NegativePreconditionPolicy.soft:
+                self.soft_remove_negative_preconditions()
 
 
     def construct_safe_actions(self) -> None:
