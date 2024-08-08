@@ -10,6 +10,7 @@ from pddl_plus_parser.models import Observation
 
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
+from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from utilities import LearningAlgorithmType
 
 DEFAULT_SIZE = 10
@@ -45,6 +46,15 @@ def init_semantic_performance_calculator(
 
     if is_numeric:
         return NumericPerformanceCalculator(
+            model_domain=model_domain,
+            observations=observations,
+            model_domain_path=domain_path,
+            working_directory_path=working_directory_path,
+            learning_algorithm=learning_algorithm,
+        )
+
+    if learning_algorithm == LearningAlgorithmType.ma_sam:
+        return MASamPerformanceCalculator(
             model_domain=model_domain,
             observations=observations,
             model_domain_path=domain_path,

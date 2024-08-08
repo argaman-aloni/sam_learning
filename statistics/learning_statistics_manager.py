@@ -72,6 +72,7 @@ class LearningStatisticsManager:
     action_learning_stats: List[Dict[str, Any]]
     numeric_learning_stats: List[Dict[str, Any]]
     merged_numeric_stats: List[Dict[str, Any]]
+    merged_action_stats: List[Dict[str, Any]]
 
     def __init__(self, working_directory_path: Path, domain_path: Path, learning_algorithm: LearningAlgorithmType):
         self.working_directory_path = working_directory_path
@@ -79,6 +80,7 @@ class LearningStatisticsManager:
         self.learning_algorithm = learning_algorithm
         self.action_learning_stats = []
         self.numeric_learning_stats = []
+        self.merged_action_stats = []
         self.merged_numeric_stats = []
         self.results_dir_path = self.working_directory_path / "results_directory"
 
@@ -192,7 +194,7 @@ class LearningStatisticsManager:
         with open(output_path, 'wt', newline='') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=LEARNED_ACTIONS_STATS_COLUMNS)
             writer.writeheader()
-            writer.writerows(self.action_learning_stats)
+            writer.writerows(self.merged_action_stats)
 
     def export_numeric_learning_statistics(self, fold_number: int) -> None:
         """Export the numeric learning statistics that were collected from the learning report.
@@ -205,6 +207,7 @@ class LearningStatisticsManager:
     def clear_statistics(self) -> None:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
         self.merged_numeric_stats.extend(self.numeric_learning_stats)
+        self.merged_action_stats.extend(self.action_learning_stats)
         self.numeric_learning_stats.clear()
         self.action_learning_stats.clear()
 
