@@ -223,30 +223,18 @@ class SAMLearner:
                 if action_data.signature[lifted_param1] == action_data.signature[lifted_param2]:
                     action_data.preconditions.root.inequality_preconditions.add((lifted_param1, lifted_param2))
 
-    def hard_remove_negative_preconditions(self):
+    def remove_negative_preconditions(self):
         """Removes all negative preconditions"""
         for action in self.partial_domain.actions.values():
             new_preconditions = set()
 
             for precondition in action.preconditions.root.operands:
                 if isinstance(precondition, Predicate) and not precondition.is_positive:
-                    continue
-
-                new_preconditions.add(precondition)
-
-            action.preconditions.root.operands = new_preconditions
-
-    def soft_remove_negative_preconditions(self):
-        """Removes negative preconditions when the fluent is an add effect"""
-        for action in self.partial_domain.actions.values():
-            new_preconditions = set()
-            action_add_effects = [effect.untyped_representation for effect in action.discrete_effects if effect.is_positive]
-
-            for precondition in action.preconditions.root.operands:
-                if isinstance(precondition, Predicate) and not precondition.is_positive:
-                    copy_precondition_positive = precondition.copy()
-                    copy_precondition_positive.is_positive = True
-                    if copy_precondition_positive.untyped_representation in action_add_effects:
+                    action_add_effects = [effect.untyped_representation for effect in action.discrete_effects
+                                          if effect.is_positive]
+                    copy_precondition_positive = precondition.copy(is_negated=True)
+                    if ((not self.negative_preconditions_policy == NegativePreconditionPolicy.soft) or
+                            copy_precondition_positive.untyped_representation in action_add_effects):
                         continue
 
                 new_preconditions.add(precondition)
@@ -254,11 +242,8 @@ class SAMLearner:
             action.preconditions.root.operands = new_preconditions
 
     def handle_negative_preconditions_policy(self):
-        match self.negative_preconditions_policy:
-            case NegativePreconditionPolicy.hard:
-                self.hard_remove_negative_preconditions()
-            case NegativePreconditionPolicy.soft:
-                self.soft_remove_negative_preconditions()
+        if not self.negative_preconditions_policy == NegativePreconditionPolicy.normal:
+            self.remove_negative_preconditions()
 
 
     def construct_safe_actions(self) -> None:
