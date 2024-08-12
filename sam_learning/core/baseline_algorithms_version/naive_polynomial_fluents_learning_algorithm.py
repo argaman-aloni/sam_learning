@@ -53,7 +53,7 @@ class NaivePolynomialFluentsLearningAlgorithm(NaiveNumericFluentStateStorage):
         """
         if self.polynom_degree == 1:
             for first_fluent, second_fluent in itertools.combinations(list(state_fluents.keys()), r=2):
-                multiplied_fluent = self.create_polynomial_string([first_fluent, second_fluent])
+                multiplied_fluent = self.create_polynomial_string(sorted([first_fluent, second_fluent]))
                 storage[multiplied_fluent].append(
                     state_fluents[first_fluent].value * state_fluents[second_fluent].value)
             return
@@ -61,7 +61,7 @@ class NaivePolynomialFluentsLearningAlgorithm(NaiveNumericFluentStateStorage):
         for degree in range(2, self.polynom_degree + 1):
             for fluent_combination in itertools.combinations_with_replacement(
                     list(state_fluents.keys()), r=degree):
-                polynomial_fluent = self.create_polynomial_string(list(fluent_combination))
+                polynomial_fluent = self.create_polynomial_string(sorted(list(fluent_combination)))
                 values = [state_fluents[fluent].value for fluent in fluent_combination]
                 self.previous_state_storage[polynomial_fluent].append(numpy.prod(values))
 
