@@ -251,6 +251,7 @@ class DomainValidator:
             solving_stats[debug_statistic] = []
 
         self.logger.info("Solving the test set problems using the learned domain!")
+        problem_solving_times = []
         for problem_path in test_set_directory_path.glob(f"{self.problem_prefix}*.pddl"):
             problem_solving_report = {}
             problem_solved = False
@@ -267,7 +268,7 @@ class DomainValidator:
                     solving_stats=problem_solving_report,
                 )
                 end_time = time.time()
-                solving_stats["solving_time"] = end_time - start_time   # time in seconds
+                problem_solving_times.append(end_time - start_time)   # time in seconds
                 if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
@@ -290,6 +291,7 @@ class DomainValidator:
                 tested_domain_path=tested_domain_file_path,
             )
 
+        solving_stats["solving_time"] = sum(problem_solving_times) / len(problem_solving_times) # average time in seconds for all solved problems
         self._calculate_solving_percentages(solving_stats)
         self._calculate_expert_validation_statistics(solving_stats)
         num_trajectories = len(used_observations)
