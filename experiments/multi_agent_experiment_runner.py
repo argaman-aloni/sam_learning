@@ -10,7 +10,7 @@ from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 from experiments.basic_experiment_runner import OfflineBasicExperimentRunner
 from sam_learning.learners import MultiAgentSAM, SAMLearner
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
 
 DEFAULT_SPLIT = 5
 
@@ -19,14 +19,17 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
     """Class that represents the POL framework for multi-agent problems."""
     executing_agents: List[str]
     ma_domain_path: Path
+    negative_preconditions_policy: NegativePreconditionPolicy
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 problem_prefix: str = "pfile", executing_agents: List[str] = None):
+                 problem_prefix: str = "pfile", executing_agents: List[str] = None,
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.normal):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=LearningAlgorithmType.ma_sam,
                          problem_prefix=problem_prefix)
         self.executing_agents = executing_agents
         self.ma_domain_path = None
+        self.negative_preconditions_policy = negative_preconditions_policy
 
     def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
         """Create a single agent observation from a multi-agent observation.
@@ -90,7 +93,8 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
         :param fold_num: the index of the current fold in the cross validation process.
         """
-        learner = SAMLearner(partial_domain=partial_domain)
+        learner = SAMLearner(partial_domain=partial_domain,
+                             negative_preconditions_policy=self.negative_preconditions_policy)
         self._learning_algorithm = LearningAlgorithmType.sam_learning
         self.domain_validator.learning_algorithm = LearningAlgorithmType.sam_learning
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.sam_learning
@@ -113,7 +117,8 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
         :param fold_num: the index of the current fold in the cross validation process.
         """
-        learner = MultiAgentSAM(partial_domain=partial_domain)
+        learner = MultiAgentSAM(partial_domain=partial_domain,
+                                negative_precondition_policy=self.negative_preconditions_policy)
         self._learning_algorithm = LearningAlgorithmType.ma_sam
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam
@@ -157,7 +162,9 @@ def parse_arguments() -> argparse.Namespace:
                              "are executing the actions")
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
-
+    parser.add_argument("--negative_preconditions_policy", required=False, type=int, choices=[1, 2, 3],
+                        help="The negative preconditions policy of the domain",
+                        default=1)
     args = parser.parse_args()
     return args
 
@@ -170,7 +177,8 @@ def main():
     offline_learner = MultiAgentExperimentRunner(working_directory_path=Path(args.working_directory_path),
                                                  domain_file_name=args.domain_file_name,
                                                  executing_agents=executing_agents,
-                                                 problem_prefix=args.problems_prefix)
+                                                 problem_prefix=args.problems_prefix,
+                                                 negative_preconditions_policy=args.negative_preconditions_policy)
     offline_learner.run_cross_validation()
 
 
