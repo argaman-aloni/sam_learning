@@ -1,0 +1,58 @@
+"""Module test for the multi-agent action model learning."""
+from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, MultiAgentComponent, \
+    GroundedPredicate
+from pytest import fixture
+
+from sam_learning.core import LiteralCNF
+from sam_learning.learners import MASAMPlus
+from tests.consts import sync_ma_snapshot
+
+WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0",
+                           "spray-varnisher0"]
+ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
+
+
+@fixture()
+def woodworking_ma_sam_plus(woodworking_ma_combined_domain: Domain) -> MASAMPlus:
+    return MASAMPlus(woodworking_ma_combined_domain)
+
+
+@fixture()
+def rovers_ma_sam(ma_rovers_domain) -> MASAMPlus:
+    return MASAMPlus(ma_rovers_domain)
+
+
+@fixture()
+def do_plane_observation_component(multi_agent_observation: MultiAgentObservation) -> MultiAgentComponent:
+    return multi_agent_observation.components[1]
+
+
+@fixture()
+def do_plane_first_action_call() -> ActionCall:
+    return ActionCall("do-plane", ["planer0", "p2", "verysmooth", "natural", "varnished"])
+
+
+@fixture()
+def do_plane_second_action_call() -> ActionCall:
+    return ActionCall("do-plane", ["planer1", "p2", "verysmooth", "natural", "untreated"])
+
+
+@fixture()
+def communicate_image_data_action_call() -> ActionCall:
+    return ActionCall("communicate_image_data", ["rover0", "lander0", "objective4", "colour", "waypoint0", "waypoint1"])
+
+
+@fixture()
+def woodworking_literals_cnf(woodworking_ma_combined_domain: Domain) -> LiteralCNF:
+    action_names = [action for action in woodworking_ma_combined_domain.actions.keys()]
+    return LiteralCNF(action_names)
+
+
+@fixture()
+def rovers_literals_cnf(ma_rovers_domain: Domain) -> LiteralCNF:
+    action_names = [action for action in ma_rovers_domain.actions.keys()]
+    return LiteralCNF(action_names)
+
+
+def test_play(woodworking_ma_sam_plus:MASAMPlus, multi_agent_observation: MultiAgentObservation):
+    learned_model, _ = woodworking_ma_sam_plus.learn_combined_action_model([multi_agent_observation])

@@ -15,7 +15,7 @@ class MASAMPlus(MultiAgentSAM):
     literals_cnf: Dict[str, LiteralCNF]
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
-    relevant_lmas: Dict[str, LiteralCNF]
+    relevant_cnfs: Dict[str, LiteralCNF]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
@@ -77,7 +77,7 @@ class MASAMPlus(MultiAgentSAM):
             action_preconditions = {p.untyped_representation for p in preconditions_to_filter}
             if not cnf.is_action_safe(action_name=action.name, action_preconditions=action_preconditions):
                 self.logger.debug("Action %s is not safe to execute!", action.name)
-                self.relevant_lmas.append(cnf)#or something like that
+                self.relevant_cnfs[action.name] = cnf #or something like that
                 return False
 
         return True
@@ -270,7 +270,7 @@ class MASAMPlus(MultiAgentSAM):
 
     def construct_macro_actions(self) -> None:
         for lma in self.relevant_lmas:
-            relevant_parameters = combined_params
+            relevant_parameters = 1
             new_mapped_params = self.create_new_params(relevant_parameters)
 
 
@@ -297,3 +297,25 @@ class MASAMPlus(MultiAgentSAM):
         super().end_measure_learning_time()
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report
+
+
+
+    def create_macro_actions(self):
+        """go over the unsafe actions and create macro actions."""
+        for action, l_cnf in self.relevant_cnfs.items():
+            pass
+
+
+    def generate_macro_action(self, actions: List[LearnerAction]) -> LearnerAction:
+        eff = []
+        combined_preconditions = list({pre for action in actions for pre in action.preconditions})
+        params_dict = {}
+        for action in actions:
+            for param_name, param_type in action.signature.items():
+                if param_type not in params_dict:
+                    params_dict[param_type] = []
+                params_dict[param_type].append((param_name, action))
+
+
+
+
