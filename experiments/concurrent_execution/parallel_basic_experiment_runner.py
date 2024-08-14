@@ -2,6 +2,7 @@
 import argparse
 import logging
 import os
+import shutil
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
@@ -149,12 +150,7 @@ class ParallelExperimentRunner:
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
         domains_backup_dir_path.mkdir(exist_ok=True)
-        self.export_learned_domain(
-            learned_model,
-            domains_backup_dir_path,
-            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
-        )
-
+        shutil.copy(domain_file_path, domains_backup_dir_path / f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl")
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         portfolio = (
             [SolverType.metric_ff, SolverType.enhsp]
