@@ -24,8 +24,8 @@ if __name__ == '__main__':
          "[apn1,apn2,tru1,tru2,tru3,tru4,tru5]", "pfile", 1),
         ("/sise/home/karato/work_tools/DomainsData/rovers_enhanced/", "rover_combined_domain.pddl",
          "[rover0,rover1,rover2,rover3,rover4,rover5,rover6,rover7,rover8,rover9]", "pfile", 1),
-        ("/sise/home/karato/work_tools/DomainsData/sokoban_enhanced/", "sokoban_combined_domain.pddl",
-         "[player-01,player-02,player-03,player-04]", "pfile")
+        # ("/sise/home/karato/work_tools/DomainsData/sokoban_enhanced/", "sokoban_combined_domain.pddl",
+        #  "[player-01,player-02,player-03,player-04]", "pfile")
     ]
 
     for config in configurations:
