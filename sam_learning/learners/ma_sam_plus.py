@@ -8,6 +8,22 @@ from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, Mult
 from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 
+from itertools import chain, combinations
+
+
+def powerset(iterable: set):
+    """returns a power set of iterable"""
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+
+
+def is_clause_consistent(clause, lma) -> bool:
+    all_atoms_act = all([action in lma for (action, _) in clause])
+    params_consistent = True
+
+    return all_atoms_act and params_consistent
+
+
 
 class MASAMPlus(MultiAgentSAM):
     """Class designated to learning action models from multi-agent trajectories with joint actions."""
@@ -79,7 +95,7 @@ class MASAMPlus(MultiAgentSAM):
             action_preconditions = {p.untyped_representation for p in preconditions_to_filter}
             if not cnf.is_action_safe(action_name=action.name, action_preconditions=action_preconditions):
                 self.logger.debug("Action %s is not safe to execute!", action.name)
-                self.relevant_cnfs[action.name] = cnf #or something like that
+                self.relevant_cnfs[domain_literal] = cnf #or something like that
                 return False
 
         return True
@@ -271,9 +287,30 @@ class MASAMPlus(MultiAgentSAM):
             self.extract_effects_from_cnf(action, action_preconditions)
 
     def construct_macro_actions(self) -> None:
-        for lma in self.relevant_lmas:
-            relevant_parameters = 1
-            new_mapped_params = self.create_new_params(relevant_parameters)
+        actions_set = set()
+
+        for action in self.partial_domain.actions.values():
+            actions_set.add(action.name)
+
+        brute_force_lmas = powerset(actions_set)
+        unsafe_actions = [action for action in actions_set if action not in self.safe_actions]
+        relevant_lmas = [lma for lma in brute_force_lmas if any(action in lma for action in unsafe_actions)]
+
+        for lma in relevant_lmas:
+            eff = []
+            combined_preconditions = list({pre for action in lma for pre in action.preconditions})
+
+            for fluent, fluent_cnf in self.literals_cnf.items():
+                for clause in fluent_cnf.possible_lifted_effects:
+                    relevant_fluents = []  # TODO: calculate them
+                    if is_clause_consistent(clause, lma):
+                        eff.extend(relevant_fluents)
+                    else:
+                        combined_preconditions.extend(relevant_fluents)
+                        # Pay attention that it might have duplicates
+            macro_action = self.generate_macro_action(lma, combined_preconditions, eff)
+            self.partial_domain.actions[macro_action.name] = macro_action
+            self.safe_actions.append(macro_action.name)
 
     def learn_combined_action_model(
             self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
@@ -299,27 +336,6 @@ class MASAMPlus(MultiAgentSAM):
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report
 
-    def create_macro_actions(self):
-        """go over the unsafe actions and create macro actions."""
-        for lma in self.LMA:
-            eff = []
-            combined_preconditions = list({pre for action in lma for pre in action.preconditions})
-
-            for fluent, fluent_cnf in self.literals_cnf.items():
-                for c in fluent_cnf.possible_lifted_effects:
-                    relevant_fluents = []   # TODO: calculate them
-                    if self.is_clause_consistent(c,lma):
-                        eff.extend(relevant_fluents)
-                    else:
-                        combined_preconditions.extend(relevant_fluents)
-                        # Pay attention that it might have duplicates
-            macro_action = self.generate_macro_action(lma, combined_preconditions, eff)
-            self.partial_domain.actions[macro_action.name] = macro_action
-            self.safe_actions.append(macro_action.name)
-
-    def is_clause_consistent(self,c, a):
-        pass
-
     def generate_macro_action(self, actions: List[LearnerAction], preconditions: List[Predicate], effects: List[Predicate]) -> LearnerAction:
         params_dict = {}
         for action in actions:
@@ -336,8 +352,3 @@ class MASAMPlus(MultiAgentSAM):
 
     def generate_signature(self, names, params) -> (str, List[str]):
         pass
-
-
-
-
-
