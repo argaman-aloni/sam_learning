@@ -319,7 +319,7 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_s
     assert output_conditions.binary_operator == "and"
     assert len(output_conditions.operands) == 4
     numeric_conditions = [operand.to_pddl() for operand in output_conditions.operands if isinstance(operand, NumericalExpressionTree)]
-    assert "(= (current_load ?z) 121)" in numeric_conditions  # the condition is shifted
+    assert "(= (- (current_load ?z) 121) 0)" in numeric_conditions  # the condition is shifted
     assert len([condition for condition in numeric_conditions if condition.startswith("(<=")]) == 2
     assert len([condition for condition in numeric_conditions if condition.startswith("(=")]) == 2
     print(str(output_conditions))
