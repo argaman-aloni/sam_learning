@@ -395,3 +395,17 @@ def create_polynomial_string(fluents: List[str]) -> str:
     :return: the polynomial string representing the equation.
     """
     return _create_polynomial_string_recursive(fluents)
+
+
+def divide_span_by_common_denominator(equations_list: List[List[float]]) -> List[List[float]]:
+    """Divides the span by the common denominator.
+
+    :param equations_list: the list of equations (all equal to zero) that can be divided by the common denominator.
+    :return: the span divided by the common denominator.
+    """
+    new_span = []
+    for equation in equations_list:
+        common_denominator = [coeff for coeff in equation if coeff != 0][0]
+        new_span.append([coeff / common_denominator for coeff in equation])
+
+    return new_span

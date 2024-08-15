@@ -61,7 +61,7 @@ def driverlog_polynomial_observation(driverlog_polynomial_domain: Domain, driver
 
 
 @fixture()
-def driverlog_polynomial_nsam(driverlog_polynomial_domain: Domain, minecraft_medium_preconditions_fluents_map: Dict[str, List[str]]) -> NumericSAMLearner:
+def driverlog_polynomial_nsam(driverlog_polynomial_domain: Domain) -> NumericSAMLearner:
     return NumericSAMLearner(driverlog_polynomial_domain, {action: [] for action in driverlog_polynomial_domain.actions}, polynomial_degree=1)
 
 
