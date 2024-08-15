@@ -78,7 +78,7 @@ class SemanticPerformanceCalculator:
     logger: logging.Logger
     results_dir_path: Path
     _random_actions: List[List[ActionCall]]
-    SEMANTIC_PRECISION_STATS: List[str]
+    semantic_precision_stats: List[str]
 
     def __init__(
         self,
