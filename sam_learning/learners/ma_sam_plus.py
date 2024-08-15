@@ -32,7 +32,7 @@ class MASAMPlus(MultiAgentSAM):
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
     relevant_cnfs: Dict[str, LiteralCNF]
-    LMA: List[List[(str,str)]]
+    LMA: List
     mapping_dict: Dict[str, Set[str]]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
