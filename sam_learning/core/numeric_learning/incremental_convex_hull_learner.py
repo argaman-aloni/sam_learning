@@ -17,6 +17,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     display_convex_hull,
     create_monomials,
     create_polynomial_string,
+    divide_span_by_common_denominator,
 )
 
 
@@ -91,6 +92,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         self.logger.debug("Learning the new normal and the complementary bases of the points in the storage dataframe.")
         self._gsp_base = self._calculate_orthonormal_base(self.data)
         self._complementary_base = self._calculate_orthonormal_complementary_base(self._gsp_base, self.data.shape[1])
+        self._complementary_base = divide_span_by_common_denominator(self._complementary_base)
         if len(self._gsp_base) == self.data.shape[1]:
             self.logger.debug("The points are spanning the original space, no need to project the points.")
             self._gsp_base = [list(vector) for vector in np.eye(self.data.shape[1])]

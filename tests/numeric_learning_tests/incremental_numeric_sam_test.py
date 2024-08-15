@@ -4,6 +4,7 @@ import pytest
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser, DomainParser
 from pddl_plus_parser.models import Domain, Problem, Observation, Predicate
 from pytest import fixture
+from typing import Dict, List
 
 from sam_learning.learners.incremental_numeric_sam import IncrementalNumericSAMLearner
 from tests.consts import (
@@ -21,7 +22,30 @@ from tests.consts import (
     FARMLAND_TRAJECTORIES_DIRECTORY,
     SAILING_LEARNED_DOMAIN_PATH,
     SAILING_TRAJECTORIES_DIRECTORY,
+    DRIVERLOG_POLY_TRAJECTORY_PATH,
+    DRIVERLOG_POLY_DOMAIN_PATH,
+    DRIVERLOG_POLY_PROBLEM_PATH,
 )
+
+
+@fixture()
+def driverlog_polynomial_domain() -> Domain:
+    return DomainParser(DRIVERLOG_POLY_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def driverlog_polynomial_problem(driverlog_polynomial_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=DRIVERLOG_POLY_PROBLEM_PATH, domain=driverlog_polynomial_domain).parse_problem()
+
+
+@fixture()
+def driverlog_polynomial_observation(driverlog_polynomial_domain: Domain, driverlog_polynomial_problem: Problem) -> Observation:
+    return TrajectoryParser(driverlog_polynomial_domain, driverlog_polynomial_problem).parse_trajectory(DRIVERLOG_POLY_TRAJECTORY_PATH)
+
+
+@fixture()
+def driverlog_polynomial_nsam(driverlog_polynomial_domain: Domain) -> IncrementalNumericSAMLearner:
+    return IncrementalNumericSAMLearner(driverlog_polynomial_domain, polynomial_degree=0)
 
 
 @fixture()
@@ -366,3 +390,15 @@ def test_learn_action_model_when_learning_sailing_domain_from_test_dataset_retur
 
     print()
     print(learned_model.to_pddl())
+
+
+def test_learn_action_model_with_driverlog_domain_does_not_fail_with_error(
+    driverlog_polynomial_nsam: IncrementalNumericSAMLearner, driverlog_polynomial_observation: Observation
+):
+    try:
+        learned_model, learning_metadata = driverlog_polynomial_nsam.learn_action_model([driverlog_polynomial_observation])
+        print()
+        print(learning_metadata)
+        print(learned_model.to_pddl())
+    except Exception as e:
+        assert False, f"An error occurred: {e}"
