@@ -212,11 +212,10 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         try:
-            filtered_matrix, column_equality_strs, _ = detect_linear_dependent_features(state_data)
-            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_matrix, display_mode=False)
+            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(state_data, display_mode=False)
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
-                inequalities_strs.extend([*additional_projection_conditions, *column_equality_strs])
+                inequalities_strs.extend(additional_projection_conditions)
 
             return construct_numeric_conditions(inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
