@@ -18,7 +18,7 @@ class MultiAgentSAM(SAMLearner):
     safe_actions: List[str]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-                 negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.normal):
+                 negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
         super().__init__(partial_domain, negative_preconditions_policy=negative_precondition_policy)
         self.logger = logging.getLogger(__name__)
         self.literals_cnf = {}

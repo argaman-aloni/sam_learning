@@ -34,7 +34,7 @@ class SAMLearner:
     negative_preconditions_policy: NegativePreconditionPolicy
 
     def __init__(self, partial_domain: Domain,
-                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.normal):
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -223,8 +223,11 @@ class SAMLearner:
                 if action_data.signature[lifted_param1] == action_data.signature[lifted_param2]:
                     action_data.preconditions.root.inequality_preconditions.add((lifted_param1, lifted_param2))
 
-    def remove_negative_preconditions(self):
+    def handle_negative_preconditions_policy(self):
         """Removes all negative preconditions"""
+        if self.negative_preconditions_policy == NegativePreconditionPolicy.no_remove:
+            return
+
         for action in self.partial_domain.actions.values():
             new_preconditions = set()
 
@@ -240,10 +243,6 @@ class SAMLearner:
                 new_preconditions.add(precondition)
 
             action.preconditions.root.operands = new_preconditions
-
-    def handle_negative_preconditions_policy(self):
-        if not self.negative_preconditions_policy == NegativePreconditionPolicy.normal:
-            self.remove_negative_preconditions()
 
 
     def construct_safe_actions(self) -> None:
