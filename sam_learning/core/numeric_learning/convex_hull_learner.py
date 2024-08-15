@@ -22,6 +22,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     detect_linear_dependent_features,
     create_monomials,
     create_polynomial_string,
+    divide_span_by_common_denominator,
 )
 
 
@@ -121,6 +122,7 @@ class ConvexHullLearner:
         self.logger.debug("Constructing the conditions to verify that points are in the correct span.")
         diagonal_eye = [list(vector) for vector in np.eye(points.shape[1])]
         orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
+        orthnormal_span = divide_span_by_common_denominator(orthnormal_span)
         transformed_orthonormal_vars = construct_projected_variable_strings(points_df.columns.tolist(), shift_axis, diagonal_eye)
         span_verification_conditions = self._construct_pddl_inequality_scheme(
             np.array(orthnormal_span), np.zeros(len(orthnormal_span)), transformed_orthonormal_vars, sign_to_use="="
@@ -200,7 +202,9 @@ class ConvexHullLearner:
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
-        irrelevant_fluents = [fluent for fluent in self.data.columns.tolist() if fluent not in relevant_fluents] if relevant_fluents is not None else []
+        irrelevant_fluents = (
+            [fluent for fluent in self.data.columns.tolist() if fluent not in relevant_fluents] if relevant_fluents is not None else []
+        )
         state_data = self.data.drop(columns=irrelevant_fluents)
         if (relevant_fluents is not None and len(relevant_fluents) == 1) or state_data.shape[1] == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")

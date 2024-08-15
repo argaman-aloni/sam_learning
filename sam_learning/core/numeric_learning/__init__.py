@@ -7,4 +7,5 @@ from .numeric_utils import (
     prettify_floating_point_number,
     construct_linear_equation_string,
     construct_non_circular_assignment,
+    divide_span_by_common_denominator
 )
