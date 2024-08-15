@@ -25,7 +25,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
         learning_algorithm: LearningAlgorithmType,
     ):
         super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
-        self.SEMANTIC_PRECISION_STATS = [
+        self.semantic_precision_stats = [
             "learning_algorithm",
             "action_name",
             "num_trajectories",

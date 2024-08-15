@@ -99,7 +99,7 @@ class SemanticPerformanceCalculator:
         self.temp_dir_path.mkdir(exist_ok=True)
         self.vocabulary_creator = VocabularyCreator()
         self._random_actions = []
-        self.SEMANTIC_PRECISION_STATS = [
+        self.semantic_precision_stats = [
             "action_name",
             "num_trajectories",
             "precondition_precision",
@@ -301,7 +301,7 @@ class SemanticPerformanceCalculator:
         """Exports the precision values of the learned preconditions to a CSV file."""
         statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_" f"{fold_num}_semantic_performance.csv"
         with open(statistics_path, "wt", newline="") as statistics_file:
-            stats_writer = csv.DictWriter(statistics_file, fieldnames=self.SEMANTIC_PRECISION_STATS)
+            stats_writer = csv.DictWriter(statistics_file, fieldnames=self.semantic_precision_stats)
             stats_writer.writeheader()
             for data_line in self.combined_stats:
                 stats_writer.writerow(data_line)
@@ -310,7 +310,7 @@ class SemanticPerformanceCalculator:
         """Export the numeric learning statistics to a CSV report file."""
         statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_semantic_performance.csv"
         with open(statistics_path, "wt", newline="") as statistics_file:
-            stats_writer = csv.DictWriter(statistics_file, fieldnames=self.SEMANTIC_PRECISION_STATS)
+            stats_writer = csv.DictWriter(statistics_file, fieldnames=self.semantic_precision_stats)
             stats_writer.writeheader()
             for data_line in self.combined_stats:
                 stats_writer.writerow(data_line)
