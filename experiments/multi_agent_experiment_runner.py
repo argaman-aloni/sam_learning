@@ -75,7 +75,17 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             allowed_ma_observations.append(complete_observation)
             allowed_sa_observations.append(filtered_observation)
             self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
+            self.negative_preconditions_policy = NegativePreconditionPolicy.normal
             self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+            self.negative_preconditions_policy=NegativePreconditionPolicy.soft
+            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+            self.negative_preconditions_policy = NegativePreconditionPolicy.hard
+            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+            self.negative_preconditions_policy = NegativePreconditionPolicy.normal
+            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
+            self.negative_preconditions_policy = NegativePreconditionPolicy.soft
+            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
+            self.negative_preconditions_policy = NegativePreconditionPolicy.hard
             self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations))
@@ -104,8 +114,8 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.export_learned_domain(
             learned_model, self.working_directory_path / "results_directory",
             f"ma_baseline_domain_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
-        self.validate_learned_domain(allowed_filtered_observations, learned_model,
-                                     test_set_dir_path, fold_num, float(learning_report["learning_time"]))
+        # self.validate_learned_domain(allowed_filtered_observations, learned_model,
+        #                              test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def learn_ma_action_model(
             self, allowed_complete_observations: List[MultiAgentObservation],
@@ -126,10 +136,10 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.learning_statistics_manager.add_to_action_stats(allowed_complete_observations, learned_model,
                                                              learning_report)
         self.ma_domain_path = self.working_directory_path / "results_directory" / \
-                              f"ma_sam_domain_{len(allowed_complete_observations)}_trajectories_fold_{fold_num}.pddl"
+                              f"ma_sam_domain_{self.negative_preconditions_policy}_{len(allowed_complete_observations)}_trajectories_fold_{fold_num}.pddl"
         self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
-        self.validate_learned_domain(allowed_complete_observations, learned_model,
-                                     test_set_dir_path, fold_num, float(learning_report["learning_time"]))
+        # self.validate_learned_domain(allowed_complete_observations, learned_model,
+        #                              test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""

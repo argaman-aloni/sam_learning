@@ -10,16 +10,16 @@ if __name__ == '__main__':
     #           f"> results-{args[2]}.txt ' &")
 
     configurations = [
-        ("/sise/home/karato/work_tools/DomainsData/satellite_enhanced/", "satellite_combined_domain.pddl",
-         "[satellite0,satellite1,satellite2,satellite3,satellite4,satellite5,satellite6,satellite7,satellite8,satellite9]",
-         "pfile", 2),
+        # ("/sise/home/karato/work_tools/DomainsData/satellite_enhanced/", "satellite_combined_domain.pddl",
+        #  "[satellite0,satellite1,satellite2,satellite3,satellite4,satellite5,satellite6,satellite7,satellite8,satellite9]",
+        #  "pfile", 2),
         # ("/sise/home/karato/work_tools/DomainsData/blocksworld_enhanced/", "blocks_combined_domain.pddl",
         #  "[a1,a2,a3,a4]", "pfile", 1),
         # ("/sise/home/karato/work_tools/DomainsData/depots_enhanced/", "depots_combined_domain.pddl",
         #  "[depot0,depot1,depot2,depot3,distributor0,distributor1,distributor2,distributor3,driver0,driver1,driver2,driver3]",
         #  "pfile", 1),
-        # ("/sise/home/karato/work_tools/DomainsData/driverlog_enhanced/", "driverlog_combined_domain.pddl",
-        #  "[driver1,driver2,driver3,driver4,driver5,driver6,driver7,driver8]", "pfile", 1),
+        ("/sise/home/karato/work_tools/DomainsData/driverlog_enhanced/", "driverlog_combined_domain.pddl",
+         "[driver1,driver2,driver3,driver4,driver5,driver6,driver7,driver8]", "pfile", 1),
         # ("/sise/home/karato/work_tools/DomainsData/logistics_enhanced/", "logistics_combined_domain.pddl",
         #  "[apn1,apn2,tru1,tru2,tru3,tru4,tru5]", "pfile", 1),
         # ("/sise/home/karato/work_tools/DomainsData/rovers_enhanced/", "rover_combined_domain.pddl",
