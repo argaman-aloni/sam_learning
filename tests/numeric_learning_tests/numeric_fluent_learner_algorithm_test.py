@@ -319,7 +319,7 @@ def test_construct_safe_linear_inequalities_when_given_only_two_states_returns_s
     assert output_conditions.binary_operator == "and"
     assert len(output_conditions.operands) == 4
     numeric_conditions = [operand.to_pddl() for operand in output_conditions.operands if isinstance(operand, NumericalExpressionTree)]
-    assert "(= (current_load ?z) 121)" in numeric_conditions  # the condition is shifted
+    assert "(= (- (current_load ?z) 121) 0)" in numeric_conditions  # the condition is shifted
     assert len([condition for condition in numeric_conditions if condition.startswith("(<=")]) == 2
     assert len([condition for condition in numeric_conditions if condition.startswith("(=")]) == 2
     print(str(output_conditions))
@@ -345,7 +345,7 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     expected_conditions = [
         "(<= (* (fuel-cost ) -1) 0)",
         "(<= (* (current_load ?z) -1) 0)",
-        "(<= (+ (* (current_load ?z) 0.7071) (* (fuel-cost ) 0.7071)) 0.7071)",
+        "(<= (+ (* (current_load ?z) 0.71) (* (fuel-cost ) 0.71)) 0.71)",
         "(= (load_limit ?z) 0)",
     ]
     for _, precondition in output_conditions:
