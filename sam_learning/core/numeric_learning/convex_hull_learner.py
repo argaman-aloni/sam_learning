@@ -19,11 +19,12 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_projected_variable_strings,
     extended_gram_schmidt,
     display_convex_hull,
+    detect_linear_dependent_features,
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
-    filter_similar_equations,
 )
+
 
 np.set_printoptions(precision=2)
 
@@ -77,10 +78,9 @@ class ConvexHullLearner:
         hull = ConvexHull(points)
         display_convex_hull(self.action_name, display_mode, hull)
         equations = np.unique(hull.equations, axis=0)
-        filtered_equations = filter_similar_equations(equations)
 
-        A = filtered_equations[:, : points.shape[1]]
-        b = -filtered_equations[:, points.shape[1]]
+        A = equations[:, : points.shape[1]]
+        b = -equations[:, points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
         border_point = prettify_coefficients(b)
         return coefficients, border_point
@@ -212,10 +212,11 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         try:
-            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(state_data, display_mode=False)
+            filtered_matrix, column_equality_strs, _ = detect_linear_dependent_features(state_data)
+            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_matrix, display_mode=False)
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
-                inequalities_strs.extend(additional_projection_conditions)
+                inequalities_strs.extend([*additional_projection_conditions, *column_equality_strs])
 
             return construct_numeric_conditions(inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
