@@ -4,6 +4,7 @@ import pytest
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser, DomainParser
 from pddl_plus_parser.models import Domain, Problem, Observation, Predicate
 from pytest import fixture
+from typing import Dict, List
 
 from sam_learning.learners.incremental_numeric_sam import IncrementalNumericSAMLearner
 from tests.consts import (

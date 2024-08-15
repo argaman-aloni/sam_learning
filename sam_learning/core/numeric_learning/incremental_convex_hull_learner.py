@@ -18,7 +18,6 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
-    filter_similar_equations,
 )
 
 
@@ -171,9 +170,8 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         """
         display_convex_hull(self.action_name, display_mode, self._convex_hull)
         equations = np.unique(self._convex_hull.equations, axis=0)
-        filtered_equations = filter_similar_equations(equations)
-        A = filtered_equations[:, : self._convex_hull.points.shape[1]]
-        b = -filtered_equations[:, self._convex_hull.points.shape[1]]
+        A = equations[:, : self._convex_hull.points.shape[1]]
+        b = -equations[:, self._convex_hull.points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
         border_point = prettify_coefficients(b)
         return coefficients, border_point
