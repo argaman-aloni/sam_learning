@@ -224,7 +224,7 @@ class SAMLearner:
                     action_data.preconditions.root.inequality_preconditions.add((lifted_param1, lifted_param2))
 
     def handle_negative_preconditions_policy(self):
-        """Removes all negative preconditions"""
+        """Handles removal of negative preconditions"""
         if self.negative_preconditions_policy == NegativePreconditionPolicy.no_remove:
             return
 
