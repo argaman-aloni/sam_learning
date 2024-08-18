@@ -1,136 +1,256 @@
 """Module to learn action models from multi-agent trajectories with joint actions."""
 import logging
-import re
 from typing import Dict, List, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
-    GroundedPredicate, JointActionCall, CompoundPrecondition, SignatureType, PDDLType
+    GroundedPredicate, JointActionCall, CompoundPrecondition
 
-from sam_learning.core import (LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data,
-                               group_params_from_clause)
+from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
-
-from itertools import chain, combinations
-from utilities import powerset, combine_groupings
-
-BindingType = Dict[tuple[str, str], str]
 
 
 class MASAMPlus(MultiAgentSAM):
-    """Class designated to learning action models with macro actions
-        from multi-agent trajectories with joint actions."""
-    mapping: Dict[str,  BindingType]
-    unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
+    """Class designated to learning action models from multi-agent trajectories with joint actions."""
+    logger: logging.Logger
+    literals_cnf: Dict[str, LiteralCNF]
+    preconditions_fluent_map: Dict[str, List[str]]
+    safe_actions: List[str]
+    relevant_lmas: Dict[str, LiteralCNF]
+
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
-        super().__init__(partial_domain, preconditions_fluent_map)
-        self.mapping = {}
-        self.unsafe_actions_preconditions_map = {}
+        super().__init__(partial_domain)
+        self.logger = logging.getLogger(__name__)
+        self.literals_cnf = {}
+        self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
+        self.safe_actions = []
 
-    def _extract_predicate_from_clause(self, clause_element, mapping):
-        """Helper function to extract predicate data and adapt it to the macro signature.
+    def _initialize_cnfs(self) -> None:
+        """Initialize the CNFs for the action model."""
+        self.logger.debug("Initializing CNFs for the action model.")
+        for predicate in self.partial_domain.predicates.values():
+            self.literals_cnf[predicate.untyped_representation] = \
+                LiteralCNF(action_names=list(self.partial_domain.actions.keys()))
+            negative_predicate = Predicate(name=predicate.name, signature=predicate.signature, is_positive=False)
+            self.literals_cnf[negative_predicate.untyped_representation] = \
+                LiteralCNF(action_names=list(self.partial_domain.actions.keys()))
 
-        :param clause_element: A tuple of (action_name, lifted_fluent).
-        :param mapping: The macro-action signature.
-        :return: Adapted predicate.
+    def _extract_relevant_not_effects(
+            self, in_state_predicates: Set[GroundedPredicate], removed_state_predicates: Set[GroundedPredicate],
+            executing_actions: List[ActionCall], relevant_action: ActionCall) -> List[GroundedPredicate]:
+        """Extracts the literals that cannot be an effect of the relevant action.
+
+        :param in_state_predicates: the predicates that appear in the next state and cannot be delete-effects of the action.
+        :param removed_state_predicates: the predicates that are missing in the next state and cannot be add-effects of the action.
+        :param executing_actions: the actions that are being executed in the joint action triplet.
+        :param relevant_action: the current action that is being tested.
+        :return: the literals that cannot be effects of the action.
         """
-        action_name, fluent = clause_element
-        action_signature = self.partial_domain.actions[action_name].signature
-        predicate = extract_predicate_data(action_signature, fluent, self.partial_domain.constants)
-        return MacroActionParser.adapt_predicate_to_macro_mapping(mapping, predicate, action_name)
+        combined_not_effects = []
+        cannot_be_add_effects = [grounded_predicate for grounded_predicate in removed_state_predicates if
+                                 relevant_action in
+                                 self.compute_interacting_actions(grounded_predicate, executing_actions)]
+        for not_add_effect in cannot_be_add_effects:
+            combined_not_effects.append(GroundedPredicate(name=not_add_effect.name, signature=not_add_effect.signature,
+                                                          object_mapping=not_add_effect.object_mapping,
+                                                          is_positive=True))
 
-    def extract_relevant_action_groups(self) -> List[set[LearnerAction]]:
-        """Extracts relevant action groups
+        cannot_be_del_effects = [grounded_predicate for grounded_predicate in in_state_predicates if relevant_action in
+                                 self.compute_interacting_actions(grounded_predicate, executing_actions)]
+        for not_del_effect in cannot_be_del_effects:
+            combined_not_effects.append(GroundedPredicate(name=not_del_effect.name, signature=not_del_effect.signature,
+                                                          object_mapping=not_del_effect.object_mapping,
+                                                          is_positive=False))
 
-        :return: a list of action groups
+        return combined_not_effects
+
+    def _is_action_safe(self, action: LearnerAction, preconditions_to_filter: Set[Predicate]) -> bool:
+        """Checks if the given action is safe to execute.
+
+        :param action: the lifted action that is to be learned.
+        :return: whether the action is safe to execute.
         """
-        action_list = [action for action in self.partial_domain.actions.values() if action.name in self.observed_actions]
-        actions_set = set(action_list)
-        action_names = set(self.observed_actions)
-        unsafe_actions = action_names.difference(set(self.safe_actions))
-        action_groups = []
+        for domain_literal, cnf in self.literals_cnf.items():
+            if not cnf.is_action_acting_in_cnf(action.name):
+                self.logger.debug(f"The literal {domain_literal} does not relate to {action.name}.")
+                continue
 
-        for fluent, fluent_cnf in self.literals_cnf.items():
-            for clause in fluent_cnf.possible_lifted_effects:
-                clause_actions = {action_name for action_name, _ in clause}
+            action_preconditions = {p.untyped_representation for p in preconditions_to_filter}
+            if not cnf.is_action_safe(action_name=action.name, action_preconditions=action_preconditions):
+                self.logger.debug("Action %s is not safe to execute!", action.name)
+                self.relevant_lmas.append(cnf)#or something like that
+                return False
 
-                if len(clause) > 1 and not unsafe_actions.isdisjoint(clause_actions):
-                    action_group = {action for action in actions_set if action.name in clause_actions}
+        return True
 
-                    if action_group not in action_groups:
-                        action_groups.append(action_group)
+    def add_not_effect_to_cnf(
+            self, executed_action: ActionCall, not_effects: List[GroundedPredicate]) -> None:
+        """Adds a predicate that cannot be an action's effect to the correct CNF.
 
-        return action_groups
-
-    def extract_relevant_parameter_groupings(self, action_group_names: list[str]) -> List[List[set]]:
-        """Extracts relevant parameter groups
-            This implementation only extracts one such possible parameter groups
+        :param executed_action: the action that is being executed in the current joint action triplet.
+        :param not_effects: the predicates that cannot be the effects of the action.
         """
-        all_param_groups = [
-            group_params_from_clause(clause)
-            for fluent_cnf in self.literals_cnf.values()
-            for clause in fluent_cnf.possible_lifted_effects
-            if all(action in action_group_names for action, _ in clause)
-            # if all(action in (a for a, _ in clause) for action, _ in lma_names)
-        ]
+        for predicate in not_effects:
+            bounded_lifted_literal = self.matcher.get_injective_match(predicate, executed_action)
+            if bounded_lifted_literal is None:
+                continue
 
-        flattened_groups = combine_groupings(all_param_groups)
+            self.literals_cnf[predicate.lifted_untyped_representation].add_not_effect(
+                executed_action.name, bounded_lifted_literal)
+            self.logger.debug(f"Removing the literal from being an effect of the action {executed_action.name}.")
 
-        return [flattened_groups]
+    def add_must_be_effect_to_cnf(self, executed_action: ActionCall, grounded_effects: Set[GroundedPredicate]) -> None:
+        """Adds an effect that has no ambiguities on which action caused it.
 
-    def extract_effects_for_macro_from_cnf(self, lma_set: set[LearnerAction], param_grouping, mapping):
-        lma_names = [lma.name for lma in lma_set]
-        cnf_effects = []
-        relevant_preconditions_str = {precondition.untyped_representation for action in lma_set for precondition
-                                      in action.preconditions if isinstance(precondition, Predicate)}
+        :param executed_action: the action that caused the effect.
+        :param grounded_effects: the grounded predicate that is affected by the action.
+        """
+        self.logger.info("Adding the effects that contain no ambiguity to the CNF.")
+        for grounded_literal in grounded_effects:
+            lifted_effect = self.matcher.get_injective_match(grounded_literal, executed_action)
+            if lifted_effect is None:
+                continue
 
-        for fluent, fluent_cnf in self.literals_cnf.items():
-            effects = fluent_cnf.extract_macro_action_effects(lma_names, relevant_preconditions_str, param_grouping)
-            for effect_element in effects:
-                cnf_effects.append(self._extract_predicate_from_clause(effect_element, mapping))
+            self.literals_cnf[grounded_literal.lifted_untyped_representation].add_possible_effect(
+                [(executed_action.name, lifted_effect.untyped_representation)])
 
-        # TODO find a neater way to remove duplicates
-        unique_representations = {}
-        unique_cnf_effects = []
+    def compute_interacting_actions(self, grounded_predicate: GroundedPredicate, executing_actions: List[ActionCall]):
+        """Computes the set of actions that interact with a certain predicate.
 
-        for effect in cnf_effects:
-            if effect.untyped_representation not in unique_representations:
-                unique_representations[effect.untyped_representation] = True
-                unique_cnf_effects.append(effect)
+        :param grounded_predicate: the effect predicate that is being interacted by possibly more than one action.
+        :param executing_actions: the actions that are being executed in the joint action.
+        :return: the actions that interact with the predicate.
+        """
+        self.logger.debug(f"Computing the set of actions that interact with predicate "
+                          f"{grounded_predicate.untyped_representation}.")
+        interacting_actions = []
+        for action in executing_actions:
+            action_parameters = action.parameters
+            action_parameters.extend(self.partial_domain.constants.keys())
+            predicate_parameters = set(grounded_predicate.grounded_objects)
+            if predicate_parameters.issubset(action_parameters):
+                interacting_actions.append(action)
 
-        return unique_cnf_effects
+        self.logger.debug(f"The actions {[str(action) for action in interacting_actions]} "
+                          f"interact with the predicate {grounded_predicate.untyped_representation}")
+        return interacting_actions
 
-    def extract_preconditions_for_macro_from_cnf(self, action_group: set[LearnerAction], param_grouping, mapping):
-        cnf_preconditions = []
-        lma_names = [action.name for action in action_group]
+    def extract_effects_from_cnf(self, action: LearnerAction, relevant_preconditions: Set[Predicate]) -> None:
+        """Extracts the action's relevant effects from the CNF object.
 
-        for fluent, fluent_cnf in self.literals_cnf.items():
-            preconditions = fluent_cnf.extract_macro_action_preconditions(lma_names, param_grouping)
-            for precondition_element in preconditions:
-                cnf_preconditions.append(self._extract_predicate_from_clause(precondition_element, mapping))
+        :param action: the action that is currently being handled.
+        :param relevant_preconditions: the preconditions of the action to filter the possible effects from.
+        """
+        relevant_preconditions_str = {predicate.untyped_representation for predicate in relevant_preconditions}
+        for domain_predicate, cnf in self.literals_cnf.items():
+            cnf_effects = cnf.extract_action_effects(action.name, relevant_preconditions_str)
+            for effect in cnf_effects:
+                lifted_predicate = extract_predicate_data(action.signature, effect, self.partial_domain.constants)
+                action.discrete_effects.add(lifted_predicate)
 
-        new_precondition = CompoundPrecondition()
-        for action in action_group:
-            preconditions = action.preconditions if action.name not in self.unsafe_actions_preconditions_map \
-                else self.unsafe_actions_preconditions_map[action.name]
+    def handle_concurrent_execution(
+            self, grounded_effect: GroundedPredicate, executing_actions: List[ActionCall]) -> None:
+        """Handles the case where effects can be achieved from more than one action.
 
-            for _, precondition in preconditions:
-                if isinstance(precondition, Predicate):
-                    cnf_preconditions.append(
-                        self._extract_predicate_from_clause((action.name,
-                                                            precondition.untyped_representation),
-                                                            mapping))
+        :param grounded_effect: the effect that is being targeted by more than one action.
+        :param executing_actions: the actions that are part of the joint action.
+        """
+        self.logger.info("Handling concurrent execution of actions.")
+        interacting_actions = self.compute_interacting_actions(grounded_effect, executing_actions)
+        if len(interacting_actions) == 1:
+            self.add_must_be_effect_to_cnf(interacting_actions[0], {grounded_effect})
+            return
 
-            # else:
-            #     for _, precondition in action.preconditions:
-            #         if isinstance(precondition, Predicate):
-            #             cnf_preconditions.append(self._extract_predicate_from_clause((action.name,
-            #                                                                       precondition.untyped_representation),
-            #                                                                      mapping))
+        concurrent_execution = []
+        for interacting_action in interacting_actions:
+            lifted_match = self.matcher.get_injective_match(grounded_effect, interacting_action)
+            concurrent_execution.append((interacting_action.name, lifted_match.untyped_representation))
 
-        for predicate in cnf_preconditions:
-            new_precondition.add_condition(predicate)
+        self.literals_cnf[grounded_effect.lifted_untyped_representation].add_possible_effect(concurrent_execution)
 
-        return new_precondition
+    def update_single_agent_executed_action(
+            self, executed_action: ActionCall, previous_state: State, next_state: State) -> None:
+        """Handles the situations where only one agent executed an action in a joint action.
+
+        :param executed_action: the single operational action in the joint action.
+        :param previous_state: the state prior to the action's execution.
+        :param next_state: the state following the action's execution.
+        """
+        self.logger.info(f"Handling the execution of the single action - {str(executed_action)}.")
+        observed_action = self.partial_domain.actions[executed_action.name]
+        if executed_action.name not in self.observed_actions:
+            super()._add_new_action_preconditions(executed_action)
+            self.observed_actions.append(observed_action.name)
+
+        else:
+            super()._update_action_preconditions(executed_action)
+
+        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
+        self.logger.debug("Updating the literals that must be effects of the action.")
+        self.add_must_be_effect_to_cnf(executed_action, grounded_add_effects.union(grounded_del_effects))
+        not_effects = self._extract_relevant_not_effects(
+            in_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                 if predicate.is_positive},
+            removed_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                      if not predicate.is_positive},
+            executing_actions=[executed_action],
+            relevant_action=executed_action)
+        self.add_not_effect_to_cnf(executed_action, not_effects)
+
+    def update_multiple_executed_actions(
+            self, joint_action: JointActionCall, previous_state: State, next_state: State) -> None:
+        """Handles the case where more than one action is executed in a single trajectory triplet.
+
+        :param joint_action: the joint action that was executed.
+        :param previous_state: the state prior to the joint action's execution.
+        :param next_state: the state following the joint action's execution.
+        """
+        self.logger.info("Learning when multiple actions are executed concurrently.")
+        executing_actions = joint_action.operational_actions
+        for executed_action in executing_actions:
+            observed_action = self.partial_domain.actions[executed_action.name]
+            self.triplet_snapshot.create_triplet_snapshot(
+                previous_state=previous_state, next_state=next_state, current_action=executed_action,
+                observation_objects=self.current_trajectory_objects)
+            if executed_action.name not in self.observed_actions:
+                super()._add_new_action_preconditions(executed_action)
+                self.observed_actions.append(observed_action.name)
+
+            else:
+                super()._update_action_preconditions(executed_action)
+
+        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
+        for executed_action in executing_actions:
+            not_effects = self._extract_relevant_not_effects(
+                in_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                     if predicate.is_positive},
+                removed_state_predicates={predicate for predicate in self.triplet_snapshot.next_state_predicates
+                                          if not predicate.is_positive},
+                executing_actions=[executed_action],
+                relevant_action=executed_action)
+            self.add_not_effect_to_cnf(executed_action, not_effects)
+
+        for grounded_effect in grounded_add_effects.union(grounded_del_effects):
+            self.handle_concurrent_execution(grounded_effect, executing_actions)
+
+    def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:
+        """Handles a single multi-agent triplet in the observed trajectory.
+
+        :param component: the triplet to handle.
+        """
+        previous_state = component.previous_state
+        joint_action = component.grounded_joint_action
+        next_state = component.next_state
+
+        if joint_action.action_count == 1:
+            executing_action = joint_action.operational_actions[0]
+            self.triplet_snapshot.create_triplet_snapshot(
+                previous_state=previous_state, next_state=next_state, current_action=executing_action,
+                observation_objects=self.current_trajectory_objects)
+            self.update_single_agent_executed_action(executing_action, previous_state, next_state)
+            return
+
+        self.logger.debug("More than one action is being executed in the current triplet.")
+        self.update_multiple_executed_actions(joint_action, previous_state, next_state)
 
     def construct_safe_actions(self) -> None:
         """Constructs the single-agent actions that are safe to execute."""
@@ -141,8 +261,6 @@ class MASAMPlus(MultiAgentSAM):
                                     action.preconditions if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                #TODO need to check if its copy or overriden next line
-                self.unsafe_actions_preconditions_map[action.name] = action.preconditions
                 action.preconditions = CompoundPrecondition()
                 continue
 
@@ -150,38 +268,20 @@ class MASAMPlus(MultiAgentSAM):
             self.safe_actions.append(action.name)
             self.extract_effects_from_cnf(action, action_preconditions)
 
-    def construct_safe_macro_actions(self) -> None:
-        """Constructs the multi-agent actions that are safe to execute."""
-        action_groups = self.extract_relevant_action_groups()
+    def construct_macro_actions(self) -> None:
+        for lma in self.relevant_lmas:
+            relevant_parameters = combined_params
+            new_mapped_params = self.create_new_params(relevant_parameters)
 
-        for action_group in action_groups:
-            action_group_names = [action.name for action in action_group]
-            parameter_groupings = self.extract_relevant_parameter_groupings(action_group_names)
-            for parameter_grouping in parameter_groupings:
-                mapper = MacroActionParser.generate_macro_mappings(parameter_grouping, action_group)
 
-                macro_action_name = MacroActionParser.generate_macro_action_name(action_group_names)
-                macro_action_signature = MacroActionParser.generate_macro_action_signature(action_group, mapper)
-                macro_action_preconditions = self.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapper)
-                macro_action_effects = self.extract_effects_for_macro_from_cnf(action_group, parameter_grouping, mapper)
-
-                macro_action = LearnerAction(macro_action_name, macro_action_signature)
-                macro_action.preconditions = macro_action_preconditions
-                macro_action.discrete_effects = macro_action_effects
-
-                self.partial_domain.actions[macro_action.name] = macro_action
-                self.safe_actions.append(macro_action.name)
-                self.observed_actions.append(macro_action.name)
-                self.mapping[macro_action.name] = mapper
-
-    def learn_combined_action_model_with_macro_actions(
+    def learn_combined_action_model(
             self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input multi-agent trajectories.
 
         :param observations: the multi-agent observations.
         :return: a domain containing the actions that were learned.
         """
-        self.logger.info("Starting to learn the action model with macro actions!")
+        self.logger.info("Starting to learn the action model!")
         super().start_measure_learning_time()
         self._initialize_cnfs()
 
@@ -192,159 +292,8 @@ class MASAMPlus(MultiAgentSAM):
                 self.handle_multi_agent_trajectory_component(component)
 
         self.construct_safe_actions()
-        self.construct_safe_macro_actions()
+        self.construct_macro_actions()
         self.logger.info("Finished learning the action model!")
         super().end_measure_learning_time()
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report
-
-    def extract_actions_from_macro_action(self, action_line: str) -> set[str]:
-        param_pattern = re.compile(r'[^\s()]+')
-        macro_name = param_pattern.findall(action_line)[0]
-
-        if macro_name not in self.mapping:
-            return {action_line}
-
-        mapping = self.mapping[macro_name]
-        action_names = {name for (name, param) in mapping}
-        actions_dict = {}
-        for action in action_names:
-            actions_dict[action] = f'({action}'
-
-        params_bound = param_pattern.findall(action_line)[1:]
-        params_name = self.partial_domain.actions[macro_name].parameter_names
-
-        for action in action_names:
-            for param in self.partial_domain.actions[action].parameter_names:
-                for param_name, param_bound in zip(params_name, params_bound):
-                    if mapping[(action, param)] == param_name:
-                        actions_dict[action] += f' {param_bound}'
-
-        for action in action_names:
-            actions_dict[action] += ')'
-
-        return set(actions_dict.values())
-
-
-class MacroActionParser:
-    # Maybe should be a util class
-
-    @staticmethod
-    def _return_sub_type(type1: PDDLType, type2: PDDLType) -> PDDLType:
-        if not type1:
-            return type2
-
-        if not type2:
-            return type1
-
-        if type1.is_sub_type(type2):
-            return type1
-
-        return type2
-
-    @staticmethod
-    def generate_macro_action_name(action_names: list[str]) -> str:
-        return "-".join(action_names)
-
-    @staticmethod
-    def generate_macro_action_signature(actions: set[LearnerAction], mapping) -> SignatureType:
-        all_params_dict = {}
-        for action in actions:
-            for param_name, param_type in action.signature.items():
-                all_params_dict[(action.name, param_name)] = param_type
-
-        action_signature: SignatureType = {}
-
-        for key, param_type in all_params_dict.items():
-            if key in mapping:
-                param_name = mapping[key]
-                if param_name not in action_signature:
-                    action_signature[param_name] = param_type
-                else:
-                    action_signature[param_name] = MacroActionParser._return_sub_type(param_type,
-                                                                                      action_signature[param_name])
-
-        return action_signature
-
-    @staticmethod
-    def adapt_predicate_to_macro_mapping(mapping, predicate: Predicate, relevant_action):
-        # Ensure the string is properly trimmed
-        predicate_copy = predicate.copy()
-        new_signature = {}
-        for param_name, param_type in predicate.signature.items():
-            new_name = mapping[(relevant_action, param_name)]
-            new_signature[new_name] = param_type
-
-        predicate_copy.signature = new_signature
-        return predicate_copy
-
-    # TODO should see what it gets. maybe Action rather than LearnerAction, but idk how the process goes.
-    @staticmethod
-    def extract_actions_from_macro_action(action_line: str, mapper) -> set[str]:
-        param_pattern = re.compile(r'[^\s()]+')
-        macro_name = param_pattern.findall(action_line)[0]
-
-        if macro_name not in mapper:
-            return {action_line}
-
-        macro_action_rep, mapping = mapper[macro_name]
-        action_names = {name for (name, param) in mapping}
-        actions_dict = {}
-        for action in action_names:
-            actions_dict[action] = f'({action}'
-
-        params_bound = param_pattern.findall(action_line)
-        params_name = param_pattern.findall(macro_action_rep)
-
-        for param_name, param_bound in zip(params_name[1:], params_bound[1:]):
-            for (action, param) in mapping:
-                if mapping[(action, param)] == param_name:
-                    actions_dict[action] += f' {param_bound}'
-
-        for action in action_names:
-            actions_dict[action] += ')'
-
-        return set(actions_dict.values())
-
-    @staticmethod
-    def adapt_fluent_str_to_macro_signature(signature, fluent_str, relevant_action):
-        # Ensure the string is properly trimmed
-        fluent_str = fluent_str.strip()
-
-        # Improved regex to account for surrounding parentheses and spaces
-        action_match = re.match(r'^\((\w+)\s+(.+)\)$', fluent_str)
-
-        if not action_match:
-            raise ValueError(f"Invalid fluent string format: '{fluent_str}'")
-
-        action_name, params_str = action_match.groups()
-
-        # Split the parameters by whitespace
-        param_list = params_str.split()
-
-        # Replace each parameter in the list according to the signature
-        adapted_params = []
-        for param in param_list:
-            adapted_params.append(f'?{signature[(relevant_action, param[1:])]}')
-
-        # Construct the adapted fluent string
-        adapted_fluent = f"({action_name} {' '.join(adapted_params)})"
-
-        return adapted_fluent
-
-    @staticmethod
-    def generate_macro_mappings(groupings: List[set], lma_set: set[LearnerAction]) -> BindingType:
-        lma_names = [action.name for action in lma_set]
-        param_bindings = {
-            (action.name, param_name): f"{param_name}_{lma_names.index(action.name)}"
-            for action in lma_set
-            for param_name in action.parameter_names
-        }
-
-        for group in groupings:
-            if len(group) > 1:
-                new_param_name = '?' + ''.join([param[1:] for _, param in group])
-                for action_name, param in group:
-                    param_bindings[(action_name, param)] = new_param_name
-
-        return param_bindings
