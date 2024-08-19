@@ -29,7 +29,7 @@ class NumericSAMLearner(SAMLearner):
         relevant_fluents: Optional[Dict[str, List[str]]] = None,
         allow_unsafe: bool = False,
         polynomial_degree: int = 0,
-        negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
+        negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft,
         **kwargs,
     ):
         super().__init__(partial_domain, negative_preconditions_policy=negative_preconditions_policy)
@@ -184,7 +184,6 @@ class NumericSAMLearner(SAMLearner):
 
                 self.handle_single_trajectory_component(component)
 
-        self.handle_negative_preconditions_policy()
         allowed_actions, learning_metadata = self._create_safe_action_model()
 
         super().end_measure_learning_time()
