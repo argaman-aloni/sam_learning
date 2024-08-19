@@ -127,3 +127,10 @@ class LiteralCNF:
                     effects.append(effect)
 
         return effects
+
+    def is_consistent(self, clause, lma) -> bool:
+        all_atoms_act = all([action in lma for (action, _) in clause])
+        params_consistent = True
+
+        return all_atoms_act and params_consistent
+

@@ -56,3 +56,19 @@ def rovers_literals_cnf(ma_rovers_domain: Domain) -> LiteralCNF:
 
 def test_play(woodworking_ma_sam_plus:MASAMPlus, multi_agent_observation: MultiAgentObservation):
     learned_model, _ = woodworking_ma_sam_plus.learn_combined_action_model([multi_agent_observation])
+
+def test_construct_safe_actions_returns_empty_list_if_no_action_is_safe(
+        woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
+        woodworking_ma_combined_domain: Domain,
+        woodworking_literals_cnf):
+    woodworking_ma_sam_plus.literals_cnf["(surface-condition ?obj ?surface)"] = woodworking_literals_cnf
+    possible_effects = [("do-immersion-varnish", "(surface-condition ?agent ?newcolour)"),
+                        ("do-grind", "(surface-condition ?agent ?oldcolour)"),
+                        ("do-plane", "(surface-condition ?agent ?colour)")]
+    woodworking_literals_cnf.add_possible_effect(possible_effects)
+    woodworking_ma_sam_plus.observed_actions.append("do-plane")
+    woodworking_ma_sam_plus.observed_actions.append("do-grind")
+    woodworking_ma_sam_plus.observed_actions.append("do-immersion-varnish")
+    woodworking_ma_sam_plus.construct_safe_actions()
+    woodworking_ma_sam_plus.construct_macro_actions()
+    assert "do-plane" not in woodworking_ma_sam_plus.safe_actions

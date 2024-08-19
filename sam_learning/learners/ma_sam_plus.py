@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
-    GroundedPredicate, JointActionCall, CompoundPrecondition
+    GroundedPredicate, JointActionCall, CompoundPrecondition, SignatureType
 
 from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
@@ -11,10 +11,13 @@ from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 from itertools import chain, combinations
 
 
-def powerset(iterable: set):
-    """returns a power set of iterable"""
-    s = list(iterable)
-    return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+def powerset(given_list: List):
+    set_size = len(given_list)
+    power_set = []
+    for i in range(1 << set_size):  # 2^set_size
+        power_set.append(set([given_list[j] for j in range(set_size) if (i & (1 << j))]))
+
+    return power_set
 
 
 def is_clause_consistent(clause, lma) -> bool:
@@ -31,9 +34,9 @@ class MASAMPlus(MultiAgentSAM):
     literals_cnf: Dict[str, LiteralCNF]
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
-    relevant_cnfs: Dict[str, LiteralCNF]
     LMA: List
     mapping_dict: Dict[str, Set[str]]
+    observed_joint_actions: List[set[str]]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain)
@@ -41,6 +44,7 @@ class MASAMPlus(MultiAgentSAM):
         self.literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
         self.safe_actions = []
+        self.observed_joint_actions = []
 
     def _initialize_cnfs(self) -> None:
         """Initialize the CNFs for the action model."""
@@ -95,7 +99,7 @@ class MASAMPlus(MultiAgentSAM):
             action_preconditions = {p.untyped_representation for p in preconditions_to_filter}
             if not cnf.is_action_safe(action_name=action.name, action_preconditions=action_preconditions):
                 self.logger.debug("Action %s is not safe to execute!", action.name)
-                self.relevant_cnfs[domain_literal] = cnf #or something like that
+                #TODO  maybe save the relevant cnfs here
                 return False
 
         return True
@@ -259,6 +263,8 @@ class MASAMPlus(MultiAgentSAM):
         joint_action = component.grounded_joint_action
         next_state = component.next_state
 
+        self.observed_joint_actions.append(set(joint_action.actions))
+
         if joint_action.action_count == 1:
             executing_action = joint_action.operational_actions[0]
             self.triplet_snapshot.create_triplet_snapshot(
@@ -290,12 +296,15 @@ class MASAMPlus(MultiAgentSAM):
         actions_set = set()
 
         for action in self.partial_domain.actions.values():
-            actions_set.add(action.name)
+            if action.name in self.observed_actions:
+                actions_set.add(action)
 
-        brute_force_lmas = powerset(actions_set)
-        unsafe_actions = [action for action in actions_set if action not in self.safe_actions]
+        brute_force_lmas = powerset(list(actions_set))
+        unsafe_actions = [action for action in actions_set if action.name not in self.safe_actions]
         relevant_lmas = [lma for lma in brute_force_lmas
                          if any(action in lma for action in unsafe_actions) and len(lma) > 1]
+        # relevant_lmas = [lma for lma in relevant_lmas if any(lma.issubset(joint_action) for joint_action
+        #                                                      in self.observed_joint_actions)]
 
         for lma in relevant_lmas:
             eff = []
@@ -304,7 +313,7 @@ class MASAMPlus(MultiAgentSAM):
             for fluent, fluent_cnf in self.literals_cnf.items():
                 for clause in fluent_cnf.possible_lifted_effects:
                     relevant_fluents = []  # TODO: calculate them
-                    if is_clause_consistent(clause, lma):
+                    if fluent_cnf.is_consistent(clause, lma):
                         eff.extend(relevant_fluents)
                     else:
                         combined_preconditions.extend(relevant_fluents)
@@ -339,14 +348,22 @@ class MASAMPlus(MultiAgentSAM):
 
     def generate_macro_action(self, actions: List[LearnerAction], preconditions: List[Predicate], effects: List[Predicate]) -> LearnerAction:
         params_dict = {}
+        signature_dict={}
         for action in actions:
             for param_name, param_type in action.signature.items():
-                if param_type not in params_dict:
-                    params_dict[param_type] = []
-                params_dict[param_type].append((param_name, action))
+                if param_type.name not in params_dict:
+                    params_dict[param_type.name] = param_type
+                if param_type.name not in signature_dict:
+                    signature_dict[param_type.name] = []
+                signature_dict[param_type.name].append((param_name, action))
 
-        name, signature = self.generate_signature([], [])
-        macro_action = LearnerAction(name, signature)
+        macro_name = "_".join([action.name for action in actions])
+        signature: SignatureType = {}
+        for type_name, tuple_list in signature_dict.items():
+            params = [param[1:] for (param, action) in tuple_list]
+            signature["?"+'_'.join(params)] = params_dict[type_name]
+
+        macro_action = LearnerAction(macro_name, signature)
         macro_action.preconditions = preconditions
         macro_action.discrete_effects = effects
         return macro_action
