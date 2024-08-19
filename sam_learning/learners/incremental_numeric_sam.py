@@ -162,6 +162,7 @@ class IncrementalNumericSAMLearner(SAMLearner):
 
                 self.handle_single_trajectory_component(component)
 
+        self.handle_negative_preconditions_policy()
         allowed_actions, learning_metadata = self._create_safe_action_model()
 
         super().end_measure_learning_time()
