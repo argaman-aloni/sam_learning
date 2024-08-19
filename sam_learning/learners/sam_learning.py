@@ -5,12 +5,10 @@ from collections import defaultdict
 from itertools import combinations
 from typing import List, Tuple, Dict, Set
 
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject, \
-    GroundedPredicate
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
 
 from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, \
     VocabularyCreator, EnvironmentSnapshot
-
 from utilities import NegativePreconditionPolicy
 
 
