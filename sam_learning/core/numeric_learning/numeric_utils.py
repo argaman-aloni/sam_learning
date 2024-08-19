@@ -416,9 +416,9 @@ def filter_similar_equations(equations: np.ndarray) -> np.ndarray:
     """Filters out the equations that are similar except for some threshold value.
 
     Note:
-        This method considers that all the equations are in the form Ax <= b.
+        This method considers that all the equations are in the form Ax + b <= 0.
         Thus, it checks whether the rows in the A part of the matrix are similar based on the Euclidean distance.
-        If so, we remove the row that has the larger b value.
+        If so, we remove the row that has the lower b value.
 
     :param equations: the set of equations to filter.
     :return: the filtered set of equations.
@@ -430,8 +430,8 @@ def filter_similar_equations(equations: np.ndarray) -> np.ndarray:
             if i != j:
                 # Calculate the Euclidean distance between the current row and another row (excluding the last column)
                 distance = np.linalg.norm(row[:-1] - compare_row[:-1])
-                # If the distance is below the threshold and this row has a higher b value, eliminate it
-                if distance < ELIMINATION_THRESHOLD and row[-1] > compare_row[-1]:
+                # If the distance is below the threshold and this row has a lower b value, eliminate it
+                if distance < ELIMINATION_THRESHOLD and row[-1] < compare_row[-1]:
                     keep_row = False
                     break
 
