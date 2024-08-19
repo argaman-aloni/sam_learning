@@ -13,6 +13,7 @@ from sam_learning.core import (
 )
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
+from utilities import NegativePreconditionPolicy
 
 
 class NumericSAMLearner(SAMLearner):
@@ -28,9 +29,10 @@ class NumericSAMLearner(SAMLearner):
         relevant_fluents: Optional[Dict[str, List[str]]] = None,
         allow_unsafe: bool = False,
         polynomial_degree: int = 0,
+        negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft,
         **kwargs,
     ):
-        super().__init__(partial_domain)
+        super().__init__(partial_domain, negative_preconditions_policy=negative_preconditions_policy)
         self.storage = {}
         self.function_matcher = NumericFunctionMatcher(partial_domain)
         self.relevant_fluents = relevant_fluents
