@@ -13,6 +13,7 @@ from sam_learning.core import (
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
 from sam_learning.core.numeric_learning import IncrementalNumericFluentStateStorage
 from sam_learning.learners.sam_learning import SAMLearner
+from utilities import NegativePreconditionPolicy
 
 
 class IncrementalNumericSAMLearner(SAMLearner):
@@ -22,8 +23,9 @@ class IncrementalNumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, allow_unsafe: bool = False, **kwargs):
-        super().__init__(partial_domain)
+    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, allow_unsafe: bool = False,
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft, **kwargs):
+        super().__init__(partial_domain, negative_preconditions_policy=negative_preconditions_policy)
         self.storage = {}
         self.polynom_degree = polynomial_degree
         self._allow_unsafe = allow_unsafe
