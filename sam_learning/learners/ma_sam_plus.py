@@ -294,7 +294,8 @@ class MASAMPlus(MultiAgentSAM):
 
         brute_force_lmas = powerset(actions_set)
         unsafe_actions = [action for action in actions_set if action not in self.safe_actions]
-        relevant_lmas = [lma for lma in brute_force_lmas if any(action in lma for action in unsafe_actions)]
+        relevant_lmas = [lma for lma in brute_force_lmas
+                         if any(action in lma for action in unsafe_actions) and len(lma) > 1]
 
         for lma in relevant_lmas:
             eff = []
