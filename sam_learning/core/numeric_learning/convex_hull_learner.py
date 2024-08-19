@@ -217,7 +217,7 @@ class ConvexHullLearner:
             A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_matrix, display_mode=False)
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
-                inequalities_strs.extend(additional_projection_conditions)
+                inequalities_strs.extend([*column_equality_strs, *additional_projection_conditions])
 
             return construct_numeric_conditions(inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
