@@ -42,7 +42,7 @@ def configure_iteration_logger(args: argparse.Namespace):
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
     if args.debug:
-        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG, handlers=[file_handler, stream_handler])
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler, stream_handler])
     else:
         logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
 
