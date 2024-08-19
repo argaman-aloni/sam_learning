@@ -19,12 +19,11 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_projected_variable_strings,
     extended_gram_schmidt,
     display_convex_hull,
-    detect_linear_dependent_features,
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
+    filter_similar_equations,
 )
-
 
 np.set_printoptions(precision=2)
 
@@ -78,9 +77,10 @@ class ConvexHullLearner:
         hull = ConvexHull(points)
         display_convex_hull(self.action_name, display_mode, hull)
         equations = np.unique(hull.equations, axis=0)
+        filtered_equations = filter_similar_equations(equations)
 
-        A = equations[:, : points.shape[1]]
-        b = -equations[:, points.shape[1]]
+        A = filtered_equations[:, : points.shape[1]]
+        b = -filtered_equations[:, points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
         border_point = prettify_coefficients(b)
         return coefficients, border_point
