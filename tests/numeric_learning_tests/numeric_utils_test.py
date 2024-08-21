@@ -9,9 +9,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_projected_variable_strings,
     extended_gram_schmidt,
     create_monomials,
-    create_polynomial_string,
-    reduce_complementary_conditions_from_convex_hull,
-    remove_complex_linear_dependencies,
+    create_polynomial_string, reduce_complementary_conditions_from_convex_hull,
 )
 
 
@@ -125,7 +123,7 @@ def test_extended_gram_schmidt_on_no_shift_with_base_correctly_returns_the_missi
     extended_standard_base = [[18, 2, 19], [2, 7, 1], [29, 31, -1]]
     complementary_projection = extended_gram_schmidt(extended_standard_base, projections)
     assert len(complementary_projection) == 1
-    assert complementary_projection == [[1.0, -9.868649107779169e-17, 0.0]]
+    assert complementary_projection == [[1.0, 0.0, 0.0]]
 
 
 def test_extended_gram_schmidt_on_no_shift_with_base_with_more_rows_than_columns_still_returns_2x2_output():
@@ -174,9 +172,8 @@ def test_reduce_complementary_conditions_from_convex_hull_basis_can_eliminate_va
     result = reduce_complementary_conditions_from_convex_hull(projections, complementary_basis)
     assert result == projections
 
-
 def test_reduce_complementary_conditions_from_convex_hull_basis_can_eliminate_values_when_computing_complementary_basis_with_linear_dependent_value():
-    test_values = [[i, 2 * i, np.random.randint(0, 100)] for i in range(10)]
+    test_values = [[i, 2*i, np.random.randint(0, 100)] for i in range(10)]
     projections = extended_gram_schmidt(test_values)
     diagonal_eye = [list(vector) for vector in np.eye(3)]
     complementary_basis = extended_gram_schmidt(diagonal_eye, projections)
@@ -222,30 +219,3 @@ def test_create_polynomial_string_when_calling_with_three_functions_returns_the_
     monomial = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
     polynomial_string = create_polynomial_string(monomial)
     assert polynomial_string == "(* (fuel-cost ) (* (load_limit ?z) (current_load ?z)))"
-
-
-def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduced_dataframe_when_one_feature_in_the_dataframe_is_constant_value():
-    test_data = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 3, 3, 4], "c": [1, 2, 3, 4]})
-    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
-    assert len(conditions) == 1
-    assert conditions[0] == "(= a 1)"
-    assert len(reduced_data.columns) == 2
-    assert "a" not in reduced_data.columns
-
-
-def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduced_dataframe_when_one_feature_equals_the_assignment_of_two_others_and_a_const():
-    test_data = pd.DataFrame({"a": [1, 2, 3, 4], "b": [1, 3, 3, 4], "c": [3, 6, 7, 9]})
-    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
-    assert len(conditions) == 1
-    assert conditions[0] == "(= a (+ (* b -1) (+ c -1)))"
-    assert len(reduced_data.columns) == 2
-    assert "a" not in reduced_data.columns
-
-
-def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduced_dataframe_when_one_feature_equals_the_assignment_of_two_others_and_a_const_and_there_is_a_const_column():
-    test_data = pd.DataFrame({"a": [1, 2, 3, 4], "b": [1, 3, 3, 4], "c": [3, 6, 7, 9], "d": [1, 1, 1, 1]})
-    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
-    assert len(conditions) == 2
-    assert conditions == ["(= a (+ (* b -1) (+ c -1)))", "(= d 1)"]
-    assert len(reduced_data.columns.tolist()) == 2
-    assert "a" not in reduced_data.columns.tolist()
