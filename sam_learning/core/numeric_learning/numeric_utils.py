@@ -306,7 +306,7 @@ def extended_gram_schmidt(input_basis_vectors: List[List[float]], eigen_vectors:
         non_normal_vectors.append(projected_vector.tolist())
         normal_vectors.append((projected_vector / np.linalg.norm(projected_vector)).tolist())
 
-    return normal_vectors
+    return np.round(normal_vectors, decimals=4).tolist()
 
 
 def display_convex_hull_2d(action_name: str, hull: ConvexHull) -> None:
@@ -439,3 +439,37 @@ def filter_similar_equations(equations: np.ndarray) -> np.ndarray:
             filtered_rows.append(row)
 
     return np.array(filtered_rows)
+
+
+def _first_non_zero_index(numbers_list: List[float]) -> int:
+    """
+
+    :param numbers_list:
+    :return:
+    """
+    for index, value in enumerate(numbers_list):
+        if value != 0:
+            return index
+    return -1
+
+def reduce_complementary_conditions_from_convex_hull(convex_hull: List[List[float]], complementary_basis: List[List[float]]) -> List[List[float]]:
+    """Reduces the complementary conditions from the Gram-Schmidt basis.
+
+    :param convex_hull: the basis of the projection.
+    :param complementary_basis: the complementary basis to the projection.
+    :return: the reduced complementary conditions.
+    """
+    if len(complementary_basis) == 0:
+        return convex_hull
+
+    reduced_convex_hull = np.array(convex_hull).copy()
+    for complementary_vector in complementary_basis:
+        non_zero_index = _first_non_zero_index(complementary_vector)
+        if non_zero_index == -1:
+            continue
+
+        new_conditions = [-1/complementary_vector[non_zero_index] * complementary_vector[i] for i in range(len(complementary_vector))]
+        reduced_convex_hull = reduced_convex_hull + np.tile(np.array(new_conditions), (reduced_convex_hull.shape[0], 1)) * reduced_convex_hull[:, non_zero_index][:, np.newaxis]
+        reduced_convex_hull[:, non_zero_index] = 0
+
+    return reduced_convex_hull.tolist()
