@@ -128,8 +128,11 @@ class LiteralCNF:
 
         return effects
 
-    def is_consistent(self, clause, lma) -> bool:
-        all_atoms_act = all([action in lma for (action, _) in clause])
+    def is_consistent(self, clause, lma, macro_signature) -> bool:
+        if len(clause) < 2:
+            return False
+        lma_action_names = list(map(lambda x: x.name, lma))
+        all_atoms_act = all([action in lma_action_names for (action, _) in clause])
         params_consistent = True
 
         return all_atoms_act and params_consistent
