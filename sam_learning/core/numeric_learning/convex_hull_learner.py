@@ -22,8 +22,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
-    filter_similar_equations,
-    detect_linear_dependent_features,
+    filter_similar_equations, reduce_complementary_conditions_from_convex_hull, detect_linear_dependent_features,
 )
 
 np.set_printoptions(precision=2)
@@ -122,8 +121,7 @@ class ConvexHullLearner:
 
         self.logger.debug("Constructing the conditions to verify that points are in the correct span.")
         diagonal_eye = [list(vector) for vector in np.eye(points.shape[1])]
-        orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
-        orthnormal_span = divide_span_by_common_denominator(orthnormal_span)
+        orthnormal_span = divide_span_by_common_denominator(extended_gram_schmidt(diagonal_eye, projection_basis))
         transformed_orthonormal_vars = construct_projected_variable_strings(points_df.columns.tolist(), shift_axis, diagonal_eye)
         span_verification_conditions = self._construct_pddl_inequality_scheme(
             np.array(orthnormal_span), np.zeros(len(orthnormal_span)), transformed_orthonormal_vars, sign_to_use="="
