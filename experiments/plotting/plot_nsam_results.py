@@ -1,10 +1,10 @@
 import sys
-from pathlib import Path
 from itertools import cycle
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
 
 
@@ -38,14 +38,12 @@ def plot_results(results_directory_path: Path):
         # Plot a line for each learning algorithm
         for algo in df['learning_algorithm'].unique():
             algo_data = grouped_data[grouped_data['learning_algorithm'] == algo]
-            plt.errorbar(algo_data['num_trajectories'],
+            plt.plot(algo_data['num_trajectories'],
                          algo_data['avg_max_percent_ok'],
-                         yerr=algo_data['goal_not_achieved'],
                          linestyle=next(line_styles),
                          label=labels[algo],
                          marker=next(markers),
                          color=next(color_cycle),
-                         lolims=True,
                          linewidth=3)
 
             # Plot standard deviation as shaded area around the mean line

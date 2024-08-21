@@ -1,4 +1,5 @@
 """Tests for numeric_utils.py"""
+
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -8,7 +9,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_projected_variable_strings,
     extended_gram_schmidt,
     create_monomials,
-    create_polynomial_string,
+    create_polynomial_string, reduce_complementary_conditions_from_convex_hull,
 )
 
 
@@ -122,7 +123,7 @@ def test_extended_gram_schmidt_on_no_shift_with_base_correctly_returns_the_missi
     extended_standard_base = [[18, 2, 19], [2, 7, 1], [29, 31, -1]]
     complementary_projection = extended_gram_schmidt(extended_standard_base, projections)
     assert len(complementary_projection) == 1
-    assert complementary_projection == [[1.0, -9.868649107779169e-17, 0.0]]
+    assert complementary_projection == [[1.0, 0.0, 0.0]]
 
 
 def test_extended_gram_schmidt_on_no_shift_with_base_with_more_rows_than_columns_still_returns_2x2_output():
@@ -161,6 +162,25 @@ def test_extended_gram_schmidt_with_paper_example_returns_correct_values():
     projections = extended_gram_schmidt([[0, 0, 0], [-1, 1, 0], [-1, 0, 1]])
     print(projections)
     assert len(projections) == 2
+
+
+def test_reduce_complementary_conditions_from_convex_hull_basis_can_eliminate_values_when_computing_complementary_basis_with_constant_value():
+    test_values = [[np.random.randint(0, 100), np.random.randint(0, 100), 0] for _ in range(10)]
+    projections = extended_gram_schmidt(test_values)
+    diagonal_eye = [list(vector) for vector in np.eye(3)]
+    complementary_basis = extended_gram_schmidt(diagonal_eye, projections)
+    result = reduce_complementary_conditions_from_convex_hull(projections, complementary_basis)
+    assert result == projections
+
+def test_reduce_complementary_conditions_from_convex_hull_basis_can_eliminate_values_when_computing_complementary_basis_with_linear_dependent_value():
+    test_values = [[i, 2*i, np.random.randint(0, 100)] for i in range(10)]
+    projections = extended_gram_schmidt(test_values)
+    diagonal_eye = [list(vector) for vector in np.eye(3)]
+    complementary_basis = extended_gram_schmidt(diagonal_eye, projections)
+    result = reduce_complementary_conditions_from_convex_hull(projections, complementary_basis)
+    for index, projection in enumerate(result):
+        assert projection[0] == 0
+        assert projection[1] == 0.5 * projections[index][0] + projections[index][1]
 
 
 def test_create_monomials_creates_correct_monomials_when_given_polynom_degree_one():
