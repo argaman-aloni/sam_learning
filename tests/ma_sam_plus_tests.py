@@ -61,14 +61,24 @@ def test_construct_safe_actions_returns_empty_list_if_no_action_is_safe(
         woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
+
     woodworking_ma_sam_plus.literals_cnf["(surface-condition ?obj ?surface)"] = woodworking_literals_cnf
-    possible_effects = [("do-immersion-varnish", "(surface-condition ?agent ?newcolour)"),
-                        ("do-grind", "(surface-condition ?agent ?oldcolour)"),
-                        ("do-plane", "(surface-condition ?agent ?colour)")]
+    possible_effects = [("do-grind", "(surface-condition ?m ?oldcolour)"),
+                        ("do-plane", "(surface-condition ?m ?colour)")]
     woodworking_literals_cnf.add_possible_effect(possible_effects)
+    woodworking_literals_cnf.add_possible_effect([("do-immersion-varnish", "(surface-condition ?m ?newcolour)")])
     woodworking_ma_sam_plus.observed_actions.append("do-plane")
-    woodworking_ma_sam_plus.observed_actions.append("do-grind")
     woodworking_ma_sam_plus.observed_actions.append("do-immersion-varnish")
+    woodworking_ma_sam_plus.observed_actions.append("do-grind")
+
     woodworking_ma_sam_plus.construct_safe_actions()
     woodworking_ma_sam_plus.construct_macro_actions()
     assert "do-plane" not in woodworking_ma_sam_plus.safe_actions
+    assert "do-grind" not in woodworking_ma_sam_plus.safe_actions
+    assert "do-immersion-varnish" in woodworking_ma_sam_plus.safe_actions
+
+def test_learn_action_model_with_colliding_actions_returns_that_actions_are_unsafe(
+        rovers_ma_sam: MASAMPlus, ma_rovers_observation):
+    _, learning_report = rovers_ma_sam.learn_combined_action_model([ma_rovers_observation])
+    assert learning_report["navigate"] == "NOT SAFE"
+    assert learning_report["communicate_rock_data"] == "NOT SAFE"
