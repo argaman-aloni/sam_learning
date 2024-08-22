@@ -330,7 +330,7 @@ class MASAMPlus(MultiAgentSAM):
         all_params_dict = {}
         for action in actions:
             for param_name, param_type in action.signature.items():
-                all_params_dict[(action.name, param_name[1:])] = param_type
+                all_params_dict[action.name+" "+param_name[1:]] = param_type
 
         macro_name = "_".join([action.name for action in actions])
         action_signature: SignatureType = {}
@@ -340,9 +340,17 @@ class MASAMPlus(MultiAgentSAM):
                 param_name = "?"+signature[key]
                 action_signature[param_name] = param_type
 
+        new_precondition = CompoundPrecondition()
+
         macro_action = LearnerAction(macro_name, action_signature)
-        preconditions.extend(list({pre for action in actions for pre in action.preconditions}))
-        macro_action.preconditions = preconditions
+        for action in actions:
+            for _, precondition in action.preconditions:
+                new_precondition.add_condition(precondition)
+
+        for predicate in preconditions:
+            new_precondition.add_condition(predicate)
+
+        macro_action.preconditions = new_precondition
         macro_action.discrete_effects = effects
         return macro_action
 
@@ -359,7 +367,8 @@ class MASAMPlus(MultiAgentSAM):
                     lma_action_names = list(map(lambda x: x.name, lma))
                     all_actions_act = all(any(action == clause_action for clause_action, _ in clause)
                                           for action in lma_action_names)
-                    if all_actions_act:
+                    all_atoms_act = all([action in lma_action_names for (action, _) in clause])
+                    if all_actions_act and all_atoms_act:
                         relevant_lmas.append(lma)
                         break
 
@@ -369,14 +378,45 @@ class MASAMPlus(MultiAgentSAM):
         #                                                      in self.observed_joint_actions)]
         return relevant_lmas
 
-    def generate_possible_signatures(self, lma_list: set[LearnerAction]) -> List[BindingType]:
-        bindings = []
+    def generate_possible_signatures(self, lma_set: set[LearnerAction]) -> List[BindingType]:
         # TODO work on the binding: basically for each () extract the params and see their name
-        # which is the actions name and make the binding, this name to new param according to type.
-        lma_list = list(lma_list)
-        return [{(lma_list[0].name, 'x'): 'x1', (lma_list[0].name, 'y'): 'yp', (lma_list[0].name, 'z'): 'z1',
-                (lma_list[1].name, 'p'): 'yp', (lma_list[1].name, 'x'): 'x2',
-                (lma_list[1].name, 'y'): 'y2', (lma_list[1].name, 'r'): 'r2', (lma_list[1].name, 'l'): 'l2'}]
+        #  which is the actions name and make the binding, this name to new param according to type.
+        actions_list = list(lma_set)
+        lma_action_names = list(map(lambda x: x.name, actions_list))
+        list_of_sets = []
+        for fluent, fluent_cnf in self.literals_cnf.items():
+            for clause in fluent_cnf.possible_lifted_effects:
+                all_actions_act = all(any(action == clause_action for clause_action, _ in clause)
+                                      for action in lma_action_names)
+                all_atoms_act = all([action in lma_action_names for (action, _) in clause])
+                if all_atoms_act:
+                    if all_actions_act:
+                        # TODO: this means that it is equal to the LMA
+                        pass
+                    else:
+                        # TODO: this means that it is מוכל ממש
+                        pass
+
+        bindings = []
+        # TODO: here for each set choose a number from 1 to set size to decide how many will share a parameter
+        #  but for now just do the must inclusive binding, which means the grouping is the binding.
+        new_binding = {}
+        for i, params_set in enumerate(list_of_sets):
+            new_param_name = '?'.join([param[1:] for (action_idx, param) in params_set]) if len(params_set) > 1 else (
+                    params_set[1]+params_set[0])
+            for (action_idx, param) in params_set:
+                new_binding[actions_list[action_idx].name + " " + param] = new_param_name
+
+        bindings.append(new_binding)
+
+        return [{"navigate " + 'x': 'x1',
+                 "navigate " + 'y': 'yp',
+                 "navigate " + 'z': 'z1',
+                 "communicate_rock_data " + 'p': 'yp',
+                 "communicate_rock_data " + 'x': 'x2',
+                 "communicate_rock_data " + 'y': 'y2',
+                 "communicate_rock_data " + 'r': 'r2',
+                 "communicate_rock_data " + 'l': 'l2'}]
 
     def adapt_fluent_str_to_macro_signature(self, signature, fluent_str, relevant_action):
         # Ensure the string is properly trimmed
@@ -408,7 +448,8 @@ class MASAMPlus(MultiAgentSAM):
         predicate_copy = predicate.copy()
         new_signature = {}
         for name, type in predicate.signature.items():
-            new_name = f'?{signature[(relevant_action, name[1:])]}'
+            print(signature)
+            new_name = f'?{signature[relevant_action+" "+name[1:]]}'
             new_signature[new_name] = type
 
         predicate_copy.signature = new_signature
