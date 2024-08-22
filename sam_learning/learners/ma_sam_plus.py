@@ -374,14 +374,9 @@ class MASAMPlus(MultiAgentSAM):
         # TODO work on the binding: basically for each () extract the params and see their name
         # which is the actions name and make the binding, this name to new param according to type.
         lma_list = list(lma_list)
-        return [{lma_list[0].name + " " + 'x': 'x1',
-                 lma_list[0].name + " " + 'y': 'yp',
-                 lma_list[0].name + " " + 'z': 'z1',
-                 lma_list[1].name + " " + 'p': 'yp',
-                 lma_list[1].name + " " + 'x': 'x2',
-                 lma_list[1].name + " " + 'y': 'y2',
-                 lma_list[1].name + " " + 'r': 'r2',
-                 lma_list[1].name + " " + 'l': 'l2'}]
+        return [{(lma_list[0].name, 'x'): 'x1', (lma_list[0].name, 'y'): 'yp', (lma_list[0].name, 'z'): 'z1',
+                (lma_list[1].name, 'p'): 'yp', (lma_list[1].name, 'x'): 'x2',
+                (lma_list[1].name, 'y'): 'y2', (lma_list[1].name, 'r'): 'r2', (lma_list[1].name, 'l'): 'l2'}]
 
     def adapt_fluent_str_to_macro_signature(self, signature, fluent_str, relevant_action):
         # Ensure the string is properly trimmed
@@ -413,7 +408,7 @@ class MASAMPlus(MultiAgentSAM):
         predicate_copy = predicate.copy()
         new_signature = {}
         for name, type in predicate.signature.items():
-            new_name = f'?{signature[relevant_action+" "+name[1:]]}'
+            new_name = f'?{signature[(relevant_action, name[1:])]}'
             new_signature[new_name] = type
 
         predicate_copy.signature = new_signature
