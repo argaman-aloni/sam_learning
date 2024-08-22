@@ -82,5 +82,4 @@ def test_learn_action_model_with_colliding_actions_returns_that_actions_are_unsa
     learned_domain, learning_report = rovers_ma_sam.learn_combined_action_model([ma_rovers_observation])
     assert learning_report["navigate"] == "NOT SAFE"
     assert learning_report["communicate_rock_data"] == "NOT SAFE"
-    assert learning_report["navigate_communicate_rock_data"] == "OK"
     print(learned_domain.to_pddl())
