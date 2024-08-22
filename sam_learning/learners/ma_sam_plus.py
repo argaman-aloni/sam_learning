@@ -28,6 +28,7 @@ def is_clause_consistent(clause, lma) -> bool:
     return all_atoms_act and params_consistent
 
 
+BindingType = Dict[tuple[str, str], str]
 
 class MASAMPlus(MultiAgentSAM):
     """Class designated to learning action models from multi-agent trajectories with joint actions."""
@@ -36,7 +37,7 @@ class MASAMPlus(MultiAgentSAM):
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
     LMA: List
-    mapping_dict: Dict[str, Set[str]]
+    mapping: Dict[str, BindingType]
     observed_joint_actions: List[set[str]]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
@@ -46,6 +47,7 @@ class MASAMPlus(MultiAgentSAM):
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
         self.safe_actions = []
         self.observed_joint_actions = []
+        self.mapping = {}
 
     def _initialize_cnfs(self) -> None:
         """Initialize the CNFs for the action model."""
@@ -323,6 +325,27 @@ class MASAMPlus(MultiAgentSAM):
         macro_action.discrete_effects = predicate_effects
         return macro_action
 
+    def construct_macro_action(self, actions: set[LearnerAction], signature,
+                               preconditions: List[Predicate], effects: List[Predicate]) -> LearnerAction:
+        all_params_dict = {}
+        for action in actions:
+            for param_name, param_type in action.signature.items():
+                all_params_dict[(action.name, param_name[1:])] = param_type
+
+        macro_name = "_".join([action.name for action in actions])
+        action_signature: SignatureType = {}
+
+        for key, param_type in all_params_dict.items():
+            if key in signature:
+                param_name = "?"+signature[key]
+                action_signature[param_name] = param_type
+
+        macro_action = LearnerAction(macro_name, action_signature)
+        preconditions.extend(list({pre for action in actions for pre in action.preconditions}))
+        macro_action.preconditions = preconditions
+        macro_action.discrete_effects = effects
+        return macro_action
+
     def extract_relevant_lmas(self) -> List[set[LearnerAction]]:
         actions_list = list(self.partial_domain.actions.values())
         actions_powerset = powerset(actions_list)
@@ -340,20 +363,27 @@ class MASAMPlus(MultiAgentSAM):
                         relevant_lmas.append(lma)
                         break
 
+        # TODO: this may be unnecessary because we check for a clause that encapsulates the lma which only happens
+        #  if a trajectory contained such joint action
         # relevant_lmas = [lma for lma in relevant_lmas if any(lma.issubset(joint_action) for joint_action
         #                                                      in self.observed_joint_actions)]
         return relevant_lmas
 
-    def generate_possible_signatures(self, lma_list: set[LearnerAction]) -> List[Dict[Tuple[str, str], str]]:
+    def generate_possible_signatures(self, lma_list: set[LearnerAction]) -> List[BindingType]:
         bindings = []
         # TODO work on the binding: basically for each () extract the params and see their name
         # which is the actions name and make the binding, this name to new param according to type.
         lma_list = list(lma_list)
-        return [{(lma_list[1].name, 'x'): 'x1', (lma_list[1].name, 'y'): (lma_list[1].name, 'yp'),
-                (lma_list[0].name, 'p'): 'yp', (lma_list[1].name, 'z'): 'z1', (lma_list[0].name, 'x'): 'x2',
-                (lma_list[0].name, 'y'): 'y2', (lma_list[0].name, 'r'): 'r2', (lma_list[0].name, 'l'): 'l2'}]
+        return [{lma_list[0].name + " " + 'x': 'x1',
+                 lma_list[0].name + " " + 'y': 'yp',
+                 lma_list[0].name + " " + 'z': 'z1',
+                 lma_list[1].name + " " + 'p': 'yp',
+                 lma_list[1].name + " " + 'x': 'x2',
+                 lma_list[1].name + " " + 'y': 'y2',
+                 lma_list[1].name + " " + 'r': 'r2',
+                 lma_list[1].name + " " + 'l': 'l2'}]
 
-    def adapt_fluent_to_macro_signature(self, signature, fluent_str, relevant_action):
+    def adapt_fluent_str_to_macro_signature(self, signature, fluent_str, relevant_action):
         # Ensure the string is properly trimmed
         fluent_str = fluent_str.strip()
 
@@ -383,7 +413,7 @@ class MASAMPlus(MultiAgentSAM):
         predicate_copy = predicate.copy()
         new_signature = {}
         for name, type in predicate.signature.items():
-            new_name = f'?{signature[(relevant_action, name[1:])]}'
+            new_name = f'?{signature[relevant_action+" "+name[1:]]}'
             new_signature[new_name] = type
 
         predicate_copy.signature = new_signature
@@ -402,22 +432,27 @@ class MASAMPlus(MultiAgentSAM):
                 for fluent, fluent_cnf in self.literals_cnf.items():
                     for clause in fluent_cnf.possible_lifted_effects:
                         if fluent_cnf.is_consistent(clause, lma, signature):
-                            fluent_eff = clause[0][1]   # the first one is enough as this clause is consistent
-                            action_signature = self.partial_domain.actions[clause[0][0]].signature
+                            (action_name, fluent_eff) = clause[0]   # the first one is enough as this clause is consistent
+                            action_signature = self.partial_domain.actions[action_name].signature
                             predicate_eff = extract_predicate_data(action_signature, fluent_eff, self.partial_domain.constants)
-                            new_predicate = self.adapt_predicate_to_macro_signature(signature, predicate_eff, clause[0][0])
+                            new_predicate = self.adapt_predicate_to_macro_signature(signature, predicate_eff, action_name)
                             cnf_eff.append(new_predicate)
                         else:
                             lma_names = [action.name for action in lma]
                             for (action_name, lifted_fluent) in clause:
                                 if action_name in lma_names:
-                                    cnf_preconditions.append(lifted_fluent)
-                                    #TODO TOMORROW generate the same thing for the preconditions then generate macro action
-                                    #IF LOOKS GOOD WORK ON THE GENERATE SIGNATURES
+                                    action_signature = self.partial_domain.actions[action_name].signature
+                                    predicate_eff = extract_predicate_data(action_signature, lifted_fluent,
+                                                                           self.partial_domain.constants)
+                                    new_predicate = self.adapt_predicate_to_macro_signature(signature, predicate_eff,
+                                                                                            action_name)
+                                    cnf_preconditions.append(new_predicate)
 
-                # macro_action = self.generate_macro_action(lma, binding, cnf_preconditions, cnf_eff)
-                # self.partial_domain.actions[macro_action.name] = macro_action
-                # self.safe_actions.append(macro_action.name)
+                macro_action = self.construct_macro_action(lma, signature, cnf_preconditions, cnf_eff)
+                self.partial_domain.actions[macro_action.name] = macro_action
+                self.safe_actions.append(macro_action.name)
+                self.observed_actions.append(macro_action.name)
+                self.mapping[macro_action.name] = signature
 
     def learn_combined_action_model(
             self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
