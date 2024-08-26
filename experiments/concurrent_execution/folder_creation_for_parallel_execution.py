@@ -19,6 +19,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--learning_algorithms", required=True, help="the list of algorithms that will run in parallel")
     parser.add_argument("--internal_iterations", required=True, help="The internal iterations that the algorithm will run in parallel.")
+    parser.add_argument("--experiment_size", required=False, help="The max items to use in each fold of the experiment.", default=DEFAULT_EXPERIMENT_SIZE)
     args = parser.parse_args()
     return args
 
