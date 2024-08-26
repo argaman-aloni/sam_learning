@@ -69,6 +69,39 @@ def plot_results(results_directory_path: Path):
         plt.show()
 
 
+        # Second Plot (with x-axis limited to 0-10)
+        plt.figure(figsize=(10, 6))
+
+        for algo in df['learning_algorithm'].unique():
+            algo_data = grouped_data[grouped_data['learning_algorithm'] == algo]
+            plt.plot(algo_data['num_trajectories'],
+                         algo_data['avg_max_percent_ok'],
+                         linestyle=next(line_styles),
+                         label=labels[algo],
+                         marker=next(markers),
+                         color=next(color_cycle),
+                         linewidth=3)
+
+            # Plot standard deviation as shaded area around the mean line
+            plt.fill_between(algo_data['num_trajectories'],
+                             np.clip(algo_data['avg_max_percent_ok'] - algo_data['std_max_percent_ok'], 0, 100),
+                             np.clip(algo_data['avg_max_percent_ok'] + algo_data['std_max_percent_ok'], 0, 100),
+                             alpha=0.2)
+
+        plt.xlabel('# Observations (0-10)', fontsize=24)
+        plt.ylabel('AVG % of solved', fontsize=24)
+        plt.xlim(0, 10)
+        plt.xticks(fontsize=24)
+        plt.yticks(ticks=list(range(0, 101, 10)), fontsize=24)
+        plt.legend(fontsize=24)
+        plt.grid(True)
+
+        output_file_path_limited = file_path.parent / f'{file_path.stem}_plot_limited.png'
+        plt.savefig(output_file_path_limited, bbox_inches='tight')
+        plt.show()
+
+
+
 if __name__ == '__main__':
     results_path = Path(sys.argv[1])
     plot_results(results_path)
