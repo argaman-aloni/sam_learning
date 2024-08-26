@@ -93,7 +93,7 @@ def create_execution_arguments(experiment, fold, compared_version):
 def create_experiment_folders(code_directory, environment_variables, experiment):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
-    max_train_size = int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
+    max_train_size = (parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
     internal_iterations = list(range(1, FIRST_BREAKPOINT)) + list(
         range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"])
     )
