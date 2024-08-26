@@ -15,7 +15,7 @@ EXPERIMENTS_CONFIG_STR = "experiment_configurations"
 signal.signal(signal.SIGINT, sigint_handler)
 
 
-def setup_experiments_folds_job(code_directory, environment_variables, experiment, internal_iterations):
+def setup_experiments_folds_job(code_directory, environment_variables, experiment, internal_iterations, experiment_size):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
@@ -29,6 +29,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
             f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
             f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
             f"--problem_prefix {experiment['problems_prefix']}",
+            f"--experiment_size {experiment_size}",
         ],
         environment_variables=environment_variables,
         logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",
@@ -92,12 +93,13 @@ def create_execution_arguments(experiment, fold, compared_version):
 def create_experiment_folders(code_directory, environment_variables, experiment):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
+    max_train_size = (parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
     internal_iterations = list(range(1, FIRST_BREAKPOINT)) + list(
-        range(FIRST_BREAKPOINT, parallelization_data["max_index"] + 1, parallelization_data["hop"])
+        range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"])
     )
     print(f"Internal iterations: {internal_iterations}")
     sid = setup_experiments_folds_job(
-        code_directory=code_directory, environment_variables=environment_variables, experiment=experiment, internal_iterations=internal_iterations,
+        code_directory=code_directory, environment_variables=environment_variables, experiment=experiment, internal_iterations=internal_iterations, experiment_size=parallelization_data.get("experiment_size", 100),
     )
     return internal_iterations, sid
 
