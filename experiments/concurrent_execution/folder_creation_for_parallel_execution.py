@@ -41,14 +41,14 @@ class FoldsCreator:
         self.working_directory_path = working_directory_path
         self.logger = logging.getLogger("cluster-folder-creator")
 
-    def create_folds_from_cross_validation(self) -> None:
+    def create_folds_from_cross_validation(self, experiment_size: int = DEFAULT_EXPERIMENT_SIZE) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         (self.working_directory_path / "results_directory").mkdir(exist_ok=True)
         self.logger.info("Removing the old folds directories if exist.")
         self.k_fold.remove_created_directories()
         self.logger.info("Done removing the old folds directories!")
         self.logger.info("Creating the folds directories.")
-        self.k_fold.create_k_fold(max_items=DEFAULT_EXPERIMENT_SIZE)
+        self.k_fold.create_k_fold(max_items=experiment_size)
         self.logger.info("Done creating the folds directories!")
 
     def create_random_performance_evaluation_trajectories(self, problem_prefix: str, learning_algorithm: int) -> None:
@@ -90,7 +90,7 @@ if __name__ == "__main__":
         learning_algorithms=experiment_learning_algorithms,
         internal_iterations=internal_iterations,
     )
-    folds_creator.create_folds_from_cross_validation()
+    folds_creator.create_folds_from_cross_validation(experiment_size=args.experiment_size)
     folds_creator.create_random_performance_evaluation_trajectories(
         problem_prefix=args.problem_prefix, learning_algorithm=int(experiment_learning_algorithms[0])
     )
