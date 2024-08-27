@@ -22,7 +22,8 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
-    filter_similar_equations, reduce_complementary_conditions_from_convex_hull, detect_linear_dependent_features,
+    filter_similar_equations, detect_linear_dependent_features,
+    filter_constant_features,
 )
 
 np.set_printoptions(precision=2)
@@ -211,11 +212,12 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         try:
-            filtered_matrix, column_equality_strs, _ = detect_linear_dependent_features(state_data)
+            no_constant_columns_matrix, equality_strs, _ = filter_constant_features(state_data)
+            filtered_matrix, column_equality_strs, _ = detect_linear_dependent_features(no_constant_columns_matrix)
             A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_matrix, display_mode=False)
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
-                inequalities_strs.extend([*column_equality_strs, *additional_projection_conditions])
+                inequalities_strs.extend([*column_equality_strs, *additional_projection_conditions, *equality_strs])
 
             return construct_numeric_conditions(inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
