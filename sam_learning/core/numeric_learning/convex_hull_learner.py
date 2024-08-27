@@ -214,6 +214,10 @@ class ConvexHullLearner:
         try:
             no_constant_columns_matrix, equality_strs, _ = filter_constant_features(state_data)
             filtered_matrix, column_equality_strs, _ = detect_linear_dependent_features(no_constant_columns_matrix)
+            if filtered_matrix.shape[0] == 0:
+                self.logger.warning("The matrix is empty, no need to create a convex hull.")
+                return construct_numeric_conditions([*equality_strs, *column_equality_strs], condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
+
             A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_matrix, display_mode=False)
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
