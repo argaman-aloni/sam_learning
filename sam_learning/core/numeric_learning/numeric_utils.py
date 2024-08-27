@@ -176,6 +176,9 @@ def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[Li
     :param columns_to_ignore: the list of columns that should be ignored.
     :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal.
     """
+    if len(input_df) == 1:
+        return input_df, [], []
+
     equal_fluent_strs, removed_fluents = [], []
     relevant_columns = [col for col in input_df.columns if col not in columns_to_ignore]
     try:
