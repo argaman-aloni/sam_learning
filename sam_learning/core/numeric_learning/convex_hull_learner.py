@@ -22,8 +22,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
-    filter_similar_equations, detect_linear_dependent_features,
-    filter_constant_features,
+    filter_similar_equations, remove_complex_linear_dependencies,
 )
 
 np.set_printoptions(precision=2)
@@ -111,9 +110,7 @@ class ConvexHullLearner:
 
         projected_points = np.dot(shifted_points, np.array(projection_basis).T)
         if projected_points.shape[1] == 1:
-            self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
-            coefficients = [[-1], [1]]
-            border_point = prettify_coefficients([-projected_points.min(), projected_points.max()])
+            border_point, coefficients = self._construct_single_dimension_convex_hull(projected_points)
 
         else:
             coefficients, border_point = self._execute_convex_hull(projected_points, display_mode)
@@ -128,6 +125,17 @@ class ConvexHullLearner:
             np.array(orthnormal_span), np.zeros(len(orthnormal_span)), transformed_orthonormal_vars, sign_to_use="="
         )
         return coefficients, border_point, transformed_vars, span_verification_conditions
+
+    def _construct_single_dimension_convex_hull(self, projected_points: np.array) -> Tuple[List[float], List[float]]:
+        """Construct the convex hull for a single dimension.
+
+        :param projected_points: the projected points on the single dimension.
+        :return: the border point and the coefficients of the planes that represent the convex hull.
+        """
+        self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
+        coefficients = [[-1], [1]]
+        border_point = prettify_coefficients([-projected_points.min(), projected_points.max()])
+        return border_point, coefficients
 
     @staticmethod
     def _construct_pddl_inequality_scheme(
@@ -212,16 +220,22 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         try:
-            no_constant_columns_matrix, equality_strs, _ = filter_constant_features(state_data)
-            filtered_matrix, column_equality_strs, _ = detect_linear_dependent_features(no_constant_columns_matrix)
-            if filtered_matrix.shape[0] == 0:
+            filtered_dataframe, extra_conditions = remove_complex_linear_dependencies(state_data)
+            if filtered_dataframe.shape[0] == 0:
                 self.logger.warning("The matrix is empty, no need to create a convex hull.")
-                return construct_numeric_conditions([*equality_strs, *column_equality_strs], condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
+                return construct_numeric_conditions(extra_conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
-            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_matrix, display_mode=False)
+            if filtered_dataframe.shape[1] == 1:
+                self.logger.debug("After filtering the linear dependencies remained with a single feature!")
+                b, A = self._construct_single_dimension_convex_hull(filtered_dataframe.to_numpy())
+                inequalities_strs = self._construct_pddl_inequality_scheme(A, b, filtered_dataframe.columns.tolist())
+                return construct_numeric_conditions([*inequalities_strs, *extra_conditions], condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
+
+
+            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_dataframe, display_mode=False)
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
-                inequalities_strs.extend([*column_equality_strs, *additional_projection_conditions, *equality_strs])
+                inequalities_strs.extend([*extra_conditions, *additional_projection_conditions])
 
             return construct_numeric_conditions(inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 

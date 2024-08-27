@@ -11,6 +11,7 @@ from pddl_plus_parser.lisp_parsers import PDDLTokenizer
 from pddl_plus_parser.models import Precondition, PDDLFunction, construct_expression_tree, NumericalExpressionTree
 from scipy.spatial import ConvexHull, convex_hull_plot_2d
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.learning_types import ConditionType
 
@@ -309,7 +310,7 @@ def extended_gram_schmidt(input_basis_vectors: List[List[float]], eigen_vectors:
         non_normal_vectors.append(projected_vector.tolist())
         normal_vectors.append((projected_vector / np.linalg.norm(projected_vector)).tolist())
 
-    return np.round(normal_vectors, decimals=4).tolist()
+    return normal_vectors
 
 
 def display_convex_hull_2d(action_name: str, hull: ConvexHull) -> None:
@@ -476,3 +477,42 @@ def reduce_complementary_conditions_from_convex_hull(convex_hull: List[List[floa
         reduced_convex_hull[:, non_zero_index] = 0
 
     return reduced_convex_hull.tolist()
+
+
+def remove_complex_linear_dependencies(data: DataFrame) -> Tuple[DataFrame, List[str]]:
+    """Removes the complex linear dependencies from the data matrix.
+
+    :param data: the matrix of the previous state values.
+    :return: the filtered matrix and the removed columns.
+    """
+    if len(data) == 0 or len(data.columns) == 1:
+        return data, []
+
+    removed_columns = []
+    conditions = []
+    for feature_to_check in data.columns:
+        features = data[[col for col in data.columns if col != feature_to_check and col not in removed_columns]]
+        if len(features.columns) == 0:
+            # no columns left to check
+            break
+
+        model = LinearRegression()
+        model.fit(features, data[feature_to_check])
+        score = model.score(features, data[feature_to_check])
+        coefficients = list(model.coef_) + [model.intercept_]
+        coefficients = prettify_coefficients(coefficients)
+        if score != 1 or not all([coef.is_integer() for coef in coefficients]):
+            # could not fit the feature to the other features - not linearly dependent
+            continue
+
+        removed_columns.append(feature_to_check)
+        if all([coef == 0 for coef in coefficients]):
+            # the feature is a constant
+            conditions.append(f"(= {feature_to_check} 0)")
+            continue
+
+        multiplication_functions = construct_linear_equation_string(construct_multiplication_strings(coefficients, [*features.columns.tolist(), "(dummy)"]))
+        conditions.append(f"(= {feature_to_check} {multiplication_functions})")
+
+    return data.drop(columns=removed_columns), conditions
+
