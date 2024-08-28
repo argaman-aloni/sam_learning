@@ -9,7 +9,7 @@ from pddl_plus_parser.models import Observation, Domain
 from experiments.basic_experiment_runner import OfflineBasicExperimentRunner, configure_logger
 from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
 from sam_learning.core import LearnerDomain
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 
@@ -68,7 +68,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
         :param train_set_dir_path: the path to the directory containing the training set problems.
         :param test_set_dir_path: the path to the directory containing the test set problems.
         """
-        self._init_semantic_performance_calculator(test_set_path=test_set_dir_path)
+        self._init_semantic_performance_calculator()
         self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
         self.domain_validator.clear_statistics()
 
