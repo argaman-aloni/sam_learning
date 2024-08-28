@@ -291,7 +291,8 @@ class DomainValidator:
                 tested_domain_path=tested_domain_file_path,
             )
 
-        solving_stats["solving_time"] = sum(problem_solving_times) / len(problem_solving_times) # average time in seconds for all solved problems
+        num_solved_problems_measures =  len(problem_solving_times) if len(problem_solving_times) > 0 else 1
+        solving_stats["solving_time"] = sum(problem_solving_times) / num_solved_problems_measures # average time in seconds for all solved problems
         self._calculate_solving_percentages(solving_stats)
         self._calculate_expert_validation_statistics(solving_stats)
         num_trajectories = len(used_observations)
