@@ -73,6 +73,8 @@ class ParallelExperimentRunner:
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
+        self.problem_prefix = problem_prefix
+
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
@@ -82,6 +84,7 @@ class ParallelExperimentRunner:
             self._learning_algorithm,
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
             is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
+            problem_prefix=self.problem_prefix,
         )
 
     def _apply_learning_algorithm(
