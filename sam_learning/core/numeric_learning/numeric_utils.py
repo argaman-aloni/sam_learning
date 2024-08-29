@@ -456,6 +456,7 @@ def _first_non_zero_index(numbers_list: List[float]) -> int:
             return index
     return -1
 
+
 def reduce_complementary_conditions_from_convex_hull(convex_hull: List[List[float]], complementary_basis: List[List[float]]) -> List[List[float]]:
     """Reduces the complementary conditions from the Gram-Schmidt basis.
 
@@ -472,8 +473,11 @@ def reduce_complementary_conditions_from_convex_hull(convex_hull: List[List[floa
         if non_zero_index == -1:
             continue
 
-        new_conditions = [-1/complementary_vector[non_zero_index] * complementary_vector[i] for i in range(len(complementary_vector))]
-        reduced_convex_hull = reduced_convex_hull + np.tile(np.array(new_conditions), (reduced_convex_hull.shape[0], 1)) * reduced_convex_hull[:, non_zero_index][:, np.newaxis]
+        new_conditions = [-1 / complementary_vector[non_zero_index] * complementary_vector[i] for i in range(len(complementary_vector))]
+        reduced_convex_hull = (
+            reduced_convex_hull
+            + np.tile(np.array(new_conditions), (reduced_convex_hull.shape[0], 1)) * reduced_convex_hull[:, non_zero_index][:, np.newaxis]
+        )
         reduced_convex_hull[:, non_zero_index] = 0
 
     return reduced_convex_hull.tolist()
@@ -507,12 +511,13 @@ def remove_complex_linear_dependencies(data: DataFrame) -> Tuple[DataFrame, List
 
         removed_columns.append(feature_to_check)
         if all([coef == 0 for coef in coefficients]):
-            # the feature is a constant
+            # the feature is a constant equal to zero
             conditions.append(f"(= {feature_to_check} 0)")
             continue
 
-        multiplication_functions = construct_linear_equation_string(construct_multiplication_strings(coefficients, [*features.columns.tolist(), "(dummy)"]))
+        multiplication_functions = construct_linear_equation_string(
+            construct_multiplication_strings(coefficients, [*features.columns.tolist(), "(dummy)"])
+        )
         conditions.append(f"(= {feature_to_check} {multiplication_functions})")
 
     return data.drop(columns=removed_columns), conditions
-
