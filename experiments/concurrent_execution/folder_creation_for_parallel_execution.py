@@ -19,7 +19,9 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--learning_algorithms", required=True, help="the list of algorithms that will run in parallel")
     parser.add_argument("--internal_iterations", required=True, help="The internal iterations that the algorithm will run in parallel.")
-    parser.add_argument("--experiment_size", required=False, help="The max items to use in each fold of the experiment.", default=DEFAULT_EXPERIMENT_SIZE, type=int)
+    parser.add_argument(
+        "--experiment_size", required=False, help="The max items to use in each fold of the experiment.", default=DEFAULT_EXPERIMENT_SIZE, type=int
+    )
     args = parser.parse_args()
     return args
 
@@ -72,6 +74,12 @@ class FoldsCreator:
                 domain_file_name=self.domain_file_name, working_directory_path=test_set_directory
             )
             random_trajectories_creator.create_domain_trajectories(problems_prefix=problem_prefix, output_directory_path=output_directory_path)
+            # copy the test set problems, solution and trajectories to use in case non of the random trajectories are valid
+            for test_set_problem in test_set_directory.glob(f"{problem_prefix}*.pddl"):
+                shutil.copy(test_set_problem, output_directory_path)
+                shutil.copy(self.working_directory_path / f"{test_set_problem.stem}.solution", output_directory_path)
+                shutil.copy(self.working_directory_path / f"{test_set_problem.stem}.trajectory", output_directory_path)
+
             (test_set_directory / self.domain_file_name).unlink()
 
         self.logger.info("Done creating the random performance evaluation trajectories!")
