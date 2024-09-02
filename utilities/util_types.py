@@ -49,4 +49,3 @@ class NegativePreconditionPolicy(Enum):
     no_remove = (1,)
     soft = (2,)
     hard = 3
-
