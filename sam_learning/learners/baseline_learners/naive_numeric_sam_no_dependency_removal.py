@@ -162,7 +162,7 @@ class NaiveNumericSAMLearnerNoDependencyRemoval(SAMLearner):
         return self.partial_domain, learning_metadata
 
 
-class NaivePolynomialSAMLearning(NaiveNumericSAMLearner):
+class NaivePolynomialSAMLearning(NaiveNumericSAMLearnerNoDependencyRemoval):
     """The Extension of SAM that is able to learn polynomial state variables."""
 
     storage: Dict[str, NaivePolynomialFluentsLearningAlgorithm]
