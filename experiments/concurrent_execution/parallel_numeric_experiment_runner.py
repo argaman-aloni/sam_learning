@@ -42,10 +42,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         self.polynom_degree = polynom_degree
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
-            self.working_directory_path,
-            learning_algorithm,
-            self.working_directory_path / domain_file_name,
-            problem_prefix=problem_prefix,
+            self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
 
     def _apply_learning_algorithm(
@@ -83,10 +80,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
-        "--learning_algorithm",
-        required=True,
-        type=int,
-        choices=[3, 15, 19],
+        "--learning_algorithm", required=True, type=int, choices=[3, 15, 19, 20, 21],
     )
     parser.add_argument(
         "--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' " "fluents", default=None,
