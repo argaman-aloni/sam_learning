@@ -87,7 +87,7 @@ class MacroDomainValidator(DomainValidator):
         There is no validation on the plan content since the learning process is safe.
     """
 
-    def validate_domain(
+    def validate_domain_macro(
         self,
         tested_domain_file_path: Path,
         test_set_directory_path: Optional[Path] = None,
