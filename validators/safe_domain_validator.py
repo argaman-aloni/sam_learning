@@ -233,6 +233,7 @@ class DomainValidator:
         timeout: int = 5,
         learning_time: float = 0,
         solvers_portfolio: List[SolverType] = None,
+        macro_actions: List[str] = None
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -271,6 +272,7 @@ class DomainValidator:
                 if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
+
                     self._validate_solution_content(
                         solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats
                     )
