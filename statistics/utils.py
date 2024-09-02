@@ -38,7 +38,7 @@ def init_semantic_performance_calculator(
     observations = []
     problem_files = list(test_set_dir_path.glob(f"{problem_prefix}*.pddl"))
     for test_problem_path in problem_files:
-        trajectory_file_path = test_set_dir_path / f"{test_problem_path.stem}.trajectory"
+        trajectory_file_path = working_directory_path / f"{test_problem_path.stem}.trajectory"
         problem = ProblemParser(test_problem_path, partial_domain).parse_problem()
         observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path, executing_agents=executing_agents)
         observations.append(observation)

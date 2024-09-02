@@ -3,6 +3,44 @@ from typing import List, Dict, Set, Tuple
 
 from pddl_plus_parser.models import Predicate
 
+import re
+
+
+def is_clause_consistent(clause, lma_names, binding: List[set]) -> bool:
+    # if len(clause) < 2:
+    #     return False
+
+    if not all([action in lma_names for (action, _) in clause]):
+        return False
+
+    grouped_params = group_params_from_clause(clause)
+
+    for group in grouped_params:
+        if not any(group.issubset(grouping) for grouping in binding):
+            return False
+
+    return True
+
+
+def group_params_from_clause(clause) -> List[set]:
+    """
+    Processes a single clause, grouping parameters from different actions
+    by their index position in the match.
+    """
+    param_pattern = re.compile(r'\?\w+')
+    grouped_params = []
+
+    for (action_name, fluent_str) in clause:
+        parameters = param_pattern.findall(fluent_str)
+
+        while len(grouped_params) < len(parameters):
+            grouped_params.append(set())
+
+        for idx, param in enumerate(parameters):
+            grouped_params[idx].add((action_name, param))
+
+    return grouped_params
+
 
 class LiteralCNF:
     """Class that manages the matching of lifted predicates to their possible executing actions."""
@@ -75,21 +113,21 @@ class LiteralCNF:
                :return: True if the action is safe to execute, False otherwise.
                """
 
-        unitc = []  # unit clauses of size 1 (1 tuple) that contains action_name
-        nonunc = []  # non-unit clauses that contain action_name
+        unit_clauses = []  # unit clauses of size 1 (1 tuple) that contains action_name
+        non_unit_clauses = []  # non-unit clauses that contain action_name
 
         for lifted_options in self.possible_lifted_effects:
             if action_name in [action for (action, _) in lifted_options]:
                 if len(lifted_options) == 1:
-                    unitc.append(lifted_options[0])
+                    unit_clauses.append(lifted_options[0])
                 else:
-                    nonunc.append(lifted_options)
+                    non_unit_clauses.append(lifted_options)
 
-        if len(nonunc) == 0:
+        if len(non_unit_clauses) == 0:
             return True
 
-        for nunc in nonunc:
-            if not any(uc in nunc for uc in unitc):
+        for nunc in non_unit_clauses:
+            if not any(uc in nunc for uc in unit_clauses):
                 for (action, predicate) in nunc:
                     if action == action_name and predicate not in action_preconditions:
                         return False
@@ -128,12 +166,40 @@ class LiteralCNF:
 
         return effects
 
-    def is_consistent(self, clause, lma, macro_signature) -> bool:
-        if len(clause) < 2:
-            return False
-        lma_action_names = list(map(lambda x: x.name, lma))
-        all_atoms_act = all([action in lma_action_names for (action, _) in clause])
-        params_consistent = True
+    def extract_macro_action_effects(self, action_names: List[str],
+                                     action_preconditions: Set[str],
+                                     param_grouping: list[set]) -> List[tuple[str, str]]:
+        """Extract the effects that a macro action is acting on.
 
-        return all_atoms_act and params_consistent
+                :param action_names: the names of the actions that participate in the macro.
+                :param action_preconditions: the preconditions of the action.
+                :param param_grouping: grouping of the parameters
+                :return: the list of effects that the action is acting on.
+                """
+        effects = []
+        for possible_joint_effect in self.possible_lifted_effects:
+            if is_clause_consistent(possible_joint_effect, action_names, param_grouping):
+                for (action, effect) in possible_joint_effect:
+                    # basically, if there's at least one action that allows this effect, we'll take the effect
+                    if effect not in action_preconditions:
+                        effects.append((action, effect))
+                        break
 
+        return effects
+
+    def extract_macro_action_preconditions(self, action_names: List[str],
+                                           param_grouping: list[set]) -> List[tuple[str, str]]:
+        """Extract the effects that a macro action is acting on.
+
+                :param action_names: the names of the actions that participate in the macro.
+                :param param_grouping: grouping of the parameters
+                :return: the list of effects that the action is acting on.
+                """
+        preconditions = []
+        for possible_joint_effect in self.possible_lifted_effects:
+            if not is_clause_consistent(possible_joint_effect, action_names, param_grouping):
+                for (action_name, lifted_fluent) in possible_joint_effect:
+                    if action_name in action_names:
+                        preconditions.append((action_name, lifted_fluent))
+
+        return preconditions

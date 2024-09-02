@@ -4,9 +4,10 @@ import re
 from typing import Dict, List, Tuple, Set, Optional
 
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
-    GroundedPredicate, JointActionCall, CompoundPrecondition, SignatureType
+    GroundedPredicate, JointActionCall, CompoundPrecondition, SignatureType, PDDLType
 
-from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
+from sam_learning.core import (LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data,
+                               group_params_from_clause)
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 
 from itertools import chain, combinations
@@ -15,64 +16,26 @@ from utilities import powerset, combine_groupings
 BindingType = Dict[tuple[str, str], str]
 
 
-def is_clause_consistent(clause, lma, binding: BindingType) -> bool:
-    if len(clause) < 2:
-        return False
-
-    lma_action_names = list(map(lambda x: x.name, lma))
-    if not all([action in lma_action_names for (action, _) in clause]):
-        return False
-
-    grouped_params = group_params_from_clause(clause, lma_action_names)
-
-    for group in grouped_params:
-        values = set(map(lambda param: binding[param], group))
-        if len(values) != 1:
-            return False
-
-    return True
-
-
-def group_params_from_clause(clause, lma_action_names) -> List[set]:
-    """
-    Processes a single clause, grouping parameters from different actions
-    by their index position in the match.
-    """
-    param_pattern = re.compile(r'\?\w+')
-    grouped_params = []
-
-    for (action_name, fluent_str) in clause:
-        parameters = param_pattern.findall(fluent_str)
-
-        while len(grouped_params) < len(parameters):
-            grouped_params.append(set())
-
-        for idx, param in enumerate(parameters):
-            grouped_params[idx].add((action_name, param))
-
-    return grouped_params
-
-
 class MASAMPlus(MultiAgentSAM):
     """Class designated to learning action models with macro actions
         from multi-agent trajectories with joint actions."""
-    mapping: Dict[str, BindingType]
+    mapping: Dict[str,  BindingType]
 
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
-        super().__init__(partial_domain)
+        super().__init__(partial_domain, preconditions_fluent_map)
         self.mapping = {}
 
-    def _extract_predicate_from_clause(self, clause_element, signature):
+    def _extract_predicate_from_clause(self, clause_element, mapping):
         """Helper function to extract predicate data and adapt it to the macro signature.
 
         :param clause_element: A tuple of (action_name, lifted_fluent).
-        :param signature: The macro-action signature.
+        :param mapping: The macro-action signature.
         :return: Adapted predicate.
         """
         action_name, fluent = clause_element
         action_signature = self.partial_domain.actions[action_name].signature
         predicate = extract_predicate_data(action_signature, fluent, self.partial_domain.constants)
-        return MacroActionParser.adapt_predicate_to_macro_signature(signature, predicate, action_name)
+        return MacroActionParser.adapt_predicate_to_macro_mapping(mapping, predicate, action_name)
 
     def extract_relevant_lmas2(self) -> List[set[LearnerAction]]:
         """Extracts relevant action groups
@@ -127,64 +90,74 @@ class MASAMPlus(MultiAgentSAM):
 
         return relevant_lmas
 
-    def generate_possible_bindings(self, lma_set: set[LearnerAction]) -> List[BindingType]:
-        lma_action_names = list(map(lambda x: x.name, lma_set))
-
+    def generate_possible_binding(self, lma_names: list[str]) -> List[set]:
         all_param_groups = [
-            group_params_from_clause(clause, lma_action_names)
+            group_params_from_clause(clause)
             for fluent_cnf in self.literals_cnf.values()
             for clause in fluent_cnf.possible_lifted_effects
-            if all(action in lma_action_names for action, _ in clause) and len(clause) > 1
+            if all(action in lma_names for action, _ in clause) and len(clause) > 1
         ]
 
         flattened_groups = combine_groupings(all_param_groups)
 
-        param_bindings = {
-            (action.name, param_name): f"{param_name}{lma_action_names.index(action.name)}"
-            for action in lma_set
-            for param_name in action.parameter_names
-        }
+        return flattened_groups
 
-        for group in flattened_groups:
-            new_param_name = '?'+''.join([param[1:] for _, param in group])
-            for action_name, param in group:
-                param_bindings[(action_name, param)] = new_param_name
-
-        return [param_bindings]
-
-    def extract_lma_predicates_from_cnf(self, lma, signature):
+    def extract_effects_for_macro_from_cnf(self, lma_set: set[LearnerAction], param_grouping, mapping):
+        lma_names = [lma.name for lma in lma_set]
         cnf_effects = []
+        relevant_preconditions_str = {precondition.untyped_representation for action in lma_set for precondition
+                                      in action.preconditions if isinstance(precondition, Predicate)}
+
+        for fluent, fluent_cnf in self.literals_cnf.items():
+            effects = fluent_cnf.extract_macro_action_effects(lma_names, relevant_preconditions_str, param_grouping)
+            for effect_element in effects:
+                cnf_effects.append(self._extract_predicate_from_clause(effect_element, mapping))
+
+        return cnf_effects
+
+    def extract_preconditions_for_macro_from_cnf(self, lma, param_grouping, mapping):
         cnf_preconditions = []
         lma_names = [action.name for action in lma]
 
         for fluent, fluent_cnf in self.literals_cnf.items():
-            for clause in fluent_cnf.possible_lifted_effects:
-                if is_clause_consistent(clause, lma, signature):
-                    cnf_effects.append(self._extract_predicate_from_clause(clause[0], signature))
-                else:
-                    for (action_name, lifted_fluent) in clause:
-                        if action_name in lma_names:
-                            cnf_preconditions.append(
-                                self._extract_predicate_from_clause((action_name, lifted_fluent), signature))
+            preconditions = fluent_cnf.extract_macro_action_preconditions(lma_names, param_grouping)
+            for precondition_element in preconditions:
+                cnf_preconditions.append(self._extract_predicate_from_clause(precondition_element, mapping))
 
-        return cnf_effects, cnf_preconditions
+        new_precondition = CompoundPrecondition()
+        for action in lma:
+            for _, precondition in action.preconditions:
+                new_precondition.add_condition(precondition)
+
+        for predicate in cnf_preconditions:
+            new_precondition.add_condition(predicate)
+
+        return new_precondition
 
     def construct_safe_macro_actions(self) -> None:
         """Constructs the multi-agent actions that are safe to execute."""
         relevant_lmas = self.extract_relevant_lmas()
 
         for lma in relevant_lmas:
-            lma_bindings = self.generate_possible_bindings(lma)
+            lma_names = [action.name for action in lma]
+            binding = self.generate_possible_binding(lma_names)
+            mapper = MacroActionParser.generate_macro_mappings(binding, lma)
 
-            for binding in lma_bindings:
-                cnf_eff, cnf_preconditions = self.extract_lma_predicates_from_cnf(lma, binding)
-                macro_action = MacroActionParser.construct_macro_action(lma, binding, cnf_preconditions, cnf_eff)
-                self.partial_domain.actions[macro_action.name] = macro_action
-                self.safe_actions.append(macro_action.name)
-                self.observed_actions.append(macro_action.name)
-                self.mapping[macro_action.name] = binding
+            macro_action_name = MacroActionParser.generate_macro_action_name(lma_names)
+            macro_action_signature = MacroActionParser.generate_macro_action_signature(lma, mapper)
+            macro_action_preconditions = self.extract_preconditions_for_macro_from_cnf(lma, binding, mapper)
+            macro_action_effects = self.extract_effects_for_macro_from_cnf(lma, binding, mapper)
 
-    def learn_combined_action_model(
+            macro_action = LearnerAction(macro_action_name, macro_action_signature)
+            macro_action.preconditions = macro_action_preconditions
+            macro_action.discrete_effects = macro_action_effects
+
+            self.partial_domain.actions[macro_action.name] = macro_action
+            self.safe_actions.append(macro_action.name)
+            self.observed_actions.append(macro_action.name)
+            self.mapping[macro_action.name] = mapper
+
+    def learn_combined_action_model_with_macro_actions(
             self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input multi-agent trajectories.
 
@@ -208,46 +181,81 @@ class MASAMPlus(MultiAgentSAM):
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report
 
+    def extract_actions_from_macro_action(self, action_line: str) -> set[str]:
+        param_pattern = re.compile(r'[^\s()]+')
+        macro_name = param_pattern.findall(action_line)[0]
+
+        if macro_name not in self.mapping:
+            return {action_line}
+
+        mapping = self.mapping[macro_name]
+        action_names = {name for (name, param) in mapping}
+        actions_dict = {}
+        for action in action_names:
+            actions_dict[action] = f'({action}'
+
+        params_bound = param_pattern.findall(action_line)[1:]
+        params_name = self.partial_domain.actions[macro_name].parameter_names
+
+        for action in action_names:
+            for param in self.partial_domain.actions[action].parameter_names:
+                for param_name, param_bound in zip(params_name, params_bound):
+                    if mapping[(action, param)] == param_name:
+                        actions_dict[action] += f' {param_bound}'
+
+        for action in action_names:
+            actions_dict[action] += ')'
+
+        return set(actions_dict.values())
+
 
 class MacroActionParser:
     # Maybe should be a util class
+
     @staticmethod
-    def construct_macro_action(actions: set[LearnerAction], signature,
-                               preconditions: List[Predicate], effects: List[Predicate]) -> LearnerAction:
+    def _return_sub_type(type1: PDDLType, type2: PDDLType) -> PDDLType:
+        if not type1:
+            return type2
+
+        if not type2:
+            return type1
+
+        if type1.is_sub_type(type2):
+            return type1
+
+        return type2
+
+    @staticmethod
+    def generate_macro_action_name(action_names: list[str]) -> str:
+        return "@".join(action_names)
+
+    @staticmethod
+    def generate_macro_action_signature(actions: set[LearnerAction], mapping) -> SignatureType:
         all_params_dict = {}
         for action in actions:
             for param_name, param_type in action.signature.items():
                 all_params_dict[(action.name, param_name)] = param_type
 
-        macro_name = "@".join([action.name for action in actions])
         action_signature: SignatureType = {}
 
         for key, param_type in all_params_dict.items():
-            if key in signature:
-                param_name = signature[key]
-                action_signature[param_name] = param_type
+            if key in mapping:
+                param_name = mapping[key]
+                if param_name not in action_signature:
+                    action_signature[param_name] = param_type
+                else:
+                    action_signature[param_name] = MacroActionParser._return_sub_type(param_type,
+                                                                                      action_signature[param_name])
 
-        new_precondition = CompoundPrecondition()
-
-        macro_action = LearnerAction(macro_name, action_signature)
-        for action in actions:
-            for _, precondition in action.preconditions:
-                new_precondition.add_condition(precondition)
-
-        for predicate in preconditions:
-            new_precondition.add_condition(predicate)
-
-        macro_action.preconditions = new_precondition
-        macro_action.discrete_effects = effects
-        return macro_action
+        return action_signature
 
     @staticmethod
-    def adapt_predicate_to_macro_signature(signature, predicate: Predicate, relevant_action):
+    def adapt_predicate_to_macro_mapping(mapping, predicate: Predicate, relevant_action):
         # Ensure the string is properly trimmed
         predicate_copy = predicate.copy()
         new_signature = {}
         for param_name, param_type in predicate.signature.items():
-            new_name = signature[(relevant_action, param_name)]
+            new_name = mapping[(relevant_action, param_name)]
             new_signature[new_name] = param_type
 
         predicate_copy.signature = new_signature
@@ -255,19 +263,25 @@ class MacroActionParser:
 
     # TODO should see what it gets. maybe Action rather than LearnerAction, but idk how the process goes.
     @staticmethod
-    def extract_actions_from_macro_action(macro_action_bound: str, macro_action_rep: str, signature) -> set[str]:
-        param_pattern = re.compile(r'\?\w+')
-        action_names = {name for (name, param) in signature}
+    def extract_actions_from_macro_action(action_line: str, mapper) -> set[str]:
+        param_pattern = re.compile(r'[^\s()]+')
+        macro_name = param_pattern.findall(action_line)[0]
+
+        if macro_name not in mapper:
+            return {action_line}
+
+        macro_action_rep, mapping = mapper[macro_name]
+        action_names = {name for (name, param) in mapping}
         actions_dict = {}
         for action in action_names:
             actions_dict[action] = f'({action}'
 
-        params_bound = param_pattern.findall(macro_action_bound)
+        params_bound = param_pattern.findall(action_line)
         params_name = param_pattern.findall(macro_action_rep)
 
         for param_name, param_bound in zip(params_name[1:], params_bound[1:]):
-            for (action, param) in signature:
-                if signature[(action, param)] == param_name:
+            for (action, param) in mapping:
+                if mapping[(action, param)] == param_name:
                     actions_dict[action] += f' {param_bound}'
 
         for action in action_names:
@@ -301,3 +315,18 @@ class MacroActionParser:
 
         return adapted_fluent
 
+    @staticmethod
+    def generate_macro_mappings(groupings: List[set], lma_set: set[LearnerAction]) -> BindingType:
+        lma_names = [action.name for action in lma_set]
+        param_bindings = {
+            (action.name, param_name): f"{param_name}'{lma_names.index(action.name)}"
+            for action in lma_set
+            for param_name in action.parameter_names
+        }
+
+        for group in groupings:
+            new_param_name = '?' + ''.join([param[1:] for _, param in group])
+            for action_name, param in group:
+                param_bindings[(action_name, param)] = new_param_name
+
+        return param_bindings
