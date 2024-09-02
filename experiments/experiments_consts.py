@@ -17,6 +17,8 @@ NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.raw_naive_nsam,
     LearningAlgorithmType.raw_naive_polysam,
     LearningAlgorithmType.incremental_nsam,
+    LearningAlgorithmType.nsam_no_dependency_removal,
+    LearningAlgorithmType.naive_nsam_no_dependency_removal,
 ]
 
 DEFAULT_NUMERIC_TOLERANCE = 0.1
