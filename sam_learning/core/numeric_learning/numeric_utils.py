@@ -503,11 +503,12 @@ def remove_complex_linear_dependencies(data: DataFrame) -> Tuple[DataFrame, List
         model = LinearRegression()
         model.fit(features, data[feature_to_check])
         score = model.score(features, data[feature_to_check])
-        coefficients = list(model.coef_) + [model.intercept_]
-        coefficients = prettify_coefficients(coefficients)
-        if score != 1 or not all([coef.is_integer() for coef in coefficients]):
+        if score != 1:
             # could not fit the feature to the other features - not linearly dependent
             continue
+
+        coefficients = list(model.coef_) + [model.intercept_]
+        coefficients = prettify_coefficients(coefficients)
 
         removed_columns.append(feature_to_check)
         if all([coef == 0 for coef in coefficients]):
