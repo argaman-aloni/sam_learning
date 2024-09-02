@@ -73,8 +73,9 @@ class MASAMPlus(MultiAgentSAM):
 
         :return: a list of action groups
         """
-        actions_set = set(self.partial_domain.actions.values())
-        action_names = set(map(lambda x: x.name, actions_set))
+        action_list = [action for action in self.partial_domain.actions.values() if action.name in self.observed_actions]
+        actions_set = set(action_list)
+        action_names = set(self.observed_actions)
         unsafe_actions = action_names.difference(set(self.safe_actions))
         relevant_lmas = []
 
@@ -95,7 +96,7 @@ class MASAMPlus(MultiAgentSAM):
             group_params_from_clause(clause)
             for fluent_cnf in self.literals_cnf.values()
             for clause in fluent_cnf.possible_lifted_effects
-            if all(action in lma_names for action, _ in clause) and len(clause) > 1
+            if all(action in lma_names for action, _ in clause)
         ]
 
         flattened_groups = combine_groupings(all_param_groups)
@@ -113,7 +114,16 @@ class MASAMPlus(MultiAgentSAM):
             for effect_element in effects:
                 cnf_effects.append(self._extract_predicate_from_clause(effect_element, mapping))
 
-        return cnf_effects
+        # TODO find a neater way to remove duplicates
+        unique_representations = {}
+        unique_cnf_effects = []
+
+        for effect in cnf_effects:
+            if effect.untyped_representation not in unique_representations:
+                unique_representations[effect.untyped_representation] = True
+                unique_cnf_effects.append(effect)
+
+        return unique_cnf_effects
 
     def extract_preconditions_for_macro_from_cnf(self, lma, param_grouping, mapping):
         cnf_preconditions = []
@@ -126,8 +136,10 @@ class MASAMPlus(MultiAgentSAM):
 
         new_precondition = CompoundPrecondition()
         for action in lma:
-            for _, precondition in action.preconditions:
-                new_precondition.add_condition(precondition)
+            for precondition in action.preconditions.root.operands:
+                cnf_preconditions.append(self._extract_predicate_from_clause((action.name,
+                                                                              precondition.untyped_representation),
+                                                                             mapping))
 
         for predicate in cnf_preconditions:
             new_precondition.add_condition(predicate)
@@ -227,7 +239,7 @@ class MacroActionParser:
 
     @staticmethod
     def generate_macro_action_name(action_names: list[str]) -> str:
-        return "@".join(action_names)
+        return "-".join(action_names)
 
     @staticmethod
     def generate_macro_action_signature(actions: set[LearnerAction], mapping) -> SignatureType:
@@ -319,14 +331,15 @@ class MacroActionParser:
     def generate_macro_mappings(groupings: List[set], lma_set: set[LearnerAction]) -> BindingType:
         lma_names = [action.name for action in lma_set]
         param_bindings = {
-            (action.name, param_name): f"{param_name}'{lma_names.index(action.name)}"
+            (action.name, param_name): f"{param_name}_{lma_names.index(action.name)}"
             for action in lma_set
             for param_name in action.parameter_names
         }
 
         for group in groupings:
-            new_param_name = '?' + ''.join([param[1:] for _, param in group])
-            for action_name, param in group:
-                param_bindings[(action_name, param)] = new_param_name
+            if len(group) > 1:
+                new_param_name = '?' + ''.join([param[1:] for _, param in group])
+                for action_name, param in group:
+                    param_bindings[(action_name, param)] = new_param_name
 
         return param_bindings
