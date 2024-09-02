@@ -258,6 +258,7 @@ def test_extract_preconditions_for_macro_from_cnf_of_non_consistent_clause_and_c
     assert len(precondition_rep) == 1
     assert "(fluent_test1 ?yp)" in precondition_rep
 
+
 def test_extract_actions_from_macro_action(
         rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
 
@@ -270,5 +271,14 @@ def test_extract_actions_from_macro_action(
             or {'(communicate_rock_data a b c d e)', '(navigate f c h)'} == new_action_lines)
 
 
+def test_extract_actions_from_macro_actions_from_line_without_macro(
+        rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
+
+    rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation])
+    macro_name = list(rovers_ma_sam_plus.mapping.keys())[0]
+    action_line = f"(navigate a b c d e f h)"
+    new_action_lines = rovers_ma_sam_plus.extract_actions_from_macro_action(action_line)
+    print(new_action_lines)
+    assert {'(navigate a b c d e f h)'} == new_action_lines
 
 

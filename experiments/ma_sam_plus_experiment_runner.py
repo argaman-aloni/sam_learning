@@ -113,7 +113,7 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
         portfolio = (
             [SolverType.fast_forward, SolverType.fast_downward]
         )
-        self.domain_validator.validate_domain(
+        self.domain_validator.validate_domain_macro(
             tested_domain_file_path=domain_file_path,
             test_set_directory_path=test_set_dir_path,
             used_observations=allowed_observations,
