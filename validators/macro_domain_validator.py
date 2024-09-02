@@ -180,7 +180,9 @@ class MacroDomainValidator(DomainValidator):
 
         new_lines = []
         for line in lines:
-            new_lines.extend(learned_domain.extract_actions_from_macro_action(line))
+            extracted_lines = learned_domain.extract_actions_from_macro_action(line)
+            new_lines.extend([extracted_line if extracted_line.endswith('\n') else f"{extracted_line}\n"
+                              for extracted_line in extracted_lines])
 
         with open(solution_path, 'w') as file:
             file.writelines(new_lines)
