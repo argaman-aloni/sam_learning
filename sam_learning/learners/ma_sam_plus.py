@@ -20,10 +20,11 @@ class MASAMPlus(MultiAgentSAM):
     """Class designated to learning action models with macro actions
         from multi-agent trajectories with joint actions."""
     mapping: Dict[str,  BindingType]
-
+    unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
     def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
         super().__init__(partial_domain, preconditions_fluent_map)
         self.mapping = {}
+        self.unsafe_actions_preconditions_map = {}
 
     def _extract_predicate_from_clause(self, clause_element, mapping):
         """Helper function to extract predicate data and adapt it to the macro signature.
@@ -44,7 +45,7 @@ class MASAMPlus(MultiAgentSAM):
         """
         actions_set = set(self.partial_domain.actions.values())
         actions_powerset = powerset(actions_set)
-        unsafe_actions = {action for action in actions_set if action.name not in self.safe_actions}
+        unsafe_actions = set(self.unsafe_actions_preconditions_map.keys())
         all_lmas = [lma for lma in actions_powerset if unsafe_actions.intersection(lma) and len(lma) > 1]
         relevant_lmas = []
 
@@ -125,7 +126,7 @@ class MASAMPlus(MultiAgentSAM):
 
         return unique_cnf_effects
 
-    def extract_preconditions_for_macro_from_cnf(self, lma, param_grouping, mapping):
+    def extract_preconditions_for_macro_from_cnf(self, lma: set[LearnerAction], param_grouping, mapping):
         cnf_preconditions = []
         lma_names = [action.name for action in lma]
 
@@ -136,15 +137,47 @@ class MASAMPlus(MultiAgentSAM):
 
         new_precondition = CompoundPrecondition()
         for action in lma:
-            for precondition in action.preconditions.root.operands:
-                cnf_preconditions.append(self._extract_predicate_from_clause((action.name,
-                                                                              precondition.untyped_representation),
-                                                                             mapping))
+            preconditions = action.preconditions if action.name not in self.unsafe_actions_preconditions_map \
+                else self.unsafe_actions_preconditions_map[action.name]
+
+            for _, precondition in preconditions:
+                if isinstance(precondition, Predicate):
+                    cnf_preconditions.append(
+                        self._extract_predicate_from_clause((action.name,
+                                                            precondition.untyped_representation),
+                                                            mapping))
+
+            else:
+                for _, precondition in action.preconditions:
+                    if isinstance(precondition, Predicate):
+                        cnf_preconditions.append(self._extract_predicate_from_clause((action.name,
+                                                                                  precondition.untyped_representation),
+                                                                                 mapping))
 
         for predicate in cnf_preconditions:
             new_precondition.add_condition(predicate)
 
         return new_precondition
+
+
+    def construct_safe_actions(self) -> None:
+        """Constructs the single-agent actions that are safe to execute."""
+        super()._remove_unobserved_actions_from_partial_domain()
+        for action in self.partial_domain.actions.values():
+            self.logger.debug("Constructing safe action for %s", action.name)
+            action_preconditions = {precondition for precondition in
+                                    action.preconditions if isinstance(precondition, Predicate)}
+            if not self._is_action_safe(action, action_preconditions):
+                self.logger.warning("Action %s is not safe to execute!", action.name)
+                #TODO need to check if its copy or overriden next line
+                self.unsafe_actions_preconditions_map[action.name] = action.preconditions
+                action.preconditions = CompoundPrecondition()
+                continue
+
+            self.logger.debug("Action %s is safe to execute.", action.name)
+            self.safe_actions.append(action.name)
+            self.extract_effects_from_cnf(action, action_preconditions)
+
 
     def construct_safe_macro_actions(self) -> None:
         """Constructs the multi-agent actions that are safe to execute."""

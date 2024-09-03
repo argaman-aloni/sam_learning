@@ -15,8 +15,9 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     MINECRAFT_TRAJECTORY_PATH, SATELLITE_DOMAIN_PATH, SATELLITE_PROBLEM_PATH, SATELLITE_NUMERIC_TRAJECTORY_PATH, \
     NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
     ADL_SATELLITE_TRAJECTORY_PATH, DEPOTS_DISCRETE_DOMAIN_PATH, DEPOTS_DISCRETE_PROBLEM_PATH, \
-    MINECRAFT_LARGE_DOMAIN_PATH, MINECRAFT_LARGE_PROBLEM_PATH, MINECRAFT_LARGE_TRAJECTORY_PATH
-from tests.multi_agent_learning_tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
+    MINECRAFT_LARGE_DOMAIN_PATH, MINECRAFT_LARGE_PROBLEM_PATH, MINECRAFT_LARGE_TRAJECTORY_PATH, \
+    DRIVERLOG_COMBINED_DOMAIN_PATH, DRIVERLOG_COMBINED_PROBLEM_PATH, DRIVERLOG_COMBINED_TRAJECTORY_PATH
+from tests.multi_agent_learning_tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES, DRIVERLOG_AGENT_NAMES
 from utilities import NegativePreconditionPolicy
 
 os.environ["CONVEX_HULL_ERROR_PATH"] = "tests\\convex_hull_error.txt"
@@ -93,14 +94,6 @@ def woodworking_ma_combined_problem(woodworking_ma_combined_domain: Domain) -> P
 
 @fixture()
 def multi_agent_observation(woodworking_ma_combined_domain: Domain,
-                            woodworking_ma_combined_problem) -> MultiAgentObservation:
-    return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
-        WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
-
-
-# TODO MA-SAM should not modify observation. When learning two models on the same observation, problems occur
-@fixture()
-def multi_agent_observation2(woodworking_ma_combined_domain: Domain,
                             woodworking_ma_combined_problem) -> MultiAgentObservation:
     return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
         WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
@@ -248,3 +241,20 @@ def minecraft_large_problem(minecraft_large_domain: Domain) -> Problem:
 def minecraft_large_trajectory(minecraft_large_domain: Domain, minecraft_large_problem: Problem) -> Observation:
     return TrajectoryParser(minecraft_large_domain, minecraft_large_problem).parse_trajectory(
         MINECRAFT_LARGE_TRAJECTORY_PATH)
+
+
+#TODO ORI ADDED
+@fixture()
+def ma_driverlog_domain() -> Domain:
+    return DomainParser(DRIVERLOG_COMBINED_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def ma_driverlog_problem(ma_driverlog_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=DRIVERLOG_COMBINED_PROBLEM_PATH, domain=ma_driverlog_domain).parse_problem()
+
+
+@fixture()
+def ma_driverlog_observation(ma_driverlog_domain: Domain, ma_driverlog_problem: Problem) -> MultiAgentObservation:
+    return TrajectoryParser(ma_driverlog_domain, ma_driverlog_problem).parse_trajectory(
+        DRIVERLOG_COMBINED_TRAJECTORY_PATH, executing_agents=DRIVERLOG_AGENT_NAMES)
