@@ -10,6 +10,7 @@ from tests.consts import sync_ma_snapshot
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0",
                            "spray-varnisher0"]
 ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
+DRIVERLOG_AGENT_NAMES = [f"driver{i}" for i in range(1, 9)]
 
 
 @fixture()

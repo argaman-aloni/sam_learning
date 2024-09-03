@@ -19,10 +19,7 @@ def woodworking_ma_sam_plus(woodworking_ma_combined_domain: Domain) -> MASAMPlus
 
 @fixture()
 def rovers_ma_sam_plus(ma_rovers_domain) -> MASAMPlus:
-    return MASAMPlus(ma_rovers_domain,
-                     ["rover0", "rover1", "rover2", "rover3", "rover4", "rover5",
-                      "rover6", "rover7", "rover8", "rover9"]
-)
+    return MASAMPlus(ma_rovers_domain)
 
 
 @fixture()
@@ -57,10 +54,23 @@ def rovers_literals_cnf(ma_rovers_domain: Domain) -> LiteralCNF:
     return LiteralCNF(action_names)
 
 
+@fixture()
+def driverlog_ma_sam_plus(ma_driverlog_domain) -> MASAMPlus:
+    return MASAMPlus(ma_driverlog_domain)
+
+
+
 def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions(
         rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
     learned_domain, learning_report = (
         rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation]))
+    print(learned_domain.to_pddl())
+
+
+def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions_driverlog(
+        driverlog_ma_sam_plus: MASAMPlus, ma_driverlog_observation):
+    learned_domain, learning_report = (
+        driverlog_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_driverlog_observation]))
     print(learned_domain.to_pddl())
 
 
