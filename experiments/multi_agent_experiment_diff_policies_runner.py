@@ -77,6 +77,12 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             self.negative_preconditions_policy = NegativePreconditionPolicy.normal
             self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
             self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
+            self.negative_preconditions_policy = NegativePreconditionPolicy.soft
+            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
+            self.negative_preconditions_policy = NegativePreconditionPolicy.hard
+            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations))
         self.semantic_performance_calc.export_semantic_performance(fold_num)
