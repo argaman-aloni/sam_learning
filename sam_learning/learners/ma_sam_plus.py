@@ -98,6 +98,7 @@ class MASAMPlus(MultiAgentSAM):
             for fluent_cnf in self.literals_cnf.values()
             for clause in fluent_cnf.possible_lifted_effects
             if all(action in lma_names for action, _ in clause)
+            # if all(action in (a for a, _ in clause) for action, _ in lma_names)
         ]
 
         flattened_groups = combine_groupings(all_param_groups)
