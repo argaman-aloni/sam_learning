@@ -109,7 +109,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
                                                              learning_report)
         self.export_learned_domain(
             learned_model, self.working_directory_path / "results_directory",
-            f"ma_baseline_domain_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
+            f"ma_baseline_domain_{self.negative_preconditions_policy}_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
         self.validate_learned_domain(allowed_filtered_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
