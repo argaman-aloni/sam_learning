@@ -22,8 +22,6 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
-    filter_similar_equations,
-    remove_complex_linear_dependencies,
 )
 
 np.set_printoptions(precision=2)
@@ -75,13 +73,12 @@ class ConvexHullLearnerNoDependencyRemoval:
         :param display_mode: whether to display the convex hull.
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
-        hull = ConvexHull(points)
+        hull = ConvexHull(points, qhull_options="Qx A0.99")
         display_convex_hull(self.action_name, display_mode, hull)
         equations = np.unique(hull.equations, axis=0)
-        filtered_equations = filter_similar_equations(equations)
 
-        A = filtered_equations[:, : points.shape[1]]
-        b = -filtered_equations[:, points.shape[1]]
+        A = equations[:, : points.shape[1]]
+        b = -equations[:, points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
         border_point = prettify_coefficients(b)
         return coefficients, border_point

@@ -15,9 +15,11 @@ def plot_results(results_directory_path: Path):
 
         # Define color-blind friendly palette
         color_palette = sns.color_palette("colorblind", n_colors=len(df["learning_algorithm"].unique()))
-        line_styles = cycle(["-", "--", "-.", ":", "--", "-.", ":"])
+        line_styles = ["-", "--", "-.", ":", "--", "-.", ":"]
+        marker_options = ["o", "s", "D", "v", "^", ">", "<", "p", "P", "*", "X", "d"]
+        line_styles_iterator = cycle(line_styles)
         color_cycle = cycle(color_palette)
-        markers = cycle(["o", "s", "D", "v", "^", ">", "<", "p", "P", "*", "X", "d"])
+        markers = cycle(marker_options)
 
         # Group the data by 'num_trajectories', 'learning_algorithm' and calculate the mean and std of 'percent_ok'
         df = df[df["learning_algorithm"] != "incremental_nsam"]  # Remove max_percent_ok from the plot
@@ -32,8 +34,10 @@ def plot_results(results_directory_path: Path):
         )
 
         labels = {
-            "numeric_sam": "NSAM*",
-            "naive_nsam": "NSAM",
+            "numeric_sam": "NSAM* with DR",
+            "naive_nsam": "NSAM with DR",
+            "nsam_no_dependency_removal": "NSAM* without DR",
+            "naive_nsam_no_dependency_removal": "NSAM without DR",
         }
 
         # Plotting
@@ -46,7 +50,7 @@ def plot_results(results_directory_path: Path):
             plt.plot(
                 algo_data["num_trajectories"],
                 algo_data["avg_max_percent_ok"],
-                linestyle=next(line_styles),
+                linestyle=next(line_styles_iterator),
                 label=labels[algo],
                 marker=next(markers),
                 color=next(color_cycle),
@@ -78,6 +82,9 @@ def plot_results(results_directory_path: Path):
         plt.show()
 
         # Second Plot (with x-axis limited to 0-10)
+        line_styles_iterator = cycle(line_styles)
+        color_cycle = cycle(color_palette)
+        markers = cycle(marker_options)
         plt.figure(figsize=(10, 6))
 
         for algo in df["learning_algorithm"].unique():
@@ -85,7 +92,7 @@ def plot_results(results_directory_path: Path):
             plt.plot(
                 algo_data["num_trajectories"],
                 algo_data["avg_max_percent_ok"],
-                linestyle=next(line_styles),
+                linestyle=next(line_styles_iterator),
                 label=labels[algo],
                 marker=next(markers),
                 color=next(color_cycle),
