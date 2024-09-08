@@ -1,6 +1,7 @@
 """Module containing the datatype of the output domain that the learning algorithms return."""
+import os
 from collections import defaultdict
-from typing import Set, List, Dict, Union
+from typing import Set, List, Dict
 
 from pddl_plus_parser.models import (
     SignatureType,
@@ -13,7 +14,6 @@ from pddl_plus_parser.models import (
     CompoundPrecondition,
     UniversalEffect,
     NumericalExpressionTree,
-    PDDLObject,
 )
 
 DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
@@ -22,7 +22,7 @@ EQUALITY_REQ = ":equality"
 UNIVERSAL_PRECONDITIONS_REQ = ":universal-preconditions"
 CONDITIONAL_EFFECTS_REQ = ":conditional-effects"
 ADDED_LEARNING_REQUIREMENTS = [NEGATIVE_PRECONDITIONS_REQ, EQUALITY_REQ]
-DEFAULT_DIGITS = 2
+DEFAULT_DIGITS = os.environ.get("NUMERIC_PRECISION", 4)
 
 
 class LearnerAction:
