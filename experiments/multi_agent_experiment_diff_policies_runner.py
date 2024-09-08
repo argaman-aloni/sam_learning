@@ -4,6 +4,9 @@ import logging
 from pathlib import Path
 from typing import List
 
+from logging.handlers import RotatingFileHandler
+from experiments.experiments_consts import MAX_SIZE_MB
+
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 
@@ -13,6 +16,25 @@ from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
 
 DEFAULT_SPLIT = 5
+
+def configure_logger(args: argparse.Namespace):
+    """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
+    working_directory_path = Path(args.working_directory_path)
+    logs_directory_path = working_directory_path / "logs"
+    logs_directory_path.mkdir(exist_ok=True)
+    # Create a rotating file handler
+    max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
+    file_handler = RotatingFileHandler(
+        logs_directory_path / f"log_{args.domain_file_name}", maxBytes=max_bytes, backupCount=1,
+    )
+    stream_handler = logging.StreamHandler()
+
+    # Create a formatter and set it for the handler
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(formatter)
+    stream_handler.setFormatter(formatter)
+
+    logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler, stream_handler])
 
 
 class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
@@ -177,8 +199,11 @@ def parse_arguments() -> argparse.Namespace:
 
 def main():
     args = parse_arguments()
+
     executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
         if args.executing_agents is not None else None
+
+    configure_logger(args)
 
     offline_learner = MultiAgentExperimentRunner(working_directory_path=Path(args.working_directory_path),
                                                  domain_file_name=args.domain_file_name,
