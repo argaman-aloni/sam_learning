@@ -1,5 +1,6 @@
 """Utility functions for handling and presenting numeric data."""
 import itertools
+import os
 from typing import Union, List, Dict, Tuple, Optional, Set
 
 import math
@@ -15,7 +16,7 @@ from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.learning_types import ConditionType
 
-DECIMAL_DIGITS = 2
+DECIMAL_DIGITS = os.environ.get("NUMERIC_PRECISION", 4)
 EPSILON = 1e-4
 ELIMINATION_THRESHOLD = 0.01
 
@@ -89,7 +90,7 @@ def construct_projected_variable_strings(
     """
     shifted_by_mean = []
     for func, shift_value in zip(function_variables, shift_point):
-        component_function = func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, 2))})"
+        component_function = func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, DECIMAL_DIGITS))})"
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
@@ -414,35 +415,6 @@ def divide_span_by_common_denominator(equations_list: List[List[float]]) -> List
         new_span.append([coeff / common_denominator for coeff in equation])
 
     return new_span
-
-
-def filter_similar_equations(equations: np.ndarray) -> np.ndarray:
-    """Filters out the equations that are similar except for some threshold value.
-
-    Note:
-        This method considers that all the equations are in the form Ax + b <= 0.
-        Thus, it checks whether the rows in the A part of the matrix are similar based on the Euclidean distance.
-        If so, we remove the row that has the lower b value.
-
-    :param equations: the set of equations to filter.
-    :return: the filtered set of equations.
-    """
-    filtered_rows = []
-    for i, row in enumerate(equations):
-        keep_row = True
-        for j, compare_row in enumerate(equations):
-            if i != j:
-                # Calculate the Euclidean distance between the current row and another row (excluding the last column)
-                distance = np.linalg.norm(row[:-1] - compare_row[:-1])
-                # If the distance is below the threshold and this row has a lower b value, eliminate it
-                if distance < ELIMINATION_THRESHOLD and row[-1] < compare_row[-1]:
-                    keep_row = False
-                    break
-
-        if keep_row:
-            filtered_rows.append(row)
-
-    return np.array(filtered_rows)
 
 
 def _first_non_zero_index(numbers_list: List[float]) -> int:
