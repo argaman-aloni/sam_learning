@@ -2,8 +2,16 @@
 from pathlib import Path
 from typing import Dict, List
 
-from pddl_plus_parser.models import PDDLType, Predicate, PDDLFunction, ObservedComponent, PDDLObject, \
-    MultiAgentComponent, ActionCall, CompoundPrecondition
+from pddl_plus_parser.models import (
+    PDDLType,
+    Predicate,
+    PDDLFunction,
+    ObservedComponent,
+    PDDLObject,
+    MultiAgentComponent,
+    ActionCall,
+    CompoundPrecondition,
+)
 
 from sam_learning.learners import SAMLearner, MultiAgentSAM
 
@@ -90,13 +98,18 @@ DRIVERLOG_POLY_PROBLEM_PATH = EXAMPLES_DIR_PATH / "driverlog_poly_problem.pddl"
 DRIVERLOG_POLY_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "driverlog_poly_problem.trajectory"
 
 FARMLAND_DOMAIN_PATH = EXAMPLES_DIR_PATH / "farmland.pddl"
-FARMLAND_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" /  "farmland"
-SAILING_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" /  "sailing"
+FARMLAND_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" / "farmland"
+SAILING_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" / "sailing"
 
 
 COUNTERS_POLYNOMIAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "counters_poly.pddl"
 COUNTERS_POLYNOMIAL_PROBLEMS_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.pddl")]
 COUNTERS_POLYNOMIAL_TRAJECTORIES_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.trajectory")]
+
+BLOCKS_PROPOSITIONAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "blocksworld_propositional_domain.pddl"
+BLOCKS_PROPOSITIONAL_PROBLEM_PATH = EXAMPLES_DIR_PATH / "blocks_propositional_prob00.pddl"
+BLOCKS_PROPOSITIONAL_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "blocks_propositional.trajectory"
+
 
 FARMLAND_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data.csv"
 FARMLAND_PAPER_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data_for_paper.csv"
@@ -116,9 +129,7 @@ AIRPLANE_TYPE = PDDLType(name="airplane", parent=AGENT_TYPE)
 LOCATION_TYPE = PDDLType(name="location", parent=OBJECT_TYPE)
 COUNT_TYPE = PDDLType(name="count", parent=OBJECT_TYPE)
 
-AT_TRUCK_PREDICATE = Predicate(name="at",
-                               signature={"?a": AGENT_TYPE,
-                                          "?loc": LOCATION_TYPE})
+AT_TRUCK_PREDICATE = Predicate(name="at", signature={"?a": AGENT_TYPE, "?loc": LOCATION_TYPE})
 
 FUEL_COST_FUNCTION = PDDLFunction(name="fuel-cost", signature={})
 LOAD_LIMIT_TRAJECTORY_FUNCTION = PDDLFunction(name="load_limit", signature={"?z": TRUCK_TYPE})
@@ -128,8 +139,9 @@ CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", si
 WEIGHT_FUNCTION = PDDLFunction(name="weight", signature={"?c": CRATE_TYPE})
 
 
-def sync_snapshot(sam_learning: SAMLearner, component: ObservedComponent,
-                  trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False) -> None:
+def sync_snapshot(
+    sam_learning: SAMLearner, component: ObservedComponent, trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False
+) -> None:
     previous_state = component.previous_state
     next_state = component.next_state
     test_action_call = component.grounded_action_call
@@ -140,18 +152,23 @@ def sync_snapshot(sam_learning: SAMLearner, component: ObservedComponent,
         all_types = []
 
     sam_learning.triplet_snapshot.create_triplet_snapshot(
-        previous_state=previous_state, next_state=next_state, current_action=test_action_call,
-        observation_objects=trajectory_objects, specific_types=all_types)
+        previous_state=previous_state,
+        next_state=next_state,
+        current_action=test_action_call,
+        observation_objects=trajectory_objects,
+        specific_types=all_types,
+    )
 
 
-def sync_ma_snapshot(ma_sam: MultiAgentSAM, component: MultiAgentComponent, action_call: ActionCall,
-                     trajectory_objects: Dict[str, PDDLObject]) -> None:
+def sync_ma_snapshot(
+    ma_sam: MultiAgentSAM, component: MultiAgentComponent, action_call: ActionCall, trajectory_objects: Dict[str, PDDLObject]
+) -> None:
     previous_state = component.previous_state
     next_state = component.next_state
     ma_sam.current_trajectory_objects = trajectory_objects
     ma_sam.triplet_snapshot.create_triplet_snapshot(
-        previous_state=previous_state, next_state=next_state, current_action=action_call,
-        observation_objects=trajectory_objects)
+        previous_state=previous_state, next_state=next_state, current_action=action_call, observation_objects=trajectory_objects
+    )
 
 
 def extract_preconditions_predicates(compound_preconditions: CompoundPrecondition) -> List[Predicate]:
