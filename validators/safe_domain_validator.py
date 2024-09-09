@@ -233,6 +233,7 @@ class DomainValidator:
         timeout: int = 5,
         learning_time: float = 0,
         solvers_portfolio: List[SolverType] = None,
+        policy = None,
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -296,6 +297,7 @@ class DomainValidator:
         self.solving_stats.append(
             {
                 "learning_algorithm": self.learning_algorithm.name,
+                "policy": policy,
                 "num_trajectories": num_trajectories,
                 "num_trajectory_triplets": num_triplets,
                 "learning_time": learning_time,
