@@ -96,11 +96,10 @@ class ParallelExperimentRunner:
         :param test_set_path: the path to the test set directory where the domain would be exported to.
         :param file_name: the name of the file to export the domain to.
         """
-        legacy_algorithms = [LearningAlgorithmType.naive_nsam, LearningAlgorithmType.naive_nsam_no_dependency_removal]
         domain_file_name = file_name or self.domain_file_name
         domain_path = test_set_path / domain_file_name
         with open(domain_path, "wt") as domain_file:
-            domain_file.write(learned_domain.to_pddl(should_simplify=(self._learning_algorithm not in legacy_algorithms)))
+            domain_file.write(learned_domain.to_pddl(should_simplify=False))
 
         return domain_path
 
