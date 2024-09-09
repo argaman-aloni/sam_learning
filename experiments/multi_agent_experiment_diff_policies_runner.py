@@ -112,6 +112,44 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
+    def validate_learned_domain(
+        self, allowed_observations: List[Observation], learned_model, test_set_dir_path: Path, fold_number: int, learning_time: float
+    ) -> Path:
+        """Validates that using the learned domain both the used and the test set problems can be solved.
+
+        :param allowed_observations: the observations that were used in the learning process.
+        :param learned_model: the domain that was learned using POL.
+        :param test_set_dir_path: the path to the directory containing the test set problems.
+        :param fold_number: the number of the fold that is currently running.
+        :param learning_time: the time it took to learn the domain (in seconds).
+        :return: the path for the learned domain.
+        """
+        domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
+        domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
+        domains_backup_dir_path.mkdir(exist_ok=True)
+        self.export_learned_domain(
+            learned_model,
+            domains_backup_dir_path,
+            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
+        )
+
+        self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
+        portfolio = (
+            [SolverType.fast_forward, SolverType.fast_downward]
+        )
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=domain_file_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=allowed_observations,
+            tolerance=0.1,
+            timeout=60,
+            learning_time=learning_time,
+            solvers_portfolio=portfolio,
+            policy=self.negative_preconditions_policy
+        )
+
+        return domain_file_path
+
     def learn_baseline_action_model(
             self, allowed_filtered_observations: List[Observation], partial_domain: Domain,
             test_set_dir_path: Path, fold_num: int) -> None:
