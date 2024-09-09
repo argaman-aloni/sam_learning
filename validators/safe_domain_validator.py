@@ -22,6 +22,7 @@ SOLVER_TYPES = {
 
 SOLVING_STATISTICS = [
     "learning_algorithm",
+    "policy",
     "num_trajectories",
     "num_trajectory_triplets",
     "learning_time",

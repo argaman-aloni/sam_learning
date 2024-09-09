@@ -20,7 +20,7 @@ DEFAULT_SPLIT = 5
 def configure_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
     working_directory_path = Path(args.working_directory_path)
-    logs_dir = args.working_directory_path if not None else working_directory_path
+    logs_dir = Path(args.working_directory_path) if not None else working_directory_path
     logs_directory_path = logs_dir / "logs"
     logs_directory_path.mkdir(exist_ok=True)
     # Create a rotating file handler
