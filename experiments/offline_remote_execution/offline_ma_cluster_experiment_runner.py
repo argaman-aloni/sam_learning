@@ -7,7 +7,7 @@ if __name__ == '__main__':
     os.system(f"nohup bash -c '{sys.executable} multi_agent_experiment_diff_policies_runner.py "
               f"--working_directory_path {args[1]} --domain_file_name {args[2]} "
               f"--executing_agents {args[3]}  --problems_prefix {args[4]} "
-              f"> results-{args[2]}.txt ' &")
+              f"--logs_directory_path {args[5]} > results-{args[2]}.txt ' &")
 
     # configurations = [
     #     # ("/sise/home/karato/work_tools/DomainsData/satellite_enhanced/", "satellite_combined_domain.pddl",
