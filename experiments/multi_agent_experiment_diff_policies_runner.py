@@ -20,7 +20,8 @@ DEFAULT_SPLIT = 5
 def configure_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
     working_directory_path = Path(args.working_directory_path)
-    logs_directory_path = working_directory_path / "logs"
+    logs_dir = args.working_directory_path if not None else working_directory_path
+    logs_directory_path = logs_dir / "logs"
     logs_directory_path.mkdir(exist_ok=True)
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
@@ -193,6 +194,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--negative_preconditions_policy", required=False, type=int, choices=[1, 2, 3],
                         help="The negative preconditions policy of the domain",
                         default=1)
+    parser.add_argument("--logs_directory_path", required=False, help="The path to the directory where the logs is")
+
     args = parser.parse_args()
     return args
 
@@ -202,6 +205,7 @@ def main():
 
     executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
         if args.executing_agents is not None else None
+
 
     configure_logger(args)
 
