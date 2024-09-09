@@ -152,5 +152,9 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
     solver = ENHSPSolver()
     solver.execute_solver(
-        problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]), problems_prefix=args[3], solving_timeout=int(args[4])
+        problems_directory_path=Path(args[1]),
+        domain_file_path=Path(args[2]),
+        problems_prefix=args[3],
+        solving_timeout=int(args[4]),
+        tolerance=float(args[5]),
     )
