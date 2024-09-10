@@ -50,6 +50,26 @@ class SingleIterationMASAMExperimentRunner(ParallelExperimentRunner):
         )
         self.executing_agents = executing_agents
 
+
+    def _filter_baseline_single_agent_trajectory(self, complete_observation) -> Observation:
+        """Create a single agent observation from a multi-agent observation.
+
+        :param complete_observation: the multi-agent observation to filter.
+        :return: the filtered single agent observation.
+        """
+        filtered_observation = Observation()
+        filtered_observation.add_problem_objects(complete_observation.grounded_objects)
+        for component in complete_observation.components:
+            if component.grounded_joint_action.action_count > 1:
+                self.logger.debug(f"Skipping the joint action - {component.grounded_joint_action} "
+                                  f"since it contains multiple agents executing at once.!")
+                continue
+
+            filtered_observation.add_component(component.previous_state,
+                                               component.grounded_joint_action.operational_actions[0],
+                                               component.next_state)
+        return filtered_observation
+
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
     ) -> Tuple[LearnerDomain, Dict[str, str]]:
@@ -68,11 +88,12 @@ class SingleIterationMASAMExperimentRunner(ParallelExperimentRunner):
             )
             return learner.learn_combined_action_model(allowed_observations)
         elif self._learning_algorithm in SAM_ALGORITHM_VERSIONS:
+            filtered_observation = self._filter_baseline_single_agent_trajectory(allowed_observations)
             learner = SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
                 partial_domain=partial_domain,
                 negative_preconditions_policy=MA_SAM_POLICIES_VERSIONS[self._learning_algorithm]
             )
-            return learner.learn_action_model(allowed_observations)
+            return learner.learn_action_model(filtered_observation)
 
         # TODO add ma sam plus and it should be enough to work for ma sam plus experiments as well
 
