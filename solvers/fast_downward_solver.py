@@ -40,7 +40,12 @@ class FastDownwardSolver:
             sas_file_path.unlink()
 
     def solve_problem(
-        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_stats: Dict[str, str], solving_timeout: int
+        self, domain_file_path: Path,
+            problem_file_path: Path,
+            problems_directory_path: Path,
+            solving_stats: Dict[str, str],
+            solving_timeout: int,
+            tolerance
     ) -> None:
         """Solves a single problem using the Fast Downward solver.
 
@@ -68,10 +73,12 @@ class FastDownwardSolver:
         ]
         run_command = f"./fast-downward.py {' '.join(running_options)}"
         try:
+            os.chdir(FAST_DOWNWARD_DIR_PATH)
             subprocess.check_output(run_command, shell=True)
             self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "ok"
             self._remove_cost_from_file(solution_path)
+            self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / f"{domain_file_path.stem}_output.sas")
 
         except subprocess.CalledProcessError as e:
             if e.returncode in [21, 23, 247]:
