@@ -69,7 +69,7 @@ class SingleIterationMASAMExperimentRunner(ParallelExperimentRunner):
         elif self._learning_algorithm in SAM_ALGORITHM_VERSIONS:
             learner = SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
                 partial_domain=partial_domain,
-                negative_precondition_policy=MA_SAM_POLICIES_VERSIONS[self._learning_algorithm]
+                negative_preconditions_policy=MA_SAM_POLICIES_VERSIONS[self._learning_algorithm]
             )
 
         # TODO add ma sam plus and it should be enough to work for ma sam plus experiments as well
