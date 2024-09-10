@@ -41,7 +41,6 @@ def test_extract_macro_action_effects_extract_an_action_effect_with_one_precondi
                                                         {"(has-colour ?agent ?oldcolour)"}, param_grouping=grouping)
     assert len(effects) == 1
 
-
 def test_extract_macro_action_effects_extract_an_action_effect_from_unit_clause(
         literals_cnf: LiteralCNF, combined_domain: Domain):
     literals_cnf.add_possible_effect([("do-immersion-varnish", "(has-colour ?agent ?newcolour)")])
@@ -76,27 +75,24 @@ def test_extract_macro_action_precondition_extract_all_action_preconditions(
 def test_is_clause_consistent_with_different_actions_return_false():
     clause = [("do-grind", "(m ?x ?y)"),
               ("do-plane", "(m ?x ?z)")]
-    parameter_grouping = [{('do-grind', '?x'), ('do-plane', '?x')}, {('do-grind', '?y'), ('do-plane', '?z')}]
-    action_group_names = ["do-grind", "do-glaze"]
+    binding = [{('do-grind', '?x'), ('do-plane', '?x')}, {('do-grind', '?y'), ('do-plane', '?z')}]
+    lma_names = ["do-grind", "do-glaze"]
 
-    assert not is_clause_consistent(action_group_names=action_group_names,
-                                    clause=clause, parameter_grouping=parameter_grouping)
+    assert not is_clause_consistent(lma_names=lma_names, clause=clause, binding=binding)
 
 
 def test_is_clause_consistent_with_unit_clause_return_true():
     clause = [("do-grind", "(m ?x ?y)")]
-    parameter_grouping = [{('do-grind', '?x'), ('do-plane', '?x')}, {('do-grind', '?y'), ('do-plane', '?z')}]
-    action_group_names = ["do-grind", "do-plane"]
+    binding = [{('do-grind', '?x'), ('do-plane', '?x')}, {('do-grind', '?y'), ('do-plane', '?z')}]
+    lma_names = ["do-grind", "do-plane"]
 
-    assert is_clause_consistent(action_group_names=action_group_names,
-                                clause=clause, parameter_grouping=parameter_grouping)
+    assert is_clause_consistent(lma_names=lma_names, clause=clause, binding=binding)
 
 
 def test_is_clause_consistent_with_relevant_lma_and_binding_return_true():
     clause = [("do-grind", "(m ?x ?y)"),
               ("do-plane", "(m ?x ?z)")]
-    parameter_grouping = [{('do-grind', '?x'), ('do-plane', '?x')}, {('do-grind', '?y'), ('do-plane', '?z')}]
-    action_group_names = ["do-grind", "do-plane"]
+    binding = [{('do-grind', '?x'), ('do-plane', '?x')}, {('do-grind', '?y'), ('do-plane', '?z')}]
+    lma_names = ["do-grind", "do-plane"]
 
-    assert is_clause_consistent(action_group_names=action_group_names,
-                                clause=clause, parameter_grouping=parameter_grouping)
+    assert is_clause_consistent(lma_names=lma_names, clause=clause, binding=binding)

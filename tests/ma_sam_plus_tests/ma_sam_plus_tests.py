@@ -58,6 +58,8 @@ def rovers_literals_cnf(ma_rovers_domain: Domain) -> LiteralCNF:
 def driverlog_ma_sam_plus(ma_driverlog_domain) -> MASAMPlus:
     return MASAMPlus(ma_driverlog_domain)
 
+
+
 def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions(
         rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
     learned_domain, learning_report = (
@@ -72,7 +74,7 @@ def test_learn_action_model_with_colliding_actions_returns_model_with_macro_acti
     print(learned_domain.to_pddl())
 
 
-def test_extract_relevant_action_groups_with_no_observed_actions_returns_no_action_group(
+def test_extract_relevant_lmas_with_no_colliding_actions_returns_no_lmas(
      woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
@@ -81,25 +83,11 @@ def test_extract_relevant_action_groups_with_no_observed_actions_returns_no_acti
 
     woodworking_literals_cnf.add_possible_effect([("do-immersion-varnish", "(surface-condition ?m ?newcolour)")])
 
-    action_group = woodworking_ma_sam_plus.extract_relevant_action_groups()
-    assert len(action_group) == 0
+    lmas = woodworking_ma_sam_plus.extract_relevant_lmas()
+    assert len(lmas) == 0
 
 
-def test_extract_relevant_action_groups_with_observed_actions_with_no_colliding_actions_returns_no_action_group(
-     woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
-        woodworking_ma_combined_domain: Domain,
-        woodworking_literals_cnf):
-
-    woodworking_ma_sam_plus.literals_cnf["(surface-condition ?obj ?surface)"] = woodworking_literals_cnf
-
-    woodworking_literals_cnf.add_possible_effect([("do-immersion-varnish", "(surface-condition ?m ?newcolour)")])
-    woodworking_ma_sam_plus.observed_actions = ["do-immersion-varnish", "do-grind", "do-plane"]
-
-    action_group = woodworking_ma_sam_plus.extract_relevant_action_groups()
-    assert len(action_group) == 0
-
-
-def test_extract_relevant_action_groups_with_observed_actions_with_colliding_actions_returns_action_group(
+def test_extract_relevant_lmas_with_colliding_actions_returns_lmas(
         woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
@@ -115,18 +103,16 @@ def test_extract_relevant_action_groups_with_observed_actions_with_colliding_act
                                                   ("do-plane", "(surface-condition ?m ?colour)"),
                                                   ("do-immersion-varnish", "(surface-condition ?m ?colour)")])
 
-    woodworking_ma_sam_plus.observed_actions = ["do-grind", "do-plane", "do-immersion-varnish"]
-
-    action_groups = woodworking_ma_sam_plus.extract_relevant_action_groups()
-    action_groups_names = list(map(lambda x: sorted(list(map(lambda u: u.name, x))), action_groups))
-    assert len(action_groups_names) == 4
-    assert sorted(["do-immersion-varnish", "do-grind"]) in action_groups_names
-    assert sorted(["do-grind", "do-plane"]) in action_groups_names
-    assert sorted(["do-plane", "do-immersion-varnish"]) in action_groups_names
-    assert sorted(["do-grind", "do-plane", "do-immersion-varnish"]) in action_groups_names
+    lmas = woodworking_ma_sam_plus.extract_relevant_lmas()
+    lmas_names = list(map(lambda x: sorted(list(map(lambda u: u.name, x))), lmas))
+    assert len(lmas_names) == 4
+    assert sorted(["do-immersion-varnish", "do-grind"]) in lmas_names
+    assert sorted(["do-grind", "do-plane"]) in lmas_names
+    assert sorted(["do-plane", "do-immersion-varnish"]) in lmas_names
+    assert sorted(["do-grind", "do-plane", "do-immersion-varnish"]) in lmas_names
 
 
-def test_extract_relevant_parameter_groupings_with_valid_action_group_returns_informative_parameter_groupings(
+def test_extract_relevant_binding_with_existing_lma_returns_informative_binding(
      woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
@@ -142,16 +128,16 @@ def test_extract_relevant_parameter_groupings_with_valid_action_group_returns_in
     woodworking_literals_cnf.add_possible_effect([("do-grind", "(surface-condition ?m ?oldcolour)"),
                                                   ("do-plane", "(surface-condition ?m ?oldcolour)")])
 
-    action_group_names = ["do-immersion-varnish", "do-grind", "do-plane"]
+    lma = ["do-immersion-varnish", "do-grind", "do-plane"]
 
-    parameter_grouping = woodworking_ma_sam_plus.extract_relevant_parameter_groupings(action_group_names)[0]
-    real_parameter_grouping = [{('do-immersion-varnish', '?m'), ('do-grind', '?m'), ('do-plane', '?m')},
+    bindings = woodworking_ma_sam_plus.generate_possible_binding(lma)
+    real_binding = [{('do-immersion-varnish', '?m'), ('do-grind', '?m'), ('do-plane', '?m')},
                     {('do-immersion-varnish', '?newcolour'), ('do-grind', '?oldcolour'), ('do-plane', '?oldcolour')}]
 
-    assert parameter_grouping == real_parameter_grouping
+    assert bindings == real_binding
 
 
-def test_extract_relevant_parameter_groupings_with_no_valid_action_group_returns_uninformative_parameter_groupings(
+def test_extract_relevant_binding_with_non_existing_lma_returns_unuseful_binding(
      woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
@@ -165,10 +151,10 @@ def test_extract_relevant_parameter_groupings_with_no_valid_action_group_returns
     woodworking_literals_cnf.add_possible_effect([("do-grind", "(surface-condition ?m ?oldcolour)"),
                                                   ("do-plane", "(surface-condition ?m ?oldcolour)")])
 
-    action_group_names = ["do-glaze", "do-grind"]
-    parameter_grouping = woodworking_ma_sam_plus.extract_relevant_parameter_groupings(action_group_names)[0]
+    lma = ["do-glaze", "do-grind"]
+    bindings = woodworking_ma_sam_plus.generate_possible_binding(lma)
 
-    assert len(parameter_grouping) == 0
+    assert len(bindings) == 0
 
 
 def test_group_params_from_non_unit_clause():
@@ -209,14 +195,13 @@ def test_extract_effects_for_macro_from_cnf(
 
     binding = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
     lma_names = ["navigate", "communicate_rock_data"]
-    action_group = [action for action in rovers_ma_sam_plus.partial_domain.actions.values() if action.name in lma_names]
 
     mapping = {('navigate', '?x'): "?x'0", ('navigate', '?y'): '?yp', ('navigate', '?z'): "?z'0",
                ('communicate_rock_data', '?r'): "?r'1", ('communicate_rock_data', '?l'): "?l'1",
                ('communicate_rock_data', '?p'): '?yp', ('communicate_rock_data', '?x'): "?x'1",
                ('communicate_rock_data', '?y'): "?y'1"}
 
-    effects = rovers_ma_sam_plus.extract_effects_for_macro_from_cnf(action_group, binding, mapping)
+    effects = rovers_ma_sam_plus.extract_effects_for_macro_from_cnf(lma_names, binding, mapping)
 
     effects_rep = [effect.untyped_representation for effect in effects]
     assert "(fluent_test1 ?yp)" in effects_rep
@@ -242,16 +227,16 @@ def test_extract_preconditions_for_macro_from_cnf(
     cnf2.add_possible_effect([('communicate_rock_data', '(fluent_test3 ?p)'),
                               ('navigate', '(fluent_test3 ?x)')])
 
-    parameter_grouping = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
-    action_group = {rovers_ma_sam_plus.partial_domain.actions["navigate"],
-           rovers_ma_sam_plus.partial_domain.actions["communicate_rock_data"]}
+    binding = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
+    lma = [rovers_ma_sam_plus.partial_domain.actions["navigate"],
+           rovers_ma_sam_plus.partial_domain.actions["communicate_rock_data"]]
 
     mapping = {('navigate', '?x'): "?x'0", ('navigate', '?y'): '?yp', ('navigate', '?z'): "?z'0",
                ('communicate_rock_data', '?r'): "?r'1", ('communicate_rock_data', '?l'): "?l'1",
                ('communicate_rock_data', '?p'): '?yp', ('communicate_rock_data', '?x'): "?x'1",
                ('communicate_rock_data', '?y'): "?y'1"}
 
-    precondition = rovers_ma_sam_plus.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapping)
+    precondition = rovers_ma_sam_plus.extract_preconditions_for_macro_from_cnf(lma, binding, mapping)
 
     precondition_rep = [precondition.untyped_representation for precondition in precondition.root.operands]
     assert len(precondition_rep) == 2
@@ -268,16 +253,16 @@ def test_extract_preconditions_for_macro_from_cnf_of_non_consistent_clause_and_c
                                              ('navigate', '(fluent_test1 ?y)'),
                                              ('sample_rock', '(fluent_test1 ?x)')])
 
-    parameter_grouping = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
-    action_group = {rovers_ma_sam_plus.partial_domain.actions["navigate"],
-           rovers_ma_sam_plus.partial_domain.actions["communicate_rock_data"]}
+    binding = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
+    lma = [rovers_ma_sam_plus.partial_domain.actions["navigate"],
+           rovers_ma_sam_plus.partial_domain.actions["communicate_rock_data"]]
 
     mapping = {('navigate', '?x'): "?x'0", ('navigate', '?y'): '?yp', ('navigate', '?z'): "?z'0",
                ('communicate_rock_data', '?r'): "?r'1", ('communicate_rock_data', '?l'): "?l'1",
                ('communicate_rock_data', '?p'): '?yp', ('communicate_rock_data', '?x'): "?x'1",
                ('communicate_rock_data', '?y'): "?y'1", ('sample_rock', '?x'): "?x'2"}
 
-    precondition = rovers_ma_sam_plus.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapping)
+    precondition = rovers_ma_sam_plus.extract_preconditions_for_macro_from_cnf(lma, binding, mapping)
 
     precondition_rep = [precondition.untyped_representation for precondition in precondition.root.operands]
     assert len(precondition_rep) == 1
