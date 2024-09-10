@@ -108,7 +108,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def main():
     args = parse_arguments()
-    configure_iteration_logger(args)
+    # configure_iteration_logger(args)
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
     working_directory_path = Path(args.working_directory_path)
     iteration_number = int(args.iteration_number)
