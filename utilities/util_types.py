@@ -26,6 +26,12 @@ class LearningAlgorithmType(Enum):
     raw_naive_polysam = 18
     raw_polynomial_nsam = 14
 
+    # To remove
+    sam_learning_soft = 31
+    sam_learning_hard = 32
+    ma_sam_soft = 33
+    ma_sam_hard = 34
+
 
 class SolverType(Enum):
     fast_downward = 1
