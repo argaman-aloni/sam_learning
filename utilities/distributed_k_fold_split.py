@@ -94,7 +94,7 @@ class DistributedKFoldSplit:
             training_data = {"internal_iterations": {}}
             for num_used_trajectories in self._internal_iterations:
                 self.logger.debug(f"Creating fold {fold_index} with {num_used_trajectories} trajectories.")
-                selected_trajectories = random.sample(train_set_trajectories, k=num_used_trajectories)
+                selected_trajectories = train_set_trajectories[:num_used_trajectories]
                 for learning_algorithm in self._learning_algorithms:
                     self.create_directories_content(
                         test_set_problems=test_set_problems,
