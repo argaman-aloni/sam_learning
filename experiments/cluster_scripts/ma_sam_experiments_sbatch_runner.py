@@ -11,7 +11,7 @@ from experiments.cluster_scripts.common import submit_job, progress_bar, sigint_
 FIRST_BREAKPOINT = 10
 
 EXPERIMENTS_CONFIG_STR = "experiment_configurations"
-CONDA_ENV = ""
+CONDA_ENV = "my_env"
 
 signal.signal(signal.SIGINT, sigint_handler)
 
