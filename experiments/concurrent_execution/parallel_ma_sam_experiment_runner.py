@@ -66,14 +66,15 @@ class SingleIterationMASAMExperimentRunner(ParallelExperimentRunner):
                 partial_domain=partial_domain, preconditions_fluent_map=self.fluents_map,
                 negative_precondition_policy=MA_SAM_POLICIES_VERSIONS[self._learning_algorithm]
             )
+            return learner.learn_combined_action_model(allowed_observations)
         elif self._learning_algorithm in SAM_ALGORITHM_VERSIONS:
             learner = SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
                 partial_domain=partial_domain,
                 negative_preconditions_policy=MA_SAM_POLICIES_VERSIONS[self._learning_algorithm]
             )
+            return learner.learn_action_model(allowed_observations)
 
         # TODO add ma sam plus and it should be enough to work for ma sam plus experiments as well
-        return learner.learn_action_model(allowed_observations)
 
     def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int = 0) -> None:
         """Learns the model of the environment by learning from the input trajectories.
@@ -103,9 +104,9 @@ class SingleIterationMASAMExperimentRunner(ParallelExperimentRunner):
         learned_domain_path = self.validate_learned_domain(
             allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
         )
-        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+        # self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.domain_validator.write_statistics(fold_num, iteration_number)
-        self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
+        # self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
 
 
 
