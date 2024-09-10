@@ -31,7 +31,7 @@ class NumericSAMLearnerNoDependencyRemoval(SAMLearner):
         relevant_fluents: Optional[Dict[str, List[str]]] = None,
         allow_unsafe: bool = False,
         polynomial_degree: int = 0,
-        negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft,
+        negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
         **kwargs,
     ):
         super().__init__(partial_domain, negative_preconditions_policy=negative_preconditions_policy)
