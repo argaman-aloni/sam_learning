@@ -24,8 +24,7 @@ def configure_iteration_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
     iteration_number = int(args.iteration_number)
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
-    local_logs_parent_path = os.environ.get("LOCAL_LOGS_PATH", args.working_directory_path)
-    working_directory_path = Path(local_logs_parent_path)
+    working_directory_path = Path(args.working_directory_path)
     logs_directory_path = working_directory_path / "logs"
     logs_directory_path.mkdir(exist_ok=True)
     # Create a rotating file handler
