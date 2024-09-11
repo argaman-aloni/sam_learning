@@ -45,7 +45,7 @@ class FastDownwardSolver:
             problems_directory_path: Path,
             solving_stats: Dict[str, str],
             solving_timeout: int,
-            tolerance
+            tolerance: float = 0.1
     ) -> None:
         """Solves a single problem using the Fast Downward solver.
 
