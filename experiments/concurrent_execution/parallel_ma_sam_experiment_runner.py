@@ -90,6 +90,7 @@ class SingleIterationMASAMExperimentRunner(ParallelExperimentRunner):
                 negative_precondition_policy=MA_SAM_POLICIES_VERSIONS[self._learning_algorithm]
             )
             return learner.learn_combined_action_model(allowed_observations)
+
         elif self._learning_algorithm in SAM_ALGORITHM_VERSIONS:
             filtered_observation = self._filter_baseline_single_agent_trajectory(allowed_observations)
             learner = SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
@@ -128,12 +129,10 @@ class SingleIterationMASAMExperimentRunner(ParallelExperimentRunner):
         learned_domain_path = self.validate_learned_domain(
             allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
         )
+        # TODO add these when semantic calculations for ma sam are in the repo and working
         # self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.domain_validator.write_statistics(fold_num, iteration_number)
         # self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
-
-
-
 
     def run_fold_iteration(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int) -> None:
         """Runs the numeric action model learning algorithms on the input fold.
@@ -175,7 +174,7 @@ def main():
     args = parse_arguments()
     executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
         if args.executing_agents is not None else None
-    # configure_iteration_logger(args)
+    configure_iteration_logger(args)
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
     working_directory_path = Path(args.working_directory_path)
     iteration_number = int(args.iteration_number)
