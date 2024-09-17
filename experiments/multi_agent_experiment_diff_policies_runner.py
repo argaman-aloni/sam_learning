@@ -84,7 +84,11 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_ma_observations = []
+        allowed_ma_observations2 = []
+        allowed_ma_observations3 = []
         allowed_sa_observations = []
+        allowed_sa_observations2 = []
+        allowed_sa_observations3 = []
         observed_objects = {}
         for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
@@ -92,20 +96,35 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             observed_objects.update(problem.objects)
             complete_observation: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
                 trajectory_file_path, self.executing_agents)
-
-            filtered_observation = self._filter_baseline_single_agent_trajectory(complete_observation)
+            complete_observation2: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+                trajectory_file_path, self.executing_agents)
+            complete_observation3: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+                trajectory_file_path, self.executing_agents)
+            complete_observation4: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+                trajectory_file_path, self.executing_agents)
+            complete_observation5: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+                trajectory_file_path, self.executing_agents)
+            complete_observation6: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+                trajectory_file_path, self.executing_agents)
+            filtered_observation = self._filter_baseline_single_agent_trajectory(complete_observation4)
+            filtered_observation2 = self._filter_baseline_single_agent_trajectory(complete_observation5)
+            filtered_observation3 = self._filter_baseline_single_agent_trajectory(complete_observation6)
             allowed_ma_observations.append(complete_observation)
             allowed_sa_observations.append(filtered_observation)
+            allowed_ma_observations2.append(complete_observation2)
+            allowed_sa_observations2.append(filtered_observation2)
+            allowed_ma_observations3.append(complete_observation3)
+            allowed_sa_observations3.append(filtered_observation3)
             self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
             self.negative_preconditions_policy = NegativePreconditionPolicy.normal
             self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
             self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
             self.negative_preconditions_policy = NegativePreconditionPolicy.soft
-            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
-            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
+            self.learn_ma_action_model(allowed_ma_observations2, partial_domain, test_set_dir_path, fold_num)
+            self.learn_baseline_action_model(allowed_sa_observations2, partial_domain, test_set_dir_path, fold_num)
             self.negative_preconditions_policy = NegativePreconditionPolicy.hard
-            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
-            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
+            self.learn_ma_action_model(allowed_ma_observations3, partial_domain, test_set_dir_path, fold_num)
+            self.learn_baseline_action_model(allowed_sa_observations3, partial_domain, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations))
         self.semantic_performance_calc.export_semantic_performance(fold_num)

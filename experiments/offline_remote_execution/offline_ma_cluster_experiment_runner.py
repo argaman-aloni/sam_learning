@@ -8,7 +8,13 @@ if __name__ == '__main__':
     #           f"--working_directory_path {args[1]} --domain_file_name {args[2]} "
     #           f"--executing_agents {args[3]}  --problems_prefix {args[4]} "
     #           f"--logs_directory_path {args[5]} > results-{args[2]}.txt ' &")
+  # /sise/home/karato/.conda/envs/my_env/bin/
 
+#16 gb /tmp/pycharm_project_341/experiments/
+#32 gb /tmp/pycharm_project_180/experiments/        ending if wtih 52
+    #16gb /tmp/pycharm_project_138/experiments/   52 (2)
+    #16gb 132.72.64.60  /tmp/pycharm_project_250/experiments/         :parametergroup2 without blocks
+    #16gb 132.72.66.213  /tmp/pycharm_project_602/experiments/          :parametergryop2 blocks
     parameter_groups = [
         # ("/sise/home/karato/work_tools/DomainsDataNonDummy/satellite_codmap/",
         #  "satellite_combined_domain.pddl",
@@ -30,11 +36,42 @@ if __name__ == '__main__':
         #  "logistics_combined_domain.pddl",
         #  "[apn1,apn2,tru1,tru2,tru3,tru4,tru5]",
         #  "pfile"),
+        ("/sise/home/karato/work_tools/DomainsDataNonDummy/sokoban/",
+         "sokoban_combined_domain.pddl",
+         "[player-01,player-02,player-03,player-04]",
+         "pfile"),
         ("/sise/home/karato/work_tools/DomainsDataNonDummy/rovers_codmap/",
          "rover_combined_domain.pddl",
          "[rover0,rover1,rover2,rover3,rover4,rover5,rover6,rover7,rover8,rover9]",
+         "pfile")
+    ]
+
+    parameter_groups2 = [
+        # ("/sise/home/karato/work_tools/DomainsData/satellite_enhanced/",
+        #  "satellite_combined_domain.pddl",
+        #  "[satellite0,satellite1,satellite2,satellite3,satellite4,satellite5,satellite6,satellite7,satellite8,satellite9]",
+        #  "pfile"),
+        ("/sise/home/karato/work_tools/DomainsData/blocksworld_enhanced/",
+         "blocks_combined_domain.pddl",
+         "[a1,a2,a3,a4]",
          "pfile"),
-        # ("/sise/home/karato/work_tools/DomainsDataNonDummy/sokoban/",
+        # ("/sise/home/karato/work_tools/DomainsData/depots_enhanced/",
+        #  "depots_combined_domain.pddl",
+        #  "[depot0,depot1,depot2,depot3,distributor0,distributor1,distributor2,distributor3,driver0,driver1,driver2,driver3]",
+        #  "pfile"),
+        # ("/sise/home/karato/work_tools/DomainsData/driverlog_enhanced/",
+        #  "driverlog_combined_domain.pddl",
+        #  "[driver1,driver2,driver3,driver4,driver5,driver6,driver7,driver8]",
+        #  "pfile"),
+        # ("/sise/home/karato/work_tools/DomainsData/logistics_enhanced/",
+        #  "logistics_combined_domain.pddl",
+        #  "[apn1,apn2,tru1,tru2,tru3,tru4,tru5]",
+        #  "pfile"),
+        # ("/sise/home/karato/work_tools/DomainsData/rovers_enhanced/",
+        #  "rover_combined_domain.pddl",
+        #  "[rover0,rover1,rover2,rover3,rover4,rover5,rover6,rover7,rover8,rover9]",
+        #  "pfile"),
+        # ("/sise/home/karato/work_tools/DomainsData/sokoban_enhanced/",
         #  "sokoban_combined_domain.pddl",
         #  "[player-01,player-02,player-03,player-04]",
         #  "pfile")

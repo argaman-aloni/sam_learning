@@ -94,12 +94,22 @@ class LiteralCNF:
         :param action_preconditions: the preconditions of the action.
         :return: True if the action is safe to execute, False otherwise.
         """
+        unitc = []  # unit clauses of size 1 (1 tuple) that contains action_name
+        nonunc = []  # non-unit clauses that contain action_name
+
         for lifted_options in self.possible_lifted_effects:
             if action_name in [action for (action, _) in lifted_options]:
                 if len(lifted_options) == 1:
-                    continue
+                    unitc.append(lifted_options[0])
+                else:
+                    nonunc.append(lifted_options)
 
-                for (action, predicate) in lifted_options:
+        if len(nonunc) == 0:
+            return True
+
+        for nunc in nonunc:
+            if not any(uc in nunc for uc in unitc):
+                for (action, predicate) in nunc:
                     if action == action_name and predicate not in action_preconditions:
                         return False
 

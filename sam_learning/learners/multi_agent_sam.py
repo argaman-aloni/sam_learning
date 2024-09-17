@@ -5,9 +5,11 @@ from typing import Dict, List, Tuple, Set, Optional
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
     GroundedPredicate, JointActionCall, CompoundPrecondition
 
-from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
+from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data, contains_duplicates
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
+from collections import defaultdict
+from itertools import combinations
 
 
 class MultiAgentSAM(SAMLearner):
@@ -232,6 +234,23 @@ class MultiAgentSAM(SAMLearner):
         for grounded_effect in grounded_add_effects.union(grounded_del_effects):
             self.handle_concurrent_execution(grounded_effect, executing_actions)
 
+    def _verify_parameter_duplication_for_ma_sam(self, joint_action: JointActionCall) -> bool:
+        joint_action_has_duplicates = False
+        for grounded_action in joint_action.operational_actions:
+            has_duplicates = contains_duplicates(grounded_action.parameters)
+            if has_duplicates:
+                joint_action_has_duplicates = True
+                action = self.partial_domain.actions[grounded_action.name]
+                grounded_signature_map = defaultdict(list)
+                for grounded_param, lifted_param in zip(grounded_action.parameters, action.parameter_names):
+                    grounded_signature_map[grounded_param].append(lifted_param)
+
+                for lifted_duplicates_list in grounded_signature_map.values():
+                    for (obj1, obj2) in combinations(lifted_duplicates_list, 2):
+                        action.preconditions.root.inequality_preconditions.discard((obj1, obj2))
+
+        return joint_action_has_duplicates
+
     def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:
         """Handles a single multi-agent triplet in the observed trajectory.
 
@@ -240,6 +259,10 @@ class MultiAgentSAM(SAMLearner):
         previous_state = component.previous_state
         joint_action = component.grounded_joint_action
         next_state = component.next_state
+
+        if self._verify_parameter_duplication_for_ma_sam(joint_action):
+            self.logger.warning(f"{str(joint_action)} contains duplicated parameters! Not suppoerted in SAM.")
+            return
 
         if joint_action.action_count == 1:
             executing_action = joint_action.operational_actions[0]
