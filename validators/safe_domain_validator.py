@@ -94,11 +94,7 @@ class DomainValidator:
     problem_prefix: str
 
     def __init__(
-        self,
-        working_directory_path: Path,
-        learning_algorithm: LearningAlgorithmType,
-        reference_domain_path: Path,
-        problem_prefix: str = "pfile",
+        self, working_directory_path: Path, learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, problem_prefix: str = "pfile",
     ):
         self.logger = logging.getLogger(__name__)
         self.solving_stats = []
@@ -242,8 +238,7 @@ class DomainValidator:
         :param timeout: the timeout for the solver.
         :param tolerance: the numeric tolerance to use.
         :param learning_time: the time it took to learn the domain (in seconds).
-        :param solvers_portfolio: the solvers to use for the validation, can be one or more and each will try to solve each planning problem at most once..
-        
+        :param solvers_portfolio: the solvers to use for the validation, can be one or more and each will try to solve each planning problem at most once.
         """
         num_triplets = self._extract_num_triplets(used_observations)
         solving_stats: Dict[str, Any] = {label: 0 for label in NUMERIC_STATISTICS_LABELS}
@@ -268,8 +263,8 @@ class DomainValidator:
                     solving_stats=problem_solving_report,
                 )
                 end_time = time.time()
-                problem_solving_times.append(end_time - start_time)   # time in seconds
                 if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
+                    problem_solving_times.append(end_time - start_time)  # time in seconds
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
                     self._validate_solution_content(
@@ -291,8 +286,9 @@ class DomainValidator:
                 tested_domain_path=tested_domain_file_path,
             )
 
-        num_solved_problems_measures =  len(problem_solving_times) if len(problem_solving_times) > 0 else 1
-        solving_stats["solving_time"] = sum(problem_solving_times) / num_solved_problems_measures # average time in seconds for all solved problems
+        solving_stats["solving_time"] = (
+            sum(problem_solving_times) / len(problem_solving_times) if len(problem_solving_times) > 0 else 0
+        )  # average time in seconds for all solved problems
         self._calculate_solving_percentages(solving_stats)
         self._calculate_expert_validation_statistics(solving_stats)
         num_trajectories = len(used_observations)
