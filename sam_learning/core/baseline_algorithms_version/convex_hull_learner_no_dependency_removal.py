@@ -73,7 +73,7 @@ class ConvexHullLearnerNoDependencyRemoval:
         :param display_mode: whether to display the convex hull.
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
-        hull = ConvexHull(points, qhull_options="Qx A0.99")
+        hull = ConvexHull(points, qhull_options="Qx A-0.99")
         display_convex_hull(self.action_name, display_mode, hull)
         equations = np.unique(hull.equations, axis=0)
 
