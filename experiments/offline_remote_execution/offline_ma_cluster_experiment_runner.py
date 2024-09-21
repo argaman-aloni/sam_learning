@@ -10,9 +10,8 @@ if __name__ == '__main__':
     #           f"--logs_directory_path {args[5]} > results-{args[2]}.txt ' &")
   # /sise/home/karato/.conda/envs/my_env/bin/
 
-    #/tmp/pycharm_project_165/experiments/       132.72.65.177
-
-    # /tmp/pycharm_project_369/experiments/      132.72.65.180
+    #/tmp/pycharm_project_195/experiments/   236 (2)
+    #/tmp/pycharm_project_845/experiments/  238
     parameter_groups = [
         # ("/sise/home/karato/work_tools/DomainsDataNonDummy/satellite_codmap/",
         #  "satellite_combined_domain.pddl",
