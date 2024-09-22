@@ -345,7 +345,7 @@ def test_construct_safe_linear_inequalities_will_create_correct_inequalities_whe
     expected_conditions = [
         "(<= (* (fuel-cost ) -1) 0)",
         "(<= (* (current_load ?z) -1) 0)",
-        "(<= (+ (* (current_load ?z) 0.71) (* (fuel-cost ) 0.71)) 0.71)",
+        "(<= (+ (* (current_load ?z) 0.7071) (* (fuel-cost ) 0.7071)) 0.7071)",
         "(= (load_limit ?z) 0)",
     ]
     for _, precondition in output_conditions:
