@@ -68,10 +68,10 @@ if __name__ == '__main__':
         #  "rover_combined_domain.pddl",
         #  "[rover0,rover1,rover2,rover3,rover4,rover5,rover6,rover7,rover8,rover9]",
         #  "pfile"),
-        ("/sise/home/karato/work_tools/DomainsData/blocksworld_enhanced/",
-         "blocks_combined_domain.pddl",
-         "[a1,a2,a3,a4]",
-         "pfile"),
+        # ("/sise/home/karato/work_tools/DomainsData/blocksworld_enhanced/",
+        #  "blocks_combined_domain.pddl",
+        #  "[a1,a2,a3,a4]",
+        #  "pfile"),
     ]
 
     # Arguments provided via command line for the non-changing parameters
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     # Build a single bash command that runs the commands sequentially
     bash_command = ""
 
-    for params in parameter_groups2:
+    for params in parameter_groups:
         working_directory_path, domain_file_name, agents, problems_prefix = params
         command = (
             f"{sys.executable} multi_agent_experiment_diff_policies_runner.py "
