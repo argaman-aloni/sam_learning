@@ -12,6 +12,16 @@ from pddl_plus_parser.models import (
 from statistics import SemanticPerformanceCalculator, _calculate_precision_recall
 from utilities import LearningAlgorithmType
 
+SEMANTIC_PERFORMANCE_STATS = [
+    "learning_algorithm",
+    "action_name",
+    "num_trajectories",
+    "precondition_precision",
+    "precondition_recall",
+    # "effects_precision",
+    # "effects_recall",
+]
+
 
 class MASamPerformanceCalculator(SemanticPerformanceCalculator):
     """Class responsible for calculating the Multi-Agent precision and recall of a model."""
@@ -25,15 +35,6 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
         learning_algorithm: LearningAlgorithmType,
     ):
         super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
-        self.semantic_precision_stats = [
-            "learning_algorithm",
-            "action_name",
-            "num_trajectories",
-            "precondition_precision",
-            "precondition_recall",
-            # "effects_precision",
-            # "effects_recall",
-        ]
 
     def calculate_preconditions_semantic_performance(
             self, learned_domain: Domain, learned_domain_path: Path
@@ -85,3 +86,21 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
             self.combined_stats.append(action_stats)
 
         self.logger.info(f"Finished calculating the learning performance for {self.learning_algorithm.name}.")
+
+    def export_semantic_performance(self, fold_num: int) -> None:
+        """Exports the precision values of the learned preconditions to a CSV file."""
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_" f"{fold_num}_semantic_performance.csv"
+        with open(statistics_path, "wt", newline="") as statistics_file:
+            stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PERFORMANCE_STATS)
+            stats_writer.writeheader()
+            for data_line in self.combined_stats:
+                stats_writer.writerow(data_line)
+
+    def export_combined_semantic_performance(self) -> None:
+        """Export the numeric learning statistics to a CSV report file."""
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_semantic_performance.csv"
+        with open(statistics_path, "wt", newline="") as statistics_file:
+            stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PERFORMANCE_STATS)
+            stats_writer.writeheader()
+            for data_line in self.combined_stats:
+                stats_writer.writerow(data_line)
