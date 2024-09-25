@@ -68,14 +68,12 @@ def main():
 
     for problem_file_path in workdir_path.glob(f"{configuration['problems_prefix']}*.pddl"):
         arguments = [
-            str((workdir_path / configuration["domain_file_name"]).absolute()),
-            str(problem_file_path.absolute()),
-            str(workdir_path),
+            (workdir_path / configuration["domain_file_name"]).absolute(),
+            problem_file_path.absolute(),
+            workdir_path,
             configuration["timeout"],
             configuration["tolerance"],
         ]
-        print(f"Submitting job for problem {problem_file_path.stem}\n")
-        print(f"Arguments: {arguments}\n")
         sid = submit_job(
             conda_env="online_nsam",
             mem="16G",
