@@ -50,6 +50,7 @@ class FastDownwardSolver:
         :param solving_stats: the statistics of the solving process.
         :param solving_timeout: the timeout for the solving process.
         """
+        os.chdir(FAST_DOWNWARD_DIR_PATH)
         self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
         solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
         running_options = [
