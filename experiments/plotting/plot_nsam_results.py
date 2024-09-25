@@ -43,6 +43,8 @@ def plot_results(results_directory_path: Path):
         sns.set(style="whitegrid")
         plt.figure(figsize=(10, 6))
 
+        legend_order = [2, 0, 1]
+
         # Plot a line for each learning algorithm
         for algo in df["learning_algorithm"].unique():
             algo_data = grouped_data[grouped_data["learning_algorithm"] == algo]
@@ -71,7 +73,8 @@ def plot_results(results_directory_path: Path):
         plt.yticks(ticks=list(range(0, 101, 10)), fontsize=24)
 
         # Add a legend
-        plt.legend(fontsize=20)
+        handles, legend_labels = plt.gca().get_legend_handles_labels()
+        plt.legend([handles[idx] for idx in legend_order], [legend_labels[idx] for idx in legend_order], fontsize=24)
         plt.grid(True)
 
         output_file_path = file_path.parent / f"{file_path.stem}_plot.png"
@@ -111,7 +114,9 @@ def plot_results(results_directory_path: Path):
         plt.xlim(0, 10)
         plt.xticks(fontsize=24)
         plt.yticks(ticks=list(range(0, 101, 10)), fontsize=24)
-        plt.legend(fontsize=24)
+
+        handles, legend_labels = plt.gca().get_legend_handles_labels()
+        plt.legend([handles[idx] for idx in legend_order], [legend_labels[idx] for idx in legend_order], fontsize=24)
         plt.grid(True)
 
         output_file_path_limited = file_path.parent / f"{file_path.stem}_plot_limited.png"
