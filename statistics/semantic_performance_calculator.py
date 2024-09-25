@@ -302,7 +302,7 @@ class SemanticPerformanceCalculator:
 
     def export_combined_semantic_performance(self) -> None:
         """Export the numeric learning statistics to a CSV report file."""
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_semantic_performance.csv"
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_combined_semantic_performance.csv"
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=self.SEMANTIC_PRECISION_STATS)
             stats_writer.writeheader()
