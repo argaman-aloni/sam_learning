@@ -115,21 +115,43 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             allowed_sa_observations2.append(filtered_observation2)
             allowed_ma_observations3.append(complete_observation3)
             allowed_sa_observations3.append(filtered_observation3)
-            self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
-            self.negative_preconditions_policy = NegativePreconditionPolicy.normal
-            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
-            self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
-            self.negative_preconditions_policy = NegativePreconditionPolicy.soft
-            self.learn_ma_action_model(allowed_ma_observations2, partial_domain, test_set_dir_path, fold_num)
-            self.learn_baseline_action_model(allowed_sa_observations2, partial_domain, test_set_dir_path, fold_num)
-            self.negative_preconditions_policy = NegativePreconditionPolicy.hard
-            self.learn_ma_action_model(allowed_ma_observations3, partial_domain, test_set_dir_path, fold_num)
-            self.learn_baseline_action_model(allowed_sa_observations3, partial_domain, test_set_dir_path, fold_num)
 
-        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations))
+        self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
+        self.negative_preconditions_policy = NegativePreconditionPolicy.normal
+        self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+        self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
+        self.negative_preconditions_policy = NegativePreconditionPolicy.soft
+        self.learn_ma_action_model(allowed_ma_observations2, partial_domain, test_set_dir_path, fold_num)
+        self.learn_baseline_action_model(allowed_sa_observations2, partial_domain, test_set_dir_path, fold_num)
+        self.negative_preconditions_policy = NegativePreconditionPolicy.hard
+        self.learn_ma_action_model(allowed_ma_observations3, partial_domain, test_set_dir_path, fold_num)
+        self.learn_baseline_action_model(allowed_sa_observations3, partial_domain, test_set_dir_path, fold_num)
+
+        self.semantic_performance_calc.learning_algorithm = LearningAlgorithmType.sam_learning
+        self.ma_domain_path = self.working_directory_path / "results_directory" / \
+                              f"ma_baseline_domain_{NegativePreconditionPolicy.normal}_{len(allowed_sa_observations)}_trajectories_fold_{fold_num}.pddl"
+        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_sa_observations), NegativePreconditionPolicy.normal)
+        self.ma_domain_path = self.working_directory_path / "results_directory" / \
+                              f"ma_baseline_domain_{NegativePreconditionPolicy.hard}_{len(allowed_sa_observations)}_trajectories_fold_{fold_num}.pddl"
+        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_sa_observations), NegativePreconditionPolicy.hard)
+        self.ma_domain_path = self.working_directory_path / "results_directory" / \
+                              f"ma_baseline_domain_{NegativePreconditionPolicy.soft}_{len(allowed_sa_observations)}_trajectories_fold_{fold_num}.pddl"
+        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_sa_observations), NegativePreconditionPolicy.soft)
+
+        self.semantic_performance_calc.learning_algorithm = LearningAlgorithmType.ma_sam
+        self.ma_domain_path = self.working_directory_path / "results_directory" / \
+                              f"ma_sam_domain_{NegativePreconditionPolicy.normal}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
+        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations), NegativePreconditionPolicy.normal)
+        self.ma_domain_path = self.working_directory_path / "results_directory" / \
+                              f"ma_sam_domain_{NegativePreconditionPolicy.hard}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
+        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations), NegativePreconditionPolicy.hard)
+        self.ma_domain_path = self.working_directory_path / "results_directory" / \
+                              f"ma_sam_domain_{NegativePreconditionPolicy.soft}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
+        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations), NegativePreconditionPolicy.soft)
+
         self.semantic_performance_calc.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
-        self.domain_validator.write_statistics(fold_num)
+        # self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(
         self, allowed_observations: List[Observation], learned_model, test_set_dir_path: Path, fold_number: int, learning_time: float
@@ -186,12 +208,13 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.sam_learning
         learned_model, learning_report = learner.learn_action_model(allowed_filtered_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_filtered_observations, learned_model,
-                                                             learning_report)
-        self.export_learned_domain(
-            learned_model, self.working_directory_path / "results_directory",
-            f"ma_baseline_domain_{self.negative_preconditions_policy}_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
-        self.validate_learned_domain(allowed_filtered_observations, learned_model,
-                                     test_set_dir_path, fold_num, float(learning_report["learning_time"]))
+                                                             learning_report, policy=self.negative_preconditions_policy)
+
+        # self.ma_domain_path = self.working_directory_path / "results_directory" / \
+        #     f"ma_baseline_domain_{self.negative_preconditions_policy}_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl"
+        # self.export_learned_domain( learned_model,self.ma_domain_path.parent, self.ma_domain_path.name)
+        # self.validate_learned_domain(allowed_filtered_observations, learned_model,
+        #                              test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def learn_ma_action_model(
             self, allowed_complete_observations: List[MultiAgentObservation],
@@ -210,12 +233,12 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam
         learned_model, learning_report = learner.learn_combined_action_model(allowed_complete_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_complete_observations, learned_model,
-                                                             learning_report)
-        self.ma_domain_path = self.working_directory_path / "results_directory" / \
-                              f"ma_sam_domain_{self.negative_preconditions_policy}_{len(allowed_complete_observations)}_trajectories_fold_{fold_num}.pddl"
-        self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
-        self.validate_learned_domain(allowed_complete_observations, learned_model,
-                                     test_set_dir_path, fold_num, float(learning_report["learning_time"]))
+                                                             learning_report, policy=self.negative_preconditions_policy)
+        # self.ma_domain_path = self.working_directory_path / "results_directory" / \
+        #                       f"ma_sam_domain_{self.negative_preconditions_policy}_{len(allowed_complete_observations)}_trajectories_fold_{fold_num}.pddl"
+        # self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
+        # self.validate_learned_domain(allowed_complete_observations, learned_model,
+        #                              test_set_dir_path, fold_num, float(learning_report["learning_time"]))
 
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
@@ -229,12 +252,12 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
                 executing_agents=self.executing_agents,
                 test_set_dir_path=test_dir_path)
             self.learn_ma_model_offline(fold_num, train_dir_path, test_dir_path)
-            self.domain_validator.clear_statistics()
+            # self.domain_validator.clear_statistics()
             self.learning_statistics_manager.clear_statistics()
             self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
         self._learning_algorithm = LearningAlgorithmType.ma_sam
-        self.domain_validator.write_complete_joint_statistics()
+        # self.domain_validator.write_complete_joint_statistics()
         self.semantic_performance_calc.export_combined_semantic_performance()
         self.learning_statistics_manager.export_all_folds_action_stats()
 
