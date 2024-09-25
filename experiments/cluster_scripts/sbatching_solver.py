@@ -68,9 +68,9 @@ def main():
 
     for problem_file_path in workdir_path.glob(f"{configuration['problems_prefix']}*.pddl"):
         arguments = [
-            (workdir_path / configuration["domain_file_name"]).absolute(),
-            problem_file_path.absolute(),
-            workdir_path,
+            str((workdir_path / configuration["domain_file_name"]).absolute()),
+            str(problem_file_path.absolute()),
+            str(workdir_path),
             configuration["timeout"],
             configuration["tolerance"],
         ]
