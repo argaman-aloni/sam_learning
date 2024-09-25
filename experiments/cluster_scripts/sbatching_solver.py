@@ -74,6 +74,8 @@ def main():
             configuration["timeout"],
             configuration["tolerance"],
         ]
+        print(f"Submitting job for problem {problem_file_path.stem}\n")
+        print(f"Arguments: {arguments}\n")
         sid = submit_job(
             conda_env="online_nsam",
             mem="16G",
