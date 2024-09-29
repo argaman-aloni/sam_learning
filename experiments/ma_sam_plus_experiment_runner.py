@@ -74,11 +74,8 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
             complete_observation: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
                 trajectory_file_path, self.executing_agents)
 
-            complete_observation2: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
-                trajectory_file_path, self.executing_agents)
-
             allowed_ma_observations.append(complete_observation)
-            allowed_ma_plus_observations.append(complete_observation2)
+            allowed_ma_plus_observations.append(complete_observation)
             self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
             self.learn_ma_plus_action_model(allowed_ma_plus_observations, partial_domain, test_set_dir_path, fold_num)
             self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
