@@ -52,12 +52,6 @@ def _calculate_precision_recall(
     precision_dict = defaultdict(float)
     recall_dict = defaultdict(float)
     for action_name, tp_rate in num_true_positives.items():
-        if tp_rate == 0 and num_false_positives[action_name] == 0:
-            precision_dict[action_name] = 1
-
-        if tp_rate == 0 and num_false_negatives[action_name] == 0:
-            precision_dict[action_name] = 1
-
         if tp_rate == 0:
             precision_dict[action_name] = 0 if action_name in learned_actions else 1
             recall_dict[action_name] = 0

@@ -164,7 +164,7 @@ class NumericSAMLearner(SAMLearner):
                 action.numeric_effects = set()
                 learning_metadata[action_name] = e.solution_type.name
 
-        self.partial_domain.actions.update(allowed_actions)
+        self.partial_domain.actions = allowed_actions
         return allowed_actions, learning_metadata
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
