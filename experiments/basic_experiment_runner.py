@@ -143,7 +143,7 @@ class OfflineBasicExperimentRunner:
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(
-        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int, learning_time: float
+        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int, learning_time: float, macro_actions: List[str] = None
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
@@ -177,6 +177,7 @@ class OfflineBasicExperimentRunner:
             timeout=60,
             learning_time=learning_time,
             solvers_portfolio=portfolio,
+            macro_actions=macro_actions
         )
 
         return domain_file_path
