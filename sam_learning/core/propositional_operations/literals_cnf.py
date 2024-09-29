@@ -6,17 +6,17 @@ from pddl_plus_parser.models import Predicate
 import re
 
 
-def is_clause_consistent(clause, lma_names, binding: List[set]) -> bool:
+def is_clause_consistent(clause, action_group_names, parameter_grouping: List[set]) -> bool:
     # if len(clause) < 2:
     #     return False
 
-    if not all([action in lma_names for (action, _) in clause]):
+    if not all([action in action_group_names for (action, _) in clause]):
         return False
 
     grouped_params = group_params_from_clause(clause)
 
     for group in grouped_params:
-        if not any(group.issubset(grouping) for grouping in binding):
+        if not any(group.issubset(grouping) for grouping in parameter_grouping):
             return False
 
     return True

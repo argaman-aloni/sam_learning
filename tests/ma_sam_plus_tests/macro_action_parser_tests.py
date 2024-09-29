@@ -23,7 +23,6 @@ def rovers_ma_sam(ma_rovers_domain) -> MASAMPlus:
                      ["rover0", "rover1", "rover2", "rover3", "rover4",
                       "rover5", "rover6", "rover7", "rover8", "rover9"])
 
-
 @fixture()
 def do_plane_observation_component(multi_agent_observation: MultiAgentObservation) -> MultiAgentComponent:
     return multi_agent_observation.components[1]
@@ -62,14 +61,14 @@ def test_generate_macro_action_name(
 ):
     actions = ["way-forward", "way-backward", "way"]
     macro_name = MacroActionParser.generate_macro_action_name(actions)
-    assert macro_name == "way-forward@way-backward@way"
+    assert macro_name == "way-forward-way-backward-way"
 
 
 def test_generate_macro_mappings_without_grouping(
         rovers_ma_sam: MASAMPlus,
         woodworking_ma_combined_domain: Domain):
     actions = {rovers_ma_sam.partial_domain.actions["drop"], rovers_ma_sam.partial_domain.actions["sample_rock"]}
-    binding = MacroActionParser.generate_macro_mappings([], [], actions)
+    binding = MacroActionParser.generate_macro_mappings([], actions)
 
     assert (len(set(binding.keys())) == len(rovers_ma_sam.partial_domain.actions["drop"].parameter_names) +
             len(rovers_ma_sam.partial_domain.actions["sample_rock"].parameter_names) == len(set(binding.values())))
@@ -80,7 +79,7 @@ def test_generate_macro_mappings_with_grouping(
         woodworking_ma_combined_domain: Domain):
     actions = {rovers_ma_sam.partial_domain.actions["drop"], rovers_ma_sam.partial_domain.actions["sample_rock"]}
     grouping = [{("drop", "?x"), ("sample_rock", "?x")}]
-    binding = MacroActionParser.generate_macro_mappings(grouping, [], actions)
+    binding = MacroActionParser.generate_macro_mappings(grouping, actions)
     duplicates = 1
     assert (len(set(binding.keys())) == len(rovers_ma_sam.partial_domain.actions["drop"].parameter_names) +
             len(rovers_ma_sam.partial_domain.actions["sample_rock"].parameter_names) ==
