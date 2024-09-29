@@ -100,14 +100,6 @@ def multi_agent_observation(woodworking_ma_combined_domain: Domain,
         WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
 
 
-# TODO MA-SAM should not modify observation. When learning two models on the same observation, problems occur
-@fixture()
-def multi_agent_observation2(woodworking_ma_combined_domain: Domain,
-                            woodworking_ma_combined_problem) -> MultiAgentObservation:
-    return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
-        WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES)
-
-
 @fixture()
 def ma_rovers_domain() -> Domain:
     return DomainParser(ROVERS_COMBINED_DOMAIN_PATH, partial_parsing=True).parse_domain()
