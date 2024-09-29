@@ -111,6 +111,8 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
             [SolverType.fast_forward, SolverType.fast_downward]
         )
         self.domain_validator.validate_domain_macro(
+            fold=fold_number,
+            policy=learner.negative_preconditions_policy,
             tested_domain_file_path=domain_file_path,
             test_set_directory_path=test_set_dir_path,
             used_observations=allowed_observations,
@@ -118,7 +120,7 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
             timeout=60,
             learning_time=learning_time,
             solvers_portfolio=portfolio,
-            mas_sam_plus = learner
+            mas_sam_plus=learner
         )
 
         return domain_file_path
