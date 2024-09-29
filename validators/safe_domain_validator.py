@@ -22,7 +22,6 @@ SOLVER_TYPES = {
 
 SOLVING_STATISTICS = [
     "learning_algorithm",
-    "policy",
     "num_trajectories",
     "num_trajectory_triplets",
     "learning_time",
@@ -95,7 +94,11 @@ class DomainValidator:
     problem_prefix: str
 
     def __init__(
-        self, working_directory_path: Path, learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, problem_prefix: str = "pfile",
+        self,
+        working_directory_path: Path,
+        learning_algorithm: LearningAlgorithmType,
+        reference_domain_path: Path,
+        problem_prefix: str = "pfile",
     ):
         self.logger = logging.getLogger(__name__)
         self.solving_stats = []
@@ -229,8 +232,7 @@ class DomainValidator:
         tolerance: float = 0.01,
         timeout: int = 5,
         learning_time: float = 0,
-        solvers_portfolio: List[SolverType] = None,
-        policy = None,
+        solvers_portfolio: List[SolverType] = None
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -298,7 +300,6 @@ class DomainValidator:
         self.solving_stats.append(
             {
                 "learning_algorithm": self.learning_algorithm.name,
-                "policy": policy,
                 "num_trajectories": num_trajectories,
                 "num_trajectory_triplets": num_triplets,
                 "learning_time": learning_time,
