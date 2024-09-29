@@ -14,6 +14,8 @@ from experiments.basic_experiment_runner import OfflineBasicExperimentRunner
 from sam_learning.learners import MultiAgentSAM, SAMLearner
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
+from validators import MacroDomainValidator
+
 
 DEFAULT_SPLIT = 5
 
@@ -52,6 +54,10 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
                          problem_prefix=problem_prefix)
         self.executing_agents = executing_agents
         self.ma_domain_path = None
+        self.domain_validator = MacroDomainValidator(
+            self.working_directory_path, LearningAlgorithmType.ma_sam_plus,
+            self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
+        )
 
     def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
         """Create a single agent observation from a multi-agent observation.
@@ -113,7 +119,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
 
     def validate_learned_domain(
         self, allowed_observations: List[Observation], learned_model, test_set_dir_path: Path,
-            fold_number: int, learning_time: float) -> Path:
+            fold_number: int, learning_time: float, learner=None) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
@@ -121,6 +127,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param fold_number: the number of the fold that is currently running.
         :param learning_time: the time it took to learn the domain (in seconds).
+        :param learner: the learning model
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
@@ -136,15 +143,16 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         portfolio = (
             [SolverType.fast_forward, SolverType.fast_downward]
         )
-        self.domain_validator.validate_domain(
+        self.domain_validator.validate_domain_macro(
+            fold=fold_number,
+            policy=learner.negative_preconditions_policy,
             tested_domain_file_path=domain_file_path,
             test_set_directory_path=test_set_dir_path,
             used_observations=allowed_observations,
             tolerance=0.1,
             timeout=60,
             learning_time=learning_time,
-            solvers_portfolio=portfolio,
-            policy=self.negative_preconditions_policy
+            solvers_portfolio=portfolio
         )
 
         return domain_file_path

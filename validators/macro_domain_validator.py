@@ -13,7 +13,7 @@ from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from validators.common import AGGREGATED_SOLVING_FIELDS
 from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, GOAL_NOT_REACHED, run_validate_script
 from validators import DomainValidator
-from sam_learning.learners import MacroActionParser
+from utilities import NegativePreconditionPolicy
 
 
 SOLVER_TYPES = {
@@ -24,7 +24,9 @@ SOLVER_TYPES = {
 }
 
 SOLVING_STATISTICS = [
+    "fold",
     "learning_algorithm",
+    "policy",
     "num_trajectories",
     "num_trajectory_triplets",
     "learning_time",
@@ -89,6 +91,8 @@ class MacroDomainValidator(DomainValidator):
 
     def validate_domain_macro(
         self,
+        fold: int,
+        policy: NegativePreconditionPolicy,
         tested_domain_file_path: Path,
         test_set_directory_path: Optional[Path] = None,
         used_observations: Union[List[Union[Observation, MultiAgentObservation]], List[Path]] = None,
@@ -96,7 +100,7 @@ class MacroDomainValidator(DomainValidator):
         timeout: int = 5,
         learning_time: float = 0,
         solvers_portfolio: List[SolverType] = None,
-        mas_sam_plus = None
+        mas_sam_plus=None
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -107,6 +111,7 @@ class MacroDomainValidator(DomainValidator):
         :param tolerance: the numeric tolerance to use.
         :param learning_time: the time it took to learn the domain (in seconds).
         :param solvers_portfolio: the solvers to use for the validation, can be one or more and each will try to solve each planning problem at most once..
+        :param mas_sam_plus: the learned model that is being tested.
 
         """
         num_triplets = self._extract_num_triplets(used_observations)
@@ -161,7 +166,9 @@ class MacroDomainValidator(DomainValidator):
         num_trajectories = len(used_observations)
         self.solving_stats.append(
             {
+                "fold": fold,
                 "learning_algorithm": self.learning_algorithm.name,
+                "policy": policy,
                 "num_trajectories": num_trajectories,
                 "num_trajectory_triplets": num_triplets,
                 "learning_time": learning_time,
@@ -171,7 +178,8 @@ class MacroDomainValidator(DomainValidator):
         )
         self._clear_plans(test_set_directory_path)
 
-    def adapt_solution_file(self, learned_domain, solution_path: Path):
+    @staticmethod
+    def adapt_solution_file(learned_domain, solution_path: Path):
         if not learned_domain:
             return
 
