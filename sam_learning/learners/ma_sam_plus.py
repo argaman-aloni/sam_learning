@@ -278,34 +278,6 @@ class MacroActionParser:
         predicate_copy.signature = new_signature
         return predicate_copy
 
-    # TODO should see what it gets. maybe Action rather than LearnerAction, but idk how the process goes.
-    @staticmethod
-    def extract_actions_from_macro_action(action_line: str, mapper) -> set[str]:
-        param_pattern = re.compile(r'[^\s()]+')
-        macro_name = param_pattern.findall(action_line)[0]
-
-        if macro_name not in mapper:
-            return {action_line}
-
-        macro_action_rep, mapping = mapper[macro_name]
-        action_names = {name for (name, param) in mapping}
-        actions_dict = {}
-        for action in action_names:
-            actions_dict[action] = f'({action}'
-
-        params_bound = param_pattern.findall(action_line)
-        params_name = param_pattern.findall(macro_action_rep)
-
-        for param_name, param_bound in zip(params_name[1:], params_bound[1:]):
-            for (action, param) in mapping:
-                if mapping[(action, param)] == param_name:
-                    actions_dict[action] += f' {param_bound}'
-
-        for action in action_names:
-            actions_dict[action] += ')'
-
-        return set(actions_dict.values())
-
     @staticmethod
     def adapt_fluent_str_to_macro_signature(signature, fluent_str, relevant_action):
         # Ensure the string is properly trimmed
