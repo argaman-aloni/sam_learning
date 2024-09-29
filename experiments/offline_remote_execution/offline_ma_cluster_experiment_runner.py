@@ -44,10 +44,10 @@ if __name__ == '__main__':
     ]
 
     parameter_groups2 = [
-        # ("/sise/home/karato/work_tools/DomainsData/satellite_enhanced/",
-        #  "satellite_combined_domain.pddl",
-        #  "[satellite0,satellite1,satellite2,satellite3,satellite4,satellite5,satellite6,satellite7,satellite8,satellite9]",
-        #  "pfile"),
+        ("/sise/home/karato/work_tools/DomainsData/satellite_enhanced/",
+         "satellite_combined_domain.pddl",
+         "[satellite0,satellite1,satellite2,satellite3,satellite4,satellite5,satellite6,satellite7,satellite8,satellite9]",
+         "pfile"),
         # ("/sise/home/karato/work_tools/DomainsData/sokoban_enhanced/",
         #  "sokoban_combined_domain.pddl",
         #  "[player-01,player-02,player-03,player-04]",
@@ -80,14 +80,15 @@ if __name__ == '__main__':
     # Build a single bash command that runs the commands sequentially
     bash_command = ""
 
-    for params in parameter_groups:
+    for params in parameter_groups2:
         working_directory_path, domain_file_name, agents, problems_prefix = params
         command = (
-            f"{sys.executable} multi_agent_experiment_diff_policies_runner.py "
+            f"{sys.executable} multi_agent_experiment_runner.py "
             f"--working_directory_path {working_directory_path} "
             f"--domain_file_name {domain_file_name} "
             f"--executing_agents {agents} "
             f"--problems_prefix {problems_prefix} "
+            f"--logs_directory_path {working_directory_path} "
             f"> results-{domain_file_name}.txt"
         )
         bash_command += f"{command}; "
