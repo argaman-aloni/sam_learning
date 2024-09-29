@@ -175,11 +175,15 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         learned_model, learning_report = learner.learn_action_model(allowed_filtered_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_filtered_observations, learned_model,
                                                              learning_report)
+        domain_path = f"ma_baseline_domain_{self.negative_preconditions_policy}_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl"
         self.export_learned_domain(
             learned_model, self.working_directory_path / "results_directory",
-            f"ma_baseline_domain_{self.negative_preconditions_policy}_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
+            domain_path)
         self.validate_learned_domain(allowed_filtered_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]))
+        self.semantic_performance_calc.calculate_performance(domain_path, len(allowed_filtered_observations),
+                                                             self.negative_preconditions_policy)
+
 
     def learn_ma_action_model(
             self, allowed_complete_observations: List[MultiAgentObservation],
@@ -204,6 +208,9 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
         self.validate_learned_domain(allowed_complete_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]))
+        self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_complete_observations),
+                                                             self.negative_preconditions_policy)
+
 
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
