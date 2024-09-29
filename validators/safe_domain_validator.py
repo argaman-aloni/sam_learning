@@ -12,6 +12,7 @@ from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver, FFADLSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
 from validators.common import AGGREGATED_SOLVING_FIELDS
 from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, GOAL_NOT_REACHED, run_validate_script
+from utilities import NegativePreconditionPolicy
 
 SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,
@@ -22,6 +23,7 @@ SOLVER_TYPES = {
 
 SOLVING_STATISTICS = [
     "learning_algorithm",
+    "policy",
     "num_trajectories",
     "num_trajectory_triplets",
     "learning_time",
@@ -233,7 +235,7 @@ class DomainValidator:
         timeout: int = 5,
         learning_time: float = 0,
         solvers_portfolio: List[SolverType] = None,
-        macro_actions: List[str] = None
+        policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -272,7 +274,6 @@ class DomainValidator:
                 if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
-
                     self._validate_solution_content(
                         solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats
                     )
@@ -298,6 +299,7 @@ class DomainValidator:
         self.solving_stats.append(
             {
                 "learning_algorithm": self.learning_algorithm.name,
+                "policy": policy,
                 "num_trajectories": num_trajectories,
                 "num_trajectory_triplets": num_triplets,
                 "learning_time": learning_time,
