@@ -24,7 +24,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
                  problem_prefix: str = "pfile", executing_agents: List[str] = None):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=LearningAlgorithmType.ma_sam,
-                         solver_type=SolverType.fast_downward, problem_prefix=problem_prefix)
+                         problem_prefix=problem_prefix)
         self.executing_agents = executing_agents
         self.ma_domain_path = None
 
