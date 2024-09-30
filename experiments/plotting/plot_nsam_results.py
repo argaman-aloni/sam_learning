@@ -35,8 +35,8 @@ def plot_results(results_directory_path: Path):
 
         labels = {
             "numeric_sam": "NSAM*",
-            "naive_nsam": "NSAM with DR",
-            "naive_nsam_no_dependency_removal": "NSAM without DR",
+            "naive_nsam": "NSAM",
+            "naive_nsam_no_dependency_removal": "NSAM - DR",
         }
 
         # Plotting
