@@ -26,6 +26,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
     ):
         super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
         self.SEMANTIC_PRECISION_STATS = [
+            "fold",
             "learning_algorithm",
             "policy",
             "action_name",
@@ -67,7 +68,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
         return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives,
                                            list(learned_domain.actions.keys()))
 
-    def calculate_performance(self, learned_domain_path: Path, num_used_observations: int, policy) -> None:
+    def calculate_performance(self, learned_domain_path: Path, num_used_observations: int, policy, fold_num) -> None:
         """Calculates the model's performance with both the precision and the recall values calculated.
         :param learned_domain_path: the path to the learned action model.
         :param num_used_observations: the number of observations used to learn the action model.
@@ -78,6 +79,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         for action_name in self.model_domain.actions:
             action_stats = {
+                "fold": fold_num,
                 "learning_algorithm": self.learning_algorithm.name,
                 "policy": policy,
                 "action_name": action_name,

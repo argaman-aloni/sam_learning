@@ -178,6 +178,35 @@ class MacroDomainValidator(DomainValidator):
         )
         self._clear_plans(test_set_directory_path)
 
+    def write_statistics(self, fold_num: int, iteration: Optional[int] = None) -> None:
+        """Writes the statistics of the learned model into a CSV file.
+
+        :param fold_num: the index of the fold that is currently being tested.
+        :param iteration: the index of the iteration that is currently being tested.
+        """
+        output_statistics_path = self.results_dir_path / (
+            f"{self.learning_algorithm.name}"
+            f"_problem_solving_stats_fold_{fold_num}"
+            f"{f'_{iteration}_trajectories' if iteration is not None else ''}.csv"
+        )
+        with open(output_statistics_path, "wt", newline="") as csv_file:
+            test_set_writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
+            test_set_writer.writeheader()
+            test_set_writer.writerows(self.solving_stats)
+
+    def write_complete_joint_statistics(self, fold: Optional[int] = None) -> None:
+        """Writes a statistics file containing all the folds combined data."""
+
+        output_path = (
+            self.results_dir_path / f"{self.learning_algorithm.name}_all_folds_solving_stats.csv"
+            if fold is None
+            else self.results_dir_path / f"{self.learning_algorithm.name}_problem_solving_stats_{fold}.csv"
+        )
+        with open(output_path, "wt", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
+            writer.writeheader()
+            writer.writerows(self.aggregated_solving_stats)
+
     @staticmethod
     def adapt_solution_file(learned_domain, solution_path: Path):
         if not learned_domain:

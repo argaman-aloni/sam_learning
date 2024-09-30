@@ -116,7 +116,7 @@ class LearningStatisticsManager:
     def add_to_action_stats(
             self, used_observations: List[Union[Observation, MultiAgentObservation]],
             learned_domain: LearnerDomain, learning_report: Optional[Dict[str, str]] = None,
-            policy = NegativePreconditionPolicy.normal) -> None:
+            policy = NegativePreconditionPolicy.no_remove) -> None:
         """Add the action data to the statistics.
 
         :param used_observations: the observations that were used to learn the action.
