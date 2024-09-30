@@ -56,8 +56,7 @@ class OfflineBasicExperimentRunner:
     semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator]
 
     def __init__(
-        self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType,
-            problem_prefix: str = "pfile"
+        self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType, problem_prefix: str = "pfile",
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
@@ -144,8 +143,7 @@ class OfflineBasicExperimentRunner:
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(
-        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path,
-            fold_number: int, learning_time: float
+        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int, learning_time: float
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
@@ -178,7 +176,7 @@ class OfflineBasicExperimentRunner:
             tolerance=DEFAULT_NUMERIC_TOLERANCE,
             timeout=60,
             learning_time=learning_time,
-            solvers_portfolio=portfolio
+            solvers_portfolio=portfolio,
         )
 
         return domain_file_path

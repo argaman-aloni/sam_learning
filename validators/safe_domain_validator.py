@@ -232,7 +232,7 @@ class DomainValidator:
         tolerance: float = 0.01,
         timeout: int = 5,
         learning_time: float = 0,
-        solvers_portfolio: List[SolverType] = None
+        solvers_portfolio: List[SolverType] = None,
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
