@@ -112,11 +112,11 @@ if __name__ == '__main__':
     # Build a single bash command that runs the commands sequentially
     bash_command = ""
 
-    for params in parameter_groups_plus:
+    for params in parameter_groups2:
         working_directory_path, domain_file_name, agents, problems_prefix = params
         command = (
-            f"{sys.executable} ma_sam_plus_experiment_runner.py "
-            # f"{sys.executable} multi_agent_experiment_runner.py "
+            # f"{sys.executable} ma_sam_plus_experiment_runner.py "
+            f"{sys.executable} multi_agent_experiment_runner.py "
             f"--working_directory_path {working_directory_path} "
             f"--domain_file_name {domain_file_name} "
             f"--executing_agents {agents} "
