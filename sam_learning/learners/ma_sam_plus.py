@@ -11,7 +11,7 @@ from sam_learning.core import (LearnerDomain, extract_effects, LiteralCNF, Learn
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 
 from itertools import chain, combinations
-from utilities import powerset, combine_groupings
+from utilities import powerset, combine_groupings, NegativePreconditionPolicy
 
 BindingType = Dict[tuple[str, str], str]
 
@@ -21,8 +21,10 @@ class MASAMPlus(MultiAgentSAM):
         from multi-agent trajectories with joint actions."""
     mapping: Dict[str,  BindingType]
     unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
-    def __init__(self, partial_domain: Domain, preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
-        super().__init__(partial_domain, preconditions_fluent_map)
+    def __init__(self, partial_domain: Domain,
+                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+                 negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+        super().__init__(partial_domain, preconditions_fluent_map, negative_precondition_policy=negative_precondition_policy)
         self.mapping = {}
         self.unsafe_actions_preconditions_map = {}
 

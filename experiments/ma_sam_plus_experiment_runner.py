@@ -21,6 +21,7 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
     """Class that represents the POL framework for multi-agent problems."""
     executing_agents: List[str]
     ma_domain_path: Path
+    negative_preconditions_policy: NegativePreconditionPolicy
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
                  problem_prefix: str = "pfile", executing_agents: List[str] = None):
@@ -136,7 +137,7 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
         :param fold_num: the index of the current fold in the cross validation process.
         """
-        learner = MASAMPlus(partial_domain=partial_domain, )
+        learner = MASAMPlus(partial_domain=partial_domain, negative_precondition_policy=self.negative_preconditions_policy)
         self._learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_plus
@@ -145,7 +146,7 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
         #                                                      learning_report)
         self.export_learned_domain(
             learned_model, self.working_directory_path / "results_directory",
-            f"ma_sam_plus_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
+            f"ma_sam_plus_{self.negative_preconditions_policy}_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
         self.validate_learned_domain(allowed_filtered_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]), learner)
 
