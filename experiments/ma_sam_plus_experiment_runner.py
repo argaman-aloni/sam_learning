@@ -11,7 +11,7 @@ from experiments.basic_experiment_runner import OfflineBasicExperimentRunner
 from sam_learning.learners import MultiAgentSAM, SAMLearner, MASAMPlus
 from sam_learning.core import LearnerDomain
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
 from validators import MacroDomainValidator
 
 DEFAULT_SPLIT = 5
@@ -77,12 +77,13 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
             allowed_ma_observations.append(complete_observation)
             allowed_ma_plus_observations.append(complete_observation)
             self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
-            self.learn_ma_plus_action_model(allowed_ma_plus_observations, partial_domain, test_set_dir_path, fold_num)
-            self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
+            for policy in NegativePreconditionPolicy:
+                self.negative_preconditions_policy = policy
+                self.learn_ma_plus_action_model(allowed_ma_plus_observations, partial_domain, test_set_dir_path, fold_num)
 
         # self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations))
         # self.semantic_performance_calc.export_semantic_performance(fold_num)
-        self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
+        # self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.domain_validator.write_statistics(fold_num)
 
     def validate_learned_domain(
@@ -135,7 +136,7 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
         :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
         :param fold_num: the index of the current fold in the cross validation process.
         """
-        learner = MASAMPlus(partial_domain=partial_domain)
+        learner = MASAMPlus(partial_domain=partial_domain, )
         self._learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_plus
@@ -202,6 +203,7 @@ def parse_arguments() -> argparse.Namespace:
                              "are executing the actions")
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
+    parser.add_argument("--logs_directory_path", required=False, help="The path to the directory where the logs is")
 
     args = parser.parse_args()
     return args
