@@ -16,7 +16,7 @@ from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
+from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
@@ -54,12 +54,10 @@ class OfflineBasicExperimentRunner:
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
     semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator]
-    negative_preconditions_policy: NegativePreconditionPolicy
 
     def __init__(
         self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType,
-            problem_prefix: str = "pfile",
-            negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.normal
+            problem_prefix: str = "pfile"
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
@@ -75,7 +73,6 @@ class OfflineBasicExperimentRunner:
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
-        self.negative_preconditions_policy = negative_precondition_policy
 
     def _init_semantic_performance_calculator(self) -> None:
         """Initializes the algorithm of the semantic precision / recall calculator."""
