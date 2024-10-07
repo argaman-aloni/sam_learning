@@ -46,9 +46,10 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
     executing_agents: List[str]
     ma_domain_path: Path
     negative_precondition_policy: NegativePreconditionPolicy
+    max_iter: int
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 problem_prefix: str = "pfile", executing_agents: List[str] = None):
+                 problem_prefix: str = "pfile", executing_agents: List[str] = None, max_traj: int = 16):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=LearningAlgorithmType.ma_sam,
                          problem_prefix=problem_prefix)
@@ -58,6 +59,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             self.working_directory_path, LearningAlgorithmType.ma_sam_plus,
             self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
+        self.max_iter = max_traj
 
     def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
         """Create a single agent observation from a multi-agent observation.
@@ -92,6 +94,9 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         allowed_ma_observations = []
         allowed_sa_observations = []
         observed_objects = {}
+        #0 to 16 and then jump by 10 upto 100
+        relevant_indexes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        num_of_traj = len(list(train_set_dir_path.glob("*.trajectory")))
         for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
@@ -101,17 +106,15 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
             filtered_observation = self._filter_baseline_single_agent_trajectory(complete_observation)
             allowed_ma_observations.append(complete_observation)
             allowed_sa_observations.append(filtered_observation)
+            if index + 1 not in relevant_indexes:
+                if index + 1 != num_of_traj:
+                    continue
+
             self.logger.info(f"Learning the action model using {len(allowed_ma_observations)} trajectories!")
             for policy in NegativePreconditionPolicy:
                 self.negative_preconditions_policy = policy
                 self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
                 self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
-            # self.negative_preconditions_policy = NegativePreconditionPolicy.soft
-            # self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
-            # self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
-            # self.negative_preconditions_policy = NegativePreconditionPolicy.hard
-            # self.learn_ma_action_model(allowed_ma_observations, partial_domain, test_set_dir_path, fold_num)
-            # self.learn_baseline_action_model(allowed_sa_observations, partial_domain, test_set_dir_path, fold_num)
 
         self.calculate_performance_of_semantic(allowed_sa_observations, allowed_ma_observations, fold_num)
         self.semantic_performance_calc.export_semantic_performance(fold_num)
@@ -134,23 +137,6 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
                 self.semantic_performance_calc.learning_algorithm = algorithm
                 self.ma_domain_path = self.working_directory_path / "results_directory" / path_patterns[algorithm]
                 self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(observations[algorithm]), policy, fold_num)
-        # self.ma_domain_path = self.working_directory_path / "results_directory" / \
-        #                       f"ma_baseline_domain_{NegativePreconditionPolicy.hard}_{len(allowed_sa_observations)}_trajectories_fold_{fold_num}.pddl"
-        # self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_sa_observations), NegativePreconditionPolicy.hard, fold_num)
-        # self.ma_domain_path = self.working_directory_path / "results_directory" / \
-        #                       f"ma_baseline_domain_{NegativePreconditionPolicy.soft}_{len(allowed_sa_observations)}_trajectories_fold_{fold_num}.pddl"
-        # self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_sa_observations), NegativePreconditionPolicy.soft, fold_num)
-        #
-        # self.semantic_performance_calc.learning_algorithm = LearningAlgorithmType.ma_sam
-        # self.ma_domain_path = self.working_directory_path / "results_directory" / \
-        #                       f"ma_sam_domain_{NegativePreconditionPolicy.no_remove}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
-        # self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations), NegativePreconditionPolicy.no_remove, fold_num)
-        # self.ma_domain_path = self.working_directory_path / "results_directory" / \
-        #                       f"ma_sam_domain_{NegativePreconditionPolicy.hard}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
-        # self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations), NegativePreconditionPolicy.hard, fold_num)
-        # self.ma_domain_path = self.working_directory_path / "results_directory" / \
-        #                       f"ma_sam_domain_{NegativePreconditionPolicy.soft}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
-        # self.semantic_performance_calc.calculate_performance(self.ma_domain_path, len(allowed_ma_observations), NegativePreconditionPolicy.soft, fold_num)
 
     def validate_learned_domain(
         self, allowed_observations: List[Observation], learned_model, test_set_dir_path: Path,
@@ -248,7 +234,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
-        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold()):
+        for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold(max_items=self.max_iter)):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
             self.semantic_performance_calc = init_semantic_performance_calculator(
                 working_directory_path=self.working_directory_path,
@@ -277,6 +263,9 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names",
                         type=str, default="pfile")
     parser.add_argument("--logs_directory_path", required=False, help="The path to the directory where the logs is")
+    parser.add_argument("--num_traj", required=False, help="The max number of trajectories",
+                        type=int, default=16)
+
     args = parser.parse_args()
     return args
 
@@ -293,7 +282,8 @@ def main():
     offline_learner = MultiAgentExperimentRunner(working_directory_path=Path(args.working_directory_path),
                                                  domain_file_name=args.domain_file_name,
                                                  executing_agents=executing_agents,
-                                                 problem_prefix=args.problems_prefix)
+                                                 problem_prefix=args.problems_prefix,
+                                                 max_traj=args.num_traj)
     offline_learner.run_cross_validation()
 
 
