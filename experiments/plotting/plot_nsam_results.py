@@ -107,7 +107,7 @@ def plot_results(results_directory_path: Path):
         # Add a vertical dashed line at x = 5, with color changed to black
         ax1.axvline(x=10, color="black", linestyle="--", linewidth=2)
         # Add an annotation to show the zoom effect
-        ax1.annotate("Zoom here", xy=(10, 20), xytext=(15, 15), arrowprops=dict(facecolor="black", shrink=0.05), fontsize=20)
+        ax1.annotate("Zoom up to here", xy=(10, 20), xytext=(15, 15), arrowprops=dict(facecolor="black", shrink=0.05), fontsize=20)
 
         output_file_path = file_path.parent / f"{file_path.stem}_plot.png"
         plt.savefig(output_file_path, bbox_inches="tight")

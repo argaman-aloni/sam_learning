@@ -32,7 +32,7 @@ def setup_experiments_folds_job(code_directory, environment_variables, experimen
             f"--experiment_size {experiment_size}",
         ],
         environment_variables=environment_variables,
-        logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",
+        logs_directory=pathlib.Path(experiment["working_directory_path"]) / "logs",
     )
     print(f"Submitted job with sid {fold_creation_sid}\n")
     time.sleep(1)
@@ -93,13 +93,29 @@ def create_execution_arguments(experiment, fold, compared_version):
 def create_experiment_folders(code_directory, environment_variables, experiment):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
-    max_train_size = int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
-    internal_iterations = list(range(1, FIRST_BREAKPOINT)) + list(
-        range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"])
+    max_train_size = (
+        int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
     )
+    if parallelization_data["hop"] == 100:
+        internal_iterations = list(range(1, 100, 10)) + list(range(100, max_train_size, 100))
+        print(f"Internal iterations: {internal_iterations}")
+        sid = setup_experiments_folds_job(
+            code_directory=code_directory,
+            environment_variables=environment_variables,
+            experiment=experiment,
+            internal_iterations=internal_iterations,
+            experiment_size=parallelization_data.get("experiment_size", 100),
+        )
+        return internal_iterations, sid
+
+    internal_iterations = list(range(1, FIRST_BREAKPOINT)) + list(range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"]))
     print(f"Internal iterations: {internal_iterations}")
     sid = setup_experiments_folds_job(
-        code_directory=code_directory, environment_variables=environment_variables, experiment=experiment, internal_iterations=internal_iterations, experiment_size=parallelization_data.get("experiment_size", 100),
+        code_directory=code_directory,
+        environment_variables=environment_variables,
+        experiment=experiment,
+        internal_iterations=internal_iterations,
+        experiment_size=parallelization_data.get("experiment_size", 100),
     )
     return internal_iterations, sid
 
@@ -129,7 +145,7 @@ def submit_job_and_validate_execution(code_directory, configurations, experiment
         suppress_output=False,
         arguments=arguments,
         environment_variables=environment_variables,
-        logs_directory=pathlib.Path(experiment['working_directory_path']) / "logs",
+        logs_directory=pathlib.Path(experiment["working_directory_path"]) / "logs",
         suppress_error=True,
     )
     time.sleep(2)
