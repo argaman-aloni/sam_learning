@@ -25,6 +25,8 @@ from sam_learning.core import VocabularyCreator
 from utilities import LearningAlgorithmType
 from validators import run_validate_script, VALID_PLAN
 
+ACTION_VOCABULARY_MIN_SIZE = 20
+
 SEMANTIC_PRECISION_STATS = [
     "action_name",
     "num_trajectories",
@@ -35,11 +37,8 @@ SEMANTIC_PRECISION_STATS = [
 ]
 
 
-ACTION_VOCABULARY_MIN_SIZE = 20
-
-
 def _calculate_precision_recall(
-    num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int], learned_actions: List[str]
+        num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int], learned_actions: List[str]
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """Calculates the precision and recall values for each action.
 
@@ -110,7 +109,7 @@ class SemanticPerformanceCalculator:
         self._random_actions = []
 
     def _calculate_action_applicability_rate(
-        self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
+            self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
     ) -> Tuple[int, int, int]:
         """Test whether an action is applicable in both the model domain and the generated domain.
 
@@ -228,9 +227,7 @@ class SemanticPerformanceCalculator:
                 self.logger.debug("The action is not applicable in the state.")
                 continue
 
-    def calculate_preconditions_semantic_performance(
-        self, learned_domain: Domain, learned_domain_path: Path
-    ) -> Tuple[Dict[str, float], Dict[str, float]]:
+    def calculate_preconditions_semantic_performance(self, learned_domain: Domain, learned_domain_path: Path) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Calculates the precision recall values of the learned preconditions.
 
         :param learned_domain: the action model that was learned using the action model learning algorithm
@@ -311,7 +308,7 @@ class SemanticPerformanceCalculator:
 
     def export_combined_semantic_performance(self) -> None:
         """Export the numeric learning statistics to a CSV report file."""
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_semantic_performance.csv"
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_combined_semantic_performance.csv"
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PRECISION_STATS)
             stats_writer.writeheader()

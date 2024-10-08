@@ -9,10 +9,11 @@ from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, 
 
 from statistics.discrete_precision_recall_calculator import PrecisionRecallCalculator
 from sam_learning.core import LearnerDomain
-from utilities import LearningAlgorithmType
+from utilities import LearningAlgorithmType, NegativePreconditionPolicy
 
 LEARNED_ACTIONS_STATS_COLUMNS = [
     "learning_algorithm",
+    "policy",
     "domain_name",
     "num_trajectories",
     "learning_time",
@@ -72,6 +73,7 @@ class LearningStatisticsManager:
     action_learning_stats: List[Dict[str, Any]]
     numeric_learning_stats: List[Dict[str, Any]]
     merged_numeric_stats: List[Dict[str, Any]]
+    merged_action_stats: List[Dict[str, Any]]
 
     def __init__(self, working_directory_path: Path, domain_path: Path, learning_algorithm: LearningAlgorithmType):
         self.working_directory_path = working_directory_path
@@ -79,6 +81,7 @@ class LearningStatisticsManager:
         self.learning_algorithm = learning_algorithm
         self.action_learning_stats = []
         self.numeric_learning_stats = []
+        self.merged_action_stats = []
         self.merged_numeric_stats = []
         self.results_dir_path = self.working_directory_path / "results_directory"
 
@@ -112,7 +115,8 @@ class LearningStatisticsManager:
 
     def add_to_action_stats(
             self, used_observations: List[Union[Observation, MultiAgentObservation]],
-            learned_domain: LearnerDomain, learning_report: Optional[Dict[str, str]] = None) -> None:
+            learned_domain: LearnerDomain, learning_report: Optional[Dict[str, str]] = None,
+            policy = NegativePreconditionPolicy.no_remove) -> None:
         """Add the action data to the statistics.
 
         :param used_observations: the observations that were used to learn the action.
@@ -137,6 +141,7 @@ class LearningStatisticsManager:
             learning_time = learning_report["learning_time"]
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,
+                "policy": policy,
                 "domain_name": self.model_domain.name,
                 "num_trajectories": len(used_observations),
                 "learning_time": learning_time,
@@ -192,7 +197,7 @@ class LearningStatisticsManager:
         with open(output_path, 'wt', newline='') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=LEARNED_ACTIONS_STATS_COLUMNS)
             writer.writeheader()
-            writer.writerows(self.action_learning_stats)
+            writer.writerows(self.merged_action_stats)
 
     def export_numeric_learning_statistics(self, fold_number: int) -> None:
         """Export the numeric learning statistics that were collected from the learning report.
@@ -205,6 +210,7 @@ class LearningStatisticsManager:
     def clear_statistics(self) -> None:
         """Clears the statistics so that each fold will have no relation to its predecessors."""
         self.merged_numeric_stats.extend(self.numeric_learning_stats)
+        self.merged_action_stats.extend(self.action_learning_stats)
         self.numeric_learning_stats.clear()
         self.action_learning_stats.clear()
 
