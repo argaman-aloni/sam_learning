@@ -22,7 +22,7 @@ def init_semantic_performance_calculator(
     test_set_dir_path: Path = None,
     is_numeric: bool = False,
     problem_prefix: str = "pfile",
-) -> Union[NumericPerformanceCalculator, SemanticPerformanceCalculator]:
+) -> Union[NumericPerformanceCalculator, SemanticPerformanceCalculator, MASamPerformanceCalculator]:
     """Initializes a numeric performance calculator object.
 
     :param working_directory_path: the directory path where the domain and problem files are located.
