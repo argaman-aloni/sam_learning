@@ -58,6 +58,7 @@ def rovers_literals_cnf(ma_rovers_domain: Domain) -> LiteralCNF:
 def driverlog_ma_sam_plus(ma_driverlog_domain) -> MASAMPlus:
     return MASAMPlus(ma_driverlog_domain)
 
+
 def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions(
         rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
     learned_domain, learning_report = (
@@ -94,6 +95,7 @@ def test_extract_relevant_action_groups_with_observed_actions_with_no_colliding_
 
     woodworking_literals_cnf.add_possible_effect([("do-immersion-varnish", "(surface-condition ?m ?newcolour)")])
     woodworking_ma_sam_plus.observed_actions = ["do-immersion-varnish", "do-grind", "do-plane"]
+    woodworking_ma_sam_plus.safe_actions = ["do-immersion-varnish"]
 
     action_group = woodworking_ma_sam_plus.extract_relevant_action_groups()
     assert len(action_group) == 0

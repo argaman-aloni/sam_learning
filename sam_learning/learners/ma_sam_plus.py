@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple, Set, Optional
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
     GroundedPredicate, JointActionCall, CompoundPrecondition, SignatureType, PDDLType
 
-from sam_learning.core import (LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data,
+from sam_learning.core import (LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data, PGType,
                                group_params_from_clause)
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 
@@ -21,6 +21,7 @@ class MASAMPlus(MultiAgentSAM):
         from multi-agent trajectories with joint actions."""
     mapping: Dict[str,  BindingType]
     unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
+
     def __init__(self, partial_domain: Domain,
                  preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
                  negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
@@ -28,7 +29,7 @@ class MASAMPlus(MultiAgentSAM):
         self.mapping = {}
         self.unsafe_actions_preconditions_map = {}
 
-    def _extract_predicate_from_clause(self, clause_element, mapping):
+    def _extract_predicate_from_clause(self, clause_element: Tuple[str, str], mapping: BindingType) -> Predicate:
         """Helper function to extract predicate data and adapt it to the macro signature.
 
         :param clause_element: A tuple of (action_name, lifted_fluent).
@@ -63,7 +64,7 @@ class MASAMPlus(MultiAgentSAM):
 
         return action_groups
 
-    def extract_relevant_parameter_groupings(self, action_group_names: list[str]) -> List[List[set]]:
+    def extract_relevant_parameter_groupings(self, action_group_names: list[str]) -> List[PGType]:
         """Extracts relevant parameter groups
             This implementation only extracts one such possible parameter groups
         """
@@ -72,14 +73,13 @@ class MASAMPlus(MultiAgentSAM):
             for fluent_cnf in self.literals_cnf.values()
             for clause in fluent_cnf.possible_lifted_effects
             if all(action in action_group_names for action, _ in clause)
-            # if all(action in (a for a, _ in clause) for action, _ in lma_names)
         ]
 
         flattened_groups = combine_groupings(all_param_groups)
 
         return [flattened_groups]
 
-    def extract_effects_for_macro_from_cnf(self, lma_set: set[LearnerAction], param_grouping, mapping):
+    def extract_effects_for_macro_from_cnf(self, lma_set: set[LearnerAction], param_grouping: PGType, mapping: BindingType):
         lma_names = [lma.name for lma in lma_set]
         cnf_effects = []
         relevant_preconditions_str = {precondition.untyped_representation for action in lma_set for precondition
@@ -101,7 +101,7 @@ class MASAMPlus(MultiAgentSAM):
 
         return unique_cnf_effects
 
-    def extract_preconditions_for_macro_from_cnf(self, action_group: set[LearnerAction], param_grouping, mapping):
+    def extract_preconditions_for_macro_from_cnf(self, action_group: set[LearnerAction], param_grouping: PGType, mapping: BindingType):
         cnf_preconditions = []
         lma_names = [action.name for action in action_group]
 
@@ -269,7 +269,7 @@ class MacroActionParser:
         return action_signature
 
     @staticmethod
-    def adapt_predicate_to_macro_mapping(mapping, predicate: Predicate, relevant_action):
+    def adapt_predicate_to_macro_mapping(mapping, predicate: Predicate, relevant_action) ->  Predicate:
         # Ensure the string is properly trimmed
         predicate_copy = predicate.copy()
         new_signature = {}
