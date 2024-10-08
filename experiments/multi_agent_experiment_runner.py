@@ -122,10 +122,10 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
     def calculate_performance_of_semantic(self, allowed_sa_observations, allowed_ma_observations, fold_num):
         path_patterns = {
             LearningAlgorithmType.sam_learning: lambda negative_policy:(
-                f"ma_baseline_domain_{policy.name}_{len(allowed_sa_observations)}_trajectories_fold_{fold_num}.pddl"
+                f"ma_baseline_domain_{negative_policy.name}_{len(allowed_sa_observations)}_trajectories_fold_{fold_num}.pddl"
             ),
             LearningAlgorithmType.ma_sam: lambda negative_policy:(
-                f"ma_sam_domain_{policy.name}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
+                f"ma_sam_domain_{negative_policy.name}_{len(allowed_ma_observations)}_trajectories_fold_{fold_num}.pddl"
             )
         }
         observations_length = {
