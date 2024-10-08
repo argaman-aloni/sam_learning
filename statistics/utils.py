@@ -23,7 +23,7 @@ def init_semantic_performance_calculator(
     executing_agents: Optional[List[str]] = None,
     test_set_dir_path: Path = None,
     is_numeric: bool = False,
-) -> Union[NumericPerformanceCalculator, SemanticPerformanceCalculator]:
+) -> Union[NumericPerformanceCalculator, SemanticPerformanceCalculator, MASamPerformanceCalculator]:
     """Initializes a numeric performance calculator object.
 
     :param working_directory_path: the directory path where the domain and problem files are located.
