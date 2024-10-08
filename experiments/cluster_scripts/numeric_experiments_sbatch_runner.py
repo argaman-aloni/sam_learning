@@ -97,7 +97,7 @@ def create_experiment_folders(code_directory, environment_variables, experiment)
         int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
     )
     if parallelization_data["hop"] == 100:
-        internal_iterations = list(range(1, 100, 10)) + list(range(100, max_train_size, 100))
+        internal_iterations = [1] + list(range(10, 100, 10)) + list(range(100, max_train_size, 100))
         print(f"Internal iterations: {internal_iterations}")
         sid = setup_experiments_folds_job(
             code_directory=code_directory,
