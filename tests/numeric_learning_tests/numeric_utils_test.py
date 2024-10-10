@@ -1,4 +1,5 @@
 """Tests for numeric_utils.py"""
+
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -9,6 +10,8 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     extended_gram_schmidt,
     create_monomials,
     create_polynomial_string,
+    reduce_complementary_conditions_from_convex_hull,
+    remove_complex_linear_dependencies,
 )
 
 
@@ -163,6 +166,26 @@ def test_extended_gram_schmidt_with_paper_example_returns_correct_values():
     assert len(projections) == 2
 
 
+def test_reduce_complementary_conditions_from_convex_hull_basis_can_eliminate_values_when_computing_complementary_basis_with_constant_value():
+    test_values = [[np.random.randint(0, 100), np.random.randint(0, 100), 0] for _ in range(10)]
+    projections = extended_gram_schmidt(test_values)
+    diagonal_eye = [list(vector) for vector in np.eye(3)]
+    complementary_basis = extended_gram_schmidt(diagonal_eye, projections)
+    result = reduce_complementary_conditions_from_convex_hull(projections, complementary_basis)
+    assert result == projections
+
+
+def test_reduce_complementary_conditions_from_convex_hull_basis_can_eliminate_values_when_computing_complementary_basis_with_linear_dependent_value():
+    test_values = [[i, 2 * i, np.random.randint(0, 100)] for i in range(10)]
+    projections = extended_gram_schmidt(test_values)
+    diagonal_eye = [list(vector) for vector in np.eye(3)]
+    complementary_basis = extended_gram_schmidt(diagonal_eye, projections)
+    result = reduce_complementary_conditions_from_convex_hull(projections, complementary_basis)
+    for index, projection in enumerate(result):
+        assert projection[0] == 0
+        assert projection[1] == 0.5 * projections[index][0] + projections[index][1]
+
+
 def test_create_monomials_creates_correct_monomials_when_given_polynom_degree_one():
     test_functions = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
     monomials = create_monomials(test_functions, polynom_degree=1)
@@ -199,3 +222,38 @@ def test_create_polynomial_string_when_calling_with_three_functions_returns_the_
     monomial = ["(fuel-cost )", "(load_limit ?z)", "(current_load ?z)"]
     polynomial_string = create_polynomial_string(monomial)
     assert polynomial_string == "(* (fuel-cost ) (* (load_limit ?z) (current_load ?z)))"
+
+
+def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduced_dataframe_when_one_feature_in_the_dataframe_is_constant_value():
+    test_data = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 3, 3, 4], "c": [1, 2, 3, 4]})
+    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
+    assert len(conditions) == 1
+    assert conditions[0] == "(= a 1)"
+    assert len(reduced_data.columns) == 2
+    assert "a" not in reduced_data.columns
+
+
+def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduced_dataframe_when_one_feature_equals_the_assignment_of_two_others_and_a_const():
+    test_data = pd.DataFrame({"a": [1, 2, 3, 4], "b": [1, 3, 3, 4], "c": [3, 6, 7, 9]})
+    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
+    assert len(conditions) == 1
+    assert conditions[0] == "(= a (+ (* b -1) (+ c -1)))"
+    assert len(reduced_data.columns) == 2
+    assert "a" not in reduced_data.columns
+
+
+def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduced_dataframe_when_one_feature_equals_the_assignment_of_two_others_and_a_const_and_there_is_a_const_column():
+    test_data = pd.DataFrame({"a": [1, 2, 3, 4], "b": [1, 3, 3, 4], "c": [3, 6, 7, 9], "d": [1, 1, 1, 1]})
+    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
+    assert len(conditions) == 2
+    assert set(conditions) == {"(= a (+ (* b -1) (+ c -1)))", "(= d 1)"}
+    assert len(reduced_data.columns.tolist()) == 2
+    assert "a" not in reduced_data.columns.tolist()
+
+
+def test_remove_complex_linear_dependencies_when_all_columns_are_constant_values_returns_empty_dataframe_and_the_pddl_constraint_that_checks_the_column_name_is_equal_to_the_constant():
+    test_data = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 1], "c": [1, 1, 1, 1]})
+    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
+    assert len(conditions) == 3
+    assert conditions == ["(= a 1)", "(= b 1)", "(= c 1)"]
+    assert len(reduced_data.columns) == 0

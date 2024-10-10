@@ -204,9 +204,9 @@ def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_c
         display_mode=True
     )
     assert coefficients == [[-1], [1]]
-    assert border_point == [0, 1.41]
-    assert transformed_vars == ["(+ (* (x ) 0.71) (* (- (y ) 1) -0.71))"]
-    assert set(span_verification_conditions) == {"(= (z ) 0.0)", "(= (+ (* (x ) 0.71) (* (- (y ) 1) 0.71)) 0.0)"}
+    assert border_point == [0, 1.4142]
+    assert transformed_vars == ["(+ (* (x ) 0.7071) (* (- (y ) 1) -0.7071))"]
+    assert set(span_verification_conditions) == {"(= (z ) 0.0)", "(= (+ (x ) (- (y ) 1)) 0.0)"}
 
 
 def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_conditions_and_correct_complementary_conditions(

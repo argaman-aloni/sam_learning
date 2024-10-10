@@ -1,5 +1,6 @@
 """Utility functions for handling and presenting numeric data."""
 import itertools
+import os
 from typing import Union, List, Dict, Tuple, Optional, Set
 
 import math
@@ -11,11 +12,13 @@ from pddl_plus_parser.lisp_parsers import PDDLTokenizer
 from pddl_plus_parser.models import Precondition, PDDLFunction, construct_expression_tree, NumericalExpressionTree
 from scipy.spatial import ConvexHull, convex_hull_plot_2d
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.learning_types import ConditionType
 
-DECIMAL_DIGITS = 2
+DECIMAL_DIGITS = os.environ.get("NUMERIC_PRECISION", 4)
 EPSILON = 1e-4
+ELIMINATION_THRESHOLD = 0.01
 
 
 def get_num_independent_equations(data_matrix: DataFrame) -> int:
@@ -87,7 +90,7 @@ def construct_projected_variable_strings(
     """
     shifted_by_mean = []
     for func, shift_value in zip(function_variables, shift_point):
-        component_function = func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, 2))})"
+        component_function = func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, DECIMAL_DIGITS))})"
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
@@ -175,6 +178,9 @@ def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[Li
     :param columns_to_ignore: the list of columns that should be ignored.
     :return: the filtered matrix and the equality strings, i.e. the strings of the values that should be equal.
     """
+    if len(input_df) == 1:
+        return input_df, [], []
+
     equal_fluent_strs, removed_fluents = [], []
     relevant_columns = [col for col in input_df.columns if col not in columns_to_ignore]
     try:
@@ -395,3 +401,100 @@ def create_polynomial_string(fluents: List[str]) -> str:
     :return: the polynomial string representing the equation.
     """
     return _create_polynomial_string_recursive(fluents)
+
+
+def divide_span_by_common_denominator(equations_list: List[List[float]]) -> List[List[float]]:
+    """Divides the span by the common denominator.
+
+    :param equations_list: the list of equations (all equal to zero) that can be divided by the common denominator.
+    :return: the span divided by the common denominator.
+    """
+    new_span = []
+    for equation in equations_list:
+        common_denominator = [coeff for coeff in equation if coeff != 0][0]
+        new_span.append([coeff / common_denominator for coeff in equation])
+
+    return new_span
+
+
+def _first_non_zero_index(numbers_list: List[float]) -> int:
+    """
+
+    :param numbers_list:
+    :return:
+    """
+    for index, value in enumerate(numbers_list):
+        if value != 0:
+            return index
+    return -1
+
+
+def reduce_complementary_conditions_from_convex_hull(convex_hull: List[List[float]], complementary_basis: List[List[float]]) -> List[List[float]]:
+    """Reduces the complementary conditions from the Gram-Schmidt basis.
+
+    :param convex_hull: the basis of the projection.
+    :param complementary_basis: the complementary basis to the projection.
+    :return: the reduced complementary conditions.
+    """
+    if len(complementary_basis) == 0:
+        return convex_hull
+
+    reduced_convex_hull = np.array(convex_hull).copy()
+    for complementary_vector in complementary_basis:
+        non_zero_index = _first_non_zero_index(complementary_vector)
+        if non_zero_index == -1:
+            continue
+
+        new_conditions = [-1 / complementary_vector[non_zero_index] * complementary_vector[i] for i in range(len(complementary_vector))]
+        reduced_convex_hull = (
+            reduced_convex_hull
+            + np.tile(np.array(new_conditions), (reduced_convex_hull.shape[0], 1)) * reduced_convex_hull[:, non_zero_index][:, np.newaxis]
+        )
+        reduced_convex_hull[:, non_zero_index] = 0
+
+    return reduced_convex_hull.tolist()
+
+
+def remove_complex_linear_dependencies(data: DataFrame) -> Tuple[DataFrame, List[str]]:
+    """Removes the complex linear dependencies from the data matrix.
+
+    :param data: the matrix of the previous state values.
+    :return: the filtered matrix and the removed columns.
+    """
+    if len(data) == 0 or len(data.columns) == 1:
+        return data, []
+
+    constant_columns = data.columns[data.nunique() == 1].tolist()
+    removed_columns = [*constant_columns]
+    conditions = [f"(= {col} {data[col].unique()[0]})" for col in constant_columns]
+    if len(data.columns) == len(constant_columns):
+        return DataFrame(), conditions
+
+    for feature_to_check in [col for col in data.columns if col not in removed_columns]:
+        features = data[[col for col in data.columns if col != feature_to_check and col not in removed_columns]]
+        if len(features.columns) == 0:
+            # no columns left to check
+            break
+
+        model = LinearRegression()
+        model.fit(features, data[feature_to_check])
+        score = model.score(features, data[feature_to_check])
+        if score != 1:
+            # could not fit the feature to the other features - not linearly dependent
+            continue
+
+        coefficients = list(model.coef_) + [model.intercept_]
+        coefficients = prettify_coefficients(coefficients)
+
+        removed_columns.append(feature_to_check)
+        if all([coef == 0 for coef in coefficients]):
+            # the feature is a constant equal to zero
+            conditions.append(f"(= {feature_to_check} 0)")
+            continue
+
+        multiplication_functions = construct_linear_equation_string(
+            construct_multiplication_strings(coefficients, [*features.columns.tolist(), "(dummy)"])
+        )
+        conditions.append(f"(= {feature_to_check} {multiplication_functions})")
+
+    return data.drop(columns=removed_columns), conditions

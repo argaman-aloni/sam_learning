@@ -2,6 +2,7 @@
 import argparse
 import logging
 import os
+import shutil
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
@@ -17,7 +18,7 @@ from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
-PLANNER_EXECUTION_TIMEOUT = 1800 # 30 minutes
+PLANNER_EXECUTION_TIMEOUT = 1800  # 30 minutes
 
 
 def configure_iteration_logger(args: argparse.Namespace):
@@ -41,11 +42,9 @@ def configure_iteration_logger(args: argparse.Namespace):
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
     if args.debug:
-        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG, handlers=[file_handler, stream_handler])
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler, stream_handler])
     else:
         logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
-
-
 
 
 class ParallelExperimentRunner:
@@ -72,6 +71,7 @@ class ParallelExperimentRunner:
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
+        self.problem_prefix = problem_prefix
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
@@ -81,6 +81,7 @@ class ParallelExperimentRunner:
             self._learning_algorithm,
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
             is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
+            problem_prefix=self.problem_prefix,
         )
 
     def _apply_learning_algorithm(
@@ -95,11 +96,10 @@ class ParallelExperimentRunner:
         :param test_set_path: the path to the test set directory where the domain would be exported to.
         :param file_name: the name of the file to export the domain to.
         """
-        legacy_algorithms = [LearningAlgorithmType.naive_nsam]
         domain_file_name = file_name or self.domain_file_name
         domain_path = test_set_path / domain_file_name
         with open(domain_path, "wt") as domain_file:
-            domain_file.write(learned_domain.to_pddl(should_simplify=(self._learning_algorithm not in legacy_algorithms)))
+            domain_file.write(learned_domain.to_pddl(should_simplify=False))
 
         return domain_path
 
@@ -149,12 +149,11 @@ class ParallelExperimentRunner:
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
         domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
         domains_backup_dir_path.mkdir(exist_ok=True)
-        self.export_learned_domain(
-            learned_model,
-            domains_backup_dir_path,
-            f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}" f"_{len(allowed_observations)}_trajectories.pddl",
+        shutil.copy(
+            domain_file_path,
+            domains_backup_dir_path / f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
+            f"_{len(allowed_observations)}_trajectories.pddl",
         )
-
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         portfolio = (
             [SolverType.metric_ff, SolverType.enhsp]

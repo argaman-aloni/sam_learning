@@ -51,8 +51,9 @@ class StatisticsCollector:
         df = pd.DataFrame(combined_statistics_data)
         numeric_columns = ["percent_ok", "fold", "num_trajectories"]
         df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric)
-        aggregated_df = df.groupby(["fold", "num_trajectories", "learning_algorithm"]).agg(max_percent_ok=("percent_ok", "max"),
-                                                                                           percent_goal_not_achieved=("percent_goal_not_achieved", "max"))
+        aggregated_df = df.groupby(["fold", "num_trajectories", "learning_algorithm"]).agg(
+            max_percent_ok=("percent_ok", "max"), percent_goal_not_achieved=("percent_goal_not_achieved", "max")
+        )
         return aggregated_df
 
     def _combine_statistics_data(self, file_path_template: str, combined_statistics_data: List[dict]) -> None:
@@ -112,8 +113,7 @@ class StatisticsCollector:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
-                        level=logging.INFO)
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     internal_iterations = [int(val) for val in args.internal_iterations.split(",")]

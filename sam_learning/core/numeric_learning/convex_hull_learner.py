@@ -19,11 +19,11 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_projected_variable_strings,
     extended_gram_schmidt,
     display_convex_hull,
-    detect_linear_dependent_features,
     create_monomials,
     create_polynomial_string,
+    divide_span_by_common_denominator,
+    remove_complex_linear_dependencies,
 )
-
 
 np.set_printoptions(precision=2)
 
@@ -109,9 +109,7 @@ class ConvexHullLearner:
 
         projected_points = np.dot(shifted_points, np.array(projection_basis).T)
         if projected_points.shape[1] == 1:
-            self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
-            coefficients = [[-1], [1]]
-            border_point = prettify_coefficients([-projected_points.min(), projected_points.max()])
+            border_point, coefficients = self._construct_single_dimension_convex_hull(projected_points)
 
         else:
             coefficients, border_point = self._execute_convex_hull(projected_points, display_mode)
@@ -120,12 +118,23 @@ class ConvexHullLearner:
 
         self.logger.debug("Constructing the conditions to verify that points are in the correct span.")
         diagonal_eye = [list(vector) for vector in np.eye(points.shape[1])]
-        orthnormal_span = extended_gram_schmidt(diagonal_eye, projection_basis)
+        orthnormal_span = divide_span_by_common_denominator(extended_gram_schmidt(diagonal_eye, projection_basis))
         transformed_orthonormal_vars = construct_projected_variable_strings(points_df.columns.tolist(), shift_axis, diagonal_eye)
         span_verification_conditions = self._construct_pddl_inequality_scheme(
             np.array(orthnormal_span), np.zeros(len(orthnormal_span)), transformed_orthonormal_vars, sign_to_use="="
         )
         return coefficients, border_point, transformed_vars, span_verification_conditions
+
+    def _construct_single_dimension_convex_hull(self, projected_points: np.array) -> Tuple[List[float], List[float]]:
+        """Construct the convex hull for a single dimension.
+
+        :param projected_points: the projected points on the single dimension.
+        :return: the border point and the coefficients of the planes that represent the convex hull.
+        """
+        self.logger.debug("The convex hull is single dimensional, creating min-max conditions on the new basis.")
+        coefficients = [[-1], [1]]
+        border_point = prettify_coefficients([-projected_points.min(), projected_points.max()])
+        return border_point, coefficients
 
     @staticmethod
     def _construct_pddl_inequality_scheme(
@@ -200,7 +209,9 @@ class ConvexHullLearner:
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
-        irrelevant_fluents = [fluent for fluent in self.data.columns.tolist() if fluent not in relevant_fluents] if relevant_fluents is not None else []
+        irrelevant_fluents = (
+            [fluent for fluent in self.data.columns.tolist() if fluent not in relevant_fluents] if relevant_fluents is not None else []
+        )
         state_data = self.data.drop(columns=irrelevant_fluents)
         if (relevant_fluents is not None and len(relevant_fluents) == 1) or state_data.shape[1] == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")
@@ -208,11 +219,27 @@ class ConvexHullLearner:
             return self._construct_single_dimension_inequalities(state_data.loc[:, relevant_fluents[0]])
 
         try:
-            filtered_matrix, column_equality_strs, _ = detect_linear_dependent_features(state_data)
-            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(filtered_matrix, display_mode=False)
+            filtered_dataframe, extra_conditions = remove_complex_linear_dependencies(state_data)
+            if filtered_dataframe.shape[0] == 0:
+                self.logger.warning("The matrix is empty, no need to create a convex hull.")
+                return construct_numeric_conditions(
+                    extra_conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions
+                )
+
+            if filtered_dataframe.shape[1] == 1:
+                self.logger.debug("After filtering the linear dependencies remained with a single feature!")
+                b, A = self._construct_single_dimension_convex_hull(filtered_dataframe.to_numpy())
+                inequalities_strs = self._construct_pddl_inequality_scheme(A, b, filtered_dataframe.columns.tolist())
+                return construct_numeric_conditions(
+                    [*inequalities_strs, *extra_conditions], condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions
+                )
+
+            A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(
+                filtered_dataframe, display_mode=False
+            )
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
-                inequalities_strs.extend([*additional_projection_conditions, *column_equality_strs])
+                inequalities_strs.extend([*extra_conditions, *additional_projection_conditions])
 
             return construct_numeric_conditions(inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 

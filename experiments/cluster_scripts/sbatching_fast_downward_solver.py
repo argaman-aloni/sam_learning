@@ -62,17 +62,23 @@ def main():
 
     environment_variables_path = configuration["environment_variables_file_path"]
     code_directory = configuration["code_directory_path"]
-    workdir_path = pathlib.Path(configuration["experiment_configurations"]["working_directory_path"])
+    workdir_path = pathlib.Path(configuration["working_directory_path"])
     with open(environment_variables_path, "rt") as environment_variables_file:
         environment_variables = json.load(environment_variables_file)
 
-    for problem_file_path in workdir_path.glob(f"pfile*.pddl"):
-        arguments = [problem_file_path.absolute(), workdir_path / "zenonumeric.pddl"]
+    for problem_file_path in workdir_path.glob(f"{configuration['problems_prefix']}*.pddl"):
+        arguments = [
+            str((workdir_path / configuration["domain_file_name"]).absolute()),
+            str(problem_file_path.absolute()),
+            str(workdir_path),
+            configuration["timeout"],
+        ]
+        print(f"Submitting job for problem {problem_file_path.stem}\n")
         sid = submit_job(
             conda_env="online_nsam",
-            mem="64G",
-            python_file=f"{code_directory}/enhsp_solver.py",
-            jobname=f"enhsp_solver",
+            mem="16G",
+            python_file=f"{code_directory}/fast_downward_solver.py",
+            jobname=f"fast_downward_solver",
             suppress_output=False,
             arguments=arguments,
             environment_variables=environment_variables,

@@ -25,6 +25,7 @@ class LearningAlgorithmType(Enum):
     raw_naive_nsam = 17
     raw_naive_polysam = 18
     raw_polynomial_nsam = 14
+    naive_nsam_no_dependency_removal = 20
 
 
 class SolverType(Enum):
@@ -44,6 +45,6 @@ class SolutionOutputTypes(Enum):
 
 
 class NegativePreconditionPolicy(Enum):
-    no_remove = 1,
-    soft = 2,
+    no_remove = (1,)
+    soft = (2,)
     hard = 3

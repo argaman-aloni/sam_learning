@@ -24,7 +24,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
 EPSILON = 1e-10
 
 
-class NaiveConvexHullLearner:
+class NaiveConvexHullLearnerNoDependencyRemoval:
     """Class that learns the convex hull of the preconditions of an action."""
 
     logger: logging.Logger
@@ -67,7 +67,6 @@ class NaiveConvexHullLearner:
         Note: the returned values represents the linear inequalities of the convex hull, i.e.,  Ax <= b.
         """
         self.logger.debug(f"Creating convex hull for action {self.action_name}.")
-        extra_conditions = []
         columns_to_use = points_df.columns.tolist()
         if points_df.shape[1] == 1:
             points = points_df.to_numpy()
@@ -76,13 +75,10 @@ class NaiveConvexHullLearner:
             border_point = prettify_coefficients([-points.min(), points.max()])
 
         else:
-            no_constant_columns_matrix, equality_strs, removed_fluents = filter_constant_features(points_df)
-            filtered_previous_state_matrix, column_equality_strs, removed_fluents = detect_linear_dependent_features(no_constant_columns_matrix)
-            coefficients, border_point = self._execute_convex_hull(filtered_previous_state_matrix.to_numpy(), display_mode)
-            extra_conditions = [*equality_strs, *column_equality_strs]
-            columns_to_use = filtered_previous_state_matrix.columns.tolist()
+            coefficients, border_point = self._execute_convex_hull(points_df.to_numpy(), display_mode)
+            columns_to_use = points_df.columns.tolist()
 
-        return coefficients, border_point, columns_to_use, extra_conditions
+        return coefficients, border_point, columns_to_use, []
 
     @staticmethod
     def _construct_pddl_inequality_scheme(

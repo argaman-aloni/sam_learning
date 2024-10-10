@@ -6,6 +6,7 @@ from pandas import DataFrame
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
+from sam_learning.core.numeric_learning.numeric_utils import remove_complex_linear_dependencies
 
 TEST_ACTION_NAME = "test_action"
 
@@ -226,6 +227,34 @@ def test_create_convex_hull_linear_creates_convex_hull_with_no_duplicate_equatio
     )
     assert len(span_verification_conditions) == 0
     assert len([str(c) for c in coefficients]) == len(set([str(c) for c in coefficients]))
+
+
+def test_create_convex_hull_with_and_without_linear_dependency_removal_should_create_the_same_number_of_inequalities_when_there_are_constants_and_linear_dependent_features(
+    convex_hull_learner: ConvexHullLearner,
+):
+    # we have data with 4 features, one feature is constant with the value of 1, and the other two are linearly dependent on one another and the last one is independent.
+    # we create 10 samples of this data, and then we create the convex hull with and without removing the linear dependency.
+    # The number of inequalities should be the same.
+    NUM_SAMPLES = 10
+    pre_state_data = {
+        "(x )": [1] * NUM_SAMPLES,
+        "(y )": [i for i in range(NUM_SAMPLES)],
+        "(z )": [2 * i for i in range(NUM_SAMPLES)],
+        "(w )": [random.randint(0, 100) for _ in range(NUM_SAMPLES)],
+    }
+    pre_state_df = DataFrame(pre_state_data)
+    filtered_df, linear_deps = remove_complex_linear_dependencies(pre_state_df)
+    assert len(filtered_df.columns.tolist()) < len(pre_state_df.columns.tolist())
+    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._create_convex_hull_linear_inequalities(
+        pre_state_df, display_mode=False
+    )
+    (
+        coefficients_filtered,
+        border_point_filtered,
+        transformed_vars_filtered,
+        span_verification_conditions_filtered,
+    ) = convex_hull_learner._create_convex_hull_linear_inequalities(filtered_df, display_mode=False)
+    assert len(coefficients_filtered) == len(coefficients)
 
 
 def test_construct_safe_linear_inequalities_with_relevant_fluents_ignores_all_variables_that_are_not_in_the_relevant_fluents(
