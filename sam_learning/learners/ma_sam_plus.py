@@ -1,19 +1,40 @@
-"""Module to learn action models from multi-agent trajectories with joint actions."""
-import logging
+"""Module to learn action models with macro actions from multi-agent trajectories with joint actions."""
 import re
 from typing import Dict, List, Tuple, Set, Optional
 
-from pddl_plus_parser.models import Predicate, Domain, MultiAgentComponent, MultiAgentObservation, ActionCall, State, \
-    GroundedPredicate, JointActionCall, CompoundPrecondition, SignatureType, PDDLType
+from pddl_plus_parser.models import Predicate, Domain, MultiAgentObservation, \
+     CompoundPrecondition, SignatureType, PDDLType
 
-from sam_learning.core import (LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data, PGType,
+from sam_learning.core import (LearnerDomain, LearnerAction, extract_predicate_data, PGType,
                                group_params_from_clause)
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 
-from itertools import chain, combinations
-from utilities import powerset, combine_groupings, NegativePreconditionPolicy
+from utilities import NegativePreconditionPolicy
 
 BindingType = Dict[tuple[str, str], str]
+
+
+def combine_groupings(groupings: List[List[set]]) -> List[set]:
+    """
+    Combine sets that share common elements across all groupings into new groupings.
+    """
+    combined = []
+
+    # Flatten and combine all sets that share elements
+    for grouping in groupings:
+        for param_set in grouping:
+            merged = False
+
+            for existing_set in combined:
+                if not param_set.isdisjoint(existing_set):
+                    existing_set.update(param_set)
+                    merged = True
+                    break
+
+            if not merged:
+                combined.append(param_set)
+
+    return combined
 
 
 class MASAMPlus(MultiAgentSAM):
@@ -29,7 +50,7 @@ class MASAMPlus(MultiAgentSAM):
         self.mapping = {}
         self.unsafe_actions_preconditions_map = {}
 
-    def _extract_predicate_from_clause(self, clause_element: Tuple[str, str], mapping: BindingType) -> Predicate:
+    def _extract_predicate_from_clause_and_adapt_to_macro(self, clause_element: Tuple[str, str], mapping: BindingType) -> Predicate:
         """Helper function to extract predicate data and adapt it to the macro signature.
 
         :param clause_element: A tuple of (action_name, lifted_fluent).
@@ -88,15 +109,15 @@ class MASAMPlus(MultiAgentSAM):
         for fluent, fluent_cnf in self.literals_cnf.items():
             effects = fluent_cnf.extract_macro_action_effects(lma_names, relevant_preconditions_str, param_grouping)
             for effect_element in effects:
-                cnf_effects.append(self._extract_predicate_from_clause(effect_element, mapping))
+                cnf_effects.append(self._extract_predicate_from_clause_and_adapt_to_macro(effect_element, mapping))
 
         # TODO find a neater way to remove duplicates
-        unique_representations = {}
+        unique_representations = set()
         unique_cnf_effects = []
 
         for effect in cnf_effects:
             if effect.untyped_representation not in unique_representations:
-                unique_representations[effect.untyped_representation] = True
+                unique_representations.add(effect.untyped_representation)
                 unique_cnf_effects.append(effect)
 
         return unique_cnf_effects
@@ -108,7 +129,7 @@ class MASAMPlus(MultiAgentSAM):
         for fluent, fluent_cnf in self.literals_cnf.items():
             preconditions = fluent_cnf.extract_macro_action_preconditions(lma_names, param_grouping)
             for precondition_element in preconditions:
-                cnf_preconditions.append(self._extract_predicate_from_clause(precondition_element, mapping))
+                cnf_preconditions.append(self._extract_predicate_from_clause_and_adapt_to_macro(precondition_element, mapping))
 
         new_precondition = CompoundPrecondition()
         for action in action_group:
@@ -118,7 +139,7 @@ class MASAMPlus(MultiAgentSAM):
             for _, precondition in preconditions:
                 if isinstance(precondition, Predicate):
                     cnf_preconditions.append(
-                        self._extract_predicate_from_clause((action.name,
+                        self._extract_predicate_from_clause_and_adapt_to_macro((action.name,
                                                             precondition.untyped_representation),
                                                             mapping))
 
@@ -143,9 +164,9 @@ class MASAMPlus(MultiAgentSAM):
                                     action.preconditions if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                #TODO need to check if its copy or overriden next line
                 self.unsafe_actions_preconditions_map[action.name] = action.preconditions
                 action.preconditions = CompoundPrecondition()
+                self.partial_domain.actions.pop(action.name)
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)
@@ -233,6 +254,9 @@ class MacroActionParser:
 
     @staticmethod
     def _return_sub_type(type1: PDDLType, type2: PDDLType) -> PDDLType:
+        """
+        function to return the subtype between two types
+        """
         if not type1:
             return type2
 
@@ -245,31 +269,40 @@ class MacroActionParser:
         return type2
 
     @staticmethod
-    def generate_macro_action_name(action_names: list[str]) -> str:
+    def generate_macro_action_name(action_names: List[str]) -> str:
+        """ function to generate a name for macro actions given the names of the actions """
         return "-".join(action_names)
 
     @staticmethod
-    def generate_macro_action_signature(actions: set[LearnerAction], mapping) -> SignatureType:
+    def generate_macro_action_signature(actions: Set[LearnerAction], mapping: BindingType) -> SignatureType:
+        """
+        generates a signature for a macro action, taking care of the types of the parameters, and their names
+
+        :param actions: a set of actions consisting the macro action
+        :param mapping: maps between micro actions param names to macro action param names
+        NOTE:, in cases of 2 or more micro actions parameters converging in 1 macro parameter, the macro param type
+                will be the subtype of all micro parameters.
+        """
         all_params_dict = {}
         for action in actions:
             for param_name, param_type in action.signature.items():
                 all_params_dict[(action.name, param_name)] = param_type
 
-        action_signature: SignatureType = {}
+        macro_action_signature: SignatureType = {}
 
         for key, param_type in all_params_dict.items():
             if key in mapping:
-                param_name = mapping[key]
-                if param_name not in action_signature:
-                    action_signature[param_name] = param_type
+                macro_action_param_name = mapping[key]
+                if macro_action_param_name not in macro_action_signature:
+                    macro_action_signature[macro_action_param_name] = param_type
                 else:
-                    action_signature[param_name] = MacroActionParser._return_sub_type(param_type,
-                                                                                      action_signature[param_name])
+                    macro_action_signature[macro_action_param_name] = (
+                        MacroActionParser._return_sub_type(param_type, macro_action_signature[macro_action_param_name]))
 
-        return action_signature
+        return macro_action_signature
 
     @staticmethod
-    def adapt_predicate_to_macro_mapping(mapping, predicate: Predicate, relevant_action) ->  Predicate:
+    def adapt_predicate_to_macro_mapping(mapping: BindingType, predicate: Predicate, relevant_action) -> Predicate:
         # Ensure the string is properly trimmed
         predicate_copy = predicate.copy()
         new_signature = {}
@@ -279,32 +312,6 @@ class MacroActionParser:
 
         predicate_copy.signature = new_signature
         return predicate_copy
-
-    @staticmethod
-    def adapt_fluent_str_to_macro_signature(signature, fluent_str, relevant_action):
-        # Ensure the string is properly trimmed
-        fluent_str = fluent_str.strip()
-
-        # Improved regex to account for surrounding parentheses and spaces
-        action_match = re.match(r'^\((\w+)\s+(.+)\)$', fluent_str)
-
-        if not action_match:
-            raise ValueError(f"Invalid fluent string format: '{fluent_str}'")
-
-        action_name, params_str = action_match.groups()
-
-        # Split the parameters by whitespace
-        param_list = params_str.split()
-
-        # Replace each parameter in the list according to the signature
-        adapted_params = []
-        for param in param_list:
-            adapted_params.append(f'?{signature[(relevant_action, param[1:])]}')
-
-        # Construct the adapted fluent string
-        adapted_fluent = f"({action_name} {' '.join(adapted_params)})"
-
-        return adapted_fluent
 
     @staticmethod
     def generate_macro_mappings(groupings: List[set], lma_set: set[LearnerAction]) -> BindingType:

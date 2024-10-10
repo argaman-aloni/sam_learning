@@ -7,7 +7,7 @@ from typing import List
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 
-from experiments.multi_agent_experiment_runner import OfflineBasicExperimentRunner
+from experiments.multi_agent_experiment_runner import OfflineBasicExperimentRunner, MultiAgentExperimentRunner
 from sam_learning.learners import MASAMPlus
 from sam_learning.core import LearnerDomain
 from statistics.utils import init_semantic_performance_calculator
@@ -15,11 +15,10 @@ from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPol
 from validators import MacroDomainValidator
 
 DEFAULT_SPLIT = 5
-# INDEXES = list(range(0, 17)) + list(range(20, 81, 10))
-INDEXES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+INDEXES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 30, 40, 50, 60, 70, 80]
 
 
-class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
+class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
     """Class that represents the POL framework for multi-agent plus problems."""
     executing_agents: List[str]
     ma_domain_path: Path
@@ -112,11 +111,11 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
         return domain_file_path
 
     def learn_ma_plus_action_model(
-            self, allowed_filtered_observations: List[MultiAgentObservation], partial_domain: Domain,
+            self, allowed_observations: List[MultiAgentObservation], partial_domain: Domain,
             test_set_dir_path: Path, fold_num: int) -> None:
-        """Learns the action model using the baseline algorithm.
+        """Learns the action model using the ma sam plus algorithm.
 
-        :param allowed_filtered_observations: the list of observations that are allowed to be used for learning.
+        :param allowed_observations: the list of observations that are allowed to be used for learning.
         :param partial_domain: the domain will be learned from the observations.
         :param test_set_dir_path: the path to the test set directory where the learned domain would be validated on.
         :param fold_num: the index of the current fold in the cross validation process.
@@ -125,11 +124,11 @@ class MultiAgentPlusExperimentRunner(OfflineBasicExperimentRunner):
         self._learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_plus
-        learned_model, learning_report = learner.learn_combined_action_model_with_macro_actions(allowed_filtered_observations)
+        learned_model, learning_report = learner.learn_combined_action_model_with_macro_actions(allowed_observations)
         self.export_learned_domain(
             learned_model, self.working_directory_path / "results_directory",
-            f"ma_sam_plus_{self.negative_preconditions_policy.name}_{len(allowed_filtered_observations)}_trajectories_fold_{fold_num}.pddl")
-        self.validate_learned_domain(allowed_filtered_observations, learned_model,
+            f"ma_sam_plus_{self.negative_preconditions_policy.name}_{len(allowed_observations)}_trajectories_fold_{fold_num}.pddl")
+        self.validate_learned_domain(allowed_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]), learner)
 
     def run_cross_validation(self) -> None:

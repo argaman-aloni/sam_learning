@@ -10,8 +10,8 @@ PGType = List[Set[Tuple[str, str]]]
 
 def is_clause_consistent(
         clause: List[Tuple[str, str]],
-        action_group_names: List[str],
-        parameter_grouping: PGType
+        macro_action_group_names: List[str],
+        parameter_grouping_of_macro: PGType
         ) -> bool:
     """
     Checks whether a given clause is consistent based on the provided action group names and parameter groupings
@@ -22,20 +22,20 @@ def is_clause_consistent(
         provided in `parameter_grouping` of the macro action.
 
     :param clause: A list of tuples of action and its associated fluent.
-    :param action_group_names: The actions' names of the macro action.
-    :param parameter_grouping:
+    :param macro_action_group_names: The actions' names of the macro action.
+    :param parameter_grouping_of_macro:
         A list of parameter groups, where each set contains tuples of (action_index, parameter_name) pairs.
         These groupings represent how parameters are related across different actions.
 
     Returns: True if the clause is consistent, else False
     """
-    if not all([action in action_group_names for (action, _) in clause]):
+    if not all(action in macro_action_group_names for (action, _) in clause):
         return False
 
-    grouped_params = group_params_from_clause(clause)
+    parameter_grouping_of_clause = group_params_from_clause(clause)
 
-    for group in grouped_params:
-        if not any(group.issubset(grouping) for grouping in parameter_grouping):
+    for clause_param_group in parameter_grouping_of_clause:
+        if not any(clause_param_group.issubset(macro_param_group) for macro_param_group in parameter_grouping_of_macro):
             return False
 
     return True
@@ -45,25 +45,25 @@ def group_params_from_clause(clause: List[Tuple[str, str]]) -> PGType:
     """
     Processes a single clause, grouping parameters from different actions
     by their index position in the match.
-
     :param clause: A list of tuples of action and its associated fluent.
 
     Returns: Parameter Grouping, which is a list of groups. Each group consists of (action, parameter).
              A group signifies the parameters that are together bound to the same objects in the macro action.
     """
     param_pattern = re.compile(r'\?\w+')
-    grouped_params = []
+    fluent_example = clause[0][1]
+    num_of_params = len(param_pattern.findall(fluent_example))
+
+    # each parameter has its own respective set of bound parameters
+    clause_param_grouping = [set() for _ in range(num_of_params)]
 
     for (action_name, fluent_str) in clause:
         parameters = param_pattern.findall(fluent_str)
 
-        while len(grouped_params) < len(parameters):
-            grouped_params.append(set())
-
         for idx, param in enumerate(parameters):
-            grouped_params[idx].add((action_name, param))
+            clause_param_grouping[idx].add((action_name, param))
 
-    return grouped_params
+    return clause_param_grouping
 
 
 class LiteralCNF:
@@ -114,10 +114,10 @@ class LiteralCNF:
     def is_action_safe(self, action_name: str, action_preconditions: Set[str]) -> bool:
         """Checks if an action is safe to execute based on this CNF clause.
 
-               :param action_name: the name of the action.
-               :param action_preconditions: the preconditions of the action.
-               :return: True if the action is safe to execute, False otherwise.
-               """
+        :param action_name: the name of the action.
+        :param action_preconditions: the preconditions of the action.
+        :return: True if the action is safe to execute, False otherwise.
+        """
 
         unit_clauses = []  # unit clauses of size 1 (1 tuple) that contains action_name
         non_unit_clauses = []  # non-unit clauses that contain action_name
@@ -177,11 +177,11 @@ class LiteralCNF:
                                      param_grouping: PGType) -> List[tuple[str, str]]:
         """Extract the effects that a macro action is acting on.
 
-                :param action_names: the names of the actions that participate in the macro.
-                :param action_preconditions: the preconditions of the action.
-                :param param_grouping: grouping of the parameters
-                :return: the list of effects that the action is acting on.
-                """
+        :param action_names: the names of the actions that participate in the macro.
+        :param action_preconditions: the preconditions of the action.
+        :param param_grouping: grouping of the parameters
+        :return: the list of effects that the action is acting on.
+        """
         effects = []
         for possible_joint_effect in self.possible_lifted_effects:
             if is_clause_consistent(possible_joint_effect, action_names, param_grouping):
@@ -197,10 +197,10 @@ class LiteralCNF:
                                            param_grouping: PGType) -> List[tuple[str, str]]:
         """Extract the effects that a macro action is acting on.
 
-                :param action_names: the names of the actions that participate in the macro.
-                :param param_grouping: grouping of the parameters
-                :return: the list of effects that the action is acting on.
-                """
+        :param action_names: the names of the actions that participate in the macro.
+        :param param_grouping: grouping of the parameters
+        :return: the list of effects that the action is acting on.
+        """
         preconditions = []
         for possible_joint_effect in self.possible_lifted_effects:
             if not is_clause_consistent(possible_joint_effect, action_names, param_grouping):
