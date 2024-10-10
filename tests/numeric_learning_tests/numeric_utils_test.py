@@ -246,6 +246,14 @@ def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduc
     test_data = pd.DataFrame({"a": [1, 2, 3, 4], "b": [1, 3, 3, 4], "c": [3, 6, 7, 9], "d": [1, 1, 1, 1]})
     reduced_data, conditions = remove_complex_linear_dependencies(test_data)
     assert len(conditions) == 2
-    assert conditions == ["(= a (+ (* b -1) (+ c -1)))", "(= d 1)"]
+    assert set(conditions) == {"(= a (+ (* b -1) (+ c -1)))", "(= d 1)"}
     assert len(reduced_data.columns.tolist()) == 2
     assert "a" not in reduced_data.columns.tolist()
+
+
+def test_remove_complex_linear_dependencies_when_all_columns_are_constant_values_returns_empty_dataframe_and_the_pddl_constraint_that_checks_the_column_name_is_equal_to_the_constant():
+    test_data = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 1, 1, 1], "c": [1, 1, 1, 1]})
+    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
+    assert len(conditions) == 3
+    assert conditions == ["(= a 1)", "(= b 1)", "(= c 1)"]
+    assert len(reduced_data.columns) == 0

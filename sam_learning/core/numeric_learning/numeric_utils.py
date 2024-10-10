@@ -464,9 +464,13 @@ def remove_complex_linear_dependencies(data: DataFrame) -> Tuple[DataFrame, List
     if len(data) == 0 or len(data.columns) == 1:
         return data, []
 
-    removed_columns = []
-    conditions = []
-    for feature_to_check in data.columns:
+    constant_columns = data.columns[data.nunique() == 1].tolist()
+    removed_columns = [*constant_columns]
+    conditions = [f"(= {col} {data[col].unique()[0]})" for col in constant_columns]
+    if len(data.columns) == len(constant_columns):
+        return DataFrame(), conditions
+
+    for feature_to_check in [col for col in data.columns if col not in removed_columns]:
         features = data[[col for col in data.columns if col != feature_to_check and col not in removed_columns]]
         if len(features.columns) == 0:
             # no columns left to check
