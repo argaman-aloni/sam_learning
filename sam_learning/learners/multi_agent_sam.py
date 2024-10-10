@@ -235,21 +235,16 @@ class MultiAgentSAM(SAMLearner):
             self.handle_concurrent_execution(grounded_effect, executing_actions)
 
     def _verify_parameter_duplication_for_ma_sam(self, joint_action: JointActionCall) -> bool:
-        joint_action_has_duplicates = False
-        for grounded_action in joint_action.operational_actions:
-            has_duplicates = contains_duplicates(grounded_action.parameters)
-            if has_duplicates:
-                joint_action_has_duplicates = True
-                action = self.partial_domain.actions[grounded_action.name]
-                grounded_signature_map = defaultdict(list)
-                for grounded_param, lifted_param in zip(grounded_action.parameters, action.parameter_names):
-                    grounded_signature_map[grounded_param].append(lifted_param)
+        """
+        verifies for each of the actions in the joint action that it does not consist of param duplications.
+        We have decided that at least one such action in the joint action makes the whole joint action illegitimate.
+        Notice that _verify_parameter_duplication deletes inequality preconditions of the action.
 
-                for lifted_duplicates_list in grounded_signature_map.values():
-                    for (obj1, obj2) in combinations(lifted_duplicates_list, 2):
-                        action.preconditions.root.inequality_preconditions.discard((obj1, obj2))
-
-        return joint_action_has_duplicates
+        NOTE: should be a list comprehension rather than lazy loaded
+        in order to call verify on all actions and not return early
+        """
+        return any([super()._verify_parameter_duplication(action)
+                   for action in joint_action.operational_actions])
 
     def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:
         """Handles a single multi-agent triplet in the observed trajectory.
