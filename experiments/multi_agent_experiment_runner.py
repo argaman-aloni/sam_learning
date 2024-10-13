@@ -64,11 +64,10 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         )
         self.max_iter = max_traj
 
-    def _generate_path_pattern(self, learning_algorithm, negative_policy, allowed_observations_len, fold_num):
-        return (
-            f"{learning_algorithm.name}_{negative_policy.name}_"
-            f"{allowed_observations_len}_trajectories_fold_{fold_num}.pddl"
-        )
+    def generate_path_pattern(self, learning_algorithm, negative_policy, allowed_observations_len, fold_num):
+        return (self.working_directory_path / "results_directory" /
+                f"{learning_algorithm.name}_{negative_policy.name}_"
+                f"{allowed_observations_len}_trajectories_fold_{fold_num}.pddl")
 
     def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
         """Create a single agent observation from a multi-agent observation.
@@ -143,16 +142,9 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         for algorithm in [LearningAlgorithmType.sam_learning, LearningAlgorithmType.ma_sam]:
             for policy in NegativePreconditionPolicy:
                 self.semantic_performance_calc.learning_algorithm = algorithm
-                self.ma_domain_path = (self.working_directory_path / "results_directory" /
-                                       self._generate_path_pattern(algorithm,
-                                                                   policy,
-                                                                   observations_length[algorithm],
-                                                                   fold_num))
+                self.ma_domain_path = self.generate_path_pattern(algorithm, policy, observations_length[algorithm], fold_num)
                 self.semantic_performance_calc.calculate_performance_for_ma_sam_experiments(
-                    self.ma_domain_path,
-                    observations_length[algorithm],
-                    policy,
-                    fold_num
+                    self.ma_domain_path, observations_length[algorithm], policy, fold_num
                 )
 
     def validate_learned_domain(
@@ -212,11 +204,10 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         learned_model, learning_report = learner.learn_action_model(allowed_filtered_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_filtered_observations, learned_model,
                                                              learning_report)
-        self.ma_domain_path = (self.working_directory_path / "results_directory" /
-                               self._generate_path_pattern(LearningAlgorithmType.sam_learning,
-                                                           self.negative_preconditions_policy,
-                                                           len(allowed_filtered_observations),
-                                                           fold_num))
+        self.ma_domain_path = self.generate_path_pattern(LearningAlgorithmType.sam_learning,
+                                                         self.negative_preconditions_policy,
+                                                         len(allowed_filtered_observations),
+                                                         fold_num)
 
         self.export_learned_domain(
             learned_model, self.ma_domain_path.parent,
@@ -242,11 +233,10 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         learned_model, learning_report = learner.learn_combined_action_model(allowed_complete_observations)
         self.learning_statistics_manager.add_to_action_stats(allowed_complete_observations, learned_model,
                                                              learning_report)
-        self.ma_domain_path = (self.working_directory_path / "results_directory" /
-                               self._generate_path_pattern(LearningAlgorithmType.ma_sam,
-                                                           self.negative_preconditions_policy,
-                                                           len(allowed_complete_observations),
-                                                           fold_num))
+        self.ma_domain_path = self.generate_path_pattern(LearningAlgorithmType.ma_sam,
+                                                         self.negative_preconditions_policy,
+                                                         len(allowed_complete_observations),
+                                                         fold_num)
         self.export_learned_domain(learned_model, self.ma_domain_path.parent, self.ma_domain_path.name)
         self.validate_learned_domain(allowed_complete_observations, learned_model,
                                      test_set_dir_path, fold_num, float(learning_report["learning_time"]))

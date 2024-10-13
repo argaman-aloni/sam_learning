@@ -4,7 +4,8 @@ from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, M
 from pytest import fixture
 
 from sam_learning.core import LiteralCNF
-from sam_learning.learners import MASAMPlus, MacroActionParser
+from sam_learning.learners import MASAMPlus
+from utilities import MacroActionParser
 from tests.consts import sync_ma_snapshot
 
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0",
@@ -22,7 +23,6 @@ def rovers_ma_sam(ma_rovers_domain) -> MASAMPlus:
     return MASAMPlus(ma_rovers_domain,
                      ["rover0", "rover1", "rover2", "rover3", "rover4",
                       "rover5", "rover6", "rover7", "rover8", "rover9"])
-
 
 @fixture()
 def do_plane_observation_component(multi_agent_observation: MultiAgentObservation) -> MultiAgentComponent:
@@ -56,38 +56,40 @@ def rovers_literals_cnf(ma_rovers_domain: Domain) -> LiteralCNF:
     return LiteralCNF(action_names)
 
 
-def test_generate_macro_action_name(
-        rovers_ma_sam: MASAMPlus,
-        woodworking_ma_combined_domain: Domain
-):
+def test_generate_macro_action_name_returns_action_name_ordered_according_to_list():
     actions = ["way-forward", "way-backward", "way"]
     macro_name = MacroActionParser.generate_macro_action_name(actions)
-    assert macro_name == "way-forward@way-backward@way"
+    assert macro_name == "way-forward-way-backward-way"
 
 
-def test_generate_macro_mappings_without_grouping(
-        rovers_ma_sam: MASAMPlus,
-        woodworking_ma_combined_domain: Domain):
+def test_generate_macro_mappings_without_grouping_returns_mapping_where_no_parameters_share_macro_parameter(
+        rovers_ma_sam: MASAMPlus
+):
     actions = {rovers_ma_sam.partial_domain.actions["drop"], rovers_ma_sam.partial_domain.actions["sample_rock"]}
-    binding = MacroActionParser.generate_macro_mappings([], [], actions)
+    binding = MacroActionParser.generate_macro_mappings([], actions)
+    drop_params_len = len(rovers_ma_sam.partial_domain.actions["drop"].parameter_names)
+    sample_rock_params_len = len(rovers_ma_sam.partial_domain.actions["sample_rock"].parameter_names)
 
-    assert (len(set(binding.keys())) == len(rovers_ma_sam.partial_domain.actions["drop"].parameter_names) +
-            len(rovers_ma_sam.partial_domain.actions["sample_rock"].parameter_names) == len(set(binding.values())))
+    assert len(set(binding.keys())) == len(set(binding.values()))
+    assert (drop_params_len + sample_rock_params_len) == len(set(binding.values()))
 
 
-def test_generate_macro_mappings_with_grouping(
+def test_generate_macro_mappings_with_grouping_returns_mapping_where_parameters_share_macro_parameter(
         rovers_ma_sam: MASAMPlus,
-        woodworking_ma_combined_domain: Domain):
+):
     actions = {rovers_ma_sam.partial_domain.actions["drop"], rovers_ma_sam.partial_domain.actions["sample_rock"]}
     grouping = [{("drop", "?x"), ("sample_rock", "?x")}]
-    binding = MacroActionParser.generate_macro_mappings(grouping, [], actions)
-    duplicates = 1
-    assert (len(set(binding.keys())) == len(rovers_ma_sam.partial_domain.actions["drop"].parameter_names) +
-            len(rovers_ma_sam.partial_domain.actions["sample_rock"].parameter_names) ==
-            len(set(binding.values())) + duplicates)
+    binding = MacroActionParser.generate_macro_mappings(grouping, actions)
+    shared_parameters = 1
+
+    drop_params_len = len(rovers_ma_sam.partial_domain.actions["drop"].parameter_names)
+    sample_rock_params_len = len(rovers_ma_sam.partial_domain.actions["sample_rock"].parameter_names)
+
+    assert len(set(binding.keys())) == (len(set(binding.values())) + shared_parameters)
+    assert (drop_params_len + sample_rock_params_len) == len(set(binding.keys()))
 
 
-def test_generate_macro_action_signature(
+def test_generate_macro_action_signature_returns_macro_signature_with_correct_types(
         rovers_ma_sam: MASAMPlus,
         woodworking_ma_combined_domain: Domain):
 
@@ -106,3 +108,31 @@ def test_generate_macro_action_signature(
             assert action.signature[parameter] == signature[parameter + str(i)]
 
     assert len(set(signature)) == len(set(bindings.values()))
+
+
+def test_extract_actions_from_macro_action_from_line_with_macro_returns_several_micro_actions_lines(
+        rovers_ma_sam_plus: MASAMPlus,
+        ma_rovers_observation
+):
+    rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation])
+    macro_name = list(rovers_ma_sam_plus.mapping.keys())[0]
+    action_line = f"({macro_name} a b c d e f h)"
+    new_action_lines = MacroActionParser.extract_actions_from_macro_action(
+        action_line, rovers_ma_sam_plus.mapping
+    )
+    print(new_action_lines)
+    print(rovers_ma_sam_plus.mapping)
+    assert {'(communicate_rock_data a b c d e)', '(navigate f c h)'} == new_action_lines
+
+
+def test_extract_actions_from_macro_actions_from_line_without_macro_returns_same_line(
+        rovers_ma_sam_plus: MASAMPlus,
+        ma_rovers_observation
+):
+    rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation])
+    action_line = f"(navigate a b c d e f h)"
+    new_action_lines = MacroActionParser.extract_actions_from_macro_action(
+        action_line, rovers_ma_sam_plus.mapping
+    )
+    print(new_action_lines)
+    assert {action_line} == new_action_lines

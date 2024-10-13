@@ -189,7 +189,8 @@ class LiteralCNF:
                     # basically, if there's at least one action that allows this effect, we'll take the effect
                     if effect not in action_preconditions:
                         effects.append((action, effect))
-                        break
+                        # Todo remove the comment after seeing all experiments prove good results
+                        # break
 
         return effects
 

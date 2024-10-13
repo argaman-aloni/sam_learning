@@ -25,8 +25,6 @@ from sam_learning.core import VocabularyCreator
 from utilities import LearningAlgorithmType
 from validators import run_validate_script, VALID_PLAN
 
-ACTION_VOCABULARY_MIN_SIZE = 20
-
 SEMANTIC_PRECISION_STATS = [
     "action_name",
     "num_trajectories",
@@ -75,7 +73,7 @@ class SemanticPerformanceCalculator:
     """Class responsible for calculating the semantic precision and recall of a model."""
 
     model_domain: Domain
-    dataset_observations: List[Observation]
+    dataset_observations: List[Union[Observation, MultiAgentObservation]]
     learning_algorithm: LearningAlgorithmType
     combined_stats: List[Dict[str, Any]]
     logger: logging.Logger

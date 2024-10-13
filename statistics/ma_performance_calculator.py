@@ -23,6 +23,7 @@ SEMANTIC_PRECISION_STATS = [
     "precondition_recall",
 ]
 
+
 class MASamPerformanceCalculator(SemanticPerformanceCalculator):
     """Class responsible for calculating the Multi-Agent precision and recall of a model."""
 
@@ -30,7 +31,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
         self,
         model_domain: Domain,
         model_domain_path: Path,
-        observations: List[Union[Observation, MultiAgentObservation]],
+        observations: List[MultiAgentObservation],
         working_directory_path: Path,
         learning_algorithm: LearningAlgorithmType,
     ):
@@ -52,8 +53,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
         for index, observation in enumerate(self.dataset_observations):
             observation_objects = observation.grounded_objects
             for component in observation.components:
-                actions = [component.grounded_action_call] if isinstance(observation, Observation) else component.grounded_joint_action.actions
-                for action in actions:
+                for action in component.grounded_joint_action.actions:
                     if action.name not in learned_domain.actions:
                         continue
 

@@ -4,7 +4,7 @@ from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, M
 from pytest import fixture
 
 from sam_learning.core import LiteralCNF
-from sam_learning.learners import MASAMPlus, group_params_from_clause
+from sam_learning.learners import MASAMPlus, group_params_from_clause, combine_groupings
 from tests.consts import sync_ma_snapshot
 
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0",
@@ -15,12 +15,6 @@ ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
 @fixture()
 def woodworking_ma_sam_plus(woodworking_ma_combined_domain: Domain) -> MASAMPlus:
     return MASAMPlus(woodworking_ma_combined_domain)
-
-
-@fixture()
-def rovers_ma_sam_plus(ma_rovers_domain) -> MASAMPlus:
-    return MASAMPlus(ma_rovers_domain)
-
 
 @fixture()
 def do_plane_observation_component(multi_agent_observation: MultiAgentObservation) -> MultiAgentComponent:
@@ -61,14 +55,14 @@ def driverlog_ma_sam_plus(ma_driverlog_domain) -> MASAMPlus:
 
 def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions(
         rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
-    learned_domain, learning_report = (
+    learned_domain, _, _ = (
         rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation]))
     print(learned_domain.to_pddl())
 
 
 def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions_driverlog(
         driverlog_ma_sam_plus: MASAMPlus, ma_driverlog_observation):
-    learned_domain, learning_report = (
+    learned_domain, _, _ = (
         driverlog_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_driverlog_observation]))
     print(learned_domain.to_pddl())
 
@@ -86,7 +80,7 @@ def test_extract_relevant_action_groups_with_no_observed_actions_returns_no_acti
     assert len(action_group) == 0
 
 
-def test_extract_relevant_action_groups_with_observed_actions_with_no_colliding_actions_returns_no_action_group(
+def test_extract_relevant_action_groups_with_observed_actions_with_no_unsafe_actions_returns_no_action_group(
      woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
@@ -101,11 +95,11 @@ def test_extract_relevant_action_groups_with_observed_actions_with_no_colliding_
     assert len(action_group) == 0
 
 
-def test_extract_relevant_action_groups_with_observed_actions_with_colliding_actions_returns_action_group(
+def test_extract_relevant_action_groups_with_observed_actions_with_unsafe_actions_returns_action_groups(
         woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
-
+    #Note: the safeness of the actions is learned through the cnfs
     woodworking_ma_sam_plus.literals_cnf["(surface-condition ?obj ?surface)"] = woodworking_literals_cnf
     woodworking_literals_cnf.add_possible_effect([("do-grind", "(surface-condition ?m ?oldcolour)"),
                                                   ("do-immersion-varnish", "(surface-condition ?m ?colour)")])
@@ -116,19 +110,19 @@ def test_extract_relevant_action_groups_with_observed_actions_with_colliding_act
     woodworking_literals_cnf.add_possible_effect([("do-grind", "(surface-condition ?m ?oldcolour)"),
                                                   ("do-plane", "(surface-condition ?m ?colour)"),
                                                   ("do-immersion-varnish", "(surface-condition ?m ?colour)")])
-
     woodworking_ma_sam_plus.observed_actions = ["do-grind", "do-plane", "do-immersion-varnish"]
+    woodworking_ma_sam_plus.safe_actions = ["do-immersion-varnish"]
 
     action_groups = woodworking_ma_sam_plus.extract_relevant_action_groups()
-    action_groups_names = list(map(lambda x: sorted(list(map(lambda u: u.name, x))), action_groups))
-    assert len(action_groups_names) == 4
-    assert sorted(["do-immersion-varnish", "do-grind"]) in action_groups_names
-    assert sorted(["do-grind", "do-plane"]) in action_groups_names
-    assert sorted(["do-plane", "do-immersion-varnish"]) in action_groups_names
-    assert sorted(["do-grind", "do-plane", "do-immersion-varnish"]) in action_groups_names
+    action_groups_names = {frozenset(u.name for u in group) for group in action_groups}
+    expected_names = [{"do-immersion-varnish", "do-grind"}, {"do-grind", "do-plane"},
+                      {"do-plane", "do-immersion-varnish"}, {"do-grind", "do-plane", "do-immersion-varnish"}]
+
+    assert all(action_group in expected_names for action_group in action_groups_names)
+    assert len(action_groups) == 4
 
 
-def test_extract_relevant_parameter_groupings_with_valid_action_group_returns_informative_parameter_groupings(
+def test_extract_relevant_parameter_groupings_with_existing_action_group_returns_valid_parameter_groupings(
      woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
@@ -153,7 +147,7 @@ def test_extract_relevant_parameter_groupings_with_valid_action_group_returns_in
     assert parameter_grouping == real_parameter_grouping
 
 
-def test_extract_relevant_parameter_groupings_with_no_valid_action_group_returns_uninformative_parameter_groupings(
+def test_extract_relevant_parameter_groupings_with_non_existing_action_group_returns_no_parameter_groupings(
      woodworking_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         woodworking_ma_combined_domain: Domain,
         woodworking_literals_cnf):
@@ -173,25 +167,27 @@ def test_extract_relevant_parameter_groupings_with_no_valid_action_group_returns
     assert len(parameter_grouping) == 0
 
 
-def test_group_params_from_non_unit_clause():
+def test_group_params_from_clause_handles_non_unit_clause_returns_parameters_grouping_with_groups_consisting_of_several_actions():
     clause = [("do-grind", "(m ?x ?y)"),
               ("do-plane", "(m ?x ?z)")]
 
     group = group_params_from_clause(clause)
-    real_group = [{('do-grind', '?x'), ('do-plane', '?x')}, {('do-grind', '?y'), ('do-plane', '?z')}]
+    real_group = [{('do-grind', '?x'), ('do-plane', '?x')},
+                  {('do-grind', '?y'), ('do-plane', '?z')}]
 
     assert group == real_group
 
 
-def test_group_params_from_unit_clause():
+def test_group_params_from_clause_handles_unit_clause_returns_parameters_grouping_with_groups_consisting_of_solo_actions():
     clause = [("do-grind", "(m ?x ?y)"),]
 
     group = group_params_from_clause(clause)
 
-    assert group == [{('do-grind', '?x')}, {('do-grind', '?y')}]
+    assert group == [{('do-grind', '?x')},
+                     {('do-grind', '?y')}]
 
 
-def test_extract_effects_for_macro_from_cnf(
+def test_extract_effects_for_macro_from_cnf_returns_effects_adapted_to_macro_naming(
         rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         ma_rovers_domain: Domain):
     action_names = [action for action in ma_rovers_domain.actions.keys()]
@@ -206,19 +202,17 @@ def test_extract_effects_for_macro_from_cnf(
                               ('navigate', '(fluent_test1 ?y)')])
     cnf2.add_possible_effect([('communicate_rock_data', '(fluent_test2 ?p)'),
                               ('navigate', '(fluent_test2 ?y)')])
-    cnf2.add_possible_effect([('communicate_rock_data', '(fluent_test3 ?p)'),
-                              ('navigate', '(fluent_test3 ?x)')])
 
-    binding = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
+    param_grouping = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
     lma_names = ["navigate", "communicate_rock_data"]
-    action_group = [action for action in rovers_ma_sam_plus.partial_domain.actions.values() if action.name in lma_names]
+    action_group = {action for action in rovers_ma_sam_plus.partial_domain.actions.values() if action.name in lma_names}
 
     mapping = {('navigate', '?x'): "?x'0", ('navigate', '?y'): '?yp', ('navigate', '?z'): "?z'0",
                ('communicate_rock_data', '?r'): "?r'1", ('communicate_rock_data', '?l'): "?l'1",
                ('communicate_rock_data', '?p'): '?yp', ('communicate_rock_data', '?x'): "?x'1",
                ('communicate_rock_data', '?y'): "?y'1"}
 
-    effects = rovers_ma_sam_plus.extract_effects_for_macro_from_cnf(action_group, binding, mapping)
+    effects = rovers_ma_sam_plus.extract_effects_for_macro_from_cnf(action_group, param_grouping, mapping)
 
     effects_rep = [effect.untyped_representation for effect in effects]
     assert "(fluent_test1 ?yp)" in effects_rep
@@ -226,7 +220,7 @@ def test_extract_effects_for_macro_from_cnf(
     assert len(effects_rep) == 2
 
 
-def test_extract_preconditions_for_macro_from_cnf(
+def test_extract_preconditions_for_macro_from_cnf_returns_preconditions_adapted_to_macro_naming(
         rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         ma_rovers_domain: Domain):
     action_names = [action for action in ma_rovers_domain.actions.keys()]
@@ -237,12 +231,13 @@ def test_extract_preconditions_for_macro_from_cnf(
     rovers_ma_sam_plus.literals_cnf["fluent_test2 ?w"] = cnf2
     rovers_ma_sam_plus.literals_cnf["fluent_test3 ?x"] = cnf3
 
+    # fluent_test1 and fluent_test2 will have consistent clauses hence only fluent_test3 will extract a precondition.
     cnf1.add_possible_effect([('communicate_rock_data', '(fluent_test1 ?p)'),
                               ('navigate', '(fluent_test1 ?y)')])
     cnf2.add_possible_effect([('communicate_rock_data', '(fluent_test2 ?p)'),
                               ('navigate', '(fluent_test2 ?y)')])
     cnf2.add_possible_effect([('communicate_rock_data', '(fluent_test3 ?p)'),
-                              ('navigate', '(fluent_test3 ?x)')])
+                              ('drop', '(fluent_test3 ?x)')])
 
     parameter_grouping = [{('communicate_rock_data', '?p'), ('navigate', '?y')}]
     action_group = {rovers_ma_sam_plus.partial_domain.actions["navigate"],
@@ -256,12 +251,11 @@ def test_extract_preconditions_for_macro_from_cnf(
     precondition = rovers_ma_sam_plus.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapping)
 
     precondition_rep = [precondition.untyped_representation for precondition in precondition.root.operands]
-    assert len(precondition_rep) == 2
-    assert "(fluent_test3 ?x'0)" in precondition_rep
+    assert len(precondition_rep) == 1
     assert "(fluent_test3 ?yp)" in precondition_rep
 
 
-def test_extract_preconditions_for_macro_from_cnf_of_non_consistent_clause_and_contains_grouped_params_returns_one_prec(
+def test_extract_preconditions_for_macro_from_cnf_returns_no_duplication_of_preconditions(
         rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall,
         ma_rovers_domain: Domain, rovers_literals_cnf):
     rovers_ma_sam_plus.literals_cnf["fluent_test1 ?w"] = rovers_literals_cnf
@@ -279,6 +273,9 @@ def test_extract_preconditions_for_macro_from_cnf_of_non_consistent_clause_and_c
                ('communicate_rock_data', '?p'): '?yp', ('communicate_rock_data', '?x'): "?x'1",
                ('communicate_rock_data', '?y'): "?y'1", ('sample_rock', '?x'): "?x'2"}
 
+    # clause is not consistent because it has one more action not relevant to the action group.
+    # in theory there are two preconditions here extracted from the cnf, for navigate and for sample rock.
+    # but after adaptation to macro, they look the same, hence only one is returned.
     precondition = rovers_ma_sam_plus.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapping)
 
     precondition_rep = [precondition.untyped_representation for precondition in precondition.root.operands]
@@ -286,26 +283,49 @@ def test_extract_preconditions_for_macro_from_cnf_of_non_consistent_clause_and_c
     assert "(fluent_test1 ?yp)" in precondition_rep
 
 
-def test_extract_actions_from_macro_action(
-        rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
+def test_combine_groupings_with_no_shared_elements_returns_no_change_to_grouping():
+    # No elements are shared, so the output should be the same as the input.
+    groupings = [
+        {('navigate', '?x'), ('go', '?y')},
+        {('go', '?l'), ('arrive', '?z')},
+        {('fly', '?w')},
+        {('navigate', '?y'), ('fly', '?m')}
+    ]
 
-    rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation])
-    macro_name = list(rovers_ma_sam_plus.mapping.keys())[0]
-    action_line = f"({macro_name} a b c d e f h)"
-    new_action_lines = rovers_ma_sam_plus.extract_actions_from_macro_action(action_line)
-    print(new_action_lines)
-    assert ({'(communicate_rock_data d e b f h)', '(navigate a b c)'} == new_action_lines
-            or {'(communicate_rock_data a b c d e)', '(navigate f c h)'} == new_action_lines)
+    result = combine_groupings(groupings)
 
-
-def test_extract_actions_from_macro_actions_from_line_without_macro(
-        rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
-
-    rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation])
-    macro_name = list(rovers_ma_sam_plus.mapping.keys())[0]
-    action_line = f"(navigate a b c d e f h)"
-    new_action_lines = rovers_ma_sam_plus.extract_actions_from_macro_action(action_line)
-    print(new_action_lines)
-    assert {'(navigate a b c d e f h)'} == new_action_lines
+    # Expected output should be the same as the input
+    expected_output = [
+        {('navigate', '?x'), ('go', '?y')},
+        {('go', '?l'), ('arrive', '?z')},
+        {('fly', '?w')},
+        {('navigate', '?y'), ('fly', '?m')}
+    ]
+    assert result == expected_output
 
 
+def test_combine_groupings_with_some_shared_elements_returns_grouping_with_all_shared_elements_in_same_group():
+    # Sets with shared elements should be merged.
+    groupings = [
+        {('navigate', '?x'), ('go', '?y')},
+        {('go', '?y'), ('arrive', '?z')},
+        {('fly', '?w'), ('arrive', '?z')},
+        {('navigate', '?y'), ('fly', '?z')}
+    ]
+    expected_output = [
+        {('navigate', '?x'), ('go', '?y'), ('arrive', '?z'), ('fly', '?w')},
+        {('navigate', '?y'), ('fly', '?z')}
+    ]
+    assert combine_groupings(groupings) == expected_output
+
+
+def test_combine_groupings_with_all_shared_elements_returns_grouping_with_one_maximal_group():
+    # All sets should merge into one big set.
+    groupings = [
+        {('navigate', '?x'), ('go', '?y')},
+        {('go', '?y'), ('arrive', '?z')},
+        {('arrive', '?z'), ('fly', '?w')},
+        {('fly', '?w'), ('navigate', '?x')}
+    ]
+    expected_output = {('navigate', '?x'), ('go', '?y'), ('arrive', '?z'), ('fly', '?w')}
+    assert combine_groupings(groupings) == [expected_output]
