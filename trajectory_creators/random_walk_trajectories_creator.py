@@ -32,9 +32,13 @@ class RandomWalkTrajectoriesCreator:
         self.vocabulary_creator = VocabularyCreator()
         self.logger = logging.getLogger(__name__)
 
-    def _select_inapplicable_action(self, domain: Domain, problem: Problem, current_state: State, ground_actions) -> Tuple[Operator, State]:
-        """Selects an inapplicable action for the current state.
+    def _select_inapplicable_action(
+        self, domain: Domain, problem: Problem, current_state: State, ground_actions: Set[ActionCall]
+    ) -> Tuple[Operator, State]:
+        """Selects an inapplicable action for the current state (This is for performance evaluation purposes).
 
+        :param domain: the domain to select the inapplicable action from.
+        :param problem: the problem defining the objects and the initial state.
         :param current_state: the current state to select the inapplicable action for.
         :param ground_actions: the grounded actions to select the inapplicable action from.
         :return: the inapplicable action and the next state.
@@ -55,19 +59,19 @@ class RandomWalkTrajectoriesCreator:
                 problem_objects=problem.objects,
             )
 
-        return operator, current_state.copy()
+        return operator, State(predicates=current_state.state_predicates, fluents=current_state.state_fluents, is_init=False)
 
     def _select_applicable_action(
         self, domain: Domain, problem: Problem, current_state: State, grounded_actions: Set[ActionCall], inapplicable_actions: Set[ActionCall]
     ) -> Tuple[Operator, State]:
-        """
+        """Selects a random applicable action for the current state.
 
-        :param domain:
-        :param problem:
-        :param current_state:
-        :param grounded_actions:
-        :param inapplicable_actions:
-        :return:
+        :param domain: the domain to select the applicable action from.
+        :param problem: the problem defining the objects and the initial state.
+        :param current_state: the current state to select the applicable action for.
+        :param grounded_actions: the grounded actions to select the applicable action from.
+        :param inapplicable_actions: the inapplicable actions that were already tried on this state.
+        :return: the applicable action and the next state.
         """
         action = random.choice([action for action in grounded_actions if action not in inapplicable_actions])
         operator = Operator(
@@ -184,7 +188,6 @@ class RandomWalkTrajectoriesCreator:
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
-
     trajectory_creator = RandomWalkTrajectoriesCreator(domain_file_name=sys.argv[1], working_directory_path=Path(sys.argv[2]))
     selected_solver = SolverType.enhsp
     trajectory_creator.create_domain_trajectories()
