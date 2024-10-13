@@ -243,7 +243,7 @@ class MultiAgentSAM(SAMLearner):
         NOTE: should be a list comprehension rather than lazy loaded
         in order to call verify on all actions and not return early
         """
-        return any([super()._verify_parameter_duplication(action)
+        return any([super(MultiAgentSAM, self)._verify_parameter_duplication(action)
                    for action in joint_action.operational_actions])
 
     def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:

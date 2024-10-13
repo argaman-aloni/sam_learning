@@ -2,16 +2,16 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 
-from experiments.multi_agent_experiment_runner import OfflineBasicExperimentRunner, MultiAgentExperimentRunner
+from experiments.multi_agent_experiment_runner import MultiAgentExperimentRunner
 from sam_learning.learners import MASAMPlus
 from sam_learning.core import LearnerDomain
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
+from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy, MappingElement
 from validators import MacroDomainValidator
 
 DEFAULT_SPLIT = 5
@@ -26,7 +26,7 @@ class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
     max_iter: int
 
     def __init__(self, working_directory_path: Path, domain_file_name: str,
-                 problem_prefix: str = "pfile", executing_agents: List[str] = None, max_traj: int = 16):
+                 problem_prefix: str = "pfile", executing_agents: List[str] = None, max_traj: int = 20):
         super().__init__(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
                          learning_algorithm=LearningAlgorithmType.ma_sam_plus,
                          problem_prefix=problem_prefix)
@@ -69,9 +69,9 @@ class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
 
         self.domain_validator.write_statistics(fold_num)
 
-    def validate_learned_domain(
+    def validate_learned_macro_domain(
         self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path,
-            fold_number: int, learning_time: float, learner: MASAMPlus = None) -> Path:
+            fold_number: int, learning_time: float, mapping: Dict[str, MappingElement]) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
         :param allowed_observations: the observations that were used in the learning process.
@@ -79,7 +79,7 @@ class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param fold_number: the number of the fold that is currently running.
         :param learning_time: the time it took to learn the domain (in seconds).
-        :param learner: the learning MA+ domain
+        :param mapping: the mapping of the learner+, between macro name and binding.
         :return: the path for the learned domain.
         """
         domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
@@ -95,6 +95,7 @@ class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
         portfolio = (
             [SolverType.fast_forward, SolverType.fast_downward]
         )
+
         self.domain_validator.validate_domain_macro(
             fold=fold_number,
             policy=self.negative_preconditions_policy,
@@ -105,7 +106,7 @@ class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
             timeout=60,
             learning_time=learning_time,
             solvers_portfolio=portfolio,
-            mas_sam_plus=learner
+            mapping=mapping
         )
 
         return domain_file_path
@@ -124,12 +125,17 @@ class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
         self._learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.domain_validator.learning_algorithm = LearningAlgorithmType.ma_sam_plus
         self.learning_statistics_manager.learning_algorithm = LearningAlgorithmType.ma_sam_plus
-        learned_model, learning_report = learner.learn_combined_action_model_with_macro_actions(allowed_observations)
+        learned_model, learning_report, mapping = learner.learn_combined_action_model_with_macro_actions(allowed_observations)
+
+        self.ma_domain_path = self.generate_path_pattern(LearningAlgorithmType.ma_sam_plus,
+                                                         self.negative_preconditions_policy,
+                                                         len(allowed_observations),
+                                                         fold_num)
         self.export_learned_domain(
-            learned_model, self.working_directory_path / "results_directory",
-            f"ma_sam_plus_{self.negative_preconditions_policy.name}_{len(allowed_observations)}_trajectories_fold_{fold_num}.pddl")
-        self.validate_learned_domain(allowed_observations, learned_model,
-                                     test_set_dir_path, fold_num, float(learning_report["learning_time"]), learner)
+            learned_model, self.ma_domain_path.parent,
+            self.ma_domain_path.name)
+        self.validate_learned_macro_domain(allowed_observations, learned_model, test_set_dir_path,
+                                           fold_num, float(learning_report["learning_time"]), learner.mapping)
 
     def run_cross_validation(self) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""

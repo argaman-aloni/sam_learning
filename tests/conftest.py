@@ -5,7 +5,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, Trajector
 from pddl_plus_parser.models import Domain, Problem, Observation, PDDLObject, MultiAgentObservation
 from pytest import fixture
 
-from sam_learning.learners import SAMLearner
+from sam_learning.learners import SAMLearner, MASAMPlus
 from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATORS_TRAJECTORY_PATH, \
     WOODWORKING_DOMAIN_PATH, WOODWORKING_PROBLEM_PATH, WOODWORKING_TRAJECTORY_PATH, WOODWORKING_COMBINED_DOMAIN_PATH, \
     WOODWORKING_COMBINED_PROBLEM_PATH, WOODWORKING_COMBINED_TRAJECTORY_PATH, ROVERS_COMBINED_DOMAIN_PATH, \
@@ -16,7 +16,8 @@ from tests.consts import ELEVATORS_DOMAIN_PATH, ELEVATORS_PROBLEM_PATH, ELEVATOR
     NURIKABE_PROBLEM_PATH, NURIKABE_TRAJECTORY_PATH, ADL_SATELLITE_DOMAIN_PATH, ADL_SATELLITE_PROBLEM_PATH, \
     ADL_SATELLITE_TRAJECTORY_PATH, DEPOTS_DISCRETE_DOMAIN_PATH, DEPOTS_DISCRETE_PROBLEM_PATH, \
     MINECRAFT_LARGE_DOMAIN_PATH, MINECRAFT_LARGE_PROBLEM_PATH, MINECRAFT_LARGE_TRAJECTORY_PATH, \
-    DRIVERLOG_COMBINED_DOMAIN_PATH, DRIVERLOG_COMBINED_PROBLEM_PATH, DRIVERLOG_COMBINED_TRAJECTORY_PATH
+    DRIVERLOG_COMBINED_DOMAIN_PATH, DRIVERLOG_COMBINED_PROBLEM_PATH, DRIVERLOG_COMBINED_TRAJECTORY_PATH, \
+    ROVERS_COMBINED_WITH_MACRO_DOMAIN_PATH
 from tests.multi_agent_learning_tests.multi_agent_sam_test import (WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES,
                                                                    DRIVERLOG_AGENT_NAMES)
 from utilities import NegativePreconditionPolicy
@@ -251,6 +252,10 @@ def ma_driverlog_domain() -> Domain:
 
 
 @fixture()
+def ma_plus_full_rovers_domain() -> Domain:
+    return DomainParser(ROVERS_COMBINED_WITH_MACRO_DOMAIN_PATH, partial_parsing=False).parse_domain()
+
+@fixture()
 def ma_driverlog_problem(ma_driverlog_domain: Domain) -> Problem:
     return ProblemParser(problem_path=DRIVERLOG_COMBINED_PROBLEM_PATH, domain=ma_driverlog_domain).parse_problem()
 
@@ -259,3 +264,8 @@ def ma_driverlog_problem(ma_driverlog_domain: Domain) -> Problem:
 def ma_driverlog_observation(ma_driverlog_domain: Domain, ma_driverlog_problem: Problem) -> MultiAgentObservation:
     return TrajectoryParser(ma_driverlog_domain, ma_driverlog_problem).parse_trajectory(
         DRIVERLOG_COMBINED_TRAJECTORY_PATH, executing_agents=DRIVERLOG_AGENT_NAMES)
+
+
+@fixture()
+def rovers_ma_sam_plus(ma_rovers_domain) -> MASAMPlus:
+    return MASAMPlus(ma_rovers_domain)

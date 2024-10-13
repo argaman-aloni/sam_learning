@@ -1,7 +1,5 @@
 """Module to validate the correctness of the learned action models that were generated."""
 import csv
-import logging
-import re
 import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
@@ -9,12 +7,11 @@ from typing import Dict, List, Any, Optional, Union
 from pddl_plus_parser.models import Observation, MultiAgentObservation
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver, FFADLSolver
-from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
-from validators.common import AGGREGATED_SOLVING_FIELDS
-from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, GOAL_NOT_REACHED, run_validate_script
+from utilities import SolverType, SolutionOutputTypes
+
 from validators import DomainValidator
 from utilities import NegativePreconditionPolicy
-
+from utilities import MacroActionParser, MappingElement
 
 SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,
@@ -79,9 +76,6 @@ NUMERIC_STATISTICS_LABELS = [
 ]
 
 
-ACTION_LINE_REGEX = r"(\[\d+, \d+\]): \(.*\)"
-
-
 class MacroDomainValidator(DomainValidator):
     """Validates that the learned domain can create plans.
 
@@ -100,7 +94,7 @@ class MacroDomainValidator(DomainValidator):
         timeout: int = 5,
         learning_time: float = 0,
         solvers_portfolio: List[SolverType] = None,
-        mas_sam_plus=None
+        mapping: Dict[str, MappingElement] = None
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -111,7 +105,7 @@ class MacroDomainValidator(DomainValidator):
         :param tolerance: the numeric tolerance to use.
         :param learning_time: the time it took to learn the domain (in seconds).
         :param solvers_portfolio: the solvers to use for the validation, can be one or more and each will try to solve each planning problem at most once..
-        :param mas_sam_plus: the learned model that is being tested.
+        :param mapping: the learned model mapper from macro action to mapping element.
 
         """
         num_triplets = self._extract_num_triplets(used_observations)
@@ -140,7 +134,10 @@ class MacroDomainValidator(DomainValidator):
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
 
-                    self.adapt_solution_file(mas_sam_plus, solution_file_path)
+                    if mapping:
+                        self.adapt_solution_file(
+                            solution_path=solution_file_path, mapping=mapping
+                        )
 
                     self._validate_solution_content(
                         solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats
@@ -208,22 +205,25 @@ class MacroDomainValidator(DomainValidator):
             writer.writerows(self.aggregated_solving_stats)
 
     @staticmethod
-    def adapt_solution_file(learned_domain, solution_path: Path):
-        if not learned_domain:
-            return
+    def adapt_solution_file(solution_path: Path, mapping):
+        """
+        Post Processing solution files with macro actions and adapt them to something validators can work with.
+        That essentially means replacing macro action lines with its consisting solo actions lines.
 
+        :param parsed_domain: the learned domain as a parsed full domain.
+        :param solution_path: the path to the solution file output from the learned domain.
+        :param mapping: the macro actions mapping of the learned domain.
+        """
         with open(solution_path, 'r') as file:
             lines = file.readlines()
 
         new_lines = []
         for line in lines:
-            extracted_lines = learned_domain.extract_actions_from_macro_action(line)
+            extracted_lines = MacroActionParser.extract_actions_from_macro_action(
+                action_line=line, mapper=mapping
+            )
             new_lines.extend([extracted_line if extracted_line.endswith('\n') else f"{extracted_line}\n"
                               for extracted_line in extracted_lines])
 
         with open(solution_path, 'w') as file:
             file.writelines(new_lines)
-
-
-
-
