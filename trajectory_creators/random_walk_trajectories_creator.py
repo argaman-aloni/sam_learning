@@ -13,7 +13,7 @@ from pddl_plus_parser.models import PDDLObject, Domain, ActionCall, Problem, Sta
 from sam_learning.core import VocabularyCreator
 from utilities import SolverType
 
-MAX_NUM_STEPS_IN_TRAJECTORY = 50
+MAX_NUM_STEPS_IN_TRAJECTORY = 100
 inapplicable_action_probability = 0.05
 random.seed(42)
 
@@ -43,15 +43,18 @@ class RandomWalkTrajectoriesCreator:
         :param ground_actions: the grounded actions to select the inapplicable action from.
         :return: the inapplicable action and the next state.
         """
-        inapplicable_action = random.choice(list(ground_actions))
+        self.logger.debug("Selecting an inapplicable action.")
+        action_queue = list(ground_actions)
+        random.shuffle(action_queue)
+        inapplicable_action = action_queue.pop()
         operator = Operator(
             action=domain.actions[inapplicable_action.name],
             domain=domain,
             grounded_action_call=inapplicable_action.parameters,
             problem_objects=problem.objects,
         )
-        while operator.is_applicable(current_state):
-            inapplicable_action = random.choice(list(ground_actions))
+        while operator.is_applicable(current_state) and len(action_queue) > 0:
+            inapplicable_action = action_queue.pop()
             operator = Operator(
                 action=domain.actions[inapplicable_action.name],
                 domain=domain,
@@ -62,7 +65,7 @@ class RandomWalkTrajectoriesCreator:
         return operator, State(predicates=current_state.state_predicates, fluents=current_state.state_fluents, is_init=False)
 
     def _select_applicable_action(
-        self, domain: Domain, problem: Problem, current_state: State, grounded_actions: Set[ActionCall], inapplicable_actions: Set[ActionCall]
+        self, domain: Domain, problem: Problem, current_state: State, grounded_actions: Set[ActionCall]
     ) -> Tuple[Operator, State]:
         """Selects a random applicable action for the current state.
 
@@ -70,26 +73,26 @@ class RandomWalkTrajectoriesCreator:
         :param problem: the problem defining the objects and the initial state.
         :param current_state: the current state to select the applicable action for.
         :param grounded_actions: the grounded actions to select the applicable action from.
-        :param inapplicable_actions: the inapplicable actions that were already tried on this state.
         :return: the applicable action and the next state.
         """
         self.logger.debug("Selecting an applicable action.")
-        action = random.choice([action for action in grounded_actions if action not in inapplicable_actions])
+        action_queue = list(grounded_actions)
+        random.shuffle(action_queue)
+        action = action_queue.pop()
         operator = Operator(
             action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters, problem_objects=problem.objects
         )
-        while not operator.is_applicable(current_state) and len(inapplicable_actions) < len(grounded_actions):
-            self.logger.info(f"Action {action} is inapplicable.")
-            inapplicable_actions.add(action)
-            if len(inapplicable_actions) == len(grounded_actions):
-                raise ValueError("No applicable actions found.")
-
-            action = random.choice([action for action in grounded_actions if action not in inapplicable_actions])
+        while not operator.is_applicable(current_state) and len(action_queue) > 0:
+            self.logger.debug(f"Action {action} is inapplicable.")
+            action = action_queue.pop()
             operator = Operator(
                 action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters, problem_objects=problem.objects
             )
 
-        next_state = operator.apply(current_state)
+        if len(action_queue) == 0:
+            raise ValueError("No applicable actions found.")
+
+        next_state = operator.apply(current_state, skip_validation=True)
         return operator, next_state
 
     def create_random_plan(self, domain: Domain, problem: Problem, grounded_actions: Set[ActionCall]) -> Tuple[List[TrajectoryTriplet], List[str]]:
@@ -103,7 +106,6 @@ class RandomWalkTrajectoriesCreator:
         self.logger.info(f"Starting to create a random trajectory for the problem - {problem.name}")
         plan = []
         current_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
-        inapplicable_actions = set()
         action_triplets = []
         for i in range(MAX_NUM_STEPS_IN_TRAJECTORY):
             self.logger.debug(f"Selecting an action for timestep {i}.")
@@ -113,16 +115,14 @@ class RandomWalkTrajectoriesCreator:
                 action_triplets.append(TrajectoryTriplet(previous_state=current_state, op=action, next_state=next_state))
                 plan.append(str(action))
                 current_state = next_state.copy()
-                inapplicable_actions.add(action)
                 continue
 
             self.logger.debug(f"Selecting an applicable action for timestep {i}.")
             try:
-                action, next_state = self._select_applicable_action(domain, problem, current_state, grounded_actions, inapplicable_actions)
+                action, next_state = self._select_applicable_action(domain, problem, current_state, grounded_actions)
                 action_triplets.append(TrajectoryTriplet(previous_state=current_state, op=action, next_state=next_state))
                 plan.append(str(action))
                 current_state = next_state.copy()
-                inapplicable_actions.clear()
 
             except ValueError:
                 self.logger.warning(f"No applicable actions found for timestep {i}.")
