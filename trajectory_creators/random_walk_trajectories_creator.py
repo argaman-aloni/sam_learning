@@ -79,6 +79,7 @@ class RandomWalkTrajectoriesCreator:
             action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters, problem_objects=problem.objects
         )
         while not operator.is_applicable(current_state) and len(inapplicable_actions) < len(grounded_actions):
+            self.logger.info(f"Action {action} is inapplicable.")
             inapplicable_actions.add(action)
             if len(inapplicable_actions) == len(grounded_actions):
                 raise ValueError("No applicable actions found.")
