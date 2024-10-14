@@ -73,6 +73,7 @@ class RandomWalkTrajectoriesCreator:
         :param inapplicable_actions: the inapplicable actions that were already tried on this state.
         :return: the applicable action and the next state.
         """
+        self.logger.debug("Selecting an applicable action.")
         action = random.choice([action for action in grounded_actions if action not in inapplicable_actions])
         operator = Operator(
             action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters, problem_objects=problem.objects
@@ -123,6 +124,7 @@ class RandomWalkTrajectoriesCreator:
                 inapplicable_actions.clear()
 
             except ValueError:
+                self.logger.warning(f"No applicable actions found for timestep {i}.")
                 break
 
         return action_triplets, plan
