@@ -107,7 +107,7 @@ class ConvexHullLearner:
         :param display_mode: whether to display the convex hull.
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
-        hull = self._epsilon_approximate_hull(points, epsilon=0.05, qhull_options="Qx A0.999")
+        hull = self._epsilon_approximate_hull(points, epsilon=0.025, qhull_options="Qx A0.999")
         display_convex_hull(self.action_name, display_mode, hull)
         equations = np.unique(hull.equations, axis=0)
 
