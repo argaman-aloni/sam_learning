@@ -67,6 +67,39 @@ class ConvexHullLearner:
 
         self.data = concat_data
 
+    def _epsilon_approximate_hull(self, points: np.ndarray, epsilon: float, qhull_options: str = "") -> ConvexHull:
+        """Approximates the convex hull of the given points with a margin of epsilon and a set of options for the qhull algorithm..
+
+        :param points: The points comprising the convex hull.
+        :param epsilon: The margin to add to the convex hull.
+        :param qhull_options: the options to pass to the qhull algorithm.
+        :return: the approximated convex hull.
+        """
+        self.logger.debug(f"Approximating the convex hull with epsilon {epsilon}.")
+        # Step 1: Compute the original convex hull
+        hull = ConvexHull(points)
+
+        # Step 2: Find the centroid of the original hull (for expanding outward)
+        centroid = np.mean(points[hull.vertices], axis=0)
+
+        # Step 3: Calculate new points on expanded facets to include epsilon margin
+        expanded_points = []
+        for simplex in hull.simplices:
+            # Get the points of the simplex (facet)
+            facet_points = points[simplex]
+            # Calculate the direction vectors from the centroid to each facet point
+            directions = facet_points - centroid
+            # Normalize directions and expand each point by (1 + epsilon)
+            expanded_facet = centroid + (1 + epsilon) * directions
+            expanded_points.extend(expanded_facet)
+
+        # Combine original points with expanded points
+        all_points = np.vstack([points, expanded_points])
+
+        # Step 4: Compute the approximated convex hull on the expanded point set
+        approx_hull = ConvexHull(all_points, qhull_options=qhull_options)
+        return approx_hull
+
     def _execute_convex_hull(self, points: np.ndarray, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
         """Runs the convex hull algorithm on the given input points.
 
@@ -74,7 +107,7 @@ class ConvexHullLearner:
         :param display_mode: whether to display the convex hull.
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
-        hull = ConvexHull(points)
+        hull = self._epsilon_approximate_hull(points, epsilon=0.05, qhull_options="Qx A0.999")
         display_convex_hull(self.action_name, display_mode, hull)
         equations = np.unique(hull.equations, axis=0)
 
