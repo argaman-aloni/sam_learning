@@ -7,7 +7,7 @@ from typing import List, Dict
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 
-from experiments.multi_agent_experiment_runner import MultiAgentExperimentRunner
+from experiments.multi_agent_experiment_runner import MultiAgentExperimentRunner, configure_logger
 from sam_learning.learners import MASAMPlus
 from sam_learning.core import LearnerDomain
 from statistics.utils import init_semantic_performance_calculator
@@ -93,7 +93,7 @@ class MultiAgentPlusExperimentRunner(MultiAgentExperimentRunner):
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         portfolio = (
-            [SolverType.fast_forward, SolverType.fast_downward]
+            [SolverType.fast_downward, SolverType.fast_forward]
         )
 
         self.domain_validator.validate_domain_macro(
@@ -180,6 +180,8 @@ def main():
     executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
         if args.executing_agents is not None else None
 
+    configure_logger(args)
+
     offline_learner = MultiAgentPlusExperimentRunner(working_directory_path=Path(args.working_directory_path),
                                                      domain_file_name=args.domain_file_name,
                                                      executing_agents=executing_agents,
@@ -189,8 +191,8 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
+    # logging.basicConfig(
+    #     format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S",
+    #     level=logging.INFO)
     main()
