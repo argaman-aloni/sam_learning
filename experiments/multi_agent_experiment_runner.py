@@ -30,7 +30,7 @@ def configure_logger(args: argparse.Namespace):
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
-        logs_directory_path / f"log_{args.domain_file_name}", maxBytes=max_bytes, backupCount=1,
+        logs_directory_path / f"log_{args.domain_file_name}.log", maxBytes=max_bytes, backupCount=1,
     )
     stream_handler = logging.StreamHandler()
 
@@ -170,7 +170,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
 
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         portfolio = (
-            [SolverType.fast_forward, SolverType.fast_downward]
+            [SolverType.fast_downward, SolverType.fast_forward]
         )
         self.domain_validator.validate_domain_macro(
             fold=fold_number,
@@ -286,7 +286,6 @@ def main():
     executing_agents = args.executing_agents.replace("[", "").replace("]", "").split(",") \
         if args.executing_agents is not None else None
 
-
     configure_logger(args)
 
     max_traj = 0 if args.num_traj is None else args.num_traj
@@ -294,15 +293,15 @@ def main():
     offline_learner = MultiAgentExperimentRunner(working_directory_path=Path(args.working_directory_path),
                                                  domain_file_name=args.domain_file_name,
                                                  executing_agents=executing_agents,
-                                                 learning_algorithm = LearningAlgorithmType.ma_sam,
+                                                 learning_algorithm=LearningAlgorithmType.ma_sam,
                                                  problem_prefix=args.problems_prefix,
                                                  max_traj=max_traj)
     offline_learner.run_cross_validation()
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO)
+    # logging.basicConfig(
+    #     format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S",
+    #     level=logging.INFO)
     main()
