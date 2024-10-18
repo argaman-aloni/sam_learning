@@ -68,7 +68,8 @@ class FFADLSolver:
             solution_path.unlink(missing_ok=True)
 
     def solve_problem(
-        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_stats: Dict[str, str], solving_timeout: int
+        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_stats: Dict[str, str], solving_timeout: int,
+            tolerance: float = 0.1
     ) -> None:
         """Solves a single problem using the FF algorithm.
 

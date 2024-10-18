@@ -3,6 +3,64 @@ from typing import List, Dict, Set, Tuple
 
 from pddl_plus_parser.models import Predicate
 
+import re
+
+PGType = List[Set[Tuple[str, str]]]
+
+
+def is_clause_consistent(clause: List[Tuple[str, str]], macro_action_group_names: List[str], parameter_grouping_of_macro: PGType) -> bool:
+    """
+    Checks whether a given clause is consistent based on the provided action group names and parameter groupings
+    of the macro action.
+
+    1. All action names in the clause must exist in `action_group_names`.
+    2. Parameters groups extracted from the clause must belong to at least one of the parameter groups
+        provided in `parameter_grouping` of the macro action.
+
+    :param clause: A list of tuples of action and its associated fluent.
+    :param macro_action_group_names: The actions' names of the macro action.
+    :param parameter_grouping_of_macro:
+        A list of parameter groups, where each set contains tuples of (action_index, parameter_name) pairs.
+        These groupings represent how parameters are related across different actions.
+
+    Returns: True if the clause is consistent, else False
+    """
+    if not all(action in macro_action_group_names for (action, _) in clause):
+        return False
+
+    parameter_grouping_of_clause = group_params_from_clause(clause)
+
+    for clause_param_group in parameter_grouping_of_clause:
+        if not any(clause_param_group.issubset(macro_param_group) for macro_param_group in parameter_grouping_of_macro):
+            return False
+
+    return True
+
+
+def group_params_from_clause(clause: List[Tuple[str, str]]) -> PGType:
+    """
+    Processes a single clause, grouping parameters from different actions
+    by their index position in the match.
+    :param clause: A list of tuples of action and its associated fluent.
+
+    Returns: Parameter Grouping, which is a list of groups. Each group consists of (action, parameter).
+             A group signifies the parameters that are together bound to the same objects in the macro action.
+    """
+    param_pattern = re.compile(r"\?\w+")
+    fluent_example = clause[0][1]
+    num_of_params = len(param_pattern.findall(fluent_example))
+
+    # each parameter has its own respective set of bound parameters
+    clause_param_grouping = [set() for _ in range(num_of_params)]
+
+    for (action_name, fluent_str) in clause:
+        parameters = param_pattern.findall(fluent_str)
+
+        for idx, param in enumerate(parameters):
+            clause_param_grouping[idx].add((action_name, param))
+
+    return clause_param_grouping
+
 
 class LiteralCNF:
     """Class that manages the matching of lifted predicates to their possible executing actions."""
@@ -56,12 +114,23 @@ class LiteralCNF:
         :param action_preconditions: the preconditions of the action.
         :return: True if the action is safe to execute, False otherwise.
         """
+
+        unit_clauses = []  # unit clauses of size 1 (1 tuple) that contains action_name
+        non_unit_clauses = []  # non-unit clauses that contain action_name
+
         for lifted_options in self.possible_lifted_effects:
             if action_name in [action for (action, _) in lifted_options]:
                 if len(lifted_options) == 1:
-                    continue
+                    unit_clauses.append(lifted_options[0])
+                else:
+                    non_unit_clauses.append(lifted_options)
 
-                for (action, predicate) in lifted_options:
+        if len(non_unit_clauses) == 0:
+            return True
+
+        for nunc in non_unit_clauses:
+            if not any(uc in nunc for uc in unit_clauses):
+                for (action, predicate) in nunc:
                     if action == action_name and predicate not in action_preconditions:
                         return False
 
@@ -91,10 +160,45 @@ class LiteralCNF:
         """
         effects = []
         for possible_joint_effect in self.possible_lifted_effects:
-            if len(possible_joint_effect) == 1 and \
-                    action_name in [action for (action, _) in possible_joint_effect]:
+            if len(possible_joint_effect) == 1 and action_name in [action for (action, _) in possible_joint_effect]:
                 (_, effect) = possible_joint_effect[0]
                 if effect not in action_preconditions:
                     effects.append(effect)
 
         return effects
+
+    def extract_macro_action_effects(self, action_names: List[str], action_preconditions: Set[str], param_grouping: PGType) -> List[tuple[str, str]]:
+        """Extract the effects that a macro action is acting on.
+
+        :param action_names: the names of the actions that participate in the macro.
+        :param action_preconditions: the preconditions of the action.
+        :param param_grouping: grouping of the parameters
+        :return: the list of effects that the action is acting on.
+        """
+        effects = []
+        for possible_joint_effect in self.possible_lifted_effects:
+            if is_clause_consistent(possible_joint_effect, action_names, param_grouping):
+                for (action, effect) in possible_joint_effect:
+                    # basically, if there's at least one action that allows this effect, we'll take the effect
+                    if effect not in action_preconditions:
+                        effects.append((action, effect))
+                        # Todo remove the comment after seeing all experiments prove good results
+                        # break
+
+        return effects
+
+    def extract_macro_action_preconditions(self, action_names: List[str], param_grouping: PGType) -> List[tuple[str, str]]:
+        """Extract the effects that a macro action is acting on.
+
+        :param action_names: the names of the actions that participate in the macro.
+        :param param_grouping: grouping of the parameters
+        :return: the list of effects that the action is acting on.
+        """
+        preconditions = []
+        for possible_joint_effect in self.possible_lifted_effects:
+            if not is_clause_consistent(possible_joint_effect, action_names, param_grouping):
+                for (action_name, lifted_fluent) in possible_joint_effect:
+                    if action_name in action_names:
+                        preconditions.append((action_name, lifted_fluent))
+
+        return preconditions

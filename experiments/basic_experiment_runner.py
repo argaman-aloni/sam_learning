@@ -15,6 +15,7 @@ from solvers.fast_forward_adl_solver import FFADLSolver
 from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
+from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
@@ -53,7 +54,7 @@ class OfflineBasicExperimentRunner:
     _learning_algorithm: LearningAlgorithmType
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
-    semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator]
+    semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator, MASamPerformanceCalculator]
 
     def __init__(
         self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType, problem_prefix: str = "pfile",

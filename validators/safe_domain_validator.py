@@ -94,7 +94,11 @@ class DomainValidator:
     problem_prefix: str
 
     def __init__(
-        self, working_directory_path: Path, learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, problem_prefix: str = "pfile",
+        self,
+        working_directory_path: Path,
+        learning_algorithm: LearningAlgorithmType,
+        reference_domain_path: Path,
+        problem_prefix: str = "pfile",
     ):
         self.logger = logging.getLogger(__name__)
         self.solving_stats = []
@@ -267,6 +271,7 @@ class DomainValidator:
                     problem_solving_times.append(end_time - start_time)  # time in seconds
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
+
                     self._validate_solution_content(
                         solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats
                     )
