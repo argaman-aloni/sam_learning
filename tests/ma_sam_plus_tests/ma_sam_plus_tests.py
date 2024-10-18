@@ -55,16 +55,26 @@ def driverlog_ma_sam_plus(ma_driverlog_domain) -> MASAMPlus:
 
 def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions(
         rovers_ma_sam_plus: MASAMPlus, ma_rovers_observation):
-    learned_domain, _, _ = (
-        rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation]))
-    print(learned_domain.to_pddl())
+    try:
+        learned_domain, _, _ = (
+            rovers_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_rovers_observation]))
+        print(learned_domain.to_pddl())
+        assert True
+
+    except:
+        assert False
 
 
 def test_learn_action_model_with_colliding_actions_returns_model_with_macro_actions_driverlog(
         driverlog_ma_sam_plus: MASAMPlus, ma_driverlog_observation):
-    learned_domain, _, _ = (
-        driverlog_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_driverlog_observation]))
-    print(learned_domain.to_pddl())
+    try:
+        learned_domain, _, _ = (
+            driverlog_ma_sam_plus.learn_combined_action_model_with_macro_actions([ma_driverlog_observation]))
+        print(learned_domain.to_pddl())
+        assert True
+
+    except:
+        assert False
 
 
 def test_extract_relevant_action_groups_with_no_observed_actions_returns_no_action_group(

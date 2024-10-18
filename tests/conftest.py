@@ -245,7 +245,6 @@ def minecraft_large_trajectory(minecraft_large_domain: Domain, minecraft_large_p
         MINECRAFT_LARGE_TRAJECTORY_PATH)
 
 
-#TODO ORI ADDED
 @fixture()
 def ma_driverlog_domain() -> Domain:
     return DomainParser(DRIVERLOG_COMBINED_DOMAIN_PATH, partial_parsing=True).parse_domain()

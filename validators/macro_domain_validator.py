@@ -12,67 +12,14 @@ from utilities import SolverType, SolutionOutputTypes
 from validators import DomainValidator
 from utilities import NegativePreconditionPolicy
 from utilities import MacroActionParser, MappingElement
+from validators.safe_domain_validator import (SOLVING_STATISTICS, SOLVER_TYPES, DEBUG_STATISTICS,
+                                              VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN,
+                                              NUMERIC_STATISTICS_LABELS)
 
-SOLVER_TYPES = {
-    SolverType.fast_downward: FastDownwardSolver,
-    SolverType.metric_ff: MetricFFSolver,
-    SolverType.enhsp: ENHSPSolver,
-    SolverType.fast_forward: FFADLSolver,
-}
-
-SOLVING_STATISTICS = [
+SOLVING_STATISTICS_MACRO = [
     "fold",
-    "learning_algorithm",
     "policy",
-    "num_trajectories",
-    "num_trajectory_triplets",
-    "learning_time",
-    "solving_time",
-    "solver",
-    "ok",
-    "no_solution",
-    "timeout",
-    "solver_error",
-    "not_applicable",
-    "goal_not_achieved",
-    "validated_against_expert_plan",
-    "not_validated_against_expert_plan",
-    "problems_ok",
-    "problems_no_solution",
-    "problems_timeout",
-    "problems_solver_error",
-    "problems_not_applicable",
-    "problems_goal_not_achieved",
-    "problems_validated_against_expert_plan",
-    "problems_not_validated_against_expert_plan",
-    "percent_ok",
-    "percent_no_solution",
-    "percent_timeout",
-    "percent_solver_error",
-    "percent_not_applicable",
-    "percent_goal_not_achieved",
-    "percent_validated_against_expert_plan",
-    "percent_not_validated_against_expert_plan",
-]
-
-DEBUG_STATISTICS = [
-    "problems_ok",
-    "problems_no_solution",
-    "problems_timeout",
-    "problems_solver_error",
-    "problems_not_applicable",
-    "problems_goal_not_achieved",
-    "problems_validated_against_expert_plan",
-    "problems_not_validated_against_expert_plan",
-]
-
-VALIDATED_AGAINST_EXPERT_PLAN = "validated_against_expert_plan"
-NOT_VALIDATED_AGAINST_EXPERT_PLAN = "not_validated_against_expert_plan"
-
-NUMERIC_STATISTICS_LABELS = [
-    *[solution_type.name for solution_type in SolutionOutputTypes],
-    VALIDATED_AGAINST_EXPERT_PLAN,
-    NOT_VALIDATED_AGAINST_EXPERT_PLAN,
+    *SOLVING_STATISTICS
 ]
 
 
@@ -187,7 +134,7 @@ class MacroDomainValidator(DomainValidator):
             f"{f'_{iteration}_trajectories' if iteration is not None else ''}.csv"
         )
         with open(output_statistics_path, "wt", newline="") as csv_file:
-            test_set_writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
+            test_set_writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS_MACRO)
             test_set_writer.writeheader()
             test_set_writer.writerows(self.solving_stats)
 
@@ -200,7 +147,7 @@ class MacroDomainValidator(DomainValidator):
             else self.results_dir_path / f"{self.learning_algorithm.name}_problem_solving_stats_{fold}.csv"
         )
         with open(output_path, "wt", newline="") as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS)
+            writer = csv.DictWriter(csv_file, fieldnames=SOLVING_STATISTICS_MACRO)
             writer.writeheader()
             writer.writerows(self.aggregated_solving_stats)
 

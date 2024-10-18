@@ -12,7 +12,7 @@ from pddl_plus_parser.models import MultiAgentObservation, Observation, Domain
 
 from experiments.basic_experiment_runner import OfflineBasicExperimentRunner
 from sam_learning.learners import MultiAgentSAM, SAMLearner
-from statistics.utils import init_semantic_performance_calculator
+from statistics.utils import init_semantic_performance_calculator_for_ma_experiments
 from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
 from validators import MacroDomainValidator
 
@@ -246,7 +246,7 @@ class MultiAgentExperimentRunner(OfflineBasicExperimentRunner):
         self.learning_statistics_manager.create_results_directory()
         for fold_num, (train_dir_path, test_dir_path) in enumerate(self.k_fold.create_k_fold(max_items=self.max_iter)):
             self.logger.info(f"Starting to test the algorithm using cross validation. Fold number {fold_num + 1}")
-            self.semantic_performance_calc = init_semantic_performance_calculator(
+            self.semantic_performance_calc = init_semantic_performance_calculator_for_ma_experiments(
                 working_directory_path=self.working_directory_path,
                 domain_file_name=self.domain_file_name,
                 learning_algorithm=LearningAlgorithmType.ma_sam,
@@ -300,8 +300,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # logging.basicConfig(
-    #     format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-    #     datefmt="%Y-%m-%d %H:%M:%S",
-    #     level=logging.INFO)
     main()
