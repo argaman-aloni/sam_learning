@@ -59,8 +59,9 @@ class MacroActionParser:
                 if macro_action_param_name not in macro_action_signature:
                     macro_action_signature[macro_action_param_name] = param_type
                 else:
-                    macro_action_signature[macro_action_param_name] = (
-                        MacroActionParser._return_sub_type(param_type, macro_action_signature[macro_action_param_name]))
+                    macro_action_signature[macro_action_param_name] = MacroActionParser._return_sub_type(
+                        param_type, macro_action_signature[macro_action_param_name]
+                    )
 
         return macro_action_signature
 
@@ -94,7 +95,7 @@ class MacroActionParser:
 
         for group in groupings:
             if len(group) > 1:
-                new_param_name = '?' + ''.join(sorted(param[1:] for _, param in group))
+                new_param_name = "?" + "".join(sorted(param[1:] for _, param in group))
                 for action_name, param in group:
                     param_bindings[(action_name, param)] = new_param_name
 
@@ -108,7 +109,7 @@ class MacroActionParser:
         :param action_line: the macro action line from the solution file to be replaced
         :param mapper: the macro actions mapping of the MA-SAM+ learned domain.
         """
-        param_pattern = re.compile(r'[^\s()]+')
+        param_pattern = re.compile(r"[^\s()]+")
         macro_name = param_pattern.findall(action_line)[0]
 
         if macro_name not in mapper:
@@ -118,7 +119,7 @@ class MacroActionParser:
         action_names = {name for (name, param) in mapping}
         actions_dict = {}
         for action in action_names:
-            actions_dict[action] = f'({action}'
+            actions_dict[action] = f"({action}"
 
         params_bound = param_pattern.findall(action_line)[1:]
 
@@ -129,10 +130,10 @@ class MacroActionParser:
 
                 for param_name, param_bound in zip(params_name, params_bound):
                     if mapping[(action, param)] == param_name:
-                        actions_dict[action] += f' {param_bound}'
+                        actions_dict[action] += f" {param_bound}"
                         break
 
         for action in action_names:
-            actions_dict[action] += ')'
+            actions_dict[action] += ")"
 
         return set(actions_dict.values())

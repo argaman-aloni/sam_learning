@@ -1,16 +1,13 @@
 """Module to learn action models with macro actions from multi-agent trajectories with joint actions."""
+from itertools import combinations
 from typing import Dict, List, Tuple, Optional
 
-from pddl_plus_parser.models import Predicate, Domain, MultiAgentObservation, \
-     CompoundPrecondition
-
-from sam_learning.core import (LearnerDomain, LearnerAction, extract_predicate_data, PGType,
-                               group_params_from_clause)
-from sam_learning.learners.multi_agent_sam import MultiAgentSAM
-
-from utilities import NegativePreconditionPolicy, MacroActionParser, BindingType, MappingElement
 import networkx as nx
-from itertools import combinations
+from pddl_plus_parser.models import Predicate, Domain, MultiAgentObservation, CompoundPrecondition
+
+from sam_learning.core import LearnerDomain, LearnerAction, extract_predicate_data, PGType, group_params_from_clause
+from sam_learning.learners.multi_agent_sam import MultiAgentSAM
+from utilities import NegativePreconditionPolicy, MacroActionParser, BindingType, MappingElement
 
 
 def combine_groupings(grouping: List[set]) -> List[set]:
@@ -38,12 +35,16 @@ def combine_groupings(grouping: List[set]) -> List[set]:
 class MASAMPlus(MultiAgentSAM):
     """Class designated to learning action models with macro actions
         from multi-agent trajectories with joint actions."""
-    mapping: Dict[str,  MappingElement]
+
+    mapping: Dict[str, MappingElement]
     unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
 
-    def __init__(self, partial_domain: Domain,
-                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
-                 negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+    def __init__(
+        self,
+        partial_domain: Domain,
+        preconditions_fluent_map: Optional[Dict[str, List[str]]] = None,
+        negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
+    ):
         super().__init__(partial_domain, preconditions_fluent_map, negative_precondition_policy=negative_precondition_policy)
         self.mapping = {}
         self.unsafe_actions_preconditions_map = {}
@@ -51,8 +52,7 @@ class MASAMPlus(MultiAgentSAM):
     def _remove_unsafe_actions_from_partial_domain(self):
         """Removes the actions that were not observed from the partial domain."""
         self.logger.debug("Removing unobserved actions from the partial domain")
-        actions_to_remove = [action for action in self.partial_domain.actions
-                             if action in self.unsafe_actions_preconditions_map]
+        actions_to_remove = [action for action in self.partial_domain.actions if action in self.unsafe_actions_preconditions_map]
         for action in actions_to_remove:
             self.partial_domain.actions.pop(action)
 
@@ -110,8 +110,9 @@ class MASAMPlus(MultiAgentSAM):
     def extract_effects_for_macro_from_cnf(self, lma_set: set[LearnerAction], param_grouping: PGType, mapping: BindingType):
         lma_names = [lma.name for lma in lma_set]
         cnf_effects = []
-        relevant_preconditions_str = {precondition.untyped_representation for action in lma_set for precondition
-                                      in action.preconditions if isinstance(precondition, Predicate)}
+        relevant_preconditions_str = {
+            precondition.untyped_representation for action in lma_set for precondition in action.preconditions if isinstance(precondition, Predicate)
+        }
 
         for fluent, fluent_cnf in self.literals_cnf.items():
             effects = fluent_cnf.extract_macro_action_effects(lma_names, relevant_preconditions_str, param_grouping)
@@ -142,13 +143,17 @@ class MASAMPlus(MultiAgentSAM):
 
         # taking the already existing learned preconditions into account
         for action in action_group:
-            preconditions = action.preconditions if action.name not in self.unsafe_actions_preconditions_map \
+            preconditions = (
+                action.preconditions
+                if action.name not in self.unsafe_actions_preconditions_map
                 else self.unsafe_actions_preconditions_map[action.name]
+            )
 
             for _, precondition in preconditions:
                 if isinstance(precondition, Predicate):
                     precondition_to_add = self._extract_predicate_from_clause_and_adapt_to_macro(
-                        clause_element=(action.name, precondition.untyped_representation), mapping=mapping)
+                        clause_element=(action.name, precondition.untyped_representation), mapping=mapping
+                    )
                     new_precondition.add_condition(precondition_to_add)
 
             # Todo remove the comment after seeing all experiments prove good results
@@ -166,8 +171,7 @@ class MASAMPlus(MultiAgentSAM):
         super()._remove_unobserved_actions_from_partial_domain()
         for action in self.partial_domain.actions.values():
             self.logger.debug("Constructing safe action for %s", action.name)
-            action_preconditions = {precondition for precondition in
-                                    action.preconditions if isinstance(precondition, Predicate)}
+            action_preconditions = {precondition for precondition in action.preconditions if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
                 self.unsafe_actions_preconditions_map[action.name] = action.preconditions
@@ -203,7 +207,7 @@ class MASAMPlus(MultiAgentSAM):
                 self.mapping[macro_action.name] = (macro_action.parameter_names, mapper)
 
     def learn_combined_action_model_with_macro_actions(
-            self, observations: List[MultiAgentObservation]
+        self, observations: List[MultiAgentObservation]
     ) -> Tuple[LearnerDomain, Dict[str, str], Dict[str, MappingElement]]:
         """Learn the SAFE action model from the input multi-agent trajectories.
 
@@ -228,4 +232,3 @@ class MASAMPlus(MultiAgentSAM):
         super().end_measure_learning_time()
         learning_report = super()._construct_learning_report()
         return self.partial_domain, learning_report, self.mapping
-

@@ -139,17 +139,16 @@ CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", si
 WEIGHT_FUNCTION = PDDLFunction(name="weight", signature={"?c": CRATE_TYPE})
 
 
-
-
-#TODO ORI ADDED
+# TODO ORI ADDED
 DRIVERLOG_COMBINED_DOMAIN_PATH = EXAMPLES_DIR_PATH / "driverlog_combined_domain.pddl"
 DRIVERLOG_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "driverlog_conflicting_problem.pddl"
 DRIVERLOG_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "driverlog_ma_sam_pfile2.trajectory"
 ROVERS_COMBINED_WITH_MACRO_DOMAIN_PATH = EXAMPLES_DIR_PATH / "rovers_ma_plus_domain.pddl"
 
 
-def sync_snapshot(sam_learning: SAMLearner, component: ObservedComponent,
-                  trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False) -> None:
+def sync_snapshot(
+    sam_learning: SAMLearner, component: ObservedComponent, trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False
+) -> None:
     previous_state = component.previous_state
     next_state = component.next_state
     test_action_call = component.grounded_action_call

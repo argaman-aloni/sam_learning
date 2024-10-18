@@ -8,11 +8,7 @@ import re
 PGType = List[Set[Tuple[str, str]]]
 
 
-def is_clause_consistent(
-        clause: List[Tuple[str, str]],
-        macro_action_group_names: List[str],
-        parameter_grouping_of_macro: PGType
-        ) -> bool:
+def is_clause_consistent(clause: List[Tuple[str, str]], macro_action_group_names: List[str], parameter_grouping_of_macro: PGType) -> bool:
     """
     Checks whether a given clause is consistent based on the provided action group names and parameter groupings
     of the macro action.
@@ -50,7 +46,7 @@ def group_params_from_clause(clause: List[Tuple[str, str]]) -> PGType:
     Returns: Parameter Grouping, which is a list of groups. Each group consists of (action, parameter).
              A group signifies the parameters that are together bound to the same objects in the macro action.
     """
-    param_pattern = re.compile(r'\?\w+')
+    param_pattern = re.compile(r"\?\w+")
     fluent_example = clause[0][1]
     num_of_params = len(param_pattern.findall(fluent_example))
 
@@ -164,17 +160,14 @@ class LiteralCNF:
         """
         effects = []
         for possible_joint_effect in self.possible_lifted_effects:
-            if len(possible_joint_effect) == 1 and \
-                    action_name in [action for (action, _) in possible_joint_effect]:
+            if len(possible_joint_effect) == 1 and action_name in [action for (action, _) in possible_joint_effect]:
                 (_, effect) = possible_joint_effect[0]
                 if effect not in action_preconditions:
                     effects.append(effect)
 
         return effects
 
-    def extract_macro_action_effects(self, action_names: List[str],
-                                     action_preconditions: Set[str],
-                                     param_grouping: PGType) -> List[tuple[str, str]]:
+    def extract_macro_action_effects(self, action_names: List[str], action_preconditions: Set[str], param_grouping: PGType) -> List[tuple[str, str]]:
         """Extract the effects that a macro action is acting on.
 
         :param action_names: the names of the actions that participate in the macro.
@@ -194,8 +187,7 @@ class LiteralCNF:
 
         return effects
 
-    def extract_macro_action_preconditions(self, action_names: List[str],
-                                           param_grouping: PGType) -> List[tuple[str, str]]:
+    def extract_macro_action_preconditions(self, action_names: List[str], param_grouping: PGType) -> List[tuple[str, str]]:
         """Extract the effects that a macro action is acting on.
 
         :param action_names: the names of the actions that participate in the macro.
