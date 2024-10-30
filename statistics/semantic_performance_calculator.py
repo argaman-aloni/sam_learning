@@ -1,7 +1,6 @@
 """Module responsible for calculating our approach for numeric precision and recall."""
 import csv
 import logging
-import random
 import uuid
 from collections import defaultdict
 from itertools import permutations
@@ -102,6 +101,8 @@ class SemanticPerformanceCalculator:
         self.temp_dir_path.mkdir(exist_ok=True)
         self.vocabulary_creator = VocabularyCreator()
         self._random_actions = []
+        self._action_requirements = {action: 0 for action in self.model_domain.actions}
+        self._action_execution_stats = None
 
     def _calculate_action_applicability_rate(
         self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
@@ -221,6 +222,46 @@ class SemanticPerformanceCalculator:
             except ValueError:
                 self.logger.debug("The action is not applicable in the state.")
                 continue
+
+    def initialize_domain_invariants(self):
+        """
+
+        :return:
+        """
+        for action_name, action in self.model_domain.actions.items():
+            possible_pb_actions = self.vocabulary_creator.create_lifted_functions_vocabulary(
+            domain=self.model_domain, possible_parameters=action.signature
+        )
+            self._action_requirements[action_name] = len(possible_pb_actions.keys()) + 1
+
+    def calculate_action_execution_rate(self, observations: List[Observation]) -> None:
+        """
+
+        :param observations:
+        :return:
+        """
+        action_execution_dist = {
+            action: [] for action in self.model_domain.actions
+        }
+        for observation in observations:
+            observation_stat = {
+                action: 0 for action in self.model_domain.actions
+            }
+            for component in observation.components:
+                grounded_action = component.grounded_action_call
+                observation_stat[grounded_action.name] += 1
+
+            for action, count in observation_stat.items():
+                action_execution_dist[action].append(count)
+
+        # Calculate the average number of times an action is executed in a trajectory
+        self._action_execution_stats = {
+            action: {
+                "avg": sum(counts) / len(observations),
+                "max": max(counts),
+                "min": min(counts),
+                     } for action, counts in action_execution_dist.items()
+        }
 
     def calculate_preconditions_semantic_performance(
         self, learned_domain: Domain, learned_domain_path: Path

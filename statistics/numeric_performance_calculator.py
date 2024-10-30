@@ -4,7 +4,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Union
 
-import math
 import sklearn
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
@@ -17,6 +16,10 @@ NUMERIC_PERFORMANCE_STATS = [
     "learning_algorithm",
     "action_name",
     "num_trajectories",
+    "min_state_transitions_to_learn",
+    "avg_num_execution_per_trajectory",
+    "max_execution_per_trajectory",
+    "min_execution_per_trajectory",
     "precondition_precision",
     "precondition_recall",
     "effects_precision",
@@ -97,6 +100,10 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                 "learning_algorithm": self.learning_algorithm.name,
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
+                "min_state_transitions_to_learn": self._action_requirements[action_name],
+                "avg_num_execution_per_trajectory": self._action_execution_stats[action_name]["avg"],
+                "max_execution_per_trajectory": self._action_execution_stats[action_name]["max"],
+                "min_execution_per_trajectory": self._action_execution_stats[action_name]["min"],
                 "precondition_precision": preconditions_precision.get(action_name, 1),
                 "precondition_recall": preconditions_recall.get(action_name, 0),
                 "effects_precision": effects_precision.get(action_name, 1),
