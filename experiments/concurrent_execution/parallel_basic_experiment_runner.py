@@ -145,7 +145,7 @@ class ParallelExperimentRunner:
             allowed_observations.append(new_observation)
 
         self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-        self.semantic_performance_calc.initialize_domain_invariants()
+        self.semantic_performance_calc.initialize_domain_invariants(self.fluents_map)
         self.semantic_performance_calc.calculate_action_execution_rate(allowed_observations)
         learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
 
