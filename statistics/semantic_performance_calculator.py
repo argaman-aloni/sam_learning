@@ -5,7 +5,7 @@ import uuid
 from collections import defaultdict
 from itertools import permutations
 from pathlib import Path
-from typing import List, Dict, Tuple, Any, Union
+from typing import List, Dict, Tuple, Any, Union, Optional
 
 from pddl_plus_parser.exporters import ProblemExporter
 from pddl_plus_parser.lisp_parsers import DomainParser
@@ -223,11 +223,16 @@ class SemanticPerformanceCalculator:
                 self.logger.debug("The action is not applicable in the state.")
                 continue
 
-    def initialize_domain_invariants(self):
+    def initialize_domain_invariants(self, relevant_fluents: Optional[Dict[str, List[str]]] = None) -> None:
         """
 
         :return:
         """
+        self.logger.info("Initializing the domain invariants.")
+        if relevant_fluents is not None:
+            self._action_requirements = {action: len(relevant_fluents[action]) + 1 for action in self.model_domain.actions}
+            return
+
         for action_name, action in self.model_domain.actions.items():
             possible_pb_actions = self.vocabulary_creator.create_lifted_functions_vocabulary(
             domain=self.model_domain, possible_parameters=action.signature
@@ -257,6 +262,7 @@ class SemanticPerformanceCalculator:
         # Calculate the average number of times an action is executed in a trajectory
         self._action_execution_stats = {
             action: {
+                "total": sum(counts),
                 "avg": sum(counts) / len(observations),
                 "max": max(counts),
                 "min": min(counts),
