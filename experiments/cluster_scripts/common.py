@@ -96,26 +96,20 @@ def setup_experiments_folds_job(
     return fold_creation_sid
 
 
-def create_experiment_folders(code_directory, environment_variables, experiment, should_create_random_trajectories: bool = True):
-    print(f"Creating the directories containing the folds datasets for the experiments.")
-    parallelization_data = experiment["parallelization_data"]
+def create_internal_iterations_list(parallelization_data):
     max_train_size = (
         int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
     )
     if parallelization_data["hop"] == 100:
-        internal_iterations = [1] + list(range(10, 100, 10)) + list(range(100, max_train_size, 100))
-        print(f"Internal iterations: {internal_iterations}")
-        sid = setup_experiments_folds_job(
-            code_directory=code_directory,
-            environment_variables=environment_variables,
-            experiment=experiment,
-            internal_iterations=internal_iterations,
-            experiment_size=parallelization_data.get("experiment_size", 100),
-            should_create_random_trajectories=should_create_random_trajectories,
-        )
-        return internal_iterations, sid
+        return [1] + list(range(10, 100, 10)) + list(range(100, max_train_size, 100))
 
-    internal_iterations = list(range(1, FIRST_BREAKPOINT)) + list(range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"]))
+    return list(range(1, FIRST_BREAKPOINT)) + list(range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"]))
+
+
+def create_experiment_folders(code_directory, environment_variables, experiment, should_create_random_trajectories: bool = True):
+    print(f"Creating the directories containing the folds datasets for the experiments.")
+    parallelization_data = experiment["parallelization_data"]
+    internal_iterations = create_internal_iterations_list(parallelization_data)
     print(f"Internal iterations: {internal_iterations}")
     sid = setup_experiments_folds_job(
         code_directory=code_directory,

@@ -187,7 +187,7 @@ class ParallelExperimentRunner:
             test_set_directory_path=test_set_dir_path,
             used_observations=allowed_observations,
             tolerance=DEFAULT_NUMERIC_TOLERANCE,
-            timeout=PLANNER_EXECUTION_TIMEOUT,
+            timeout=os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT),
             learning_time=learning_time,
             solvers_portfolio=portfolio,
             preconditions_removal_policy=negative_preconditions_policy,

@@ -56,6 +56,8 @@ class FoldsCreator:
         self.logger.info("Removing the old folds directories if exist.")
         self.k_fold.remove_created_directories()
         self.logger.info("Done removing the old folds directories!")
+        self.logger.info("Creating a logs directory.")
+        (self.working_directory_path / "logs").mkdir(exist_ok=True)
         self.logger.info("Creating the folds directories.")
         self.k_fold.create_k_fold(max_items=experiment_size)
         self.logger.info("Done creating the folds directories!")
