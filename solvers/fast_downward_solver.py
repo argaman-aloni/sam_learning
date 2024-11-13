@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Dict
 
@@ -59,13 +60,14 @@ class FastDownwardSolver:
         os.chdir(FAST_DOWNWARD_DIR_PATH)
         self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
         solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
+        sas_file_path = f"{domain_file_path.stem}_{uuid.uuid4()}_output.sas"
         running_options = [
             "--overall-time-limit",
             f"{solving_timeout}s",
             "--plan-file",
             str(solution_path.absolute()),
             "--sas-file",
-            f"{domain_file_path.stem}_output.sas",
+            sas_file_path,
             str(domain_file_path.absolute()),
             str(problem_file_path.absolute()),
             "--evaluator",
@@ -81,7 +83,7 @@ class FastDownwardSolver:
             self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "ok"
             self._remove_cost_from_file(solution_path)
-            self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / f"{domain_file_path.stem}_output.sas")
+            self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / sas_file_path)
 
         except subprocess.CalledProcessError as e:
             if e.returncode in [21, 23, 247]:
@@ -116,7 +118,6 @@ class FastDownwardSolver:
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
 
-        self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / f"{domain_file_path.stem}_output.sas")
         return solving_stats
 
 
