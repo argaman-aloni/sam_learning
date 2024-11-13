@@ -37,11 +37,16 @@ class FastDownwardSolver:
         :param sas_file_path: the path to the SAS file.
         """
         if sas_file_path.exists():
-            sas_file_path.unlink()
+            sas_file_path.unlink(missing_ok=True)
 
     def solve_problem(
-        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_stats: Dict[str, str], solving_timeout: int,
-            tolerance: float = 0.1
+        self,
+        domain_file_path: Path,
+        problem_file_path: Path,
+        problems_directory_path: Path,
+        solving_stats: Dict[str, str],
+        solving_timeout: int,
+        tolerance: float = 0.1,
     ) -> None:
         """Solves a single problem using the Fast Downward solver.
 
