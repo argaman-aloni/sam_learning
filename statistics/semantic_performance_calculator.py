@@ -1,7 +1,6 @@
 """Module responsible for calculating our approach for numeric precision and recall."""
 import csv
 import logging
-import random
 import uuid
 from collections import defaultdict
 from itertools import permutations
@@ -27,6 +26,8 @@ from validators import run_validate_script, VALID_PLAN
 
 SEMANTIC_PRECISION_STATS = [
     "action_name",
+    "policy",
+    "learning_algorithm",
     "num_trajectories",
     "precondition_precision",
     "precondition_recall",
@@ -289,9 +290,13 @@ class SemanticPerformanceCalculator:
             }
             self.combined_stats.append(action_stats)
 
-    def export_semantic_performance(self, fold_num: int) -> None:
-        """Exports the precision values of the learned preconditions to a CSV file."""
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_" f"{fold_num}_semantic_performance.csv"
+    def export_semantic_performance(self, fold_num: int, iteration_num: int = 0) -> None:
+        """Exports the precision values of the learned preconditions to a CSV file.
+
+        :param fold_num: the fold number.
+        :param iteration_num: the iteration number.
+        """
+        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_{fold_num}_{iteration_num}_semantic_performance.csv"
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PRECISION_STATS)
             stats_writer.writeheader()

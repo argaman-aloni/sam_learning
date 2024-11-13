@@ -303,7 +303,7 @@ class MultiAgentSAM(SAMLearner):
             action_preconditions = {precondition for precondition in action.preconditions if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                action.preconditions = CompoundPrecondition()
+                self.partial_domain.actions.pop(action.name)
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)

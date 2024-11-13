@@ -9,7 +9,6 @@ class LearningAlgorithmType(Enum):
     plan_miner = 5
     polynomial_sam = 6
     ma_sam = 7
-    ma_sam_baseline = 8
     conditional_sam = 9
     universal_sam = 10
     online_nsam = 13

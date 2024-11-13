@@ -7,7 +7,8 @@ from typing import List, Tuple, Dict, Set
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
 
-from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, VocabularyCreator, EnvironmentSnapshot
+from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, VocabularyCreator, \
+    EnvironmentSnapshot
 from utilities import NegativePreconditionPolicy
 
 
@@ -288,6 +289,7 @@ class SAMLearner:
                 self.handle_single_trajectory_component(component)
 
         self.construct_safe_actions()
+        self._remove_unobserved_actions_from_partial_domain()
         self.handle_negative_preconditions_policy()
         self.end_measure_learning_time()
         learning_report = self._construct_learning_report()
