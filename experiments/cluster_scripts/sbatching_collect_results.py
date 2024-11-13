@@ -1,5 +1,4 @@
 import pathlib
-import sys
 import time
 
 from experiments.cluster_scripts.common import (

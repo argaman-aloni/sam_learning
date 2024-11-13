@@ -177,11 +177,7 @@ class ParallelExperimentRunner:
             allowed_observations, fold_number, learned_model, negative_preconditions_policy, test_set_dir_path
         )
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
-        portfolio = (
-            [SolverType.metric_ff, SolverType.enhsp]
-            if self._learning_algorithm in NUMERIC_ALGORITHMS
-            else [SolverType.fast_downward, SolverType.fast_forward]
-        )
+        portfolio = [SolverType.metric_ff, SolverType.enhsp] if self._learning_algorithm in NUMERIC_ALGORITHMS else [SolverType.fast_downward]
         self.domain_validator.validate_domain(
             tested_domain_file_path=domain_file_path,
             test_set_directory_path=test_set_dir_path,
