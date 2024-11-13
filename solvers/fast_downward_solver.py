@@ -48,7 +48,7 @@ class FastDownwardSolver:
         solving_stats: Dict[str, str],
         solving_timeout: int,
         tolerance: float = 0.1,
-    ) -> None:
+    ) -> bool:
         """Solves a single problem using the Fast Downward solver.
 
         :param domain_file_path: the path to the domain file.
@@ -56,6 +56,7 @@ class FastDownwardSolver:
         :param problems_directory_path: the path to the directory containing the problems.
         :param solving_stats: the statistics of the solving process.
         :param solving_timeout: the timeout for the solving process.
+        :return Whether the execution terminated successfully.
         """
         os.chdir(FAST_DOWNWARD_DIR_PATH)
         self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
@@ -84,17 +85,21 @@ class FastDownwardSolver:
             solving_stats[problem_file_path.stem] = "ok"
             self._remove_cost_from_file(solution_path)
             self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / sas_file_path)
+            return True
 
         except subprocess.CalledProcessError as e:
             if e.returncode in [21, 23, 247]:
                 self.logger.warning(f"Fast Downward returned status code {e.returncode} - timeout on problem {problem_file_path.stem}.")
                 solving_stats[problem_file_path.stem] = "timeout"
+                return True
             elif e.returncode in [11, 12]:
                 self.logger.warning(f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}.")
                 solving_stats[problem_file_path.stem] = "no_solution"
+                return True
             else:
                 self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")
                 solving_stats[problem_file_path.stem] = "solver_error"
+                return False
 
     def execute_solver(
         self,
@@ -116,7 +121,13 @@ class FastDownwardSolver:
         os.chdir(FAST_DOWNWARD_DIR_PATH)
         self.logger.info("Starting to solve the input problems using Fast-Downward solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
-            self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
+            terminated_successfully = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
+            num_retries = 0
+            while not terminated_successfully and num_retries < 3:
+                terminated_successfully = self.solve_problem(
+                    domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout
+                )
+                num_retries += 1
 
         return solving_stats
 
