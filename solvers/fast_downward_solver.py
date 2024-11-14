@@ -121,6 +121,7 @@ class FastDownwardSolver:
         os.chdir(FAST_DOWNWARD_DIR_PATH)
         self.logger.info("Starting to solve the input problems using Fast-Downward solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
+            self.logger.info(f"Fast Downward is starting to solve problem - {problem_file_path.stem}")
             terminated_successfully = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
             num_retries = 0
             while not terminated_successfully and num_retries < 3:

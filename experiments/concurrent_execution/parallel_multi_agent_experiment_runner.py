@@ -1,5 +1,6 @@
 """Runs experiments for the numeric model learning algorithms."""
 import argparse
+import os
 from pathlib import Path
 from typing import List, Dict, Tuple, Union
 
@@ -9,6 +10,7 @@ from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 from experiments.concurrent_execution.parallel_basic_experiment_runner import (
     ParallelExperimentRunner,
     configure_iteration_logger,
+    PLANNER_EXECUTION_TIMEOUT,
 )
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, MultiAgentSAM, MASAMPlus
@@ -17,7 +19,7 @@ from statistics.utils import init_semantic_performance_calculator_for_ma_experim
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy, MappingElement, SolverType
 from validators import DomainValidator
 
-EXPERIMENT_TIMEOUT = 60
+EXPERIMENT_TIMEOUT = os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT)
 
 
 class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
@@ -92,12 +94,12 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         """
         domain_file_path = self._export_domain_and_backup(allowed_observations, fold_number, learned_model, policy, test_set_dir_path)
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
-        portfolio = [SolverType.fast_downward, SolverType.fast_forward]
+        portfolio = [SolverType.fast_downward]
         self.domain_validator.validate_domain(
             tested_domain_file_path=domain_file_path,
             test_set_directory_path=test_set_dir_path,
             used_observations=allowed_observations,
-            timeout=60,
+            timeout=EXPERIMENT_TIMEOUT,
             learning_time=learning_time,
             solvers_portfolio=portfolio,
             preconditions_removal_policy=policy,
