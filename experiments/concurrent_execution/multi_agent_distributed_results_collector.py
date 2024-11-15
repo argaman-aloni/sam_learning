@@ -49,11 +49,10 @@ class MultiAgentExperimentsResultsCollector:
     def _combine_statistics_data(
         self, file_path_template: str, combined_statistics_data: List[dict], exclude_algorithm: Optional[LearningAlgorithmType] = None
     ) -> None:
-        """
+        """Combines the statistics data from the statistics files in the results directory to a single file.
 
-        :param file_path_template:
-        :param combined_statistics_data:
-        :return:
+        :param file_path_template: the template of the file path to use to find the statistics files.
+        :param combined_statistics_data: the list to append the combined statistics data to.
         """
         results_directory = self.working_directory_path / "results_directory"
         algorithms_to_iterate = (
@@ -88,6 +87,10 @@ class MultiAgentExperimentsResultsCollector:
         self.logger.info("Done collecting the solving statistics from the results directory!")
 
     def _collect_semantic_performance_statistics(self, domain: Domain) -> None:
+        """Collects the semantic performance statistics from the results directory.
+
+        :param domain: the domain to collect the statistics for.
+        """
         self.logger.info("Collecting the semantic performance statistics from the results directory.")
         combined_semantic_performance_file_path = self.working_directory_path / "results_directory" / "semantic_performance_combined_statistics.csv"
         combined_semantic_performance_statistics_data = []
@@ -101,6 +104,10 @@ class MultiAgentExperimentsResultsCollector:
             writer.writerows(combined_semantic_performance_statistics_data)
 
     def _collect_synthetic_performance_statistics(self, domain: Domain) -> None:
+        """Collects the syntactic performance statistics from the results directory.
+
+        :param domain: the domain to collect the statistics for.
+        """
         self.logger.info("Collecting the syntactic performance statistics from the results directory.")
         combined_syntactic_performance_file_path = self.working_directory_path / "results_directory" / "syntactic_performance_combined_statistics.csv"
         combined_action_performance_statistics_data = []

@@ -298,17 +298,21 @@ class MultiAgentSAM(SAMLearner):
     def construct_safe_actions(self) -> None:
         """Constructs the single-agent actions that are safe to execute."""
         super()._remove_unobserved_actions_from_partial_domain()
+        unsafe_actions = []
         for action in self.partial_domain.actions.values():
             self.logger.debug("Constructing safe action for %s", action.name)
             action_preconditions = {precondition for precondition in action.preconditions if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                self.partial_domain.actions.pop(action.name)
+                unsafe_actions.append(action.name)
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)
             self.safe_actions.append(action.name)
             self.extract_effects_from_cnf(action, action_preconditions)
+
+        for unsafe_action in unsafe_actions:
+            self.partial_domain.actions.pop(unsafe_action)
 
     def learn_combined_action_model(self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input multi-agent trajectories.
