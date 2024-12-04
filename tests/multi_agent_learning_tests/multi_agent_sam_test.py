@@ -267,10 +267,12 @@ def test_construct_safe_actions_returns_safe_action_when_it_has_only_one_effect_
     assert "do-immersion-varnish" in woodworking_ma_sam.safe_actions
 
 
-def test_learn_action_model_with_colliding_actions_returns_that_actions_are_unsafe(rovers_ma_sam: MultiAgentSAM, ma_rovers_observation):
+def test_learn_action_model_with_colliding_actions_not_learn_actions_that_are_considered_as_unsafe(
+    rovers_ma_sam: MultiAgentSAM, ma_rovers_observation
+):
     _, learning_report = rovers_ma_sam.learn_combined_action_model([ma_rovers_observation])
-    assert learning_report["navigate"] == "NOT SAFE"
-    assert learning_report["communicate_rock_data"] == "NOT SAFE"
+    assert "navigate" not in learning_report
+    assert "communicate_rock_data" not in learning_report
 
 
 def test_learn_action_model_returns_learned_model(woodworking_ma_sam: MultiAgentSAM, multi_agent_observation: MultiAgentObservation):
