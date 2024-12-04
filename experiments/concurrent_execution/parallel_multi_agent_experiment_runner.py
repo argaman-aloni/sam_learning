@@ -14,7 +14,6 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
 )
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, MultiAgentSAM, MASAMPlus
-from statistics import LearningStatisticsManager
 from statistics.utils import init_semantic_performance_calculator_for_ma_experiments
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy, MappingElement, SolverType
 from validators import DomainValidator
@@ -24,8 +23,6 @@ EXPERIMENT_TIMEOUT = os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTI
 
 class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
     """Class to conduct offline multi-agent action model learning experiments."""
-
-    learning_statistics_manager: LearningStatisticsManager
 
     def __init__(
         self,
@@ -43,11 +40,6 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         )
         self.executing_agents = executing_agents
         self.ma_domain_path = None
-        self.learning_statistics_manager = LearningStatisticsManager(
-            working_directory_path=working_directory_path,
-            domain_path=self.working_directory_path / domain_file_name,
-            learning_algorithm=learning_algorithm,
-        )
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
