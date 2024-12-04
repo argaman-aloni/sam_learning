@@ -227,7 +227,7 @@ class LearnerDomain:
         predicates = "\n\t".join([str(p) for p in self.predicates.values()])
         predicates_str = f"(:predicates {predicates}\n)\n\n" if len(self.predicates) > 0 else ""
         types_str = f"(:types {self._types_to_pddl()}\n)\n\n" if len(self.types) > 0 else ""
-        actions = "\n".join(action.to_pddl_legacy(should_simplify=should_simplify, decimal_digits=decimal_digits) for action in self.actions.values())
+        actions = "\n".join(action.to_pddl(decimal_digits=decimal_digits) for action in self.actions.values())
         constants = f"(:constants {self._constants_to_pddl()}\n)\n\n" if len(self.constants) > 0 else ""
         functions = f"(:functions {self._functions_to_pddl()}\n)\n\n" if len(self.functions) > 0 else ""
         return (
