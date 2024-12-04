@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional, Union
 from pddl_plus_parser.models import Observation, MultiAgentObservation
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver, FFADLSolver
-from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
+from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes, NegativePreconditionPolicy, MappingElement, MacroActionParser
 from validators.common import AGGREGATED_SOLVING_FIELDS
 from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, GOAL_NOT_REACHED, run_validate_script
 
@@ -24,6 +24,7 @@ SOLVING_STATISTICS = [
     "learning_algorithm",
     "num_trajectories",
     "num_trajectory_triplets",
+    "policy",
     "learning_time",
     "solving_time",
     "solver",
@@ -220,6 +221,26 @@ class DomainValidator:
             solving_stats[f"percent_{statistic}"] = percentage_statistic
             self.logger.info(f"{statistic} percentage: {percentage_statistic:.2f}%")
 
+    @staticmethod
+    def adapt_solution_file(solution_path: Path, mapping: Dict[str, MappingElement]):
+        """
+        Post Processing solution files with macro actions and adapt them to something validators can work with.
+        That essentially means replacing macro action lines with its consisting solo actions lines.
+
+        :param solution_path: the path to the solution file output from the learned domain.
+        :param mapping: the macro actions mapping of the learned domain.
+        """
+        with open(solution_path, "r") as file:
+            lines = file.readlines()
+
+        new_lines = []
+        for line in lines:
+            extracted_lines = MacroActionParser.extract_actions_from_macro_action(action_line=line, mapper=mapping)
+            new_lines.extend([extracted_line if extracted_line.endswith("\n") else f"{extracted_line}\n" for extracted_line in extracted_lines])
+
+        with open(solution_path, "w") as file:
+            file.writelines(new_lines)
+
     def validate_domain(
         self,
         tested_domain_file_path: Path,
@@ -229,6 +250,8 @@ class DomainValidator:
         timeout: int = 5,
         learning_time: float = 0,
         solvers_portfolio: List[SolverType] = None,
+        preconditions_removal_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
+        mapping: Dict[str, MappingElement] = None,
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -239,6 +262,8 @@ class DomainValidator:
         :param tolerance: the numeric tolerance to use.
         :param learning_time: the time it took to learn the domain (in seconds).
         :param solvers_portfolio: the solvers to use for the validation, can be one or more and each will try to solve each planning problem at most once.
+        :param preconditions_removal_policy: the policy used to remove the negative discrete preconditions.
+        :param mapping: the learned model mapper from macro action to mapping element.
         """
         num_triplets = self._extract_num_triplets(used_observations)
         solving_stats: Dict[str, Any] = {label: 0 for label in NUMERIC_STATISTICS_LABELS}
@@ -267,6 +292,10 @@ class DomainValidator:
                     problem_solving_times.append(end_time - start_time)  # time in seconds
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
+
+                    if mapping:
+                        self.adapt_solution_file(solution_path=solution_file_path, mapping=mapping)
+
                     self._validate_solution_content(
                         solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats
                     )
@@ -296,6 +325,7 @@ class DomainValidator:
             {
                 "learning_algorithm": self.learning_algorithm.name,
                 "num_trajectories": num_trajectories,
+                "policy": preconditions_removal_policy.name,
                 "num_trajectory_triplets": num_triplets,
                 "learning_time": learning_time,
                 "solver": [solver.name for solver in solvers_portfolio],

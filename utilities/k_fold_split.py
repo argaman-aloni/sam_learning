@@ -15,8 +15,7 @@ FOLDS_CONFIG_FILE_NAME = "folds.json"
 FOLDS_LABEL = "fold"
 
 
-def create_test_set_indices(array_size: int, n_split: int,
-                            only_train_test: bool = False) -> Iterator[Tuple[List[int], List[int]]]:
+def create_test_set_indices(array_size: int, n_split: int, only_train_test: bool = False) -> Iterator[Tuple[List[int], List[int]]]:
     """Creates the indices to use to create the train and the test set of the problems.
 
     :param array_size: the size of the array containing the problems.
@@ -59,9 +58,27 @@ def load_fold_settings(workdir_path: Path) -> Dict[str, Dict[str, List[Path]]]:
         config_data = json.load(folds_file)
         for fold_name, fold in config_data.items():
             folds_configurations[fold_name] = {
-                "train": fold["train"],
-                "test": [Path(problem) for problem in fold["test"]]
+                "train": [Path(problem) for problem in fold["train"]],
+                "test": [Path(problem) for problem in fold["test"]],
             }
+
+    return folds_configurations
+
+
+def load_distributed_fold_settings(workdir_path: Path) -> Dict[str, Dict[str, List[Path]]]:
+    """Loads the fold settings from a json file.
+
+    :param workdir_path: the path to the working directory.
+    :return: the folds configuration, i.e. the train and test problems.
+    """
+    if not (workdir_path / FOLDS_CONFIG_FILE_NAME).exists():
+        return {}
+
+    folds_configurations = {}
+    with open(workdir_path / FOLDS_CONFIG_FILE_NAME, "rt") as folds_file:
+        config_data = json.load(folds_file)
+        for fold_name, fold in config_data.items():
+            folds_configurations[fold_name] = {"train": fold["train"], "test": [Path(problem) for problem in fold["test"]]}
 
     return folds_configurations
 
@@ -77,8 +94,7 @@ class KFoldSplit:
     domain_file_path: Path
     only_train_test: bool
 
-    def __init__(self, working_directory_path: Path, domain_file_name: str, n_split: int = 0,
-                 only_train_test: bool = False):
+    def __init__(self, working_directory_path: Path, domain_file_name: str, n_split: int = 0, only_train_test: bool = False):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
         self.n_split = n_split
@@ -99,8 +115,7 @@ class KFoldSplit:
         self.logger.debug("Deleting the test set directory!")
         shutil.rmtree(self.test_set_dir_path)
 
-    def create_directories_content(
-            self, train_set_problems: List[Path], test_set_problems: List[Path], trajectory_paths: List[Path]) -> None:
+    def create_directories_content(self, train_set_problems: List[Path], test_set_problems: List[Path], trajectory_paths: List[Path]) -> None:
         self.train_set_dir_path.mkdir(exist_ok=True)
         self.test_set_dir_path.mkdir(exist_ok=True)
         self._copy_domain()
@@ -112,8 +127,9 @@ class KFoldSplit:
             shutil.copy(trajectory, self.train_set_dir_path / trajectory.name)
             shutil.copy(problem, self.train_set_dir_path / problem.name)
 
-    def create_k_fold(self, trajectory_suffix: str = "*.trajectory",
-                      max_items: int = 0, load_configuration: bool = True) -> Generator[Tuple[Path, Path], None, None]:
+    def create_k_fold(
+        self, trajectory_suffix: str = "*.trajectory", max_items: int = 0, load_configuration: bool = True
+    ) -> Generator[Tuple[Path, Path], None, None]:
         """Creates a generator that will be used for the next algorithm to know where the train and test set
             directories reside.
 
@@ -127,9 +143,7 @@ class KFoldSplit:
         if load_configuration and len(folds_data) > 0:
             self.logger.info("Loading the folds settings from the configuration file.")
             for fold_name, fold_content in folds_data.items():
-                train_set_trajectories = [
-                    self.working_directory_path / f"{problem_path.stem}.trajectory" for
-                    problem_path in fold_content["train"]]
+                train_set_trajectories = [self.working_directory_path / f"{problem_path.stem}.trajectory" for problem_path in fold_content["train"]]
                 self.create_directories_content(fold_content["train"], fold_content["test"], train_set_trajectories)
                 self.logger.debug("Finished creating fold!")
                 yield self.train_set_dir_path, self.test_set_dir_path
@@ -147,18 +161,20 @@ class KFoldSplit:
             problem_paths.append(self.working_directory_path / f"{trajectory_file_path.stem}.pddl")
 
         num_splits = len(trajectory_paths) if self.n_split == 0 else self.n_split
-        for fold_index, (train_set_indices, test_set_indices) in enumerate(create_test_set_indices(
-                len(problem_paths), num_splits, self.only_train_test)):
+        for fold_index, (train_set_indices, test_set_indices) in enumerate(
+            create_test_set_indices(len(problem_paths), num_splits, self.only_train_test)
+        ):
             test_set_problems = [problem_paths[i] for i in test_set_indices]
             train_set_problems = [problem_paths[i] for i in train_set_indices]
-            train_set_trajectories = [trajectory_paths[i] for i in range(len(trajectory_paths)) if
-                                      i not in test_set_indices]
-            self.logger.info(f"Created a new fold - train set has the following problems: {train_set_problems} "
-                             f"and test set had the following problems: {test_set_problems}")
+            train_set_trajectories = [trajectory_paths[i] for i in range(len(trajectory_paths)) if i not in test_set_indices]
+            self.logger.info(
+                f"Created a new fold - train set has the following problems: {train_set_problems} "
+                f"and test set had the following problems: {test_set_problems}"
+            )
             self.create_directories_content(train_set_problems, test_set_problems, train_set_trajectories)
             folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
                 "train": [str(p.absolute()) for p in train_set_problems],
-                "test": [str(p.absolute()) for p in test_set_problems]
+                "test": [str(p.absolute()) for p in test_set_problems],
             }
             self.logger.debug("Finished creating fold!")
             yield self.train_set_dir_path, self.test_set_dir_path

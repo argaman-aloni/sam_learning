@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Tuple, List, Optional, Any, Dict
 
-from utilities.k_fold_split import create_test_set_indices, save_fold_settings, FOLDS_LABEL, load_fold_settings
+from utilities.k_fold_split import create_test_set_indices, save_fold_settings, FOLDS_LABEL, load_distributed_fold_settings
 
 
 class DistributedKFoldSplit:
@@ -126,7 +126,7 @@ class DistributedKFoldSplit:
         self.logger.info("Starting to create the folds for the cross validation process.")
         self.train_set_dir_path.mkdir(exist_ok=True)
         self.test_set_dir_path.mkdir(exist_ok=True)
-        folds_data = load_fold_settings(self.working_directory_path)
+        folds_data = load_distributed_fold_settings(self.working_directory_path)
         train_test_paths = []
         if load_configuration and len(folds_data) > 0:
             self.logger.debug("Loading the folds settings from the configuration file.")

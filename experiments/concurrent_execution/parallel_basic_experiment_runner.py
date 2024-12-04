@@ -5,16 +5,16 @@ import os
 import shutil
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple, Any
+from typing import List, Optional, Dict, Tuple, Any, Union
 
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
-from pddl_plus_parser.models import Observation, Domain
+from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 
 from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_SPLIT, DEFAULT_NUMERIC_TOLERANCE, NUMERIC_ALGORITHMS
 from sam_learning.core import LearnerDomain
 from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
@@ -89,7 +89,7 @@ class ParallelExperimentRunner:
     ) -> Tuple[LearnerDomain, Dict[str, Any]]:
         raise NotImplementedError
 
-    def export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None) -> Path:
+    def _export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
@@ -102,6 +102,26 @@ class ParallelExperimentRunner:
             domain_file.write(learned_domain.to_pddl(should_simplify=False))
 
         return domain_path
+
+    def _export_domain_and_backup(self, allowed_observations, fold_number, learned_model, negative_preconditions_policy, test_set_dir_path) -> Path:
+        """Exports the domain to the test set directory and another backup to the results directory.
+
+        :param allowed_observations: the observations that were used in the learning process.
+        :param fold_number: the number of the fold that is currently running.
+        :param learned_model: the domain learned by the action model learning algorithm.
+        :param negative_preconditions_policy: the policy to use for the negative preconditions.
+        :param test_set_dir_path: the path to the test set directory.
+        :return: the path of the PDDL domain in the test set directory.
+        """
+        domain_file_path = self._export_learned_domain(learned_model, test_set_dir_path)
+        domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
+        domains_backup_dir_path.mkdir(exist_ok=True)
+        shutil.copy(
+            domain_file_path,
+            domains_backup_dir_path / f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
+            f"_{len(allowed_observations)}_trajectories_{negative_preconditions_policy.name}_policy.pddl",
+        )
+        return domain_file_path
 
     def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int = 0) -> None:
         """Learns the model of the environment by learning from the input trajectories.
@@ -135,7 +155,13 @@ class ParallelExperimentRunner:
         self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
 
     def validate_learned_domain(
-        self, allowed_observations: List[Observation], learned_model: LearnerDomain, test_set_dir_path: Path, fold_number: int, learning_time: float
+        self,
+        allowed_observations: Union[List[Observation], List[MultiAgentObservation]],
+        learned_model: LearnerDomain,
+        test_set_dir_path: Path,
+        fold_number: int,
+        learning_time: float,
+        negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
     ) -> Path:
         """Validates that using the learned domain both the used and the test set problems can be solved.
 
@@ -144,30 +170,23 @@ class ParallelExperimentRunner:
         :param test_set_dir_path: the path to the directory containing the test set problems.
         :param fold_number: the number of the fold that is currently running.
         :param learning_time: the time it took to learn the domain (in seconds).
+        :param negative_preconditions_policy: the policy to use for the negative preconditions.
         :return: the path for the learned domain.
         """
-        domain_file_path = self.export_learned_domain(learned_model, test_set_dir_path)
-        domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
-        domains_backup_dir_path.mkdir(exist_ok=True)
-        shutil.copy(
-            domain_file_path,
-            domains_backup_dir_path / f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
-            f"_{len(allowed_observations)}_trajectories.pddl",
+        domain_file_path = self._export_domain_and_backup(
+            allowed_observations, fold_number, learned_model, negative_preconditions_policy, test_set_dir_path
         )
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
-        portfolio = (
-            [SolverType.metric_ff, SolverType.enhsp]
-            if self._learning_algorithm in NUMERIC_ALGORITHMS
-            else [SolverType.fast_forward, SolverType.fast_downward]
-        )
+        portfolio = [SolverType.metric_ff, SolverType.enhsp] if self._learning_algorithm in NUMERIC_ALGORITHMS else [SolverType.fast_downward]
         self.domain_validator.validate_domain(
             tested_domain_file_path=domain_file_path,
             test_set_directory_path=test_set_dir_path,
             used_observations=allowed_observations,
             tolerance=DEFAULT_NUMERIC_TOLERANCE,
-            timeout=PLANNER_EXECUTION_TIMEOUT,
+            timeout=os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT),
             learning_time=learning_time,
             solvers_portfolio=portfolio,
+            preconditions_removal_policy=negative_preconditions_policy,
         )
 
         return domain_file_path

@@ -4,52 +4,35 @@ import time
 from datetime import datetime
 
 from experiments.cluster_scripts.common import (
-    submit_job,
     progress_bar,
     sigint_handler,
     get_configurations,
     get_environment_variables,
-    validate_job_running,
-    create_all_experiments_folders,
     EXPERIMENTS_CONFIG_STR,
+    create_all_experiments_folders,
     submit_job_and_validate_execution,
 )
-from experiments.cluster_scripts.multi_agent_experiments_sbatch_runner import create_execution_arguments
 
 signal.signal(signal.SIGINT, sigint_handler)
 
 
-def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids, internal_iterations):
-    print(f"Creating the job that will collect the statistics from all the domain's experiments.")
-    filtered_sids = [sid for sid in job_ids if validate_job_running(sid) is not None]
-    statistics_collection_job = submit_job(
-        conda_env="online_nsam",
-        mem="4G",
-        python_file=f"{code_directory}/distributed_results_collector.py",
-        dependency=f"afterok:{':'.join([str(e) for e in filtered_sids])}",
-        jobname=f"collect_statistics_{experiment['domain_file_name']}",
-        suppress_output=False,
-        arguments=[
-            f"--working_directory_path {experiment['working_directory_path']}",
-            f"--domain_file_name {experiment['domain_file_name']}",
-            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            f"--num_folds {configuration['num_folds']}",
-            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
-        ],
-        environment_variables=environment_variables,
-    )
-    print(f"Submitted job with sid {statistics_collection_job}\n")
-    time.sleep(1)
-    print("Removing the temp.sbatch for the statistics collection file")
-    pathlib.Path("temp.sbatch").unlink()
+def create_execution_arguments(experiment, fold, compared_version):
+    arguments = []
+    arguments.append(f"--fold_number {fold}")
+    arguments.append(f"--learning_algorithm {compared_version}")
+    for key, value in experiment.items():
+        if key != "compared_versions" and key != "parallelization_data":
+            arguments.append(f"--{key} {value}")
+
+    return arguments
 
 
 def main():
     configurations = get_configurations()
     environment_variables = get_environment_variables(configurations)
     code_directory = configurations["code_directory_path"]
-    print("Starting to setup and run the experiments!")
-    iterations_to_use = create_all_experiments_folders(code_directory, environment_variables, configurations)
+    print("Starting to setup and run the mult-agent experiments!")
+    iterations_to_use = create_all_experiments_folders(code_directory, environment_variables, configurations, should_create_random_trajectories=False)
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         internal_iterations = iterations_to_use[experiment_index]
         experiment_sids = []
@@ -69,13 +52,15 @@ def main():
                             fold,
                             arguments,
                             environment_variables,
-                            f"{experiment['domain_file_name']}_{fold}_numeric_experiment_runner",
+                            f"{experiment['domain_file_name']}_{fold}_multi_agent_experiment_runner",
                             None,
                         )
 
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-                    print(f"{formatted_date_time} - submitted job with sid {sid} for fold {fold} and iteration {internal_iteration}.")
+                    print(
+                        f"{formatted_date_time} - submitted job for the multi-agent experiments with sid {sid} for domain {experiment['domain_file_name']} fold {fold} and iteration {internal_iteration}."
+                    )
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
@@ -83,9 +68,6 @@ def main():
             time.sleep(5)
 
         print("Finished building the experiment folds!")
-        execute_statistics_collection_job(
-            code_directory, configurations, environment_variables, experiment, experiment_sids, internal_iterations,
-        )
 
 
 if __name__ == "__main__":

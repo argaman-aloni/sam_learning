@@ -9,7 +9,6 @@ class LearningAlgorithmType(Enum):
     plan_miner = 5
     polynomial_sam = 6
     ma_sam = 7
-    ma_sam_baseline = 8
     conditional_sam = 9
     universal_sam = 10
     online_nsam = 13
@@ -26,6 +25,8 @@ class LearningAlgorithmType(Enum):
     raw_naive_polysam = 18
     raw_polynomial_nsam = 14
     naive_nsam_no_dependency_removal = 20
+
+    ma_sam_plus = 25
 
 
 class SolverType(Enum):
