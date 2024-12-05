@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from pandas import DataFrame
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
+from scipy.spatial import ConvexHull
 
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
 from sam_learning.core.numeric_learning.numeric_utils import remove_complex_linear_dependencies
@@ -272,3 +273,14 @@ def test_construct_safe_linear_inequalities_with_relevant_fluents_ignores_all_va
         assert "(x )" in operand.to_pddl()
         assert "(y )" not in operand.to_pddl()
         assert "(z )" not in operand.to_pddl()
+
+
+def test_epsilon_approximate_hull_when_given_epsilon_zero_and_no_parameters_returns_original_convex_hull(
+    convex_hull_learner: ConvexHullLearner,
+):
+    # create a three-dimensional np.array with 10 samples of random numbers.
+    data = np.random.randint(0, 100, (10, 3))
+    non_approximated_hull = convex_hull_learner._epsilon_approximate_hull(data, epsilon=0, qhull_options="")
+    expected_convex_hull = ConvexHull(data)
+    assert np.equal(non_approximated_hull.points, expected_convex_hull.points).all()
+    assert np.equal(non_approximated_hull.equations, expected_convex_hull.equations).all()

@@ -21,7 +21,7 @@ def plot_results(results_directory_path: Path):
         markers = list(marker_options)
 
         # Group the data by 'num_trajectories', 'learning_algorithm' and calculate the mean and std of 'percent_ok'
-        df = df[df["learning_algorithm"] != "incremental_nsam"]  # Remove max_percent_ok from the plot
+        df = df[~df["learning_algorithm"].isin(["incremental_nsam", "naive_nsam_no_dependency_removal"])]
         grouped_data = (
             df.groupby(["num_trajectories", "learning_algorithm"])
             .agg(
@@ -35,14 +35,14 @@ def plot_results(results_directory_path: Path):
         labels = {
             "numeric_sam": "NSAM*",
             "naive_nsam": "NSAM",
-            "naive_nsam_no_dependency_removal": "NSAM - DR",
         }
 
         # Plotting
         sns.set(style="whitegrid")
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
 
-        legend_order = [2, 0, 1]
+        legend_order = [1, 0]
+        x_lim = max(grouped_data["num_trajectories"]) * 1.25
 
         # Plot a line for each learning algorithm
         for index, algo in enumerate(df["learning_algorithm"].unique()):
@@ -84,30 +84,34 @@ def plot_results(results_directory_path: Path):
             )
 
             # Set plot labels and title
-            ax1.set_xlabel("# Observations", fontsize=24)
-            ax1.set_ylabel("AVG % of solved", fontsize=24)
+            ax1.set_xlabel("# Trajectories", fontsize=28)
+            ax1.set_ylabel("AVG % of solved", fontsize=28)
             ax1.set_ylim(0, 100)
-            ax1.tick_params(axis="both", which="major", labelsize=20)
+            ax1.tick_params(axis="both", which="major", labelsize=24)
 
-            ax2.set_xlabel("# Observations (0-10)", fontsize=24)
-            ax2.set_xlim(1, 10)
+
+
+            ax2.set_xlabel("# Observations (0-10)", fontsize=28)
+            ax2.set_xlim(1, x_lim * 0.1)
             ax2.set_ylim(0, 100)
-            ax2.tick_params(axis="both", which="major", labelsize=20)
+            ax2.tick_params(axis="both", which="major", labelsize=24)
 
         ax1.grid(True)
         ax2.grid(True)
 
         # Add a legend
         handles1, legend_labels1 = plt.gca().get_legend_handles_labels()
-        ax1.legend([handles1[idx] for idx in legend_order], [legend_labels1[idx] for idx in legend_order], fontsize=24)
+        ax1.legend([handles1[idx] for idx in legend_order], [legend_labels1[idx] for idx in legend_order], fontsize=28)
 
         handles2, legend_labels2 = plt.gca().get_legend_handles_labels()
-        ax2.legend([handles2[idx] for idx in legend_order], [legend_labels2[idx] for idx in legend_order], fontsize=24)
+        ax2.legend([handles2[idx] for idx in legend_order], [legend_labels2[idx] for idx in legend_order], fontsize=28)
 
         # Add a vertical dashed line at x = 5, with color changed to black
-        ax1.axvline(x=10, color="black", linestyle="--", linewidth=2)
+        ax1.axvline(x=x_lim * 0.1, color="black", linestyle="--", linewidth=4)
         # Add an annotation to show the zoom effect
-        ax1.annotate("Zoom up to here", xy=(10, 20), xytext=(15, 15), arrowprops=dict(facecolor="black", shrink=0.05), fontsize=20)
+        ax1.annotate(
+            "Zoom up to\n here", xy=(x_lim * 0.1, 20), xytext=(x_lim * 0.15, 15), arrowprops=dict(facecolor="black", shrink=0.05), fontsize=18
+        )
 
         output_file_path = file_path.parent / f"{file_path.stem}_plot.png"
         plt.savefig(output_file_path, bbox_inches="tight")

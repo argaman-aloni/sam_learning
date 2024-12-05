@@ -38,6 +38,7 @@ class NumericSAMLearner(SAMLearner):
         self.relevant_fluents = relevant_fluents
         self._allow_unsafe = allow_unsafe
         self.polynom_degree = polynomial_degree
+        self.approximation_params = kwargs["approximation_params"] if "approximation_params" in kwargs else None
 
     def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
         """Constructs the safe preconditions for the input action.
@@ -105,7 +106,7 @@ class NumericSAMLearner(SAMLearner):
             domain=self.partial_domain, possible_parameters=self.partial_domain.actions[grounded_action.name].signature
         )
         self.storage[grounded_action.name] = NumericFluentStateStorage(
-            action_name=grounded_action.name, domain_functions=possible_bounded_functions, polynom_degree=self.polynom_degree,
+            action_name=grounded_action.name, domain_functions=possible_bounded_functions, polynom_degree=self.polynom_degree, approximation_params=self.approximation_params
         )
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)

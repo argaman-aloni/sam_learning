@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, Set, NoReturn, List
+from typing import Dict, Set, List
 
 from pddl_plus_parser.models import Action, Predicate
 

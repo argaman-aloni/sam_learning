@@ -68,6 +68,11 @@ class ParallelExperimentRunner:
         self.domain_file_name = domain_file_name
         self._learning_algorithm = learning_algorithm
         self.semantic_performance_calc = None
+        self.learning_statistics_manager = LearningStatisticsManager(
+            working_directory_path=working_directory_path,
+            domain_path=self.working_directory_path / domain_file_name,
+            learning_algorithm=learning_algorithm,
+        )
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
@@ -146,13 +151,14 @@ class ParallelExperimentRunner:
 
         self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
         learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
-
+        self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
         learned_domain_path = self.validate_learned_domain(
             allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
         )
         self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
         self.domain_validator.write_statistics(fold_num, iteration_number)
         self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
+        self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num, iteration_num=iteration_number)
 
     def validate_learned_domain(
         self,

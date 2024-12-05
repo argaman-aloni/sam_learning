@@ -164,7 +164,7 @@ def extract_numeric_linear_coefficient(function1_values: Series, function2_value
     denominator = np.where(function2_values == 0, 1e-9, function2_values)
     division_res = np.array(function1_values) / np.array(denominator)
     for value in division_res:
-        if not math.isnan(value) and not math.isinf(value):
+        if not math.isnan(value) and not math.isinf(value) and not math.isclose(value, 0.0, abs_tol=ELIMINATION_THRESHOLD):
             linear_coeff = value
             break
 
