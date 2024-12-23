@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import List, Dict, Tuple, Union
 
-from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
+from pddl_plus_parser.lisp_parsers import TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 
 from experiments.concurrent_execution.parallel_basic_experiment_runner import (
@@ -156,7 +156,6 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         :param partial_domain:
         :param test_set_dir_path:
         :param fold_num:
-        :param iteration_number:
         :return:
         """
         if self._learning_algorithm in [LearningAlgorithmType.ma_sam, LearningAlgorithmType.sam_learning]:

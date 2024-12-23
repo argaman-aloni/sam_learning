@@ -97,12 +97,8 @@ class SingleIterationTripletsNSAMExperimentRunner(SingleIterationNSAMExperimentR
         complete_train_set = self.collect_observations(train_set_dir_path, partial_domain)
         transitions_based_training_set = self.create_transitions_based_training_set(complete_train_set)
         execution_scheme = [index + 1 for index in range(10)] + [index for index in range(20, len(transitions_based_training_set), 10)]
-        i = 0
         for index in execution_scheme:
             self._learn_model_offline([*transitions_based_training_set[0:index]], partial_domain, test_set_dir_path, fold_num)
-            i += 1
-            if i == 2:
-                break
 
         self.semantic_performance_calc.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)

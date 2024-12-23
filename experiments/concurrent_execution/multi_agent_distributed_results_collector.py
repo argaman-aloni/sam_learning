@@ -7,6 +7,7 @@ from typing import List, Optional
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain
 
+from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector
 from experiments.plotting.plot_masam_results import plot_solving_results
 from statistics.learning_statistics_manager import LEARNED_ACTIONS_STATS_COLUMNS
 from statistics.semantic_performance_calculator import SEMANTIC_PRECISION_STATS
@@ -28,7 +29,7 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-class MultiAgentExperimentsResultsCollector:
+class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
     logger: logging.Logger
 
     def __init__(
@@ -45,30 +46,6 @@ class MultiAgentExperimentsResultsCollector:
         self.num_folds = num_folds
         self.iterations = iterations
         self.logger = logging.getLogger("ClusterRunner")
-
-    def _combine_statistics_data(
-        self, file_path_template: str, combined_statistics_data: List[dict], exclude_algorithm: Optional[LearningAlgorithmType] = None
-    ) -> None:
-        """Combines the statistics data from the statistics files in the results directory to a single file.
-
-        :param file_path_template: the template of the file path to use to find the statistics files.
-        :param combined_statistics_data: the list to append the combined statistics data to.
-        """
-        results_directory = self.working_directory_path / "results_directory"
-        algorithms_to_iterate = (
-            self.learning_algorithms
-            if exclude_algorithm is None
-            else [algorithm for algorithm in self.learning_algorithms if algorithm != exclude_algorithm]
-        )
-        for fold in range(self.num_folds):
-            for iteration in self.iterations:
-                for learning_algorithm in algorithms_to_iterate:
-                    solving_statistics_file_path = results_directory / file_path_template.format(
-                        fold=fold, iteration=iteration, learning_algorithm=learning_algorithm.name
-                    )
-                    with open(solving_statistics_file_path, "rt") as statistics_file:
-                        reader = csv.DictReader(statistics_file)
-                        combined_statistics_data.extend([{FOLD_FIELD: fold, **row} for row in reader])
 
     def _collect_solving_statistics(self) -> None:
         """Collects the statistics from the statistics files in the results directory and combines them."""

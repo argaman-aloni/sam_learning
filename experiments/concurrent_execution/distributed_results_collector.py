@@ -1,9 +1,8 @@
 import argparse
 import csv
 import logging
-import pandas as pd
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Optional
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 
@@ -27,7 +26,7 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-class StatisticsCollector:
+class DistributedResultsCollector:
     logger: logging.Logger
 
     def __init__(
@@ -45,28 +44,24 @@ class StatisticsCollector:
         self.iterations = iterations
         self.logger = logging.getLogger("ClusterRunner")
 
-    @staticmethod
-    def _process_combined_data(combined_statistics_data: List[Dict]) -> pd.DataFrame:
-        # Load the CSV file into a DataFrame
-        df = pd.DataFrame(combined_statistics_data)
-        numeric_columns = ["percent_ok", "fold", "num_trajectories"]
-        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric)
-        aggregated_df = df.groupby(["fold", "num_trajectories", "learning_algorithm"]).agg(
-            max_percent_ok=("percent_ok", "max"), percent_goal_not_achieved=("percent_goal_not_achieved", "max")
-        )
-        return aggregated_df
+    def _combine_statistics_data(
+        self, file_path_template: str, combined_statistics_data: List[dict], exclude_algorithm: Optional[LearningAlgorithmType] = None
+    ) -> None:
+        """Combines the statistics data from the statistics files in the results directory to a single file.
 
-    def _combine_statistics_data(self, file_path_template: str, combined_statistics_data: List[dict]) -> None:
-        """
-
-        :param file_path_template:
-        :param combined_statistics_data:
-        :return:
+        :param file_path_template: the template of the file path to use to find the statistics files.
+        :param combined_statistics_data: the list to append the combined statistics data to.
+        :param exclude_algorithm: the algorithm to exclude and not include in the combined statistics.
         """
         results_directory = self.working_directory_path / "results_directory"
+        algorithms_to_iterate = (
+            self.learning_algorithms
+            if exclude_algorithm is None
+            else [algorithm for algorithm in self.learning_algorithms if algorithm != exclude_algorithm]
+        )
         for fold in range(self.num_folds):
             for iteration in self.iterations:
-                for learning_algorithm in self.learning_algorithms:
+                for learning_algorithm in algorithms_to_iterate:
                     solving_statistics_file_path = results_directory / file_path_template.format(
                         fold=fold, iteration=iteration, learning_algorithm=learning_algorithm.name
                     )
@@ -74,23 +69,39 @@ class StatisticsCollector:
                         reader = csv.DictReader(statistics_file)
                         combined_statistics_data.extend([{FOLD_FIELD: fold, **row} for row in reader])
 
-    def _collect_solving_statistics(self) -> None:
-        """Collects the statistics from the statistics files in the results directory and combines them."""
+    def _collect_solving_statistics_internal(self, collecting_triplets: bool = False) -> None:
+        """Collects the statistics from the statistics files in the results directory based on the given parameters.
+
+        :param collecting_triplets: whether to collect the statistics based on triplets or not.
+        """
         self.logger.info("Collecting the solving statistics from the results directory.")
         results_directory = self.working_directory_path / "results_directory"
-        combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
-        combined_aggregated_stats = results_directory / "solving_aggregated_statistics.csv"
+        combined_statistics_file_path = (
+            results_directory / "solving_combined_statistics.csv"
+            if not collecting_triplets
+            else results_directory / "solving_combined_statistics_with_triplets.csv"
+        )
         combined_statistics_data = []
-        file_path_template = "{learning_algorithm}_problem_solving_stats_fold_{fold}_{iteration}_trajectories.csv"
+        file_path_template = (
+            "{learning_algorithm}_problem_solving_stats_fold_{fold}_{iteration}_trajectories.csv"
+            if not collecting_triplets
+            else "{learning_algorithm}_problem_solving_stats_fold_{fold}.csv"
+        )
         self._combine_statistics_data(file_path_template, combined_statistics_data)
-        combined_and_augmented_df = self._process_combined_data(combined_statistics_data)
-        combined_and_augmented_df.to_csv(combined_aggregated_stats)
-        plot_results(results_directory)
 
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SOLVING_STATISTICS])
             writer.writeheader()
             writer.writerows(combined_statistics_data)
+
+    def _collect_solving_statistics(self) -> None:
+        """Collects the statistics from the statistics files in the results directory and combines them."""
+        self.logger.info("Collecting the solving statistics from the results directory.")
+        self._collect_solving_statistics_internal(collecting_triplets=False)
+        self._collect_solving_statistics_internal(collecting_triplets=True)
+        results_directory = self.working_directory_path / "results_directory"
+        plot_results(results_directory, file_template="*solving_combined_statistics.csv")
+        plot_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv")
 
         self.logger.info("Done collecting the solving statistics from the results directory!")
 
@@ -108,6 +119,7 @@ class StatisticsCollector:
         self.logger.info("Done collecting the statistics from the results directory!")
 
     def collect_statistics(self) -> None:
+        """Collects the statistics from the results directory."""
         self._collect_solving_statistics()
         self._collect_numeric_performance_statistics()
 
@@ -117,7 +129,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     internal_iterations = [int(val) for val in args.internal_iterations.split(",")]
-    StatisticsCollector(
+    DistributedResultsCollector(
         working_directory_path=Path(args.working_directory_path),
         domain_file_name=args.domain_file_name,
         learning_algorithms=experiment_learning_algorithms,
