@@ -363,7 +363,7 @@ def test_learn_action_model_when_learning_farmland_domain_from_large_number_of_s
     learned_model, learning_metadata = farmland_nsam.learn_action_model(observations)
     farmland_move_slow_action = learned_model.actions["move-slow"]
     move_slow_schema = farmland_move_slow_action.to_pddl()
-    assert "(>= (x ?f1) 1)" in move_slow_schema  # in original domain the condition is (>= (x ?f1) 1) which holds
+    assert "(<= (* (x ?f1) -1) -1)" in move_slow_schema  # in original domain the condition is (>= (x ?f1) 1) which holds
     print()
     print(learned_model.to_pddl())
 
