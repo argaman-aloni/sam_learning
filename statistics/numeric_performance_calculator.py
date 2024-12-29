@@ -4,7 +4,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Union
 
-import math
 import sklearn
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
