@@ -2,20 +2,16 @@ import argparse
 import csv
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain
 
-from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector
+from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector, FOLD_FIELD
 from experiments.plotting.plot_masam_results import plot_solving_results
 from statistics.learning_statistics_manager import LEARNED_ACTIONS_STATS_COLUMNS
 from statistics.semantic_performance_calculator import SEMANTIC_PRECISION_STATS
 from utilities import LearningAlgorithmType
-from validators.safe_domain_validator import SOLVING_STATISTICS
-
-FOLD_FIELD = "fold"
-MAX_SOLVED_FIELD = "max_percent_solved"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -40,28 +36,7 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
         num_folds: int = 5,
         iterations: List[int] = None,
     ):
-        self.domain_file_name = domain_file_name
-        self.working_directory_path = working_directory_path
-        self.learning_algorithms = [LearningAlgorithmType(int(e)) for e in learning_algorithms]
-        self.num_folds = num_folds
-        self.iterations = iterations
-        self.logger = logging.getLogger("ClusterRunner")
-
-    def _collect_solving_statistics(self) -> None:
-        """Collects the statistics from the statistics files in the results directory and combines them."""
-        self.logger.info("Collecting the solving statistics for the combination of the algorithms.")
-        results_directory = self.working_directory_path / "results_directory"
-        combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
-        combined_statistics_data = []
-        file_path_template = "{learning_algorithm}_problem_solving_stats_fold_{fold}_{iteration}_trajectories.csv"
-        self._combine_statistics_data(file_path_template, combined_statistics_data)
-        with open(combined_statistics_file_path, "wt") as combined_statistics_file:
-            writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SOLVING_STATISTICS])
-            writer.writeheader()
-            writer.writerows(combined_statistics_data)
-
-        plot_solving_results(combined_statistics_file_path, results_directory / "solving_combined_statistics.pdf")
-        self.logger.info("Done collecting the solving statistics from the results directory!")
+        super().__init__(working_directory_path, domain_file_name, learning_algorithms, num_folds, iterations)
 
     def _collect_semantic_performance_statistics(self, domain: Domain) -> None:
         """Collects the semantic performance statistics from the results directory.
@@ -80,7 +55,7 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
             writer.writeheader()
             writer.writerows(combined_semantic_performance_statistics_data)
 
-    def _collect_synthetic_performance_statistics(self, domain: Domain) -> None:
+    def _collect_syntactic_performance_statistics(self, domain: Domain) -> None:
         """Collects the syntactic performance statistics from the results directory.
 
         :param domain: the domain to collect the statistics for.
@@ -100,11 +75,14 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
     def _collect_performance_statistics(self) -> None:
         domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
         self._collect_semantic_performance_statistics(domain)
-        self._collect_synthetic_performance_statistics(domain)
+        self._collect_syntactic_performance_statistics(domain)
         self.logger.info("Done collecting the statistics from the results directory!")
 
     def collect_statistics(self) -> None:
         self._collect_solving_statistics()
+        results_directory = self.working_directory_path / "results_directory"
+        combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
+        plot_solving_results(combined_statistics_file_path, results_directory / "solving_combined_statistics.pdf")
         self._collect_performance_statistics()
 
 

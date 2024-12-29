@@ -99,10 +99,6 @@ class DistributedResultsCollector:
         self.logger.info("Collecting the solving statistics from the results directory.")
         self._collect_solving_statistics_internal(collecting_triplets=False)
         self._collect_solving_statistics_internal(collecting_triplets=True)
-        results_directory = self.working_directory_path / "results_directory"
-        plot_results(results_directory, file_template="*solving_combined_statistics.csv")
-        plot_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv")
-
         self.logger.info("Done collecting the solving statistics from the results directory!")
 
     def _collect_numeric_performance_statistics(self) -> None:
@@ -121,6 +117,9 @@ class DistributedResultsCollector:
     def collect_statistics(self) -> None:
         """Collects the statistics from the results directory."""
         self._collect_solving_statistics()
+        results_directory = self.working_directory_path / "results_directory"
+        plot_results(results_directory, file_template="*solving_combined_statistics.csv")
+        plot_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv")
         self._collect_numeric_performance_statistics()
 
 

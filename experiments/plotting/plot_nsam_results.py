@@ -35,11 +35,11 @@ def plot_results(results_directory_path: Path, file_template: str = "*solving_co
 
         legend_order = [0, 1]
 
+        x_lim = max(grouped_data["num_trajectories"]) * 1.25 if not using_triplets else max(grouped_data["num_trajectory_triplets"]) * 1.25
         # Plot a line for each learning algorithm
         for index, algo in enumerate(df["learning_algorithm"].unique()):
             algo_data = grouped_data[grouped_data["learning_algorithm"] == algo]
             plot_x_axis = algo_data["num_trajectories"] if not using_triplets else algo_data["num_trajectory_triplets"]
-            x_lim = max(plot_x_axis) * 1.25
 
             ax1.plot(
                 plot_x_axis,
