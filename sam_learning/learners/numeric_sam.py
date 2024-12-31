@@ -106,7 +106,10 @@ class NumericSAMLearner(SAMLearner):
             domain=self.partial_domain, possible_parameters=self.partial_domain.actions[grounded_action.name].signature
         )
         self.storage[grounded_action.name] = NumericFluentStateStorage(
-            action_name=grounded_action.name, domain_functions=possible_bounded_functions, polynom_degree=self.polynom_degree, approximation_params=self.approximation_params
+            action_name=grounded_action.name,
+            domain_functions=possible_bounded_functions,
+            polynom_degree=self.polynom_degree,
+            approximation_params=self.approximation_params,
         )
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)
@@ -177,6 +180,7 @@ class NumericSAMLearner(SAMLearner):
         self.logger.info("Starting to learn the action model!")
         super().start_measure_learning_time()
         super().deduce_initial_inequality_preconditions()
+        self._complete_possibly_missing_actions()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:

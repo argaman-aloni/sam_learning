@@ -7,8 +7,15 @@ from typing import List, Tuple, Dict, Set
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
 
-from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, VocabularyCreator, \
-    EnvironmentSnapshot
+from sam_learning.core import (
+    PredicatesMatcher,
+    extract_effects,
+    LearnerDomain,
+    contains_duplicates,
+    VocabularyCreator,
+    EnvironmentSnapshot,
+    LearnerAction,
+)
 from utilities import NegativePreconditionPolicy
 
 
@@ -43,6 +50,7 @@ class SAMLearner:
         self.learning_start_time = 0
         self.learning_end_time = 0
         self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
+        self._action_signatures = {action_name: action.signature for action_name, action in partial_domain.actions.items()}
         self.negative_preconditions_policy = negative_preconditions_policy
 
     def _remove_unobserved_actions_from_partial_domain(self):
@@ -189,6 +197,17 @@ class SAMLearner:
 
         return has_duplicates
 
+    def _complete_possibly_missing_actions(self):
+        """Completes the actions that were not observed in the trajectory.
+
+        Note:
+            This allows SAM to be used multiple times on different trajectories.
+            In case some actions were deleted in previous iterations they will be added back.
+        """
+        for action_name, action_signature in self._action_signatures.items():
+            if action_name not in self.partial_domain.actions:
+                self.partial_domain.actions[action_name] = LearnerAction(name=action_name, signature=action_signature)
+
     def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
         """Handles a single trajectory component as a part of the learning process.
 
@@ -280,6 +299,7 @@ class SAMLearner:
         self.logger.info("Starting to learn the action model!")
         self.start_measure_learning_time()
         self.deduce_initial_inequality_preconditions()
+        self._complete_possibly_missing_actions()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:

@@ -251,7 +251,6 @@ def test_learn_action_model_with_minecraft_small_domain_creates_domain_with_corr
     print(learned_model.to_pddl())
 
 
-
 def test_learn_action_model_with_driverlog_polynomial_domain_returns_non_trivial_polynomial_conditions_to_learned_actions_and_does_not_fail_with_error(
     driverlog_polynomial_nsam: NumericSAMLearner, driverlog_polynomial_observation: Observation
 ):
@@ -262,3 +261,32 @@ def test_learn_action_model_with_driverlog_polynomial_domain_returns_non_trivial
         print(learned_model.to_pddl())
     except Exception as e:
         assert False, f"An error occurred: {e}"
+
+
+def test_learn_action_model_when_applying_multiple_times_with_different_trajectories_updates_the_learned_action_model_and_allows_learning_when_some_actions_are_deleted_since_they_are_not_being_observed(
+    depot_nsam: NumericSAMLearner, depot_observation: Observation
+):
+    num_triplets = len(depot_observation)
+    observation1 = Observation()
+    observation2 = Observation()
+    observation1.add_problem_objects(depot_observation.grounded_objects)
+    observation2.add_problem_objects(depot_observation.grounded_objects)
+    for i in range(2):
+        observation1.add_component(
+            previous_state=depot_observation.components[i].previous_state,
+            call=depot_observation.components[i].grounded_action_call,
+            next_state=depot_observation.components[i].next_state,
+        )
+
+    for i in range(2, num_triplets):
+        observation2.add_component(
+            previous_state=depot_observation.components[i].previous_state,
+            call=depot_observation.components[i].grounded_action_call,
+            next_state=depot_observation.components[i].next_state,
+        )
+
+    learned_model1, learning_metadata = depot_nsam.learn_action_model([observation1])
+    num_learned_actions_model1 = len(learned_model1.actions)
+    learned_model2, learning_metadata = depot_nsam.learn_action_model([observation2])
+    num_learned_actions_model2 = len(learned_model2.actions)
+    assert num_learned_actions_model1 < num_learned_actions_model2
