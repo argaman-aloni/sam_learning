@@ -2,14 +2,13 @@ import argparse
 import csv
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain
 
 from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector, FOLD_FIELD
 from experiments.plotting.plot_masam_results import plot_solving_results
-from statistics.learning_statistics_manager import LEARNED_ACTIONS_STATS_COLUMNS
 from statistics.semantic_performance_calculator import SEMANTIC_PRECISION_STATS
 from utilities import LearningAlgorithmType
 
@@ -38,7 +37,7 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
     ):
         super().__init__(working_directory_path, domain_file_name, learning_algorithms, num_folds, iterations)
 
-    def _collect_semantic_performance_statistics(self, domain: Domain) -> None:
+    def _collect_semantic_performance_statistics(self, domain: Domain, exclude_algorithm: Optional[LearningAlgorithmType] = None) -> None:
         """Collects the semantic performance statistics from the results directory.
 
         :param domain: the domain to collect the statistics for.
@@ -47,43 +46,24 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
         combined_semantic_performance_file_path = self.working_directory_path / "results_directory" / "semantic_performance_combined_statistics.csv"
         combined_semantic_performance_statistics_data = []
         file_path_template = "{learning_algorithm}_" + domain.name + "_{fold}_{iteration}_semantic_performance.csv"
-        self._combine_statistics_data(
-            file_path_template, combined_semantic_performance_statistics_data, exclude_algorithm=LearningAlgorithmType.ma_sam_plus
-        )
+        self._combine_statistics_data(file_path_template, combined_semantic_performance_statistics_data, exclude_algorithm=exclude_algorithm)
         with open(combined_semantic_performance_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SEMANTIC_PRECISION_STATS])
             writer.writeheader()
             writer.writerows(combined_semantic_performance_statistics_data)
 
-    def _collect_syntactic_performance_statistics(self, domain: Domain) -> None:
-        """Collects the syntactic performance statistics from the results directory.
-
-        :param domain: the domain to collect the statistics for.
-        """
-        self.logger.info("Collecting the syntactic performance statistics from the results directory.")
-        combined_syntactic_performance_file_path = self.working_directory_path / "results_directory" / "syntactic_performance_combined_statistics.csv"
-        combined_action_performance_statistics_data = []
-        action_performance_path_template = "{learning_algorithm}_" + domain.name + "_action_stats_fold_{fold}_{iteration}.csv"
-        self._combine_statistics_data(
-            action_performance_path_template, combined_action_performance_statistics_data, exclude_algorithm=LearningAlgorithmType.ma_sam_plus
-        )
-        with open(combined_syntactic_performance_file_path, "wt") as combined_statistics_file:
-            writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *LEARNED_ACTIONS_STATS_COLUMNS])
-            writer.writeheader()
-            writer.writerows(combined_action_performance_statistics_data)
-
-    def _collect_performance_statistics(self) -> None:
+    def _collect_performance_statistics(self, exclude_algorithm: Optional[LearningAlgorithmType] = None) -> None:
         domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
-        self._collect_semantic_performance_statistics(domain)
-        self._collect_syntactic_performance_statistics(domain)
+        self._collect_semantic_performance_statistics(domain, exclude_algorithm=exclude_algorithm)
+        self._collect_syntactic_performance_statistics(domain, exclude_algorithm=exclude_algorithm)
         self.logger.info("Done collecting the statistics from the results directory!")
 
-    def collect_statistics(self) -> None:
+    def collect_multi_agent_statistics(self) -> None:
         self._collect_solving_statistics()
         results_directory = self.working_directory_path / "results_directory"
         combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
         plot_solving_results(combined_statistics_file_path, results_directory / "solving_combined_statistics.pdf")
-        self._collect_performance_statistics()
+        self._collect_performance_statistics(exclude_algorithm=LearningAlgorithmType.ma_sam_plus)
 
 
 if __name__ == "__main__":
@@ -97,4 +77,4 @@ if __name__ == "__main__":
         learning_algorithms=experiment_learning_algorithms,
         num_folds=args.num_folds,
         iterations=internal_iterations,
-    ).collect_statistics()
+    ).collect_multi_agent_statistics()
