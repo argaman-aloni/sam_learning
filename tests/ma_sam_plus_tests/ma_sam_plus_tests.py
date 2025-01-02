@@ -245,6 +245,41 @@ def test_extract_effects_for_macro_from_cnf_returns_effects_adapted_to_macro_nam
     assert len(effects_rep) == 2
 
 
+def test_extract_effects_for_macro_from_cnf_returns_effects_with_no_duplications(
+    rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall, ma_rovers_domain: Domain
+):
+    action_names = [action for action in ma_rovers_domain.actions.keys()]
+    cnf1 = LiteralCNF(action_names)
+    rovers_ma_sam_plus.literals_cnf["fluent_test1 ?w"] = cnf1
+    cnf1.add_possible_effect(
+        [
+            ("communicate_rock_data", "(fluent_test1 ?p)"),
+            ("communicate_rock_data", "(fluent_test1 ?p)"),
+            ("navigate", "(fluent_test1 ?y)"),
+            ("navigate", "(fluent_test1 ?y)"),
+        ]
+    )
+
+    param_grouping = [{("communicate_rock_data", "?p"), ("navigate", "?y")}]
+    lma_names = ["navigate", "communicate_rock_data"]
+    action_group = {action for action in rovers_ma_sam_plus.partial_domain.actions.values() if action.name in lma_names}
+    mapping = {
+        ("navigate", "?x"): "?x'0",
+        ("navigate", "?y"): "?yp",
+        ("navigate", "?z"): "?z'0",
+        ("communicate_rock_data", "?r"): "?r'1",
+        ("communicate_rock_data", "?l"): "?l'1",
+        ("communicate_rock_data", "?p"): "?yp",
+        ("communicate_rock_data", "?x"): "?x'1",
+        ("communicate_rock_data", "?y"): "?y'1",
+    }
+
+    effects = rovers_ma_sam_plus.extract_effects_for_macro_from_cnf(action_group, param_grouping, mapping)
+    effects_rep = [effect.untyped_representation for effect in effects]
+    assert len(set(effects_rep)) == len(effects_rep)
+    print(effects_rep)
+
+
 def test_extract_preconditions_for_macro_from_cnf_returns_preconditions_adapted_to_macro_naming(
     rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall, ma_rovers_domain: Domain
 ):

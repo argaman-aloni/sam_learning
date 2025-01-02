@@ -5,7 +5,7 @@ from pddl_plus_parser.models import Predicate, SignatureType, PDDLType
 
 from sam_learning.core import LearnerAction
 
-BindingType = Dict[tuple[str, str], str]
+BindingType = Dict[Tuple[str, str], str]
 MappingElement = Tuple[List[str], BindingType]
 
 
@@ -78,7 +78,7 @@ class MacroActionParser:
         return predicate_copy
 
     @staticmethod
-    def generate_macro_mappings(groupings: List[set], lma_set: set[LearnerAction]) -> BindingType:
+    def generate_macro_mappings(groupings: List[set], lma_set: Set[LearnerAction]) -> BindingType:
         """
         returns a mapping between macro action names and macro action names
         the orders of the keys conveys important information:
@@ -102,7 +102,7 @@ class MacroActionParser:
         return param_bindings
 
     @staticmethod
-    def extract_actions_from_macro_action(action_line: str, mapper) -> set[str]:
+    def extract_actions_from_macro_action(action_line: str, mapper) -> Set[str]:
         """
         This function replaces a single line consisting of macro action, with several micro actions.
 

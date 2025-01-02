@@ -1,6 +1,6 @@
 """Module to learn action models with macro actions from multi-agent trajectories with joint actions."""
 from itertools import combinations
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Set
 
 import networkx as nx
 from pddl_plus_parser.models import Predicate, Domain, MultiAgentObservation, CompoundPrecondition
@@ -68,7 +68,7 @@ class MASAMPlus(MultiAgentSAM):
         predicate = extract_predicate_data(action_signature, fluent, self.partial_domain.constants)
         return MacroActionParser.adapt_predicate_to_macro_mapping(mapping, predicate, action_name)
 
-    def extract_relevant_action_groups(self) -> List[set[LearnerAction]]:
+    def extract_relevant_action_groups(self) -> List[Set[LearnerAction]]:
         """Extracts relevant action groups
 
         :return: a list of action groups
@@ -91,7 +91,7 @@ class MASAMPlus(MultiAgentSAM):
 
         return action_groups
 
-    def extract_relevant_parameter_groupings(self, action_group_names: list[str]) -> List[PGType]:
+    def extract_relevant_parameter_groupings(self, action_group_names: List[str]) -> List[PGType]:
         """Extracts relevant parameter groups
             This implementation only extracts one such possible parameter groups
         """
@@ -107,9 +107,16 @@ class MASAMPlus(MultiAgentSAM):
 
         return [flattened_groups]
 
-    def extract_effects_for_macro_from_cnf(self, lma_set: set[LearnerAction], param_grouping: PGType, mapping: BindingType):
+    def extract_effects_for_macro_from_cnf(self, lma_set: Set[LearnerAction], param_grouping: PGType, mapping: BindingType) -> Set[Predicate]:
+        """
+
+        :param lma_set:
+        :param param_grouping:
+        :param mapping:
+        :return:
+        """
         lma_names = [lma.name for lma in lma_set]
-        cnf_effects = []
+        cnf_effects = set()
         relevant_preconditions_str = {
             precondition.untyped_representation for action in lma_set for precondition in action.preconditions if isinstance(precondition, Predicate)
         }
@@ -117,20 +124,20 @@ class MASAMPlus(MultiAgentSAM):
         for fluent, fluent_cnf in self.literals_cnf.items():
             effects = fluent_cnf.extract_macro_action_effects(lma_names, relevant_preconditions_str, param_grouping)
             for effect_element in effects:
-                cnf_effects.append(self._extract_predicate_from_clause_and_adapt_to_macro(effect_element, mapping))
+                cnf_effects.add(self._extract_predicate_from_clause_and_adapt_to_macro(effect_element, mapping))
 
-        # TODO find a neater way to remove duplicates
-        unique_representations = set()
-        unique_cnf_effects = []
+        return cnf_effects
 
-        for effect in cnf_effects:
-            if effect.untyped_representation not in unique_representations:
-                unique_representations.add(effect.untyped_representation)
-                unique_cnf_effects.append(effect)
+    def extract_preconditions_for_macro_from_cnf(
+        self, action_group: Set[LearnerAction], param_grouping: PGType, mapping: BindingType
+    ) -> CompoundPrecondition:
+        """
 
-        return unique_cnf_effects
-
-    def extract_preconditions_for_macro_from_cnf(self, action_group: set[LearnerAction], param_grouping: PGType, mapping: BindingType):
+        :param action_group:
+        :param param_grouping:
+        :param mapping:
+        :return:
+        """
         new_precondition = CompoundPrecondition()
         lma_names = [action.name for action in action_group]
 
@@ -155,14 +162,6 @@ class MASAMPlus(MultiAgentSAM):
                         clause_element=(action.name, precondition.untyped_representation), mapping=mapping
                     )
                     new_precondition.add_condition(precondition_to_add)
-
-            # Todo remove the comment after seeing all experiments prove good results
-            # else:
-            #     for _, precondition in action.preconditions:
-            #         if isinstance(precondition, Predicate):
-            #             cnf_preconditions.append(self._extract_predicate_from_clause((action.name,
-            #                                                                       precondition.untyped_representation),
-            #                                                                      mapping))
 
         return new_precondition
 

@@ -167,7 +167,7 @@ class LiteralCNF:
 
         return effects
 
-    def extract_macro_action_effects(self, action_names: List[str], action_preconditions: Set[str], param_grouping: PGType) -> List[tuple[str, str]]:
+    def extract_macro_action_effects(self, action_names: List[str], action_preconditions: Set[str], param_grouping: PGType) -> List[Tuple[str, str]]:
         """Extract the effects that a macro action is acting on.
 
         :param action_names: the names of the actions that participate in the macro.
@@ -187,7 +187,7 @@ class LiteralCNF:
 
         return effects
 
-    def extract_macro_action_preconditions(self, action_names: List[str], param_grouping: PGType) -> List[tuple[str, str]]:
+    def extract_macro_action_preconditions(self, action_names: List[str], param_grouping: PGType) -> List[Tuple[str, str]]:
         """Extract the effects that a macro action is acting on.
 
         :param action_names: the names of the actions that participate in the macro.
