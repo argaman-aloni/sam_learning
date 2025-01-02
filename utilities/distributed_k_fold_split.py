@@ -161,13 +161,14 @@ class DistributedKFoldSplit:
                 # creating the folder to be used for the triplets based experiments
                 largest_iteration = max([int(i) for i in fold_content["train"]["internal_iterations"].keys()])
                 relevant_paths = [Path(p) for p in fold_content["train"]["internal_iterations"][str(largest_iteration)]]
-                self.create_directories_content(
-                    test_set_problems=fold_content["test"],
-                    selected_training_trajectories=relevant_paths,
-                    fold_index=index,
-                    learning_algorithm=0,
-                    additional_suffix="_triplets",
-                )
+                for learning_algorithm in self._learning_algorithms:
+                    self.create_directories_content(
+                        test_set_problems=fold_content["test"],
+                        selected_training_trajectories=relevant_paths,
+                        fold_index=index,
+                        learning_algorithm=learning_algorithm,
+                        additional_suffix="_triplets",
+                    )
 
             return
 

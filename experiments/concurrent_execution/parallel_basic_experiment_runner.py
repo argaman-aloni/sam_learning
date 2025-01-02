@@ -206,7 +206,6 @@ class ParallelExperimentRunner:
         fold_num: int,
         train_set_dir_path: Path,
         test_set_dir_path: Path,
-        iteration_number: int = 0,
         negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
     ) -> None:
         """Learns the model of the environment by learning from the input trajectories.
@@ -230,7 +229,7 @@ class ParallelExperimentRunner:
         learned_domain_path = self.validate_learned_domain(
             allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
         )
-        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+        # self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
     def run_fold_iteration(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int) -> None:
         """Runs the numeric action model learning algorithms on the input fold.
@@ -242,7 +241,7 @@ class ParallelExperimentRunner:
         """
         self.logger.info(f"Running fold {fold_num} iteration {iteration_number}")
         self._init_semantic_performance_calculator(fold_num)
-        self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path, iteration_number)
+        self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
         self.domain_validator.write_statistics(fold_num, iteration_number)
         self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num, iteration_num=iteration_number)
