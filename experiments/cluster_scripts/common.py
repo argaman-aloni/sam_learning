@@ -96,6 +96,17 @@ def setup_experiments_folds_job(
     return fold_creation_sid
 
 
+def create_execution_arguments(experiment, fold, compared_version):
+    arguments = []
+    arguments.append(f"--fold_number {fold}")
+    arguments.append(f"--learning_algorithm {compared_version}")
+    for key, value in experiment.items():
+        if key != "compared_versions" and key != "parallelization_data":
+            arguments.append(f"--{key} {value}")
+
+    return arguments
+
+
 def create_internal_iterations_list(parallelization_data):
     max_train_size = (
         int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1

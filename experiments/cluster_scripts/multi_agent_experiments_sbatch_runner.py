@@ -11,20 +11,10 @@ from experiments.cluster_scripts.common import (
     EXPERIMENTS_CONFIG_STR,
     create_all_experiments_folders,
     submit_job_and_validate_execution,
+    create_execution_arguments,
 )
 
 signal.signal(signal.SIGINT, sigint_handler)
-
-
-def create_execution_arguments(experiment, fold, compared_version):
-    arguments = []
-    arguments.append(f"--fold_number {fold}")
-    arguments.append(f"--learning_algorithm {compared_version}")
-    for key, value in experiment.items():
-        if key != "compared_versions" and key != "parallelization_data":
-            arguments.append(f"--{key} {value}")
-
-    return arguments
 
 
 def main():
