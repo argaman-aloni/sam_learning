@@ -15,6 +15,7 @@ from experiments.cluster_scripts.common import (
     submit_job_and_validate_execution,
 )
 from experiments.cluster_scripts.multi_agent_experiments_sbatch_runner import create_execution_arguments
+from utilities import LearningAlgorithmType
 
 signal.signal(signal.SIGINT, sigint_handler)
 
@@ -75,22 +76,28 @@ def main():
 
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-                    print(f"{formatted_date_time} - submitted job with sid {sid} for fold {fold} and iteration {internal_iteration}.")
+                    print(
+                        f"{formatted_date_time} - submitted job with sid {sid} for algorithm {LearningAlgorithmType(version_index).name} fold {fold} and iteration {internal_iteration}."
+                    )
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
 
                 print("Creating the job to run the experiment with triplets instead of trajectories.")
-                submit_job_and_validate_execution(
+                sid = submit_job_and_validate_execution(
                     code_directory,
                     configurations,
                     experiment,
                     fold,
                     arguments,
                     environment_variables,
-                    f"{experiment['domain_file_name']}_{fold}_multi_agent_experiment_runner",
+                    f"{experiment['domain_file_name']}_{fold}_numeric_triplets_experiment_runner",
                     None,
                     python_file=f"{code_directory}/parallel_numeric_experiment_runner_with_triplets.py",
+                )
+                formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+                print(
+                    f"{formatted_date_time} - submitted job to run experiment for triplets with sid {sid} for algorithm {LearningAlgorithmType(version_index).name} and fold {fold}."
                 )
 
             time.sleep(5)
