@@ -49,8 +49,10 @@ class LinearRegressionLearner:
         """
         # assuming that if a function is an effect of the action it will always be present in the next state.
         if relevant_fluents is not None:
-            self.previous_state_data = self.previous_state_data[[fluent for fluent in  self.previous_state_data.columns.tolist() if fluent in relevant_fluents]]
-            self.next_state_data = self.next_state_data[[fluent for fluent in  self.next_state_data.columns.tolist() if fluent in relevant_fluents]]
+            self.previous_state_data = self.previous_state_data[
+                [fluent for fluent in self.previous_state_data.columns.tolist() if fluent in relevant_fluents]
+            ]
+            self.next_state_data = self.next_state_data[[fluent for fluent in self.next_state_data.columns.tolist() if fluent in relevant_fluents]]
 
         next_state_df = self.next_state_data.add_prefix(NEXT_STATE_PREFIX)
         combined_data = pd.concat([self.previous_state_data, next_state_df], axis=1)
@@ -258,9 +260,12 @@ class LinearRegressionLearner:
         :param state_data: the data of the state.
         :param store_in_prev_state: whether to store the data in the previous state or the next state.
         """
-
         state_sample = DataFrame.from_dict(data={k: [v] for k, v in state_data.items()}, orient="columns")
         data_to_update = self.previous_state_data if store_in_prev_state else self.next_state_data
+        if not store_in_prev_state:
+            legal_next_state_columns = [func.untyped_representation for func in self.domain_functions.values()]
+            state_sample = state_sample.drop([col for col in state_sample.columns if col not in legal_next_state_columns], axis=1)
+
         attribute_name = "previous_state_data" if store_in_prev_state else "next_state_data"
 
         if data_to_update.empty:

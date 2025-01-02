@@ -185,7 +185,12 @@ class LearningStatisticsManager:
             self.action_learning_stats.append(action_stats)
 
     def _export_statistics_data(
-        self, fold_number: int, iteration_num: int, columns: List[str], action_data_to_export: List[Dict[str, Any]], stats_data_file_name: str
+        self,
+        fold_number: int,
+        iteration_num: Optional[int] = None,
+        columns: List[str] = [],
+        action_data_to_export: List[Dict[str, Any]] = {},
+        stats_data_file_name: str = "",
     ) -> None:
         """Exports statistics to a report CSV file.
 
@@ -195,9 +200,10 @@ class LearningStatisticsManager:
         :param action_data_to_export: the data to export to the report.
         :param stats_data_file_name: the name of the statistics to publish in the report file.
         """
+        iterations_suffix = f"_{iteration_num}" if iteration_num is not None else ""
         statistics_path = (
             self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}"
-            f"_{stats_data_file_name}_{fold_number}_{iteration_num}.csv"
+            f"_{stats_data_file_name}_{fold_number}{iterations_suffix}.csv"
         )
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=columns)
@@ -205,7 +211,7 @@ class LearningStatisticsManager:
             for data_line in action_data_to_export:
                 stats_writer.writerow(data_line)
 
-    def export_action_learning_statistics(self, fold_number: int, iteration_num: int) -> None:
+    def export_action_learning_statistics(self, fold_number: int, iteration_num: Optional[int] = None) -> None:
         """Export the statistics collected about the actions.
 
         :param fold_number: the number of the currently running fold.
