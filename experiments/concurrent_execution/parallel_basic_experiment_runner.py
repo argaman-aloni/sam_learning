@@ -214,7 +214,6 @@ class ParallelExperimentRunner:
         :param train_set_dir_path: the directory containing the trajectories in which the algorithm is learning from.
         :param test_set_dir_path: the directory containing the test set problems in which the learned model should be
             used to solve.
-        :param iteration_number: the number of the iteration that is currently running.
         :param negative_preconditions_policy: the policy to use for the negative preconditions.
         """
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
@@ -229,7 +228,7 @@ class ParallelExperimentRunner:
         learned_domain_path = self.validate_learned_domain(
             allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
         )
-        # self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
 
     def run_fold_iteration(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int) -> None:
         """Runs the numeric action model learning algorithms on the input fold.

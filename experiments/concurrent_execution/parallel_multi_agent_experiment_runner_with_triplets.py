@@ -57,7 +57,7 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
         partial_domain = self.read_domain_file(train_set_dir_path)
         complete_train_set = self.collect_observations(train_set_dir_path, partial_domain)
         transitions_based_training_set = self.create_transitions_based_training_set(complete_train_set)
-        execution_scheme = [index + 1 for index in range(10)] + [index for index in range(20, len(transitions_based_training_set), 10)]
+        execution_scheme = [index + 1 for index in range(10)] + [index for index in range(20, min(len(transitions_based_training_set), 1000), 10)]
         for index in execution_scheme:
             self._learn_model_offline([*transitions_based_training_set[0:index]], partial_domain, test_set_dir_path, fold_num)
 
