@@ -77,7 +77,7 @@ def main():
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(
-                        f"{formatted_date_time} - submitted job with sid {sid} for algorithm {learning_algorithms_map[version_index]} fold {fold} and iteration {internal_iteration}."
+                        f"{formatted_date_time} - submitted job with sid {sid} for algorithm {learning_algorithms_map[compared_version]} fold {fold} and iteration {internal_iteration}."
                     )
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
@@ -97,7 +97,7 @@ def main():
                 )
                 formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                 print(
-                    f"{formatted_date_time} - submitted job to run experiment for triplets with sid {sid} for algorithm {learning_algorithms_map[version_index]} and fold {fold}."
+                    f"{formatted_date_time} - submitted job to run experiment for triplets with sid {sid} for algorithm {learning_algorithms_map[compared_version]} and fold {fold}."
                 )
 
             time.sleep(5)
