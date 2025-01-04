@@ -24,6 +24,7 @@ from .learner_domain import LearnerAction, LearnerDomain
 from .learning_types import EquationSolutionType, ConditionType
 from .matching_utils import (
     extract_effects,
+    extract_not_effects,
     contains_duplicates,
     create_signature_permutations,
     create_fully_observable_predicates,
