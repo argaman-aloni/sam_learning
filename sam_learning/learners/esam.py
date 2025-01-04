@@ -1,15 +1,9 @@
-from typing import List, Tuple, Dict, Hashable
-
-from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
+from typing import List, Tuple, Dict, Set, Union, Hashable
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, \
     PDDLType
 from sam_learning.core import  extract_effects, LearnerDomain, LearnerAction, extract_not_effects
 from sam_learning.learners.sam_learning import SAMLearner
 from nnf import And, Or, Var
-
-from utilities import NegativePreconditionPolicy
-
-
 class DisjointSet:  # this class was taken from geeksForGeeks
     def __init__(self, size):
         self.parent = [i for i in range(size)]
@@ -61,12 +55,8 @@ class ExtendedSamLearner(SAMLearner):
     cnf_eff: dict[str, And[Or[Var]]]
     cnf_eff_as_set: dict[str, set[Or[Var]]]
     vars_to_forget: dict[str, set[Predicate]]
-    def __init__(self,
-                 partial_domain: Domain,
-                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft):
-        super().__init__(partial_domain=partial_domain,
-                         is_esam=True,
-                         negative_preconditions_policy=negative_preconditions_policy)
+    def __init__(self, partial_domain: Domain):
+        super().__init__(partial_domain, is_esam=True)
         self.possible_effect = dict()
         self.cnf_eff_as_set = dict()
         self.vars_to_forget = dict()
@@ -82,8 +72,6 @@ class ExtendedSamLearner(SAMLearner):
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
         super()._add_new_action_preconditions(grounded_action)
-
-        # handling effects
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
         lifted_effects = set(lifted_add_effects).union(lifted_delete_effects)
@@ -117,10 +105,7 @@ class ExtendedSamLearner(SAMLearner):
         """
         action_name = grounded_action.name
         observed_action = self.partial_domain.actions[action_name]
-        # handle preconditions
         super()._update_action_preconditions(grounded_action)
-
-        # handle effects
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
         lifted_effects = set(lifted_add_effects).union(lifted_delete_effects)
@@ -171,29 +156,23 @@ class ExtendedSamLearner(SAMLearner):
 
 
     def create_proxy_actions(self, action_name: str):
-        proxy_preconds = 0
-        proxy_effects = 1
-        proxy_model_dict = 2
-        act_signature = self.partial_domain.actions[action_name].signature
+        proxy_key = 0
+        proxy_preconds = 1
+        proxy_effects = 2
 
+        proxy_index = 1
+        base_action = self.partial_domain.actions.get(action_name)
         proxies = list()
         for model in self.cnf_eff[action_name].models():
             effect = set()
             preconds_to_add = set()
             for k, v in model.items():
-                predicate = parse_predicate_from_string(str(k), self.partial_domain.types)
                 if v:
-                    effect.add(predicate)
+                    effect.add(self.hashable_to_predicate(k))
                 else:
-                    preconds_to_add.add(predicate)
-            if self.negative_preconditions_policy == NegativePreconditionPolicy.hard and any(
-                    not p.is_positive for p in preconds_to_add):
-                continue
-            proxy_signature_modified_param_dict = get_minimize_parameters_equality_dict(model_dict=model,
-                                                                                act_signature=act_signature,
-                                                                                domain_types=self.partial_domain.types)
-
-            proxies.append((preconds_to_add, effect, proxy_signature_modified_param_dict))
+                    preconds_to_add.add(self.hashable_to_predicate(k))
+            proxies.append((proxy_index, preconds_to_add, effect))
+            proxy_index+=1
 
         if len(proxies) == 1:
             self.partial_domain.actions[action_name].discrete_effects = proxies[0][proxy_effects]
@@ -201,41 +180,21 @@ class ExtendedSamLearner(SAMLearner):
             self.partial_domain.actions[action_name].preconditions.root.operands.update(preconds)
 
         elif len(proxies) > 1:
-            proxy_number = 1
             for proxy in proxies:
                 # unpack tuple fields to get properties of proxy action
-                name = f"{action_name}_{proxy_number}"
+                name = f"{action_name}_{proxy[proxy_key]}"
                 signature = self.partial_domain.actions[action_name].signature
                 preconds: set[Predicate] = proxy[proxy_preconds]
-                preconds.update(p for p in self.partial_domain.actions[action_name].preconditions.root.operands
-                                if isinstance(p,Predicate))
-
-                proxy_signature_modified_param_dict = proxy[proxy_model_dict]
-                effects: set[Predicate] = modify_predicate_signature(proxy[proxy_effects],
-                                                                     proxy_signature_modified_param_dict)
-                preconds = modify_predicate_signature(preconds, proxy_signature_modified_param_dict)
-                reversed_proxy_signature_modified_param_dict: dict[str, str] = {
-                    v: k for k, v in proxy_signature_modified_param_dict.items()}
-
-                new_signature = {k: signature[k] for k in reversed_proxy_signature_modified_param_dict.keys()}
+                effects: set[Predicate] = proxy[proxy_effects]
 
                 #initialize action
-                self.partial_domain.actions[name] = LearnerAction(name, signature=new_signature)
+                self.partial_domain.actions[name] = LearnerAction(name, signature=signature)
                 # set effects
                 self.partial_domain.actions[name].discrete_effects = effects
+                #initialize preconditions to observed possible preconditions
+                self.partial_domain.actions[name].preconditions = self.partial_domain.actions[action_name].preconditions
                 #update union all proxy cnf_eff negative literals to be preconditions
-                self.partial_domain.actions[name].preconditions.root.operands = preconds
-                proxy_number+=1
-            self.partial_domain.actions.pop(action_name)
-
-    def handle_negative_preconditions_policy(self):
-        for action_name in self.partial_domain.actions.keys():
-            if self.negative_preconditions_policy != NegativePreconditionPolicy.no_remove:
-                preconds_to_keep = set()
-                for precond in self.partial_domain.actions[action_name].preconditions.root.operands:
-                    if precond.is_positive:
-                        preconds_to_keep.add(precond)
-                self.partial_domain.actions[action_name].preconditions.root.operands = preconds_to_keep
+                self.partial_domain.actions[name].preconditions.root.operands.update(preconds)
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
@@ -252,97 +211,95 @@ class ExtendedSamLearner(SAMLearner):
         # note that creating will reset all of the actions effects and precondition due to cnf solver usage.
         self.logger.debug("creating updated actions")
         #build all cnf sentences for action's effects
-        self.handle_negative_preconditions_policy()
         self.build_cnf_formulas()
         for action_name in self.observed_actions:
             self.create_proxy_actions(action_name)
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
 
+    # @staticmethod
+    # def minimize_parameters(model_dict: dict[LearnedLiftedFluent, bool],
+    #                         act_num_of_param: int) -> dict[int, int]:
+    #     """
+    #     the method computes the minimization of parameter list
+    #     Args:
+    #         act_num_of_param: the length of action's param's list
+    #         model_dict: represents the cnf, maps each literal to its grounded value
+    #     Returns:
+    #         a dictionary mapping each original param act ind_ to the new actions minimized parameter list
+    #     """
+    #     # make a table that determines if an act ind 'i' is an effect in all occurrences of F, nad is bound to index 'j'
+    #     #  in F, minimize i with all indexes t who are bound to 'j' in F in all true occurrences of F
+    #
+    #     ret_dict: dict[int, int] = dict()
+    #     if len(model_dict.keys()) == 0:
+    #         return ret_dict
+    #
+    #     ind_occ: dict[str, list[set[int]]] = dict()
+    #     for f in model_dict.keys():
+    #         ind_occ[f.name] = (list())
+    #         for _ in range(len(f.param_act_inds)):
+    #             ind_occ[f.name].append(set())
+    #
+    #     not_to_minimize: set[int] = set()
+    #
+    #     for f, val in model_dict.items():
+    #         if not val:
+    #             not_to_minimize.update(f.param_act_inds)
+    #
+    #     ind_sets = DisjointSet(act_num_of_param)
+    #     for f, val in model_dict.items():
+    #         for i in range(len(f.param_act_inds)):
+    #             if f.param_act_inds[i] not in not_to_minimize:
+    #                 ind_occ[f.name][i].add(f.param_act_inds[i])
+    #
+    #     for i in set(range(act_num_of_param)).difference(not_to_minimize):
+    #         for f, set_list in ind_occ.items():
+    #             for sett in set_list:
+    #                 if i in sett:
+    #                     for j in sett:
+    #                         ind_sets.union_by_rank(i, j)
+    #
+    #     ugly_inds: list[int] = list({ind_sets.find(i) for i in range(act_num_of_param)})
+    #     ugly_inds.sort()
+    #     for i in range(act_num_of_param):
+    #         ret_dict[i] = ugly_inds.index(ind_sets.find(i))
+    #
+    #     return ret_dict
+    #
+    # @staticmethod
+    # def modify_fluent_params(fluents: set[LearnedLiftedFluent],
+    #                          param_dict: dict[int, int]) -> set[LearnedLiftedFluent]:
+    #
+    #     new_set: set[LearnedLiftedFluent] = set()
+    #     for f in fluents:
+    #         new_f = LearnedLiftedFluent(name=f.name, param_sorts=f.param_sorts,
+    #                                          param_act_inds=[param_dict[i] for i in f.param_act_inds])
+    #         new_set.add(new_f)
+    #     return new_set
 
-def get_minimize_parameters_equality_dict(model_dict: dict[Hashable, bool],
-                                          act_signature: SignatureType,
-                                          domain_types) -> dict[str, str]:
-    """
-    the method computes the minimization of parameter list
-    Args:
-        act_signature: the signature of the action
-        model_dict: represents the cnf, maps each literal to its grounded value
-        domain_types: the domain types
-    Returns:
-        a dictionary mapping each original param act ind_ to the new actions minimized parameter list
-    """
-    # make a table that determines if an act ind 'i' is an effect in all occurrences of F, nad is bound to index 'j'
-    #  in F, minimize i with all indexes t who are bound to 'j' in F in all true occurrences of F
+    @staticmethod
+    def hashable_to_predicate(hashable: Hashable) -> Predicate:
+        """Converts a hashable object back into a Predicate instance."""
+        # Convert the hashable object to a string
+        pred_str = str(hashable)
 
-    # reduce the problem to instance of macq, transform params from str too int by index in action
-    # transformation is for deciding what parameters to reduce by order in action signature
-    new_model_dict: dict[Predicate, bool] = {parse_predicate_from_string(str(h), domain_types): v for h, v in model_dict.items()}
-    param_index_in_action = {param: index for index, param in enumerate(act_signature.keys())}
-    num_of_act_params = len(param_index_in_action.keys())
-    reversed_param_index_in_action = {v: k for k, v in param_index_in_action.items()}
+        # Handle negation
+        is_positive = not pred_str.startswith("(not ")
+        if not is_positive:
+            pred_str = pred_str[5:-1]  # Remove "(not (" and ")"
 
-    param_index_in_predicate: dict[Predicate, dict[str, int]] = dict()
-    for predicate in new_model_dict.keys():
-        param_index_in_predicate[predicate] = dict()
-        for index , param in enumerate(predicate.signature.keys()):
-            param_index_in_predicate[predicate][param] = index
+        # Strip parentheses and split the string
+        pred_str = pred_str.strip("()")
+        parts = pred_str.split()
 
-    predicate_to_param_act_inds: dict[Predicate, list[int]] = dict()
-    for predicate in new_model_dict.keys():
-        predicate_to_param_act_inds[predicate] = list()
-        for param in predicate.signature.keys():
-            predicate_to_param_act_inds[predicate].append(param_index_in_action[param])
+        # First part is the predicate name
+        name = parts[0]
 
-# start algorithm of parameters equality check
-    if len(new_model_dict.keys()) == 0:
-        return dict()
+        # Remaining parts are parameters with types
+        signature: SignatureType = {}
+        for item in parts[1:]:
+            param, _, param_type_name = item.partition("-")
+            signature[param.strip()] = PDDLType(param_type_name.strip())
 
-    ind_occ: dict[str, list[set[int]]] = dict()
-    for predicate in new_model_dict.keys():
-        ind_occ[predicate.name] = (list())
-        for _ in range(len(predicate_to_param_act_inds[predicate])):
-            ind_occ[predicate.name].append(set())
-
-    not_to_minimize: set[int] = set()
-
-    for predicate, val in new_model_dict.items():
-        if not val:
-            not_to_minimize.update(predicate_to_param_act_inds[predicate])
-
-    ind_sets = DisjointSet(len(param_index_in_action.keys()))
-    for predicate, val in new_model_dict.items():
-        for i in range(len(predicate_to_param_act_inds[predicate])):
-            if predicate_to_param_act_inds[predicate][i] not in not_to_minimize:
-                ind_occ[predicate.name][i].add(predicate_to_param_act_inds[predicate][i])
-
-    for i in set(range(num_of_act_params)).difference(not_to_minimize):
-        for f, set_list in ind_occ.items():
-            for sett in set_list:
-                if i in sett:
-                    for j in sett:
-                        ind_sets.union_by_rank(i, j)
-
-    ret_dict_by_indexes: dict[int, int] = dict()
-    ugly_inds: list[int] = list({ind_sets.find(i) for i in range(len(param_index_in_action.keys()))})
-    ugly_inds.sort()
-    for i in range(len(param_index_in_action.keys())):
-        ret_dict_by_indexes[i] = ugly_inds.index(ind_sets.find(i))
-
-# transform all indexes back to  str to fit sam learning conventions
-    ret_dict_by_param_name: [str, str] = {
-        reversed_param_index_in_action[k1]: reversed_param_index_in_action[k2]
-        for k1, k2 in ret_dict_by_indexes.items()}
-
-
-    return ret_dict_by_param_name
-
-def modify_predicate_signature(predicates: set[Predicate],
-                         param_dict: dict[str, str]) -> set[Predicate]:
-    new_set: set[Predicate] = set()
-    for predicate in predicates:
-        new_signature: dict[str, PDDLType] = {
-            param_dict[param]: predicate.signature[param] for param in predicate.signature.keys()}
-        new_predicate = Predicate(name=predicate.name, signature= new_signature, is_positive=predicate.is_positive)
-        new_set.add(new_predicate)
-    return new_set
+        return Predicate(name=name, signature=signature, is_positive=is_positive)

@@ -7,17 +7,9 @@ from typing import List, Tuple, Dict, Set
 
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, PDDLObject
 
-from sam_learning.core import (
-    PredicatesMatcher,
-    extract_effects,
-    LearnerDomain,
-    contains_duplicates,
-    VocabularyCreator,
-    EnvironmentSnapshot,
-    LearnerAction,
-)
+from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain, contains_duplicates, VocabularyCreator, \
+    EnvironmentSnapshot
 from utilities import NegativePreconditionPolicy
-
 
 class SAMLearner:
     """Class that represents the safe action model learner algorithm.
@@ -203,17 +195,6 @@ class SAMLearner:
 
         return has_duplicates
 
-    def _complete_possibly_missing_actions(self):
-        """Completes the actions that were not observed in the trajectory.
-
-        Note:
-            This allows SAM to be used multiple times on different trajectories.
-            In case some actions were deleted in previous iterations they will be added back.
-        """
-        for action_name, action_signature in self._action_signatures.items():
-            if action_name not in self.partial_domain.actions:
-                self.partial_domain.actions[action_name] = LearnerAction(name=action_name, signature=action_signature)
-
     def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
         """Handles a single trajectory component as a part of the learning process.
 
@@ -305,9 +286,7 @@ class SAMLearner:
         """
         self.logger.info("Starting to learn the action model!")
         self.start_measure_learning_time()
-        if not self.is_esam:
-            self.deduce_initial_inequality_preconditions()
-            self._complete_possibly_missing_actions()
+        # self.deduce_initial_inequality_preconditions()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
@@ -318,8 +297,7 @@ class SAMLearner:
 
         self.construct_safe_actions()
         self._remove_unobserved_actions_from_partial_domain()
-        if not self.is_esam:
-            self.handle_negative_preconditions_policy()
+        self.handle_negative_preconditions_policy()
         self.end_measure_learning_time()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
