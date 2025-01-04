@@ -11,7 +11,6 @@ from sam_learning.core import PredicatesMatcher, extract_effects, LearnerDomain,
     EnvironmentSnapshot
 from utilities import NegativePreconditionPolicy
 
-
 class SAMLearner:
     """Class that represents the safe action model learner algorithm.
 
@@ -30,8 +29,13 @@ class SAMLearner:
     vocabulary_creator: VocabularyCreator
     cannot_be_effect: Dict[str, Set[Predicate]]
     negative_preconditions_policy: NegativePreconditionPolicy
+    is_esam = False
 
-    def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+    def __init__(self,
+                 partial_domain: Domain,
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
+                 is_esam: bool = False):
+
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -44,6 +48,7 @@ class SAMLearner:
         self.learning_end_time = 0
         self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
         self.negative_preconditions_policy = negative_preconditions_policy
+        self.is_esam = is_esam
 
     def _remove_unobserved_actions_from_partial_domain(self):
         """Removes the actions that were not observed from the partial domain."""
@@ -141,6 +146,7 @@ class SAMLearner:
         :param previous_state: the state that the action was executed on.
         :param next_state: the state that was created after executing the action on the previous
         """
+
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
@@ -198,8 +204,9 @@ class SAMLearner:
         grounded_action = component.grounded_action_call
         next_state = component.next_state
 
-        if self._verify_parameter_duplication(grounded_action):
-            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM.")
+        if not self.is_esam and self._verify_parameter_duplication(grounded_action):
+            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM."
+                                f"aborting learning from component")
             return
 
         self.triplet_snapshot.create_triplet_snapshot(
@@ -279,7 +286,7 @@ class SAMLearner:
         """
         self.logger.info("Starting to learn the action model!")
         self.start_measure_learning_time()
-        self.deduce_initial_inequality_preconditions()
+        # self.deduce_initial_inequality_preconditions()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:

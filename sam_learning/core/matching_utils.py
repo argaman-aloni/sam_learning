@@ -90,3 +90,17 @@ def extract_effects(previous_state: State, next_state: State) -> Tuple[Set[Groun
             delete_effects.add(new_predicate)
 
     return add_effects, delete_effects
+
+def extract_not_effects(previous_state: State, next_state: State) -> Set[GroundedPredicate]:
+    """Extracts discrete the effects from the state object.
+
+    :param previous_state: the previous state object containing the grounded literals.
+    :param next_state: the next state object containing its grounded literals.
+    :return: tuple containing the add and delete effects of the action.
+    """
+    prev_state_predicate = previous_state.state_predicates
+    next_state_predicate = next_state.state_predicates
+    not_effects = set().union(
+        *next_state_predicate.values()).intersection(
+        set().union(*prev_state_predicate.values()))
+    return  not_effects
