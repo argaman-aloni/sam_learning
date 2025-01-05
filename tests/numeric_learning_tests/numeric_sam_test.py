@@ -22,6 +22,8 @@ from tests.consts import (
     DRIVERLOG_POLY_DOMAIN_PATH,
     DRIVERLOG_POLY_PROBLEM_PATH,
     DRIVERLOG_POLY_TRAJECTORY_PATH,
+    TEST_PPO_OBSERVATIONS_DIRECTORY,
+    TEST_PPO_MINECRAFT_DOMAIN,
 )
 
 
@@ -43,6 +45,11 @@ def minecraft_medium_preconditions_fluents_map() -> Dict[str, List[str]]:
 @fixture()
 def minecraft_medium_domain() -> Domain:
     return DomainParser(MINECRAFT_MEDIUM_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def minecraft_ppo_domain() -> Domain:
+    return DomainParser(TEST_PPO_MINECRAFT_DOMAIN, partial_parsing=True).parse_domain()
 
 
 @fixture()
@@ -290,3 +297,17 @@ def test_learn_action_model_when_applying_multiple_times_with_different_trajecto
     learned_model2, learning_metadata = depot_nsam.learn_action_model([observation2])
     num_learned_actions_model2 = len(learned_model2.actions)
     assert num_learned_actions_model1 < num_learned_actions_model2
+
+
+# def test_learn_action_model_with_ppo_observations_and_nsam_returns_preconditions_without_duplications_while_using_the_trajectories_incrementally(
+#     minecraft_ppo_domain: Domain,
+# ):
+#     mincraft_ppo_nsam = NumericSAMLearner(minecraft_ppo_domain)
+#     parser = TrajectoryParser(minecraft_ppo_domain)
+#     learned_model = None
+#     for observation in TEST_PPO_OBSERVATIONS_DIRECTORY.glob("*.trajectory"):
+#         trajectory = parser.parse_trajectory(observation)
+#         learned_model, _ = mincraft_ppo_nsam.learn_action_model([trajectory])
+#
+#     print()
+#     print(learned_model.to_pddl())

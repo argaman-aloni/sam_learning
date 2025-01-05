@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, NumericalExpressionTree
 
 from sam_learning.core import (
     LearnerDomain,
@@ -40,12 +40,26 @@ class NumericSAMLearner(SAMLearner):
         self.polynom_degree = polynomial_degree
         self.approximation_params = kwargs["approximation_params"] if "approximation_params" in kwargs else None
 
+    def _remove_deprecated_numeric_preconditions(self, action: LearnerAction) -> None:
+        """Removes the deprecated numeric preconditions from the input action (used when the learning process is iterative).
+
+        :param action: the action that the preconditions are removed from.
+        """
+        self.logger.debug(f"Removing the deprecated numeric preconditions from the action - {action.name}.")
+        non_numeric_preconditions = Precondition("and")
+        for condition in action.preconditions.root.operands:
+            if not isinstance(condition, NumericalExpressionTree):
+                non_numeric_preconditions.add_condition(condition)
+
+        action.preconditions.root = non_numeric_preconditions
+
     def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
         """Constructs the safe preconditions for the input action.
 
         :param action: the action that the preconditions are constructed for.
         """
         action_name = action.name
+        self._remove_deprecated_numeric_preconditions(action)
         if self.relevant_fluents is None:
             learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
 

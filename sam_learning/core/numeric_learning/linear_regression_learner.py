@@ -38,6 +38,7 @@ class LinearRegressionLearner:
         self.action_name = action_name
         self.domain_functions = {func.name: func for func in domain_functions.values()}
         functions = list([function.untyped_representation for function in domain_functions.values()])
+        self._function_representation = functions
         monomials = create_monomials(functions, polynom_degree)
         self.previous_state_data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in monomials])
         self.next_state_data = DataFrame(columns=functions)
@@ -263,8 +264,7 @@ class LinearRegressionLearner:
         state_sample = DataFrame.from_dict(data={k: [v] for k, v in state_data.items()}, orient="columns")
         data_to_update = self.previous_state_data if store_in_prev_state else self.next_state_data
         if not store_in_prev_state:
-            legal_next_state_columns = [func.untyped_representation for func in self.domain_functions.values()]
-            state_sample = state_sample.drop([col for col in state_sample.columns if col not in legal_next_state_columns], axis=1)
+            state_sample = state_sample.drop([col for col in state_sample.columns if col not in self._function_representation], axis=1)
 
         attribute_name = "previous_state_data" if store_in_prev_state else "next_state_data"
 
@@ -312,7 +312,7 @@ class LinearRegressionLearner:
         is_safe_to_learn = self._validate_legal_equations(regression_df)
         for feature_fluent, tagged_fluent in zip(self.next_state_data.columns.tolist(), tagged_next_state_fluents):
             regression_df[LABEL_COLUMN] = combined_data[tagged_fluent]
-            if combined_data[feature_fluent].equals(combined_data[tagged_fluent]):
+            if self.previous_state_data[feature_fluent].equals(self.next_state_data[feature_fluent]):
                 self.logger.debug(
                     f"The value of the {feature_fluent} is the same before and "
                     f"after the application of the action. The action does not change the value!"

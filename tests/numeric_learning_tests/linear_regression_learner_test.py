@@ -3,7 +3,7 @@ import random
 import numpy as np
 import pytest
 from pandas import DataFrame
-from pddl_plus_parser.models import PDDLFunction
+from pddl_plus_parser.models import PDDLFunction, ObjectType
 
 from sam_learning.core import NotSafeActionError
 from sam_learning.core.numeric_learning.linear_regression_learner import LinearRegressionLearner
@@ -32,6 +32,16 @@ def polynomial_regression_learner() -> LinearRegressionLearner:
         "(w )": PDDLFunction(name="w", signature={}),
     }
     return LinearRegressionLearner(TEST_ACTION_NAME, domain_functions, polynom_degree=1)
+
+
+@pytest.fixture
+def regression_learner_with_functions_with_the_same_name() -> LinearRegressionLearner:
+    domain_functions = {
+        "(x ?f2)": PDDLFunction(name="x", signature={"?f2": ObjectType}),
+        "(x ?f1)": PDDLFunction(name="x", signature={"?f1": ObjectType}),
+        "(cost )": PDDLFunction(name="cost", signature={}),
+    }
+    return LinearRegressionLearner(TEST_ACTION_NAME, domain_functions)
 
 
 def test_add_new_observation_to_the_previous_state_data_adds_the_data_to_this_dataframe_only(linear_regression_learner: LinearRegressionLearner,):
@@ -270,7 +280,9 @@ def test_construct_assignment_equations_returns_correct_equations_when_no_change
     assert preconditions is None
 
 
-def test_construct_assignment_equations_restrictive_preconditions_when_not_enough_data_is_given(linear_regression_learner: LinearRegressionLearner,):
+def test_construct_assignment_equations_restrictive_preconditions_when_not_enough_data_is_given_and_the_values_are_equal_before_and_after_results_in_no_effect(
+    linear_regression_learner: LinearRegressionLearner,
+):
     pre_state_matrix = {
         "(x )": [2, 1],
         "(y )": [0, 3],
@@ -285,6 +297,33 @@ def test_construct_assignment_equations_restrictive_preconditions_when_not_enoug
     for i in range(2):
         linear_regression_learner.add_new_observation({name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True)
         linear_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
+    numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
+    assert not learned_correctly
+    assert preconditions is None  # The preconditions will be learned in externally to maintain safety.
+    assert len(numeric_effects) == 0
+    for effect in numeric_effects:
+        print(effect.to_pddl())
+
+
+def test_construct_assignment_equations_restrictive_preconditions_when_not_enough_data_is_given_and_the_values_are_not_equal_before_and_after_results_in_effect(
+    linear_regression_learner: LinearRegressionLearner,
+):
+    pre_state_matrix = {
+        "(x )": [2, 1],
+        "(y )": [0, 3],
+        "(z )": [0, 2],
+    }
+    next_state_matrix = {
+        "(x )": [12, 3],
+        "(y )": [1, 3],
+        "(z )": [9, 2],
+    }
+    function_names = ["(x )", "(y )", "(z )"]
+    for i in range(2):
+        linear_regression_learner.add_new_observation({name: pre_state_matrix[name][i] for name in function_names}, store_in_prev_state=True)
+        linear_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
+
     numeric_effects, preconditions, learned_correctly = linear_regression_learner.construct_assignment_equations()
     assert not learned_correctly
     assert preconditions is None  # The preconditions will be learned in externally to maintain safety.
@@ -462,7 +501,6 @@ def test_construct_assignment_equations_with_polynomial_degree_one_returns_corre
         assert effect.to_pddl() in expected_effects
 
 
-
 def test_construct_assignment_equations_with_polynomial_degree_one_and_relevant_fluents_does_not_fail_and_returns_correct_equations(
     polynomial_regression_learner: LinearRegressionLearner,
 ):
@@ -496,7 +534,9 @@ def test_construct_assignment_equations_with_polynomial_degree_one_and_relevant_
         )
         polynomial_regression_learner.add_new_observation({name: next_state_matrix[name][i] for name in function_names}, store_in_prev_state=False)
 
-    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations(relevant_fluents=["(x )", "(* (x ) (y ))", "(y )", "(z )"])
+    numeric_effects, preconditions, learned_correctly = polynomial_regression_learner.construct_assignment_equations(
+        relevant_fluents=["(x )", "(* (x ) (y ))", "(y )", "(z )"]
+    )
     assert learned_correctly
     assert len(numeric_effects) == 3
     expected_effects = {
@@ -545,3 +585,107 @@ def test_construct_assignment_equations_with_polynomial_degree_one_with_change_t
     }
     for effect in numeric_effects:
         assert effect.to_pddl() in expected_effects
+
+
+def test_construct_assignment_equations_when_two_functions_share_the_same_name_but_with_different_parameters_will_result_in_correct_assignment_of_the_equations_for_both_versions(
+    regression_learner_with_functions_with_the_same_name: LinearRegressionLearner,
+):
+    k = 50
+    numbers = list(range(500))
+    x_f1 = random.sample(numbers, k=k)
+    x_f2 = random.sample(numbers, k=k)
+    cost = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x ?f1)": x_f1,
+        "(x ?f2)": x_f2,
+        "(cost )": cost,
+    }
+    next_state_matrix = {
+        "(x ?f1)": [x1 - 4 for x1 in x_f1],
+        "(x ?f2)": [x2 + 2 for x2 in x_f2],
+        "(cost )": [c + 1 for c in cost],
+    }
+    for i in range(k):
+        regression_learner_with_functions_with_the_same_name.add_new_observation(
+            state_data={name: pre_state_matrix[name][i] for name in pre_state_matrix}, store_in_prev_state=True
+        )
+        regression_learner_with_functions_with_the_same_name.add_new_observation(
+            {name: next_state_matrix[name][i] for name in next_state_matrix}, store_in_prev_state=False
+        )
+
+    numeric_effects, preconditions, learned_correctly = regression_learner_with_functions_with_the_same_name.construct_assignment_equations()
+    assert learned_correctly
+    assert len(numeric_effects) == 3
+    expected_effects = {
+        "(decrease (x ?f1) 4)",
+        "(increase (x ?f2) 2)",
+        "(increase (cost ) 1)",
+    }
+    for effect in numeric_effects:
+        assert effect.to_pddl() in expected_effects
+
+
+def test_construct_assignment_equations_when_two_functions_share_the_same_name_but_with_different_parameters_will_result_in_correct_assignment_of_the_equations_for_both_versions_when_observing_only_a_few_samples(
+    regression_learner_with_functions_with_the_same_name: LinearRegressionLearner,
+):
+    k = 3
+    numbers = list(range(500))
+    x_f1 = random.sample(numbers, k=k)
+    cost = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x ?f1)": x_f1,
+        "(x ?f2)": [0] * 3,
+        "(cost )": cost,
+    }
+    next_state_matrix = {
+        "(x ?f1)": [x1 - 4 for x1 in x_f1],
+        "(x ?f2)": [2] * 3,
+        "(cost )": [c + 1 for c in cost],
+    }
+    for i in range(k):
+        regression_learner_with_functions_with_the_same_name.add_new_observation(
+            state_data={name: pre_state_matrix[name][i] for name in pre_state_matrix}, store_in_prev_state=True
+        )
+        regression_learner_with_functions_with_the_same_name.add_new_observation(
+            {name: next_state_matrix[name][i] for name in next_state_matrix}, store_in_prev_state=False
+        )
+
+    numeric_effects, preconditions, learned_correctly = regression_learner_with_functions_with_the_same_name.construct_assignment_equations()
+    assert learned_correctly
+    assert len(numeric_effects) == 3
+    expected_effects = {
+        "(decrease (x ?f1) 4)",
+        "(assign (x ?f2) 2)",
+        "(increase (cost ) 1)",
+    }
+    for effect in numeric_effects:
+        assert effect.to_pddl() in expected_effects
+
+
+def test_construct_assignment_equations_when_two_functions_share_the_same_name_but_with_different_parameters_identifies_that_action_does_not_affect_function_even_with_small_number_of_samples(
+    regression_learner_with_functions_with_the_same_name: LinearRegressionLearner,
+):
+    k = 2
+    numbers = list(range(500))
+    x_f1 = random.sample(numbers, k=k)
+    cost = random.sample(numbers, k=k)
+    pre_state_matrix = {
+        "(x ?f1)": x_f1,
+        "(x ?f2)": [0] * 3,
+        "(cost )": cost,
+    }
+    next_state_matrix = {
+        "(x ?f1)": [x1 - 4 for x1 in x_f1],
+        "(x ?f2)": [0] * 3,
+        "(cost )": [c + 1 for c in cost],
+    }
+    for i in range(k):
+        regression_learner_with_functions_with_the_same_name.add_new_observation(
+            state_data={name: pre_state_matrix[name][i] for name in pre_state_matrix}, store_in_prev_state=True
+        )
+        regression_learner_with_functions_with_the_same_name.add_new_observation(
+            {name: next_state_matrix[name][i] for name in next_state_matrix}, store_in_prev_state=False
+        )
+
+    numeric_effects, preconditions, learned_correctly = regression_learner_with_functions_with_the_same_name.construct_assignment_equations()
+    assert len(numeric_effects) == 2
