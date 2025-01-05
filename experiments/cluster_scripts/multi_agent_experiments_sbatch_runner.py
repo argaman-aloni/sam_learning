@@ -63,7 +63,7 @@ def main():
                     fold,
                     arguments,
                     environment_variables,
-                    f"{experiment['domain_file_name']}_{fold}_multi_agent_experiment_runner",
+                    f"triplets_{experiment['domain_file_name']}_{fold}_multi_agent_experiment_runner",
                     None,
                     python_file=f"{code_directory}/parallel_multi_agent_experiment_runner_with_triplets.py",
                 )

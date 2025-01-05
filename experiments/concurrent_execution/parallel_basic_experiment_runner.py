@@ -118,26 +118,27 @@ class ParallelExperimentRunner:
         return domain_path
 
     def create_transitions_based_training_set(
-        self, complete_train_set: Union[List[MultiAgentObservation], List[Observation]]
+        self, complete_train_set: Union[List[MultiAgentObservation], List[Observation]], num_triplets_per_testing: int = NUM_TRIPLETS_PER_TESTING
     ) -> Union[List[MultiAgentObservation], List[Observation]]:
         """Creates new observations containing only part of the transitions for the learning process.
 
         :param complete_train_set: the complete training set containing all the observations.
+        :param num_triplets_per_testing: the number of triplets to use in each observation.
         :return: the new training set containing only part of the transitions.
         """
         transition_training_set = []
-        self.logger.debug(f"Extracting {NUM_TRIPLETS_PER_TESTING} sized observations from each trajectory.")
+        self.logger.debug(f"Extracting {num_triplets_per_testing} sized observations from each trajectory.")
         for observation in complete_train_set:
-            if len(observation) % NUM_TRIPLETS_PER_TESTING != 0:
-                self.logger.debug(f"Will remove some of the transitions to make the number of transitions divisible by {NUM_TRIPLETS_PER_TESTING}.")
+            if len(observation) % num_triplets_per_testing != 0:
+                self.logger.debug(f"Will remove some of the transitions to make the number of transitions divisible by {num_triplets_per_testing}.")
 
-            for index in range(0, len(observation), NUM_TRIPLETS_PER_TESTING):
-                if len(observation.components[index : index + NUM_TRIPLETS_PER_TESTING]) < NUM_TRIPLETS_PER_TESTING:
+            for index in range(0, len(observation), num_triplets_per_testing):
+                if len(observation.components[index : index + num_triplets_per_testing]) < num_triplets_per_testing:
                     break
 
                 new_obs = MultiAgentObservation(executing_agents=self.executing_agents) if self.executing_agents is not None else Observation()
                 new_obs.add_problem_objects(observation.grounded_objects)
-                new_obs.components = observation.components[index : index + NUM_TRIPLETS_PER_TESTING]
+                new_obs.components = observation.components[index : index + num_triplets_per_testing]
                 transition_training_set.append(new_obs)
 
         return transition_training_set

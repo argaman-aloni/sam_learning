@@ -91,7 +91,7 @@ def main():
                     fold,
                     arguments,
                     environment_variables,
-                    f"{experiment['domain_file_name']}_{fold}_numeric_triplets_experiment_runner",
+                    f"triplets_numeric_{experiment['domain_file_name']}_{fold}_experiment_runner",
                     None,
                     python_file=f"{code_directory}/parallel_numeric_experiment_runner_with_triplets.py",
                 )

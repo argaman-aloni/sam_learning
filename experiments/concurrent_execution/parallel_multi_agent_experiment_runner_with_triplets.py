@@ -14,6 +14,8 @@ from statistics.utils import init_semantic_performance_calculator_for_ma_experim
 from utilities import LearningAlgorithmType
 
 EXPERIMENT_TIMEOUT = os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT)
+MAX_NUM_ITERATIONS = 21
+MAX_TRIPLETS_FOR_EXPERIMENT = 5
 
 
 class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimentRunner):
@@ -56,9 +58,10 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
         )
         partial_domain = self.read_domain_file(train_set_dir_path)
         complete_train_set = self.collect_observations(train_set_dir_path, partial_domain)
-        transitions_based_training_set = self.create_transitions_based_training_set(complete_train_set)
-        execution_scheme = [index + 1 for index in range(10)] + [index for index in range(20, min(len(transitions_based_training_set), 1000), 10)]
-        for index in execution_scheme:
+        transitions_based_training_set = self.create_transitions_based_training_set(
+            complete_train_set, num_triplets_per_testing=MAX_TRIPLETS_FOR_EXPERIMENT
+        )
+        for index in range(1, MAX_NUM_ITERATIONS):  # we want to run the experiments with up to 100 triplets
             self._learn_model_offline([*transitions_based_training_set[0:index]], partial_domain, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.export_semantic_performance(fold_num)
