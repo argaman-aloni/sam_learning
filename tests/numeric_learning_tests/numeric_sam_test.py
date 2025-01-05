@@ -299,15 +299,15 @@ def test_learn_action_model_when_applying_multiple_times_with_different_trajecto
     assert num_learned_actions_model1 < num_learned_actions_model2
 
 
-# def test_learn_action_model_with_ppo_observations_and_nsam_returns_preconditions_without_duplications_while_using_the_trajectories_incrementally(
-#     minecraft_ppo_domain: Domain,
-# ):
-#     mincraft_ppo_nsam = NumericSAMLearner(minecraft_ppo_domain)
-#     parser = TrajectoryParser(minecraft_ppo_domain)
-#     learned_model = None
-#     for observation in TEST_PPO_OBSERVATIONS_DIRECTORY.glob("*.trajectory"):
-#         trajectory = parser.parse_trajectory(observation)
-#         learned_model, _ = mincraft_ppo_nsam.learn_action_model([trajectory])
-#
-#     print()
-#     print(learned_model.to_pddl())
+def test_learn_action_model_with_ppo_observations_and_nsam_returns_preconditions_without_duplications_while_using_the_trajectories_incrementally(
+    minecraft_ppo_domain: Domain,
+):
+    mincraft_ppo_nsam = NumericSAMLearner(minecraft_ppo_domain)
+    parser = TrajectoryParser(minecraft_ppo_domain)
+    learned_model = None
+    for observation in TEST_PPO_OBSERVATIONS_DIRECTORY.glob("*.trajectory"):
+        trajectory = parser.parse_trajectory(observation)
+        learned_model, _ = mincraft_ppo_nsam.learn_action_model([trajectory])
+
+    print()
+    print(learned_model.to_pddl())
