@@ -297,7 +297,8 @@ class SAMLearner:
 
         self.construct_safe_actions()
         self._remove_unobserved_actions_from_partial_domain()
-        self.handle_negative_preconditions_policy()
+        if not self.is_esam:
+            self.handle_negative_preconditions_policy()
         self.end_measure_learning_time()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
