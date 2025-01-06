@@ -4,6 +4,10 @@ from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, D
 from sam_learning.core import  extract_effects, LearnerDomain, LearnerAction, extract_not_effects
 from sam_learning.learners.sam_learning import SAMLearner
 from nnf import And, Or, Var
+
+from utilities import NegativePreconditionPolicy
+
+
 class DisjointSet:  # this class was taken from geeksForGeeks
     def __init__(self, size):
         self.parent = [i for i in range(size)]
@@ -55,8 +59,12 @@ class ExtendedSamLearner(SAMLearner):
     cnf_eff: dict[str, And[Or[Var]]]
     cnf_eff_as_set: dict[str, set[Or[Var]]]
     vars_to_forget: dict[str, set[Predicate]]
-    def __init__(self, partial_domain: Domain):
-        super().__init__(partial_domain, is_esam=True)
+    def __init__(self,
+                 partial_domain: Domain,
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft):
+        super().__init__(partial_domain=partial_domain,
+                         is_esam=True,
+                         negative_preconditions_policy=negative_preconditions_policy)
         self.possible_effect = dict()
         self.cnf_eff_as_set = dict()
         self.vars_to_forget = dict()
@@ -72,6 +80,8 @@ class ExtendedSamLearner(SAMLearner):
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
         super()._add_new_action_preconditions(grounded_action)
+
+        # handling effects
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
         lifted_effects = set(lifted_add_effects).union(lifted_delete_effects)
@@ -105,7 +115,10 @@ class ExtendedSamLearner(SAMLearner):
         """
         action_name = grounded_action.name
         observed_action = self.partial_domain.actions[action_name]
+        # handle preconditions
         super()._update_action_preconditions(grounded_action)
+
+        # handle effects
         lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
             grounded_action, previous_state, next_state)
         lifted_effects = set(lifted_add_effects).union(lifted_delete_effects)
@@ -156,23 +169,24 @@ class ExtendedSamLearner(SAMLearner):
 
 
     def create_proxy_actions(self, action_name: str):
-        proxy_key = 0
-        proxy_preconds = 1
-        proxy_effects = 2
+        proxy_preconds = 0
+        proxy_effects = 1
 
-        proxy_index = 1
-        base_action = self.partial_domain.actions.get(action_name)
         proxies = list()
         for model in self.cnf_eff[action_name].models():
             effect = set()
             preconds_to_add = set()
             for k, v in model.items():
+                predicate = self.hashable_to_predicate(k)
                 if v:
-                    effect.add(self.hashable_to_predicate(k))
+                    effect.add(predicate)
                 else:
-                    preconds_to_add.add(self.hashable_to_predicate(k))
-            proxies.append((proxy_index, preconds_to_add, effect))
-            proxy_index+=1
+                    preconds_to_add.add(predicate)
+            if self.negative_preconditions_policy == NegativePreconditionPolicy.hard and any(
+                    not p.is_positive for p in preconds_to_add):
+                continue
+
+            proxies.append((preconds_to_add, effect, model))
 
         if len(proxies) == 1:
             self.partial_domain.actions[action_name].discrete_effects = proxies[0][proxy_effects]
@@ -180,21 +194,33 @@ class ExtendedSamLearner(SAMLearner):
             self.partial_domain.actions[action_name].preconditions.root.operands.update(preconds)
 
         elif len(proxies) > 1:
+            proxy_number = 1
             for proxy in proxies:
                 # unpack tuple fields to get properties of proxy action
-                name = f"{action_name}_{proxy[proxy_key]}"
+                name = f"{action_name}_{proxy_number}"
                 signature = self.partial_domain.actions[action_name].signature
                 preconds: set[Predicate] = proxy[proxy_preconds]
+                preconds.update(p for p in self.partial_domain.actions[action_name].preconditions.root.operands
+                                if isinstance(p,Predicate))
                 effects: set[Predicate] = proxy[proxy_effects]
 
                 #initialize action
                 self.partial_domain.actions[name] = LearnerAction(name, signature=signature)
                 # set effects
                 self.partial_domain.actions[name].discrete_effects = effects
-                #initialize preconditions to observed possible preconditions
-                self.partial_domain.actions[name].preconditions = self.partial_domain.actions[action_name].preconditions
                 #update union all proxy cnf_eff negative literals to be preconditions
-                self.partial_domain.actions[name].preconditions.root.operands.update(preconds)
+                self.partial_domain.actions[name].preconditions.root.operands = preconds
+                proxy_number+=1
+            self.partial_domain.actions.pop(action_name)
+
+    def handle_negative_preconditions_policy(self):
+        for action_name in self.partial_domain.actions.keys():
+            if self.negative_preconditions_policy != NegativePreconditionPolicy.no_remove:
+                preconds_to_keep = set()
+                for precond in self.partial_domain.actions[action_name].preconditions.root.operands:
+                    if precond.is_positive:
+                        preconds_to_keep.add(precond)
+                self.partial_domain.actions[action_name].preconditions.root.operands = preconds_to_keep
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
@@ -211,6 +237,7 @@ class ExtendedSamLearner(SAMLearner):
         # note that creating will reset all of the actions effects and precondition due to cnf solver usage.
         self.logger.debug("creating updated actions")
         #build all cnf sentences for action's effects
+        self.handle_negative_preconditions_policy()
         self.build_cnf_formulas()
         for action_name in self.observed_actions:
             self.create_proxy_actions(action_name)
@@ -280,7 +307,7 @@ class ExtendedSamLearner(SAMLearner):
 
     @staticmethod
     def hashable_to_predicate(hashable: Hashable) -> Predicate:
-        """Converts a hashable object back into a Predicate instance."""
+        """Converts a hashable object back into a Predicate instance, ignoring types."""
         # Convert the hashable object to a string
         pred_str = str(hashable)
 
@@ -295,11 +322,13 @@ class ExtendedSamLearner(SAMLearner):
 
         # First part is the predicate name
         name = parts[0]
+        params = list()
+        parts = parts[1:]
+        for i in range(len(parts)-2):
+            params.append((parts[i], parts[i+2]))
+            i+=2
 
-        # Remaining parts are parameters with types
-        signature: SignatureType = {}
-        for item in parts[1:]:
-            param, _, param_type_name = item.partition("-")
-            signature[param.strip()] = PDDLType(param_type_name.strip())
+        # Remaining parts are parameters
+        signature = {param[0]: PDDLType(param[1]) for param in params if param}
 
         return Predicate(name=name, signature=signature, is_positive=is_positive)
