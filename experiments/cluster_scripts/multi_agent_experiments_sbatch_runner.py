@@ -15,6 +15,7 @@ from experiments.cluster_scripts.common import (
 )
 
 signal.signal(signal.SIGINT, sigint_handler)
+learning_algorithms_map = {1: "sam", 7: "ma-sam", 25: "ma-sam+"}
 
 
 def main():
@@ -49,7 +50,7 @@ def main():
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(
-                        f"{formatted_date_time} - submitted job for the multi-agent experiments with sid {sid} for domain {experiment['domain_file_name']} fold {fold} and iteration {internal_iteration}."
+                        f"{formatted_date_time} - submitted job for the multi-agent experiments with sid {sid} for algorithm {learning_algorithms_map[compared_version]} for domain {experiment['domain_file_name']} fold {fold} and iteration {internal_iteration}."
                     )
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
