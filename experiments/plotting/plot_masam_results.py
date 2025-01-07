@@ -11,15 +11,16 @@ markers = ["o", "s", "^", "D", "v", "P", "X", "H"]  # Marker styles for line dif
 line_styles = ["-", "--", "-.", ":", "--", "-.", ":"]
 
 
-def plot_solving_results(file_path: Path, output_file_path: Path):
+def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets: bool = False):
     # Adjusting the x-axis to start from 0 and end at the maximum value of 'num_trajectories'
     data = pd.read_csv(file_path)
     debug_columns = [column for column in data.columns if "problems" in column]
     data = data.drop(columns=["solver", *debug_columns])
     # Prepare the data: group by and average 'percent_ok' over 'fold'
-    grouped_data = data.groupby(["num_trajectories", "learning_algorithm", "policy"], as_index=False).agg(
-        avg_percent_ok=("percent_ok", "mean"), std_percent_ok=("percent_ok", "std"),
+    group_by_columns = (
+        ["num_trajectories", "learning_algorithm", "policy"] if not using_triplets else ["num_trajectory_triplets", "learning_algorithm", "policy"]
     )
+    grouped_data = data.groupby(group_by_columns, as_index=False).agg(avg_percent_ok=("percent_ok", "mean"), std_percent_ok=("percent_ok", "std"),)
 
     # Label mappings for readability
     algorithm_label_map = {"sam_learning": "SAM", "ma_sam": "MA-SAM", "ma_sam_plus": "MA-SAM+"}
@@ -36,10 +37,10 @@ def plot_solving_results(file_path: Path, output_file_path: Path):
         ax = axes[i]
         policy_data = grouped_data[grouped_data["policy"] == policy]
         unique_combinations = policy_data.groupby(["learning_algorithm"])
-
         for idx, (algo, group) in enumerate(unique_combinations):
+            plot_x_axis = group["num_trajectories"] if not using_triplets else group["num_trajectory_triplets"]
             ax.plot(
-                group["num_trajectories"],
+                plot_x_axis,
                 group["avg_percent_ok"],
                 label=algo[0],
                 color=colorblind_palette[idx % len(colorblind_palette)],
@@ -49,7 +50,7 @@ def plot_solving_results(file_path: Path, output_file_path: Path):
                 linewidth=4,
             )
             ax.fill_between(
-                group["num_trajectories"],
+                plot_x_axis,
                 np.clip(group["avg_percent_ok"] - group["std_percent_ok"], 0, 100),
                 np.clip(group["avg_percent_ok"] + group["std_percent_ok"], 0, 100),
                 alpha=0.2,
@@ -61,8 +62,9 @@ def plot_solving_results(file_path: Path, output_file_path: Path):
         # Individual plot for the current policy
         plt.figure(figsize=(8, 6))
         for idx, (algo, group) in enumerate(unique_combinations):
+            plot_x_axis = group["num_trajectories"] if not using_triplets else group["num_trajectory_triplets"]
             plt.plot(
-                group["num_trajectories"],
+                plot_x_axis,
                 group["avg_percent_ok"],
                 label=algo,
                 color=colorblind_palette[idx % len(colorblind_palette)],
@@ -72,13 +74,13 @@ def plot_solving_results(file_path: Path, output_file_path: Path):
                 linewidth=4,
             )
             plt.fill_between(
-                group["num_trajectories"],
+                plot_x_axis,
                 np.clip(group["avg_percent_ok"] - group["std_percent_ok"], 0, 100),
                 np.clip(group["avg_percent_ok"] + group["std_percent_ok"], 0, 100),
                 alpha=0.2,
             )
         plt.title(f"Policy: {policy}", fontsize=28)
-        plt.xlabel("# Trajectories", fontsize=28)
+        plt.xlabel(f"# {'Trajectories' if not using_triplets else 'Triplets'}", fontsize=28)
         plt.ylabel("Average % Solved", fontsize=28)
         plt.tick_params(axis="both", which="major", labelsize=28)
         plt.ylim(0, 100)
@@ -93,7 +95,7 @@ def plot_solving_results(file_path: Path, output_file_path: Path):
         plt.close()
 
         ax.set_title(f"Policy: {policy}", fontsize=24)
-        ax.set_xlabel("# Trajectories", fontsize=24)
+        ax.set_xlabel(f"# {'Trajectories' if not using_triplets else 'Triplets'}", fontsize=24)
         ax.set_ylim(0, 100)
         ax.grid(True, alpha=0.3)
 

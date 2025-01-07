@@ -8,13 +8,13 @@ from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain
 
 from experiments.plotting.plot_nsam_results import plot_results
+from experiments.plotting.plot_nsam_solo_results import plot_solo_results
 from statistics.learning_statistics_manager import LEARNED_ACTIONS_STATS_COLUMNS
 from statistics.numeric_performance_calculator import NUMERIC_PERFORMANCE_STATS
 from utilities import LearningAlgorithmType
 from validators.safe_domain_validator import SOLVING_STATISTICS
 
 FOLD_FIELD = "fold"
-MAX_SOLVED_FIELD = "max_percent_solved"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -103,18 +103,33 @@ class DistributedResultsCollector:
         self._collect_solving_statistics_internal(collecting_triplets=True)
         self.logger.info("Done collecting the solving statistics from the results directory!")
 
-    def _collect_numeric_semantic_performance_statistics(self) -> None:
+    def _collect_numeric_semantic_performance_statistics_internal(self, collecting_triplets: bool = False) -> None:
         self.logger.info("Collecting the numeric performance statistics from the results directory.")
         domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
-        combined_statistics_file_path = self.working_directory_path / "results_directory" / "numeric_performance_combined_statistics.csv"
+        combined_statistics_file_path = (
+            self.working_directory_path / "results_directory" / "numeric_performance_combined_statistics.csv"
+            if not collecting_triplets
+            else self.working_directory_path / "results_directory" / "numeric_performance_combined_statistics_with_triplets.csv"
+        )
+        file_path_template = (
+            "{learning_algorithm}_" + domain.name + "_numeric_learning_performance_stats_fold_{fold}_{iteration}.csv"
+            if not collecting_triplets
+            else "{learning_algorithm}_" + domain.name + "_numeric_learning_performance_stats_fold_{fold}.csv"
+        )
         combined_statistics_data = []
-        file_path_template = "{learning_algorithm}_" + domain.name + "_numeric_learning_performance_stats_fold_{fold}_{iteration}.csv"
         self._combine_statistics_data(file_path_template, combined_statistics_data)
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *NUMERIC_PERFORMANCE_STATS])
             writer.writeheader()
             writer.writerows(combined_statistics_data)
         self.logger.info("Done collecting the statistics from the results directory!")
+
+    def _collect_numeric_semantic_performance_statistics(self) -> None:
+        """Collects the numeric semantic performance statistics from the results directory."""
+        self.logger.info("Collecting the solving statistics from the results directory.")
+        self._collect_numeric_semantic_performance_statistics_internal(collecting_triplets=False)
+        self._collect_numeric_semantic_performance_statistics_internal(collecting_triplets=True)
+        self.logger.info("Done collecting the solving statistics from the results directory!")
 
     def _collect_semantic_performance_statistics(self, domain: Domain, exclude_algorithm: Optional[LearningAlgorithmType] = None) -> None:
         """Collects the semantic performance statistics from the results directory.
@@ -153,7 +168,9 @@ class DistributedResultsCollector:
         self._collect_solving_statistics()
         results_directory = self.working_directory_path / "results_directory"
         plot_results(results_directory, file_template="*solving_combined_statistics.csv")
-        plot_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv")
+        plot_solo_results(results_directory, file_template="*solving_combined_statistics.csv")
+        plot_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv", using_triplets=True)
+        plot_solo_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv", using_triplets=True)
         self._collect_numeric_semantic_performance_statistics()
 
 

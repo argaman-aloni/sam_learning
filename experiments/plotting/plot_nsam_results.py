@@ -84,7 +84,7 @@ def plot_results(results_directory_path: Path, file_template: str = "*solving_co
             ax1.set_ylim(0, 100)
             ax1.tick_params(axis="both", which="major", labelsize=24)
 
-            ax2.set_xlabel(f"{x_axis_label} (0-{x_lim * 0.1})", fontsize=28)
+            ax2.set_xlabel(f"{x_axis_label} (0-{int(x_lim * 0.1)})", fontsize=28)
             ax2.set_xlim(1, x_lim * 0.1)
             ax2.set_ylim(0, 100)
             ax2.tick_params(axis="both", which="major", labelsize=24)
