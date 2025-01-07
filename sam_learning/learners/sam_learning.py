@@ -55,7 +55,6 @@ class SAMLearner:
         self.learning_start_time = 0
         self.learning_end_time = 0
         self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
-        self._action_signatures = {action_name: action.signature for action_name, action in partial_domain.actions.items()}
         self.negative_preconditions_policy = negative_preconditions_policy
         self.is_esam = is_esam
 
@@ -155,6 +154,7 @@ class SAMLearner:
         :param previous_state: the state that the action was executed on.
         :param next_state: the state that was created after executing the action on the previous
         """
+
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
