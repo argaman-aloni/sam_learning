@@ -56,7 +56,7 @@ def main():
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
 
                 print("Creating the job to run the experiment with triplets instead of trajectories.")
-                submit_job_and_validate_execution(
+                sid = submit_job_and_validate_execution(
                     code_directory,
                     configurations,
                     experiment,
@@ -66,6 +66,10 @@ def main():
                     f"triplets_{experiment['domain_file_name']}_{fold}_multi_agent_experiment_runner",
                     None,
                     python_file=f"{code_directory}/parallel_multi_agent_experiment_runner_with_triplets.py",
+                )
+                formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+                print(
+                    f"{formatted_date_time} - submitted job to run experiment for triplets with sid {sid} for algorithm {learning_algorithms_map[compared_version]} and fold {fold}."
                 )
 
             time.sleep(5)
