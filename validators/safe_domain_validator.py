@@ -224,7 +224,7 @@ class DomainValidator:
     @staticmethod
     def adapt_solution_file(solution_path: Path, mapping: Dict[str, MappingElement]):
         """
-        Post Processing solution files with macro actions and adapt them to something validators can work with.
+        Post-processing solution files with macro actions and adapt them to something validators can work with.
         That essentially means replacing macro action lines with its consisting solo actions lines.
 
         :param solution_path: the path to the solution file output from the learned domain.

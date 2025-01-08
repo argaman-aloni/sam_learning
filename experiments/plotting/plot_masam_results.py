@@ -91,7 +91,11 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
         )
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig(output_file_path.parent / f"solving_statistics_{policy.replace(' ', '_')}_plot.pdf", dpi=300, bbox_inches="tight")
+        plt.savefig(
+            output_file_path.parent / f"solving_statistics_{policy.replace(' ', '_')}_plot{'_with_triplets' if using_triplets else ''}.pdf",
+            dpi=300,
+            bbox_inches="tight",
+        )
         plt.close()
 
         ax.set_title(f"Policy: {policy}", fontsize=24)
