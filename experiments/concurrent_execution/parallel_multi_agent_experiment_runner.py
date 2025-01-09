@@ -14,7 +14,7 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
 )
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, MultiAgentSAM, MASAMPlus
-from statistics.utils import init_semantic_performance_calculator_for_ma_experiments
+from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy, MappingElement, SolverType
 from validators import DomainValidator
 
@@ -214,13 +214,7 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         :param iteration_number: the number of the iteration that is currently running.
         """
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
-        self.semantic_performance_calc = init_semantic_performance_calculator_for_ma_experiments(
-            working_directory_path=self.working_directory_path,
-            domain_file_name=self.domain_file_name,
-            learning_algorithm=self._learning_algorithm,
-            executing_agents=self.executing_agents,
-            test_set_dir_path=test_set_dir_path,
-        )
+        self._init_semantic_performance_calculator(fold_num)
         partial_domain = self.read_domain_file(train_set_dir_path)
         allowed_observations = self.collect_observations(train_set_dir_path, partial_domain)
         # Execute the actual experiments

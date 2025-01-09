@@ -10,12 +10,10 @@ from pddl_plus_parser.models import Observation, Domain
 
 from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_NUMERIC_TOLERANCE, NUMERIC_ALGORITHMS, DEFAULT_SPLIT
 from sam_learning.core import LearnerDomain
-from solvers import ENHSPSolver, MetricFFSolver, FastDownwardSolver
-from solvers.fast_forward_adl_solver import FFADLSolver
 from statistics.learning_statistics_manager import LearningStatisticsManager
+from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
-from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType
 from utilities.k_fold_split import KFoldSplit
@@ -81,7 +79,6 @@ class OfflineBasicExperimentRunner:
             self.domain_file_name,
             self._learning_algorithm,
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories",
-            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
         )
 
     def _apply_learning_algorithm(

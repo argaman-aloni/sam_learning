@@ -85,13 +85,9 @@ def test_extract_relevant_not_effects_returns_empty_list_if_none_of_the_predicat
     in_state_test_predicates = {
         GroundedPredicate(name="boardsize-successor", signature=lifted_predicate.signature, object_mapping={"?size1": "s8", "?size2": "s10"})
     }
+    woodworking_ma_sam.triplet_snapshot.next_state_predicates = in_state_test_predicates
     assert (
-        woodworking_ma_sam._extract_relevant_not_effects(
-            in_state_predicates=in_state_test_predicates,
-            removed_state_predicates=set(),
-            executing_actions=[do_plane_first_action_call],
-            relevant_action=do_plane_first_action_call,
-        )
+        woodworking_ma_sam._extract_relevant_not_effects(executing_actions=[do_plane_first_action_call], relevant_action=do_plane_first_action_call,)
         == []
     )
 
@@ -103,11 +99,9 @@ def test_extract_relevant_not_effects_returns_one_negative_literal_when_only_giv
     in_state_test_predicates = {
         GroundedPredicate(name="surface-condition", signature=lifted_predicate.signature, object_mapping={"?obj": "p2", "?surface": "verysmooth"})
     }
+    woodworking_ma_sam.triplet_snapshot.next_state_predicates = in_state_test_predicates
     not_effects = woodworking_ma_sam._extract_relevant_not_effects(
-        in_state_predicates=in_state_test_predicates,
-        removed_state_predicates=set(),
-        executing_actions=[do_plane_first_action_call],
-        relevant_action=do_plane_first_action_call,
+        executing_actions=[do_plane_first_action_call], relevant_action=do_plane_first_action_call,
     )
     assert len(not_effects) == 1
     assert not_effects[0].untyped_representation == "(not (surface-condition p2 verysmooth))"
@@ -122,11 +116,9 @@ def test_extract_relevant_not_effects_returns_one_positive_literal_when_only_giv
             name="surface-condition", signature=lifted_predicate.signature, object_mapping={"?obj": "p2", "?surface": "verysmooth"}, is_positive=False
         )
     }
+    woodworking_ma_sam.triplet_snapshot.next_state_predicates = removed_state_test_predicates
     not_effects = woodworking_ma_sam._extract_relevant_not_effects(
-        in_state_predicates=set(),
-        removed_state_predicates=removed_state_test_predicates,
-        executing_actions=[do_plane_first_action_call],
-        relevant_action=do_plane_first_action_call,
+        executing_actions=[do_plane_first_action_call], relevant_action=do_plane_first_action_call,
     )
 
     assert len(not_effects) == 1

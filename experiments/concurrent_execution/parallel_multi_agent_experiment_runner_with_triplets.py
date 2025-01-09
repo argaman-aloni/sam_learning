@@ -10,7 +10,6 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
 )
 from experiments.concurrent_execution.parallel_multi_agent_experiment_runner import SingleIterationMultiAgentExperimentRunner
 from statistics import LearningStatisticsManager
-from statistics.utils import init_semantic_performance_calculator_for_ma_experiments
 from utilities import LearningAlgorithmType
 
 EXPERIMENT_TIMEOUT = os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT)
@@ -49,13 +48,7 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
             used to solve.
         """
         self.logger.info(f"Executing the experiments on the action triplets instead of the trajectories for the fold - {fold_num}!")
-        self.semantic_performance_calc = init_semantic_performance_calculator_for_ma_experiments(
-            working_directory_path=self.working_directory_path,
-            domain_file_name=self.domain_file_name,
-            learning_algorithm=self._learning_algorithm,
-            executing_agents=self.executing_agents,
-            test_set_dir_path=test_set_dir_path,
-        )
+        self._init_semantic_performance_calculator(fold_num)
         partial_domain = self.read_domain_file(train_set_dir_path)
         complete_train_set = self.collect_observations(train_set_dir_path, partial_domain)
         transitions_based_training_set = self.create_transitions_based_training_set(

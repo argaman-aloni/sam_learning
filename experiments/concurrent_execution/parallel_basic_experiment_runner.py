@@ -94,8 +94,8 @@ class ParallelExperimentRunner:
             self.domain_file_name,
             self._learning_algorithm,
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
-            is_numeric=self._learning_algorithm in NUMERIC_ALGORITHMS,
             problem_prefix=self.problem_prefix,
+            executing_agents=self.executing_agents,
         )
 
     def _apply_learning_algorithm(
