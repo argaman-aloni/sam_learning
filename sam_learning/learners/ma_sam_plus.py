@@ -37,7 +37,6 @@ class MASAMPlus(MultiAgentSAM):
         from multi-agent trajectories with joint actions."""
 
     mapping: Dict[str, MappingElement]
-    unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
 
     def __init__(
         self,
@@ -48,13 +47,6 @@ class MASAMPlus(MultiAgentSAM):
         super().__init__(partial_domain, preconditions_fluent_map, negative_precondition_policy=negative_precondition_policy)
         self.mapping = {}
         self.unsafe_actions_preconditions_map = {}
-
-    def _remove_unsafe_actions_from_partial_domain(self):
-        """Removes the actions that were not observed from the partial domain."""
-        self.logger.debug("Removing unobserved actions from the partial domain")
-        actions_to_remove = [action for action in self.partial_domain.actions if action in self.unsafe_actions_preconditions_map]
-        for action in actions_to_remove:
-            self.partial_domain.actions.pop(action)
 
     def _extract_predicate_from_clause_and_adapt_to_macro(self, clause_element: Tuple[str, str], mapping: BindingType) -> Predicate:
         """Helper function to extract predicate data and adapt it to the macro signature.
@@ -165,22 +157,6 @@ class MASAMPlus(MultiAgentSAM):
 
         return new_precondition
 
-    def construct_safe_actions(self) -> None:
-        """Constructs the single-agent actions that are safe to execute."""
-        super()._remove_unobserved_actions_from_partial_domain()
-        for action in self.partial_domain.actions.values():
-            self.logger.debug("Constructing safe action for %s", action.name)
-            action_preconditions = {precondition for precondition in action.preconditions if isinstance(precondition, Predicate)}
-            if not self._is_action_safe(action, action_preconditions):
-                self.logger.warning("Action %s is not safe to execute!", action.name)
-                self.unsafe_actions_preconditions_map[action.name] = action.preconditions
-                action.preconditions = CompoundPrecondition()
-                continue
-
-            self.logger.debug("Action %s is safe to execute.", action.name)
-            self.safe_actions.append(action.name)
-            self.extract_effects_from_cnf(action, action_preconditions)
-
     def construct_safe_macro_actions(self) -> None:
         """Constructs the multi-agent-plus macro actions that are safe to execute."""
         action_groups = self.extract_relevant_action_groups()
@@ -225,7 +201,6 @@ class MASAMPlus(MultiAgentSAM):
 
         self.construct_safe_actions()
         self.construct_safe_macro_actions()
-        self._remove_unsafe_actions_from_partial_domain()
         self.handle_negative_preconditions_policy()
         self.logger.info("Finished learning the action model!")
         super().end_measure_learning_time()

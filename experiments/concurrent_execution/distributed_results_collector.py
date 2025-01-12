@@ -47,13 +47,18 @@ class DistributedResultsCollector:
         self.logger = logging.getLogger("ClusterRunner")
 
     def _combine_statistics_data(
-        self, file_path_template: str, combined_statistics_data: List[dict], exclude_algorithm: Optional[LearningAlgorithmType] = None
+        self,
+        file_path_template: str,
+        combined_statistics_data: List[dict],
+        exclude_algorithm: Optional[LearningAlgorithmType] = None,
+        using_triplets: bool = False,
     ) -> None:
         """Combines the statistics data from the statistics files in the results directory to a single file.
 
         :param file_path_template: the template of the file path to use to find the statistics files.
         :param combined_statistics_data: the list to append the combined statistics data to.
         :param exclude_algorithm: the algorithm to exclude and not include in the combined statistics.
+        :param using_triplets: whether to use triplets or not.
         """
         results_directory = self.working_directory_path / "results_directory"
         algorithms_to_iterate = (
@@ -64,8 +69,10 @@ class DistributedResultsCollector:
         for fold in range(self.num_folds):
             for iteration in self.iterations:
                 for learning_algorithm in algorithms_to_iterate:
-                    solving_statistics_file_path = results_directory / file_path_template.format(
-                        fold=fold, iteration=iteration, learning_algorithm=learning_algorithm.name
+                    solving_statistics_file_path = (
+                        results_directory / file_path_template.format(fold=fold, iteration=iteration, learning_algorithm=learning_algorithm.name)
+                        if not using_triplets
+                        else results_directory / file_path_template.format(fold=fold, learning_algorithm=learning_algorithm.name)
                     )
                     with open(solving_statistics_file_path, "rt") as statistics_file:
                         reader = csv.DictReader(statistics_file)
@@ -89,7 +96,7 @@ class DistributedResultsCollector:
             if not collecting_triplets
             else "{learning_algorithm}_problem_solving_stats_fold_{fold}.csv"
         )
-        self._combine_statistics_data(file_path_template, combined_statistics_data)
+        self._combine_statistics_data(file_path_template, combined_statistics_data, using_triplets=collecting_triplets)
 
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SOLVING_STATISTICS])
@@ -117,7 +124,7 @@ class DistributedResultsCollector:
             else "{learning_algorithm}_" + domain.name + "_numeric_learning_performance_stats_fold_{fold}.csv"
         )
         combined_statistics_data = []
-        self._combine_statistics_data(file_path_template, combined_statistics_data)
+        self._combine_statistics_data(file_path_template, combined_statistics_data, using_triplets=collecting_triplets)
         with open(combined_statistics_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *NUMERIC_PERFORMANCE_STATS])
             writer.writeheader()

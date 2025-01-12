@@ -60,7 +60,7 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
             ax.set_yticklabels(ax.get_yticks(), fontsize=20)
 
         # Individual plot for the current policy
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(10, 6))
         for idx, (algo, group) in enumerate(unique_combinations):
             plot_x_axis = group["num_trajectories"] if not using_triplets else group["num_trajectory_triplets"]
             plt.plot(

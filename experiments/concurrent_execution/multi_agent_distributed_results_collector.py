@@ -62,8 +62,11 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
         self._collect_solving_statistics()
         results_directory = self.working_directory_path / "results_directory"
         combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
+        combined_statistics_file_path_with_triplets = results_directory / "solving_combined_statistics_with_triplets.csv"
         plot_solving_results(combined_statistics_file_path, results_directory / "solving_combined_statistics.pdf")
-        plot_solving_results(combined_statistics_file_path, results_directory / "solving_combined_statistics_with_triplets.pdf", using_triplets=True)
+        plot_solving_results(
+            combined_statistics_file_path_with_triplets, results_directory / "solving_combined_statistics_with_triplets.pdf", using_triplets=True
+        )
         self._collect_performance_statistics(exclude_algorithm=LearningAlgorithmType.ma_sam_plus)
 
 

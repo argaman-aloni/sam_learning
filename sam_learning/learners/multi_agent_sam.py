@@ -28,6 +28,7 @@ class MultiAgentSAM(SAMLearner):
     literals_cnf: Dict[str, LiteralCNF]
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
+    unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
 
     def __init__(
         self,
@@ -40,6 +41,7 @@ class MultiAgentSAM(SAMLearner):
         self.literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
         self.safe_actions = []
+        self.unsafe_actions_preconditions_map = {}
 
     def _initialize_cnfs(self) -> None:
         """Initialize the CNFs for the action model."""
@@ -276,9 +278,11 @@ class MultiAgentSAM(SAMLearner):
         unsafe_actions = []
         for action in self.partial_domain.actions.values():
             self.logger.debug("Constructing safe action for %s", action.name)
-            action_preconditions = {precondition for precondition in action.preconditions if isinstance(precondition, Predicate)}
+            action_preconditions = {precondition for precondition in action.preconditions.root.operands if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
+                self.unsafe_actions_preconditions_map[action.name] = action.preconditions
+                action.preconditions = CompoundPrecondition()
                 unsafe_actions.append(action.name)
                 continue
 

@@ -55,6 +55,9 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
             complete_train_set, num_triplets_per_testing=MAX_TRIPLETS_FOR_EXPERIMENT
         )
         for index in range(1, MAX_NUM_ITERATIONS):  # we want to run the experiments with up to 100 triplets
+            if index != 3:
+                continue
+
             self._learn_model_offline([*transitions_based_training_set[0:index]], partial_domain, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.export_semantic_performance(fold_num)
