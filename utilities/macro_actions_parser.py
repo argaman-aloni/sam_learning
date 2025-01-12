@@ -102,7 +102,7 @@ class MacroActionParser:
         return param_bindings
 
     @staticmethod
-    def extract_actions_from_macro_action(action_line: str, mapper) -> Set[str]:
+    def extract_actions_from_macro_action(action_line: str, mapper: Dict[str, MappingElement]) -> Set[str]:
         """
         This function replaces a single line consisting of macro action, with several micro actions.
 

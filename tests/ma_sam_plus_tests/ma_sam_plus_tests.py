@@ -120,6 +120,7 @@ def test_extract_relevant_action_groups_with_observed_actions_with_unsafe_action
     )
     woodworking_ma_sam_plus.observed_actions = ["do-grind", "do-plane", "do-immersion-varnish"]
     woodworking_ma_sam_plus.safe_actions = ["do-immersion-varnish"]
+    woodworking_ma_sam_plus._unsafe_actions = {"do-grind", "do-plane"}
 
     action_groups = woodworking_ma_sam_plus.extract_relevant_action_groups()
     action_groups_names = {frozenset(u.name for u in group) for group in action_groups}

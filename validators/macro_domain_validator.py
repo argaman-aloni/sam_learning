@@ -12,15 +12,16 @@ from utilities import SolverType, SolutionOutputTypes
 from validators import DomainValidator
 from utilities import NegativePreconditionPolicy
 from utilities import MacroActionParser, MappingElement
-from validators.safe_domain_validator import (SOLVING_STATISTICS, SOLVER_TYPES, DEBUG_STATISTICS,
-                                              VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN,
-                                              NUMERIC_STATISTICS_LABELS)
+from validators.safe_domain_validator import (
+    SOLVING_STATISTICS,
+    SOLVER_TYPES,
+    DEBUG_STATISTICS,
+    VALIDATED_AGAINST_EXPERT_PLAN,
+    NOT_VALIDATED_AGAINST_EXPERT_PLAN,
+    NUMERIC_STATISTICS_LABELS,
+)
 
-SOLVING_STATISTICS_MACRO = [
-    "fold",
-    "policy",
-    *SOLVING_STATISTICS
-]
+SOLVING_STATISTICS_MACRO = ["fold", "policy", *SOLVING_STATISTICS]
 
 
 class MacroDomainValidator(DomainValidator):
@@ -41,7 +42,7 @@ class MacroDomainValidator(DomainValidator):
         timeout: int = 5,
         learning_time: float = 0,
         solvers_portfolio: List[SolverType] = None,
-        mapping: Dict[str, MappingElement] = None
+        mapping: Dict[str, MappingElement] = None,
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -76,15 +77,13 @@ class MacroDomainValidator(DomainValidator):
                     solving_stats=problem_solving_report,
                 )
                 end_time = time.time()
-                solving_stats["solving_time"] = end_time - start_time   # time in seconds
+                solving_stats["solving_time"] = end_time - start_time  # time in seconds
                 if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
                     problem_solved = True
                     solution_file_path = test_set_directory_path / f"{problem_file_name}.solution"
 
                     if mapping:
-                        self.adapt_solution_file(
-                            solution_path=solution_file_path, mapping=mapping
-                        )
+                        self.adapt_solution_file(solution_path=solution_file_path, mapping=mapping)
 
                     self._validate_solution_content(
                         solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats
@@ -152,7 +151,7 @@ class MacroDomainValidator(DomainValidator):
             writer.writerows(self.aggregated_solving_stats)
 
     @staticmethod
-    def adapt_solution_file(solution_path: Path, mapping):
+    def adapt_solution_file(solution_path: Path, mapping: Dict[str, MappingElement]):
         """
         Post Processing solution files with macro actions and adapt them to something validators can work with.
         That essentially means replacing macro action lines with its consisting solo actions lines.
@@ -161,16 +160,13 @@ class MacroDomainValidator(DomainValidator):
         :param solution_path: the path to the solution file output from the learned domain.
         :param mapping: the macro actions mapping of the learned domain.
         """
-        with open(solution_path, 'r') as file:
+        with open(solution_path, "r") as file:
             lines = file.readlines()
 
         new_lines = []
         for line in lines:
-            extracted_lines = MacroActionParser.extract_actions_from_macro_action(
-                action_line=line, mapper=mapping
-            )
-            new_lines.extend([extracted_line if extracted_line.endswith('\n') else f"{extracted_line}\n"
-                              for extracted_line in extracted_lines])
+            extracted_lines = MacroActionParser.extract_actions_from_macro_action(action_line=line, mapper=mapping)
+            new_lines.extend([extracted_line if extracted_line.endswith("\n") else f"{extracted_line}\n" for extracted_line in extracted_lines])
 
-        with open(solution_path, 'w') as file:
+        with open(solution_path, "w") as file:
             file.writelines(new_lines)
