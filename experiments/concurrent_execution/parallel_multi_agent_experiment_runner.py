@@ -2,7 +2,7 @@
 import argparse
 import os
 from pathlib import Path
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Optional
 
 from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 
@@ -147,6 +147,7 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         partial_domain: Domain,
         test_set_dir_path: Path,
         fold_num: int,
+        single_agent_observations: Optional[List[Observation]] = None,
     ):
         """
 
@@ -158,7 +159,12 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         """
         if self._learning_algorithm in [LearningAlgorithmType.ma_sam, LearningAlgorithmType.sam_learning]:
             for policy in NegativePreconditionPolicy:
-                learned_domain, learning_report = self._apply_multi_agent_learning_algorithms(partial_domain, allowed_observations, policy)
+                if self._learning_algorithm == LearningAlgorithmType.sam_learning:
+                    learned_domain, learning_report = self._apply_multi_agent_learning_algorithms(partial_domain, single_agent_observations, policy)
+
+                else:
+                    learned_domain, learning_report = self._apply_multi_agent_learning_algorithms(partial_domain, allowed_observations, policy)
+
                 self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_domain, learning_report, policy=policy)
                 learned_domain_path = self.validate_learned_domain(
                     allowed_observations, learned_domain, test_set_dir_path, fold_num, float(learning_report["learning_time"]), policy
@@ -192,6 +198,10 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         allowed_observations = multi_agent_observations
         if self._learning_algorithm == LearningAlgorithmType.sam_learning:
             allowed_observations = [self._filter_baseline_single_agent_trajectory(observation) for observation in multi_agent_observations]
+            # Execute the actual experiments
+            self._learn_model_offline(
+                multi_agent_observations, partial_domain, test_set_dir_path, fold_num, single_agent_observations=allowed_observations
+            )
 
         # Execute the actual experiments
         self._learn_model_offline(allowed_observations, partial_domain, test_set_dir_path, fold_num)

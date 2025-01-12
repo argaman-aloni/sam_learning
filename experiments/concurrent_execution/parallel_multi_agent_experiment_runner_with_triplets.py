@@ -61,7 +61,16 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
             allowed_observations = [self._filter_baseline_single_agent_trajectory(observation) for observation in transitions_based_training_set]
 
         for index in range(1, MAX_NUM_ITERATIONS):  # we want to run the experiments with up to 100 triplets
-            self._learn_model_offline([*allowed_observations[0:index]], partial_domain, test_set_dir_path, fold_num)
+            if self._learning_algorithm == LearningAlgorithmType.sam_learning:
+                self._learn_model_offline(
+                    [*transitions_based_training_set[0:index]],
+                    partial_domain,
+                    test_set_dir_path,
+                    fold_num,
+                    single_agent_observations=[*allowed_observations[0:index]],
+                )
+            else:
+                self._learn_model_offline([*allowed_observations[0:index]], partial_domain, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
