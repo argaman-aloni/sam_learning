@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from typing import List
 
+from pddl_plus_parser.models import MultiAgentObservation
+
 from experiments.concurrent_execution.parallel_basic_experiment_runner import (
     configure_iteration_logger,
     PLANNER_EXECUTION_TIMEOUT,
@@ -50,15 +52,16 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
         self.logger.info(f"Executing the experiments on the action triplets instead of the trajectories for the fold - {fold_num}!")
         self._init_semantic_performance_calculator(fold_num)
         partial_domain = self.read_domain_file(train_set_dir_path)
-        complete_train_set = self.collect_observations(train_set_dir_path, partial_domain)
+        complete_train_set: List[MultiAgentObservation] = super().collect_observations(train_set_dir_path, partial_domain)
         transitions_based_training_set = self.create_transitions_based_training_set(
             complete_train_set, num_triplets_per_testing=MAX_TRIPLETS_FOR_EXPERIMENT
         )
-        for index in range(1, MAX_NUM_ITERATIONS):  # we want to run the experiments with up to 100 triplets
-            if index != 3:
-                continue
+        allowed_observations = transitions_based_training_set
+        if self._learning_algorithm == LearningAlgorithmType.sam_learning:
+            allowed_observations = [self._filter_baseline_single_agent_trajectory(observation) for observation in transitions_based_training_set]
 
-            self._learn_model_offline([*transitions_based_training_set[0:index]], partial_domain, test_set_dir_path, fold_num)
+        for index in range(1, MAX_NUM_ITERATIONS):  # we want to run the experiments with up to 100 triplets
+            self._learn_model_offline([*allowed_observations[0:index]], partial_domain, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)

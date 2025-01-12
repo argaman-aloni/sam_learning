@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from typing import List, Dict, Tuple, Union
 
-from pddl_plus_parser.lisp_parsers import TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 
 from experiments.concurrent_execution.parallel_basic_experiment_runner import (
@@ -14,7 +13,6 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
 )
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, MultiAgentSAM, MASAMPlus
-from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy, MappingElement, SolverType
 from validators import DomainValidator
 
@@ -178,32 +176,6 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
 
         self.logger.info(f"Finished the learning phase for the fold - {fold_num} and {len(allowed_observations)} observations!")
 
-    def collect_observations(self, train_set_dir_path: Path, partial_domain: Domain) -> List[MultiAgentObservation]:
-        """Collects all the observations from the trajectories in the train set directory.
-
-        :param train_set_dir_path: the path to the directory containing the trajectories.
-        :param partial_domain: the partial domain without the actions' preconditions and effects.
-        :return: the allowed observations.
-        """
-        allowed_observations = []
-        sorted_trajectory_paths = sorted(train_set_dir_path.glob("*.trajectory"))  # for consistency
-        for index, trajectory_file_path in enumerate(sorted_trajectory_paths):
-            # assuming that the folders were created so that each folder contains only the correct number of trajectories, i.e., iteration_number
-            problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
-            problem = ProblemParser(problem_path, partial_domain).parse_problem()
-            complete_observation: MultiAgentObservation = TrajectoryParser(partial_domain, problem).parse_trajectory(
-                trajectory_file_path, self.executing_agents
-            )
-
-            if self._learning_algorithm == LearningAlgorithmType.sam_learning:
-                filtered_observation = self._filter_baseline_single_agent_trajectory(complete_observation)
-                allowed_observations.append(filtered_observation)
-
-            else:
-                allowed_observations.append(complete_observation)
-
-        return allowed_observations
-
     def run_experiment(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int = 0) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
@@ -216,7 +188,11 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         self._init_semantic_performance_calculator(fold_num)
         partial_domain = self.read_domain_file(train_set_dir_path)
-        allowed_observations = self.collect_observations(train_set_dir_path, partial_domain)
+        multi_agent_observations: List[MultiAgentObservation] = super().collect_observations(train_set_dir_path, partial_domain)
+        allowed_observations = multi_agent_observations
+        if self._learning_algorithm == LearningAlgorithmType.sam_learning:
+            allowed_observations = [self._filter_baseline_single_agent_trajectory(observation) for observation in multi_agent_observations]
+
         # Execute the actual experiments
         self._learn_model_offline(allowed_observations, partial_domain, test_set_dir_path, fold_num)
         self.domain_validator.write_statistics(fold_num, iteration_number)

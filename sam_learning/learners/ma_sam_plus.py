@@ -46,7 +46,6 @@ class MASAMPlus(MultiAgentSAM):
     ):
         super().__init__(partial_domain, preconditions_fluent_map, negative_precondition_policy=negative_precondition_policy)
         self.mapping = {}
-        self.unsafe_actions_preconditions_map = {}
 
     def _extract_predicate_from_clause_and_adapt_to_macro(self, clause_element: Tuple[str, str], mapping: BindingType) -> Predicate:
         """Helper function to extract predicate data and adapt it to the macro signature.
@@ -61,22 +60,19 @@ class MASAMPlus(MultiAgentSAM):
         return MacroActionParser.adapt_predicate_to_macro_mapping(mapping, predicate, action_name)
 
     def extract_relevant_action_groups(self) -> List[Set[LearnerAction]]:
-        """Extracts relevant action groups
+        """Extracts the action sets containing at least one unsafe action.
 
-        :return: a list of action groups
+        These action groups (sets) are the ones that are relevant for the macro-action construction.
+
+        :return: a list of action groups.
         """
-        action_list = [action for action in self.partial_domain.actions.values() if action.name in self.observed_actions]
-        actions_set = set(action_list)
-        action_names = set(self.observed_actions)
-        unsafe_actions = action_names.difference(set(self.safe_actions))
         action_groups = []
-
-        for fluent, fluent_cnf in self.literals_cnf.items():
-            for clause in fluent_cnf.possible_lifted_effects:
+        for lifted_literal, cnf in self.literals_cnf.items():
+            for clause in cnf.possible_lifted_effects:
                 clause_actions = {action_name for action_name, _ in clause}
 
-                if len(clause) > 1 and not unsafe_actions.isdisjoint(clause_actions):
-                    action_group = {action for action in actions_set if action.name in clause_actions}
+                if len(clause) > 1 and not self._unsafe_actions.isdisjoint(clause_actions):
+                    action_group = {action for action in self.partial_domain.actions.values() if action.name in clause_actions}
 
                     if action_group not in action_groups:
                         action_groups.append(action_group)
@@ -84,14 +80,18 @@ class MASAMPlus(MultiAgentSAM):
         return action_groups
 
     def extract_relevant_parameter_groupings(self, action_group_names: List[str]) -> List[PGType]:
-        """Extracts relevant parameter groups
-            This implementation only extracts one such possible parameter groups
+        """Extracts relevant parameter groups, that is, the parameters of the actions in the action group.
+
+            Note:
+                This implementation only extracts one such possible parameter groups
+
+            :param action_group_names: the names of the actions in the action group.
         """
         all_param_groups = [
             param_set
             for fluent_cnf in self.literals_cnf.values()
             for clause in fluent_cnf.possible_lifted_effects
-            if all(action in action_group_names for action, _ in clause)
+            if all([action in action_group_names for action, _ in clause])
             for param_set in group_params_from_clause(clause)
         ]
 
@@ -100,18 +100,18 @@ class MASAMPlus(MultiAgentSAM):
         return [flattened_groups]
 
     def extract_effects_for_macro_from_cnf(self, lma_set: Set[LearnerAction], param_grouping: PGType, mapping: BindingType) -> Set[Predicate]:
-        """
+        """Extract the effects of the macro action containing the input single-agent actions.
 
-        :param lma_set:
-        :param param_grouping:
-        :param mapping:
-        :return:
+        :param lma_set: the single agent actions contained in the macro action.
+        :param param_grouping: the parameter grouping of the macro action.
+        :param mapping: the mapping between the macro action and the single-agent actions.
+        :return: the set of effects of the macro action.
         """
         lma_names = [lma.name for lma in lma_set]
         cnf_effects = set()
-        relevant_preconditions_str = {
-            precondition.untyped_representation for action in lma_set for precondition in action.preconditions if isinstance(precondition, Predicate)
-        }
+        relevant_preconditions_str = set()
+        for action in lma_set:
+            relevant_preconditions_str.update(action.preconditions_str_set)
 
         for fluent, fluent_cnf in self.literals_cnf.items():
             effects = fluent_cnf.extract_macro_action_effects(lma_names, relevant_preconditions_str, param_grouping)
@@ -142,13 +142,7 @@ class MASAMPlus(MultiAgentSAM):
 
         # taking the already existing learned preconditions into account
         for action in action_group:
-            preconditions = (
-                action.preconditions
-                if action.name not in self.unsafe_actions_preconditions_map
-                else self.unsafe_actions_preconditions_map[action.name]
-            )
-
-            for _, precondition in preconditions:
+            for _, precondition in action.preconditions:
                 if isinstance(precondition, Predicate):
                     precondition_to_add = self._extract_predicate_from_clause_and_adapt_to_macro(
                         clause_element=(action.name, precondition.untyped_representation), mapping=mapping
@@ -162,7 +156,7 @@ class MASAMPlus(MultiAgentSAM):
         action_groups = self.extract_relevant_action_groups()
 
         for action_group in action_groups:
-            action_group_names = list(sorted(action.name for action in action_group))
+            action_group_names = sorted([action.name for action in action_group])
             parameter_groupings = self.extract_relevant_parameter_groupings(action_group_names)
             for parameter_grouping in parameter_groupings:
                 mapper = MacroActionParser.generate_macro_mappings(parameter_grouping, action_group)
@@ -180,6 +174,9 @@ class MASAMPlus(MultiAgentSAM):
                 self.safe_actions.append(macro_action.name)
                 self.observed_actions.append(macro_action.name)
                 self.mapping[macro_action.name] = (macro_action.parameter_names, mapper)
+
+        for unsafe_action in self._unsafe_actions:
+            self.partial_domain.actions.pop(unsafe_action)
 
     def learn_combined_action_model_with_macro_actions(
         self, observations: List[MultiAgentObservation]
@@ -199,7 +196,7 @@ class MASAMPlus(MultiAgentSAM):
             for component in observation.components:
                 self.handle_multi_agent_trajectory_component(component)
 
-        self.construct_safe_actions()
+        self.construct_safe_actions(should_remove_actions=False)
         self.construct_safe_macro_actions()
         self.handle_negative_preconditions_policy()
         self.logger.info("Finished learning the action model!")

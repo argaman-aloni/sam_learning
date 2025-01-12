@@ -11,14 +11,11 @@ from pddl_plus_parser.models import (
     State,
     GroundedPredicate,
     JointActionCall,
-    CompoundPrecondition,
 )
 
-from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data, contains_duplicates
+from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
-from collections import defaultdict
-from itertools import combinations
 
 
 class MultiAgentSAM(SAMLearner):
@@ -28,7 +25,6 @@ class MultiAgentSAM(SAMLearner):
     literals_cnf: Dict[str, LiteralCNF]
     preconditions_fluent_map: Dict[str, List[str]]
     safe_actions: List[str]
-    unsafe_actions_preconditions_map: Dict[str, CompoundPrecondition]
 
     def __init__(
         self,
@@ -41,7 +37,7 @@ class MultiAgentSAM(SAMLearner):
         self.literals_cnf = {}
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
         self.safe_actions = []
-        self.unsafe_actions_preconditions_map = {}
+        self._unsafe_actions = set()
 
     def _initialize_cnfs(self) -> None:
         """Initialize the CNFs for the action model."""
@@ -234,17 +230,6 @@ class MultiAgentSAM(SAMLearner):
         for grounded_effect in grounded_add_effects.union(grounded_del_effects):
             self.handle_concurrent_execution(grounded_effect, executing_actions)
 
-    def _verify_parameter_duplication_for_ma_sam(self, joint_action: JointActionCall) -> bool:
-        """
-        verifies for each of the actions in the joint action that it does not consist of param duplications.
-        We have decided that at least one such action in the joint action makes the whole joint action illegitimate.
-        Notice that _verify_parameter_duplication deletes inequality preconditions of the action.
-
-        NOTE: should be a list comprehension rather than lazy loaded
-        in order to call verify on all actions and not return early
-        """
-        return any([super(MultiAgentSAM, self)._verify_parameter_duplication(action) for action in joint_action.operational_actions])
-
     def handle_multi_agent_trajectory_component(self, component: MultiAgentComponent) -> None:
         """Handles a single multi-agent triplet in the observed trajectory.
 
@@ -254,7 +239,7 @@ class MultiAgentSAM(SAMLearner):
         joint_action = component.grounded_joint_action
         next_state = component.next_state
 
-        if self._verify_parameter_duplication_for_ma_sam(joint_action):
+        if any([self._verify_parameter_duplication(action) for action in joint_action.operational_actions]):
             self.logger.warning(f"{str(joint_action)} contains duplicated parameters! Not suppoerted in SAM.")
             return
 
@@ -272,26 +257,27 @@ class MultiAgentSAM(SAMLearner):
         self.logger.debug("More than one action is being executed in the current triplet.")
         self.update_multiple_executed_actions(joint_action, previous_state, next_state)
 
-    def construct_safe_actions(self) -> None:
-        """Constructs the single-agent actions that are safe to execute."""
+    def construct_safe_actions(self, should_remove_actions: bool = True) -> None:
+        """Constructs the single-agent actions that are safe to execute.
+
+        :param should_remove_actions: whether to remove the actions that are not safe to execute. (for MA-SAM+)
+        """
         super()._remove_unobserved_actions_from_partial_domain()
-        unsafe_actions = []
         for action in self.partial_domain.actions.values():
             self.logger.debug("Constructing safe action for %s", action.name)
             action_preconditions = {precondition for precondition in action.preconditions.root.operands if isinstance(precondition, Predicate)}
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
-                self.unsafe_actions_preconditions_map[action.name] = action.preconditions
-                action.preconditions = CompoundPrecondition()
-                unsafe_actions.append(action.name)
+                self._unsafe_actions.add(action.name)
                 continue
 
             self.logger.debug("Action %s is safe to execute.", action.name)
             self.safe_actions.append(action.name)
             self.extract_effects_from_cnf(action, action_preconditions)
 
-        for unsafe_action in unsafe_actions:
-            self.partial_domain.actions.pop(unsafe_action)
+        if should_remove_actions:
+            for unsafe_action in self._unsafe_actions:
+                self.partial_domain.actions.pop(unsafe_action)
 
     def learn_combined_action_model(self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input multi-agent trajectories.
