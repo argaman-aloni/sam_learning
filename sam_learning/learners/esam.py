@@ -2,7 +2,7 @@ from typing import List, Tuple, Dict, Hashable
 
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, \
-    PDDLType
+    PDDLType, GroundedPredicate
 from sam_learning.core import  extract_effects, LearnerDomain, LearnerAction, extract_not_effects
 from sam_learning.learners.sam_learning import SAMLearner
 from nnf import And, Or, Var
@@ -63,7 +63,7 @@ class ExtendedSamLearner(SAMLearner):
     vars_to_forget: dict[str, set[Predicate]]
     def __init__(self,
                  partial_domain: Domain,
-                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft):
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard_but_allow_proxy):
         super().__init__(partial_domain=partial_domain,
                          is_esam=True,
                          negative_preconditions_policy=negative_preconditions_policy)
@@ -71,6 +71,44 @@ class ExtendedSamLearner(SAMLearner):
         self.cnf_eff_as_set = dict()
         self.vars_to_forget = dict()
 
+    def get_is_eff_clause_for_predicate(self,
+                                        grounded_action: ActionCall,
+                                        grounded_effect: GroundedPredicate) ->Or[Var]:
+        """
+        Get the is effect clause for a given predicate by matching it to action literals.
+
+        Parameters:
+            grounded_action (ActionCall): The action call related to the grounded effect.
+            grounded_effect (GroundedPredicate): The grounded predicate to match.
+
+        Returns:
+            Or[Var]: The Or clause composed of is_effect for the given predicate.
+
+        """
+        c_eff: list[Var] = list()
+        possible_literals = self.matcher.match_predicate_to_action_literals(grounded_effect, grounded_action)
+        if len(possible_literals) > 0:
+            c_eff.extend([Var(possible_literals) for possible_literals in possible_literals])
+        return  Or(c_eff)
+
+    def get_surely_not_eff(self,
+                           previous_state: State,
+                           next_state: State,
+                           grounded_action: ActionCall) -> set[Predicate]:
+        """
+        Return the set of predicates representing the negative effects caused by the action between the previous state and the next state.
+
+        Parameters:
+            previous_state (State): The previous state before the action is taken.
+            next_state (State): The state resulting from taking the action.
+            grounded_action (ActionCall): The grounded action that was executed.
+
+        Returns:
+            set[Predicate]: A set of predicates that cannot be an effect.
+        """
+        grounded_not_effect = extract_not_effects(previous_state, next_state)
+        lifted_not_eff = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_not_effect))
+        return set(lifted_not_eff)
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
 
@@ -84,31 +122,24 @@ class ExtendedSamLearner(SAMLearner):
         super()._add_new_action_preconditions(grounded_action)
 
         # handling effects
-        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
-            grounded_action, previous_state, next_state)
-        lifted_effects = set(lifted_add_effects).union(lifted_delete_effects)
-        self.possible_effect[observed_action.name] = set(lifted_effects)
         add_grounded_effects, del_grounded_effects = extract_effects(previous_state, next_state)
         self.cnf_eff_as_set[observed_action.name] = set()
 
         # add 'Or' clauses to set of 'Or' clauses
         for grounded_effect in add_grounded_effects.union(del_grounded_effects):
-            c_eff: list[Var] = list()
-            possible_literals = self.matcher.match_predicate_to_action_literals(grounded_effect, grounded_action)
-            if len(possible_literals) > 0:
-                c_eff.extend([Var(possible_literals) for possible_literals in possible_literals])
+            or_clause = self.get_is_eff_clause_for_predicate(grounded_action, grounded_effect)
+            self.cnf_eff_as_set[grounded_action.name].add(or_clause)
 
-            self.cnf_eff_as_set[observed_action.name].add(Or(c_eff))
-        grounded_not_effect = extract_not_effects(previous_state, next_state)
-        lifted_not_eff = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_not_effect))
-        self.vars_to_forget[observed_action.name] = set(lifted_not_eff)
+        # extract predicated who are surely not an effect
+        not_eff_set = self.get_surely_not_eff(previous_state, next_state, grounded_action)
+        self.vars_to_forget[observed_action.name] = not_eff_set
 
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
 
     def update_action(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
-        """Create a new action in the domain.
+        """updates an existing action in the domain based on a transition.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
         :param previous_state: the state that the action was executed on.
@@ -119,24 +150,15 @@ class ExtendedSamLearner(SAMLearner):
         observed_action = self.partial_domain.actions[action_name]
         # handle preconditions
         super()._update_action_preconditions(grounded_action)
-
         # handle effects
-        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(
-            grounded_action, previous_state, next_state)
-        lifted_effects = set(lifted_add_effects).union(lifted_delete_effects)
-        self.possible_effect[observed_action.name].update(lifted_effects)
         add_grounded_effects, del_grounded_effects = extract_effects(previous_state, next_state)
+        # add 'Or' clauses to set of 'Or' clauses
         for grounded_effect in add_grounded_effects.union(del_grounded_effects):
-            c_eff: list[Var] = list()
-            possible_literals = self.matcher.match_predicate_to_action_literals(grounded_effect, grounded_action)
-            if len(possible_literals) > 0:
-                c_eff.extend([Var(possible_literals) for possible_literals in possible_literals])
+            or_clause = self.get_is_eff_clause_for_predicate(grounded_action, grounded_effect)
+            self.cnf_eff_as_set[grounded_action.name].add(or_clause)
 
-            self.cnf_eff_as_set[grounded_action.name].add(Or(c_eff))
-
-        grounded_not_effect = extract_not_effects(previous_state, next_state)
-        lifted_not_eff = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_not_effect))
-        self.vars_to_forget[observed_action.name].update(lifted_not_eff)
+        not_eff_set = self.get_surely_not_eff(previous_state, next_state, grounded_action)
+        self.vars_to_forget[observed_action.name] = not_eff_set
 
         # add all predicates who are surely not an effect for future
         self.logger.debug(f"Done updating the action cnf formulas - {grounded_action.name}")
@@ -160,7 +182,10 @@ class ExtendedSamLearner(SAMLearner):
         else:
             self.add_new_action(grounded_action, previous_state, next_state)
 
-    def build_cnf_formulas(self):
+    def build_cnf_formulas(self) -> None:
+        """
+        for each action, builds the effect cnf formula
+        """
         # build initial deducted cnf sentence for each action
         self.cnf_eff = {k: And(v) for k, v in self.cnf_eff_as_set.items()}
         for action_name in self.cnf_eff.keys():
@@ -170,32 +195,75 @@ class ExtendedSamLearner(SAMLearner):
             self.cnf_eff[action_name] = self.cnf_eff[action_name].implicates()
 
 
-    def create_proxy_actions(self, action_name: str):
-        proxy_preconds = 0
-        proxy_effects = 1
-        proxy_model_dict = 2
+    def create_lifted_action_data(self, action_name: str) -> None:
+        """
+        creates and adds the proxy action by its name in the domain to the learned domain.
+        Args:
+            action_name: the name of the action to build proxys.
+        """
+
         act_signature = self.partial_domain.actions[action_name].signature
 
         proxies = list()
         for model in self.cnf_eff[action_name].models():
             effect = set()
             preconds_to_add = set()
+            is_skip_proxy = False
             for k, v in model.items():
                 predicate = parse_predicate_from_string(str(k), self.partial_domain.types)
                 if v:
                     effect.add(predicate)
-                else:
+
+                # handle precondition additions
+                else:  # check for contradiction
+                    if self.negative_preconditions_policy != NegativePreconditionPolicy.hard:
+                        predicate_opposite_copy = predicate.copy()
+                        #create negated precondition (true-> false, false -> true)
+                        predicate_opposite_copy.is_positive = not predicate_opposite_copy.is_positive
+
+                        # check for negated precond in preconds  to avoid contradictions
+                        if self.partial_domain.actions[action_name].preconditions.root.operands.__contains__(
+                            predicate_opposite_copy):
+                            is_skip_proxy = True
+                            break
+
+                    else:  # if no negative preconditions are allowed by policy, so skip proxy
+                        if not predicate.is_positive:
+                            is_skip_proxy = True
+                            break
+
+                    # all ok add it to preconds
                     preconds_to_add.add(predicate)
-            if self.negative_preconditions_policy == NegativePreconditionPolicy.hard and any(
-                    not p.is_positive for p in preconds_to_add):
+
+            # check to see if the action needs to be skipped
+            if is_skip_proxy:
                 continue
+
+            # assemble proxy info
             proxy_signature_modified_param_dict = get_minimize_parameters_equality_dict(model_dict=model,
                                                                                 act_signature=act_signature,
                                                                                 domain_types=self.partial_domain.types)
 
             proxies.append((preconds_to_add, effect, proxy_signature_modified_param_dict))
 
-        if len(proxies) == 1:
+        self.add_lifted_action_instance(action_name, proxies)
+
+
+    def add_lifted_action_instance(self,
+                                   action_name: str,
+                                   proxies: list[tuple[set[Predicate], set[Predicate], dict[str, str]]]):
+        """
+        adds the lifted action additional information to the partial domain, if proxys are needed, the adds proxys to
+        the partial domain.
+        Args:
+            action_name: the name of the lifted action.
+            proxies: the proxies of the lifted action data, if len 1, no proxy needed.
+        """
+        proxy_preconds = 0
+        proxy_effects = 1
+        proxy_model_dict = 2
+
+        if len(proxies) == 1: # to avoid index in the action name if not needed
             self.partial_domain.actions[action_name].discrete_effects = proxies[0][proxy_effects]
             preconds: set[Predicate] = proxies[0][proxy_preconds]
             self.partial_domain.actions[action_name].preconditions.root.operands.update(preconds)
@@ -228,15 +296,27 @@ class ExtendedSamLearner(SAMLearner):
                 proxy_number+=1
             self.partial_domain.actions.pop(action_name)
 
-    def handle_negative_preconditions_policy(self):
+    def esam_handle_negative_preconditions_policy(self):
         for action_name in self.partial_domain.actions.keys():
-            if self.negative_preconditions_policy != NegativePreconditionPolicy.no_remove:
+            if self.negative_preconditions_policy in [NegativePreconditionPolicy.hard,
+                                                      NegativePreconditionPolicy.hard_but_allow_proxy]:
                 preconds_to_keep = set()
                 for precond in self.partial_domain.actions[action_name].preconditions.root.operands:
                     if precond.is_positive:
                         preconds_to_keep.add(precond)
                 self.partial_domain.actions[action_name].preconditions.root.operands = preconds_to_keep
 
+    def handle_observations(self, observations: list[Observation]):
+        """
+        Handles observations from input, invokes learning methods prior to deducting effects by cnf.
+
+        Parameters:
+        observations (list[Observation]): List of Observation to learn from.
+        """
+        for observation in observations:
+            self.current_trajectory_objects = observation.grounded_objects
+            for component in observation.components:
+                self.handle_single_trajectory_component(component)
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
@@ -244,18 +324,17 @@ class ExtendedSamLearner(SAMLearner):
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
-        for observation in observations:
-            self.current_trajectory_objects = observation.grounded_objects
-            for component in observation.components:
-                self.handle_single_trajectory_component(component)
-        # todo add logic of action creation using nnf models for creating proxy actions
-        # note that creating will reset all of the actions effects and precondition due to cnf solver usage.
+
+        self.handle_observations(observations)
+
+        # note that creating will reset all the actions effects and precondition due to cnf solver usage.
         self.logger.debug("creating updated actions")
         #build all cnf sentences for action's effects
-        self.handle_negative_preconditions_policy()
+        self.esam_handle_negative_preconditions_policy()
         self.build_cnf_formulas()
         for action_name in self.observed_actions:
-            self.create_proxy_actions(action_name)
+            self.create_lifted_action_data(action_name)
+        self.handle_negative_preconditions_policy()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
 
@@ -267,7 +346,7 @@ def get_minimize_parameters_equality_dict(model_dict: dict[Hashable, bool],
     the method computes the minimization of parameter list
     Args:
         act_signature: the signature of the action
-        model_dict: represents the cnf, maps each literal to its grounded value
+        model_dict: represents the cnf, maps each literal to its value in the cnf formula solution
         domain_types: the domain types
     Returns:
         a dictionary mapping each original param act ind_ to the new actions minimized parameter list
@@ -339,6 +418,9 @@ def get_minimize_parameters_equality_dict(model_dict: dict[Hashable, bool],
 
 def modify_predicate_signature(predicates: set[Predicate],
                          param_dict: dict[str, str]) -> set[Predicate]:
+    """
+    modifies a set of predicates to fit the proxy minimized parameter list if minimization is needed
+    """
     new_set: set[Predicate] = set()
     for predicate in predicates:
         new_signature: dict[str, PDDLType] = {
