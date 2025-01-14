@@ -55,6 +55,7 @@ class SAMLearner:
         self.learning_start_time = 0
         self.learning_end_time = 0
         self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
+        self._action_signatures = {action_name: action.signature for action_name, action in partial_domain.actions.items()}
         self.negative_preconditions_policy = negative_preconditions_policy
         self.is_esam = is_esam
 
@@ -305,9 +306,8 @@ class SAMLearner:
         """
         self.logger.info("Starting to learn the action model!")
         self.start_measure_learning_time()
-        if not self.is_esam:
-            self.deduce_initial_inequality_preconditions()
-            self._complete_possibly_missing_actions()
+        self.deduce_initial_inequality_preconditions()
+        self._complete_possibly_missing_actions()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
@@ -318,8 +318,7 @@ class SAMLearner:
 
         self.construct_safe_actions()
         self._remove_unobserved_actions_from_partial_domain()
-        if not self.is_esam:
-            self.handle_negative_preconditions_policy()
+        self.handle_negative_preconditions_policy()
         self.end_measure_learning_time()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
