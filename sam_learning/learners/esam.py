@@ -49,7 +49,7 @@ class DisjointSet:  # this class was taken from geeksForGeeks
         # Else if their ranks are the same
         else:
             # Move i under j (doesn't matter which one goes where)
-            self.parent[irep] = jrep
+            self.parent[jrep] = irep
             # Increment the result tree's rank by 1
             self.rank[jrep] += 1
 
@@ -133,7 +133,6 @@ class ExtendedSamLearner(SAMLearner):
         # extract predicated who are surely not an effect
         not_eff_set = self.get_surely_not_eff(previous_state, next_state, grounded_action)
         self.vars_to_forget[observed_action.name] = not_eff_set
-
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
 
@@ -325,15 +324,17 @@ class ExtendedSamLearner(SAMLearner):
         """
         self.logger.info("Starting to learn the action model!")
 
+        self._complete_possibly_missing_actions()
         self.handle_observations(observations)
-
         # note that creating will reset all the actions effects and precondition due to cnf solver usage.
         self.logger.debug("creating updated actions")
         #build all cnf sentences for action's effects
         self.esam_handle_negative_preconditions_policy()
+        self._remove_unobserved_actions_from_partial_domain()
         self.build_cnf_formulas()
         for action_name in self.observed_actions:
             self.create_lifted_action_data(action_name)
+
         self.handle_negative_preconditions_policy()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
@@ -398,13 +399,16 @@ def get_minimize_parameters_equality_dict(model_dict: dict[Hashable, bool],
     for i in set(range(num_of_act_params)).difference(not_to_minimize):
         for f, set_list in ind_occ.items():
             for sett in set_list:
-                if i in sett:
+                set_as_sorted_list = list(sett)
+                set_as_sorted_list.sort()
+                if i in set_as_sorted_list:
                     for j in sett:
                         ind_sets.union_by_rank(i, j)
 
     ret_dict_by_indexes: dict[int, int] = dict()
     ugly_inds: list[int] = list({ind_sets.find(i) for i in range(len(param_index_in_action.keys()))})
     ugly_inds.sort()
+
     for i in range(len(param_index_in_action.keys())):
         ret_dict_by_indexes[i] = ugly_inds.index(ind_sets.find(i))
 
