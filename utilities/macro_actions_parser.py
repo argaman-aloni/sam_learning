@@ -1,5 +1,6 @@
 import re
 from typing import List, Set, Dict, Tuple
+from uuid import uuid4
 
 from pddl_plus_parser.models import Predicate, SignatureType, PDDLType
 
@@ -29,9 +30,18 @@ class MacroActionParser:
         return type2
 
     @staticmethod
-    def generate_macro_action_name(action_names: List[str]) -> str:
-        """ function to generate a name for macro actions given the names of the actions """
-        return "-".join(action_names)
+    def generate_macro_action_name(action_names: List[str], other_macro_actions: List[str]) -> str:
+        """function to generate a name for macro actions given the names of the actions.
+
+        :param action_names: the names of the actions that compose the macro action.
+        :param other_macro_actions: the names of the other macro actions in the domain.
+        :return: a unique name for the macro action.
+        """
+        name_candidate = "-".join(action_names)
+        if name_candidate not in other_macro_actions:
+            return name_candidate
+
+        return f"{name_candidate}---{uuid4()}"
 
     @staticmethod
     def generate_macro_action_signature(actions: Set[LearnerAction], mapping: BindingType) -> SignatureType:

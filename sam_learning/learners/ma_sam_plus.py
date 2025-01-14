@@ -153,13 +153,15 @@ class MASAMPlus(MultiAgentSAM):
         """Constructs the multi-agent-plus macro actions that are safe to execute."""
         action_groups = self.extract_relevant_action_groups()
 
+        macro_action_names = []
         for action_group in action_groups:
             action_group_names = sorted([action.name for action in action_group])
             parameter_groupings = self.extract_relevant_parameter_groupings(action_group_names)
             for parameter_grouping in parameter_groupings:
                 mapper = MacroActionParser.generate_macro_mappings(parameter_grouping, action_group)
 
-                macro_action_name = MacroActionParser.generate_macro_action_name(action_group_names)
+                macro_action_name = MacroActionParser.generate_macro_action_name(action_group_names, macro_action_names)
+                macro_action_names.append(macro_action_name)
                 macro_action_signature = MacroActionParser.generate_macro_action_signature(action_group, mapper)
                 macro_action_preconditions = self.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapper)
                 macro_action_effects = self.extract_effects_for_macro_from_cnf(action_group, parameter_grouping, mapper)
