@@ -4,6 +4,7 @@ from pytest import fixture
 
 from sam_learning.core import LiteralCNF, group_params_from_clause
 from sam_learning.learners import MASAMPlus, combine_groupings
+from sam_learning.learners.ma_sam_plus import generate_supersets_of_actions
 
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0", "spray-varnisher0"]
 ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
@@ -132,7 +133,7 @@ def test_extract_relevant_action_groups_with_observed_actions_with_unsafe_action
     ]
 
     assert all(action_group in expected_names for action_group in action_groups_names)
-    assert len(action_groups) == 4
+    assert len(action_groups) >= 4
 
 
 def test_extract_relevant_parameter_groupings_with_existing_action_group_returns_valid_parameter_groupings(
@@ -385,3 +386,27 @@ def test_combine_groupings_with_all_shared_elements_returns_grouping_with_one_ma
     ]
     expected_output = {("navigate", "?x"), ("go", "?y"), ("arrive", "?z"), ("fly", "?w")}
     assert combine_groupings(groupings) == [expected_output]
+
+
+def test_generate_supersets_does_not_change_original_set_if_cannot_create_supersets():
+    # Test 1: Basic Functionality
+    original_sets = [{"1", "2"}]
+    result = generate_supersets_of_actions(original_sets)
+    expected = [{"1", "2"}]  # The original set and all its supersets
+    assert sorted(result, key=lambda x: (len(x), x)) == sorted(expected, key=lambda x: (len(x), x)), "Test failed!"
+
+
+def test_generate_supersets_creates_supersets_containing_unique_objects_only():
+    # Test 1: Basic Functionality
+    original_sets = [{"1", "2"}, {"2", "3"}]
+    result = generate_supersets_of_actions(original_sets)
+    expected = [{"1", "2"}, {"2", "3"}, {"1", "2", "3"}]  # The original set and all its supersets
+    assert sorted(result, key=lambda x: (len(x), x)) == sorted(expected, key=lambda x: (len(x), x)), "Test failed!"
+
+
+def test_generate_supersets_does_not_break_original_sets_and_only_adds_new_sets_combining_all_the_original_strings():
+    # Test 1: Basic Functionality
+    original_sets = [{"1", "2"}, {"3", "4"}]
+    result = generate_supersets_of_actions(original_sets)
+    expected = [{"1", "2"}, {"3", "4"}, {"1", "2", "3", "4"}]  # The original set and all its supersets
+    assert sorted(result, key=lambda x: (len(x), x)) == sorted(expected, key=lambda x: (len(x), x)), "Test failed!"

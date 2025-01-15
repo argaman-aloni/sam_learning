@@ -87,7 +87,7 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
         plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
         handles, _ = plt.gca().get_legend_handles_labels()
         plt.legend(
-            [handles[idx] for idx in legend_order], ["SAM", "MA-SAM", "MA-SAM+"], loc="lower right", bbox_to_anchor=(1, 0), fontsize=28,
+            [handles[idx] for idx in legend_order], ["SAM", "MA-SAM", "MA-SAM+"], fontsize=28,
         )
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
@@ -106,7 +106,7 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
     axes[0].set_ylabel("Average % Solved", fontsize=24)
     handles, legend_labels = plt.gca().get_legend_handles_labels()
     axes[2].legend(
-        [handles[idx] for idx in legend_order], [legend_labels[idx] for idx in legend_order], loc="lower right", bbox_to_anchor=(1, 0), fontsize=24,
+        [handles[idx] for idx in legend_order], [legend_labels[idx] for idx in legend_order], fontsize=24,
     )
 
     plt.tight_layout()  # Adjust layout for legend

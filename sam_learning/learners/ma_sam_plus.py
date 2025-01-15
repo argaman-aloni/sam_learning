@@ -1,5 +1,5 @@
 """Module to learn action models with macro actions from multi-agent trajectories with joint actions."""
-from itertools import combinations
+from itertools import combinations, chain
 from typing import Dict, List, Tuple, Optional, Set
 
 import networkx as nx
@@ -28,6 +28,20 @@ def combine_groupings(grouping: List[set]) -> List[set]:
     maximal_grouping = list(nx.connected_components(grouping_graph))
     # Convert the set of tuples back to a list of sets
     return maximal_grouping
+
+
+def generate_supersets_of_actions(action_groups: List[Set[str]]) -> List[Set[str]]:
+    """Generate the superset of all possible action combinations for the macro-action construction.
+
+    :param action_groups: the action groups containing the actions that are relevant for the macro-action construction.
+    :return: a list of action groups and their supersets.
+    """
+    power_sets = []
+    for r in range(1, len(action_groups) + 1):
+        action_combinations = list(combinations(action_groups, r))
+        power_sets.extend([set(chain.from_iterable(a)) for a in action_combinations])
+
+    return power_sets
 
 
 class MASAMPlus(MultiAgentSAM):
@@ -70,12 +84,15 @@ class MASAMPlus(MultiAgentSAM):
                 clause_actions = {action_name for action_name, _ in clause}
 
                 if len(clause) > 1 and not self._unsafe_actions.isdisjoint(clause_actions):
-                    action_group = {action for action in self.partial_domain.actions.values() if action.name in clause_actions}
+                    action_group = {action.name for action in self.partial_domain.actions.values() if action.name in clause_actions}
 
                     if action_group not in action_groups:
                         action_groups.append(action_group)
 
-        return action_groups
+        super_set_groups = generate_supersets_of_actions(action_groups)
+
+        action_candidates = [{self.partial_domain.actions[action] for action in group} for group in super_set_groups]
+        return action_candidates
 
     def extract_relevant_parameter_groupings(self, action_group_names: List[str]) -> List[PGType]:
         """Extracts relevant parameter groups, that is, the parameters of the actions in the action group.
