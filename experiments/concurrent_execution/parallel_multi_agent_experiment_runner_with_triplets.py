@@ -17,6 +17,8 @@ from utilities import LearningAlgorithmType
 EXPERIMENT_TIMEOUT = os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT)
 MAX_NUM_ITERATIONS = 21
 MAX_TRIPLETS_FOR_EXPERIMENT = 5
+ROVERS_EXPERIMENT_MAX_TRIPLETS = 51
+ROVERS_TRIPLETS_PER_EXPERIMENT = 20
 
 
 class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimentRunner):
@@ -53,14 +55,25 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
         self._init_semantic_performance_calculator(fold_num)
         partial_domain = self.read_domain_file(train_set_dir_path)
         complete_train_set: List[MultiAgentObservation] = super().collect_observations(train_set_dir_path, partial_domain)
+        triplets_per_experiment = MAX_TRIPLETS_FOR_EXPERIMENT if partial_domain.name != "rover" else ROVERS_TRIPLETS_PER_EXPERIMENT
         transitions_based_training_set = self.create_transitions_based_training_set(
-            complete_train_set, num_triplets_per_testing=MAX_TRIPLETS_FOR_EXPERIMENT
+            complete_train_set, num_triplets_per_testing=triplets_per_experiment
         )
+        num_trivial_action_triplets = 0
+        num_non_trivial_action_triplets = 0
         allowed_observations = transitions_based_training_set
         if self._learning_algorithm == LearningAlgorithmType.sam_learning:
-            allowed_observations = [self._filter_baseline_single_agent_trajectory(observation) for observation in transitions_based_training_set]
+            allowed_observations = []
+            for observation in transitions_based_training_set:
+                filtered_observation, num_trivial_triplets, num_non_trivial_triplets = self._filter_baseline_single_agent_trajectory(observation)
+                allowed_observations.append(filtered_observation)
+                num_trivial_action_triplets += num_trivial_triplets
+                num_non_trivial_action_triplets += num_non_trivial_triplets
 
-        for index in range(1, MAX_NUM_ITERATIONS):  # we want to run the experiments with up to 100 triplets
+            self._export_dataset_statistics(fold_num, num_trivial_action_triplets, num_non_trivial_action_triplets)
+
+        iterations_to_run = MAX_NUM_ITERATIONS if partial_domain.name != "rover" else ROVERS_EXPERIMENT_MAX_TRIPLETS
+        for index in range(1, iterations_to_run):  # we want to run the experiments with up to 100 triplets
             if self._learning_algorithm == LearningAlgorithmType.sam_learning:
                 self._learn_model_offline(
                     [*transitions_based_training_set[0:index]],

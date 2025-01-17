@@ -44,14 +44,29 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
         )
 
-    def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Observation:
+    def _export_dataset_statistics(self, fold_num: int, num_trivial_action_triplets: int, num_non_trivial_action_triplets: int) -> None:
+        """Exports the number of trivial and non-trivial action triplets to a file.
+
+        :param fold_num: the number of the fold that is currently running.
+        :param num_trivial_action_triplets: the number of trivial action triplets.
+        :param num_non_trivial_action_triplets: the number of non-trivial action triplets.
+        """
+        dataset_statistics_file_path = self.working_directory_path / "results_directory" / f"dataset_statistics_{fold_num}.txt"
+        with open(dataset_statistics_file_path, "wt") as dataset_statistics_file:
+            dataset_statistics_file.write(f"Number of trivial action triplets: {num_trivial_action_triplets}\n")
+            dataset_statistics_file.write(f"Number of non-trivial action triplets: {num_non_trivial_action_triplets}\n")
+            dataset_statistics_file.write(f"Ration: {num_trivial_action_triplets / num_non_trivial_action_triplets}\n")
+
+    def _filter_baseline_single_agent_trajectory(self, complete_observation: MultiAgentObservation) -> Tuple[Observation, int, int]:
         """Create a single agent observation from a multi-agent observation.
 
         :param complete_observation: the multi-agent observation to filter.
-        :return: the filtered single agent observation.
+        :return: the filtered single agent observation and some additional statistics on the dataset.
         """
         filtered_observation = Observation()
         filtered_observation.add_problem_objects(complete_observation.grounded_objects)
+        num_trivial_action_triplets = 0
+        num_non_trivial_action_triplets = 0
         for component in complete_observation.components:
             if component.grounded_joint_action.action_count > 1:
                 # since when using transitions the number of effective transitions matter to the learning process we will add the
@@ -60,6 +75,7 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
                     f"Adding the already existing component to the filtered observation - "
                     f"{component.previous_state.serialize()} -> {str(component.grounded_joint_action)} -> {component.next_state.serialize()}"
                 )
+                num_non_trivial_action_triplets += 1
                 if len(filtered_observation.components) > 0:
                     filtered_observation.add_component(
                         filtered_observation.components[-1].previous_state,
@@ -68,9 +84,10 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
                     )
                 continue
 
+            num_trivial_action_triplets += 1
             filtered_observation.add_component(component.previous_state, component.grounded_joint_action.operational_actions[0], component.next_state)
 
-        return filtered_observation
+        return filtered_observation, num_trivial_action_triplets, num_non_trivial_action_triplets
 
     def _validate_learned_domain_with_macro_actions(
         self,
@@ -149,36 +166,36 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         fold_num: int,
         single_agent_observations: Optional[List[Observation]] = None,
     ):
-        """
+        """Learns the agents' action model from the input trajectories.
 
-        :param allowed_observations:
-        :param partial_domain:
-        :param test_set_dir_path:
-        :param fold_num:
+        :param allowed_observations: the multi-agent observations to learn from.
+        :param partial_domain: the partial domain without the actions' preconditions and effects.
+        :param test_set_dir_path: the directory containing the test set problems in which the learned model should be used to solve.
+        :param fold_num: the number of the fold that is currently running.
+        :param single_agent_observations: the single agent observations to learn from.
         :return:
         """
+        policy = NegativePreconditionPolicy.no_remove
         if self._learning_algorithm in [LearningAlgorithmType.ma_sam, LearningAlgorithmType.sam_learning]:
-            for policy in NegativePreconditionPolicy:
-                if self._learning_algorithm == LearningAlgorithmType.sam_learning:
-                    learned_domain, learning_report = self._apply_multi_agent_learning_algorithms(partial_domain, single_agent_observations, policy)
+            if self._learning_algorithm == LearningAlgorithmType.sam_learning:
+                learned_domain, learning_report = self._apply_multi_agent_learning_algorithms(partial_domain, single_agent_observations, policy)
 
-                else:
-                    learned_domain, learning_report = self._apply_multi_agent_learning_algorithms(partial_domain, allowed_observations, policy)
+            else:
+                learned_domain, learning_report = self._apply_multi_agent_learning_algorithms(partial_domain, allowed_observations, policy)
 
-                self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_domain, learning_report, policy=policy)
-                learned_domain_path = self.validate_learned_domain(
-                    allowed_observations, learned_domain, test_set_dir_path, fold_num, float(learning_report["learning_time"]), policy
-                )
-                self.semantic_performance_calc.calculate_performance_for_ma_sam_experiments(learned_domain_path, len(allowed_observations), policy)
+            self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_domain, learning_report, policy=policy)
+            learned_domain_path = self.validate_learned_domain(
+                allowed_observations, learned_domain, test_set_dir_path, fold_num, float(learning_report["learning_time"]), policy
+            )
+            self.semantic_performance_calc.calculate_performance_for_ma_sam_experiments(learned_domain_path, len(allowed_observations), policy)
 
         else:
-            for policy in NegativePreconditionPolicy:
-                learned_domain, learning_report, mapping = self._apply_ma_sam_plus_algorithm(
-                    allowed_observations=allowed_observations, partial_domain=partial_domain, policy=policy
-                )
-                self._validate_learned_domain_with_macro_actions(
-                    allowed_observations, learned_domain, test_set_dir_path, fold_num, float(learning_report["learning_time"]), policy, mapping
-                )
+            learned_domain, learning_report, mapping = self._apply_ma_sam_plus_algorithm(
+                allowed_observations=allowed_observations, partial_domain=partial_domain, policy=policy
+            )
+            self._validate_learned_domain_with_macro_actions(
+                allowed_observations, learned_domain, test_set_dir_path, fold_num, float(learning_report["learning_time"]), policy, mapping
+            )
 
         self.logger.info(f"Finished the learning phase for the fold - {fold_num} and {len(allowed_observations)} observations!")
 
@@ -197,7 +214,7 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         multi_agent_observations: List[MultiAgentObservation] = super().collect_observations(train_set_dir_path, partial_domain)
         allowed_observations = multi_agent_observations
         if self._learning_algorithm == LearningAlgorithmType.sam_learning:
-            allowed_observations = [self._filter_baseline_single_agent_trajectory(observation) for observation in multi_agent_observations]
+            allowed_observations = [self._filter_baseline_single_agent_trajectory(observation)[0] for observation in multi_agent_observations]
             self._learn_model_offline(
                 multi_agent_observations, partial_domain, test_set_dir_path, fold_num, single_agent_observations=allowed_observations
             )
