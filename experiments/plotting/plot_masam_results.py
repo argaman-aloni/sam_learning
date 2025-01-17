@@ -79,7 +79,6 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
                 np.clip(group["avg_percent_ok"] + group["std_percent_ok"], 0, 100),
                 alpha=0.2,
             )
-        plt.title(f"Policy: {policy}", fontsize=28)
         plt.xlabel(f"# {'Trajectories' if not using_triplets else 'Triplets'}", fontsize=28)
         plt.ylabel("Average % Solved", fontsize=28)
         plt.tick_params(axis="both", which="major", labelsize=28)

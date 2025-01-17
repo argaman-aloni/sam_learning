@@ -153,15 +153,25 @@ class DistributedResultsCollector:
             writer.writeheader()
             writer.writerows(combined_semantic_performance_statistics_data)
 
-    def _collect_syntactic_performance_statistics(self, domain: Domain, exclude_algorithm: Optional[LearningAlgorithmType] = None) -> None:
+    def _collect_syntactic_performance_statistics(
+        self, domain: Domain, exclude_algorithm: Optional[LearningAlgorithmType] = None, using_triplets: bool = False
+    ) -> None:
         """Collects the syntactic performance statistics from the results directory.
 
         :param domain: the domain to collect the statistics for.
         """
         self.logger.info("Collecting the syntactic performance statistics from the results directory.")
-        combined_syntactic_performance_file_path = self.working_directory_path / "results_directory" / "syntactic_performance_combined_statistics.csv"
+        combined_syntactic_performance_file_path = (
+            self.working_directory_path / "results_directory" / "syntactic_performance_combined_statistics.csv"
+            if not using_triplets
+            else self.working_directory_path / "results_directory" / "syntactic_performance_combined_statistics_with_triplets.csv"
+        )
         combined_action_performance_statistics_data = []
-        action_performance_path_template = "{learning_algorithm}_" + domain.name + "_action_stats_fold_{fold}_{iteration}.csv"
+        action_performance_path_template = (
+            "{learning_algorithm}_" + domain.name + "_action_stats_fold_{fold}_{iteration}.csv"
+            if not using_triplets
+            else "{learning_algorithm}_" + domain.name + "_action_stats_fold_{fold}.csv"
+        )
         self._combine_statistics_data(
             action_performance_path_template, combined_action_performance_statistics_data, exclude_algorithm=exclude_algorithm
         )

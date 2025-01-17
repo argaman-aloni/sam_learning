@@ -198,13 +198,13 @@ class SingleIterationMultiAgentExperimentRunner(ParallelExperimentRunner):
         allowed_observations = multi_agent_observations
         if self._learning_algorithm == LearningAlgorithmType.sam_learning:
             allowed_observations = [self._filter_baseline_single_agent_trajectory(observation) for observation in multi_agent_observations]
-            # Execute the actual experiments
             self._learn_model_offline(
                 multi_agent_observations, partial_domain, test_set_dir_path, fold_num, single_agent_observations=allowed_observations
             )
 
-        # Execute the actual experiments
-        self._learn_model_offline(allowed_observations, partial_domain, test_set_dir_path, fold_num)
+        else:
+            self._learn_model_offline(allowed_observations, partial_domain, test_set_dir_path, fold_num)
+
         self.domain_validator.write_statistics(fold_num, iteration_number)
         if self._learning_algorithm in [LearningAlgorithmType.ma_sam, LearningAlgorithmType.sam_learning]:
             self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)

@@ -37,15 +37,25 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
     ):
         super().__init__(working_directory_path, domain_file_name, learning_algorithms, num_folds, iterations)
 
-    def _collect_semantic_performance_statistics(self, domain: Domain, exclude_algorithm: Optional[LearningAlgorithmType] = None) -> None:
+    def _collect_semantic_performance_statistics(
+        self, domain: Domain, exclude_algorithm: Optional[LearningAlgorithmType] = None, using_triplets: bool = False
+    ) -> None:
         """Collects the semantic performance statistics from the results directory.
 
         :param domain: the domain to collect the statistics for.
         """
         self.logger.info("Collecting the semantic performance statistics from the results directory.")
-        combined_semantic_performance_file_path = self.working_directory_path / "results_directory" / "semantic_performance_combined_statistics.csv"
+        combined_semantic_performance_file_path = (
+            self.working_directory_path / "results_directory" / "semantic_performance_combined_statistics.csv"
+            if not using_triplets
+            else self.working_directory_path / "results_directory" / "semantic_performance_combined_statistics_with_triplets.csv"
+        )
         combined_semantic_performance_statistics_data = []
-        file_path_template = "{learning_algorithm}_" + domain.name + "_{fold}_{iteration}_semantic_performance.csv"
+        file_path_template = (
+            "{learning_algorithm}_" + domain.name + "_{fold}_{iteration}_semantic_performance.csv"
+            if not using_triplets
+            else "{learning_algorithm}_" + domain.name + "_{fold}__semantic_performance.csv"
+        )
         self._combine_statistics_data(file_path_template, combined_semantic_performance_statistics_data, exclude_algorithm=exclude_algorithm)
         with open(combined_semantic_performance_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SEMANTIC_PRECISION_STATS])
@@ -55,7 +65,9 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
     def _collect_performance_statistics(self, exclude_algorithm: Optional[LearningAlgorithmType] = None) -> None:
         domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
         self._collect_semantic_performance_statistics(domain, exclude_algorithm=exclude_algorithm)
+        self._collect_semantic_performance_statistics(domain, exclude_algorithm=exclude_algorithm, using_triplets=True)
         self._collect_syntactic_performance_statistics(domain, exclude_algorithm=exclude_algorithm)
+        self._collect_syntactic_performance_statistics(domain, exclude_algorithm=exclude_algorithm, using_triplets=True)
         self.logger.info("Done collecting the statistics from the results directory!")
 
     def collect_multi_agent_statistics(self) -> None:
