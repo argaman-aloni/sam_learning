@@ -65,13 +65,12 @@ class SingleIterationTripletsNSAMExperimentRunner(SingleIterationNSAMExperimentR
     def _learn_model_offline(
         self, allowed_observations: List[Observation], partial_domain: Domain, test_set_dir_path: Path, fold_num: int,
     ):
-        """
+        """Applies the learning algorithm on the allowed observations.
 
-        :param allowed_observations:
-        :param partial_domain:
-        :param test_set_dir_path:
-        :param fold_num:
-        :return:
+        :param allowed_observations: the allowed observations to learn the action model from.
+        :param partial_domain: the partial domain without the actions' preconditions and effects.
+        :param test_set_dir_path: the path to the directory containing the test problems.
+        :param fold_num: the number of the fold that is currently running.
         """
         # For now, we are only interested in the no-remove policy.
         policy = NegativePreconditionPolicy.no_remove
