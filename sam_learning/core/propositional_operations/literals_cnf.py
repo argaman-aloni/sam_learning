@@ -39,8 +39,7 @@ def is_clause_consistent(clause: List[Tuple[str, str]], macro_action_group_names
 
 def group_params_from_clause(clause: List[Tuple[str, str]]) -> PGType:
     """
-    Processes a single clause, grouping parameters from different actions
-    by their index position in the match.
+    Processes a single clause, grouping parameters from different actions by their index position in the match.
     :param clause: A list of tuples of action and its associated fluent.
 
     Returns: Parameter Grouping, which is a list of groups. Each group consists of (action, parameter).

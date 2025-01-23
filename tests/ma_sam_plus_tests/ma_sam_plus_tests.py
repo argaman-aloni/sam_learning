@@ -2,7 +2,7 @@
 from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, MultiAgentComponent
 from pytest import fixture
 
-from sam_learning.core import LiteralCNF, group_params_from_clause
+from sam_learning.core import LiteralCNF
 from sam_learning.learners import MASAMPlus, combine_groupings
 from sam_learning.learners.ma_sam_plus import generate_supersets_of_actions
 
@@ -191,25 +191,6 @@ def test_extract_relevant_parameter_groupings_with_non_existing_action_group_ret
     assert len(parameter_grouping) == 0
 
 
-def test_group_params_from_clause_handles_non_unit_clause_returns_parameters_grouping_with_groups_consisting_of_several_actions():
-    clause = [("do-grind", "(m ?x ?y)"), ("do-plane", "(m ?x ?z)")]
-
-    group = group_params_from_clause(clause)
-    real_group = [{("do-grind", "?x"), ("do-plane", "?x")}, {("do-grind", "?y"), ("do-plane", "?z")}]
-
-    assert group == real_group
-
-
-def test_group_params_from_clause_handles_unit_clause_returns_parameters_grouping_with_groups_consisting_of_solo_actions():
-    clause = [
-        ("do-grind", "(m ?x ?y)"),
-    ]
-
-    group = group_params_from_clause(clause)
-
-    assert group == [{("do-grind", "?x")}, {("do-grind", "?y")}]
-
-
 def test_extract_effects_for_macro_from_cnf_returns_effects_adapted_to_macro_naming(
     rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall, ma_rovers_domain: Domain
 ):
@@ -386,6 +367,43 @@ def test_combine_groupings_with_all_shared_elements_returns_grouping_with_one_ma
     ]
     expected_output = {("navigate", "?x"), ("go", "?y"), ("arrive", "?z"), ("fly", "?w")}
     assert combine_groupings(groupings) == [expected_output]
+
+
+def test_combine_groupings_when_there_are_multiple_parameters_mapped_to_the_same_binding_returns_a_single_option_that_matches_everything():
+    # All sets should merge into one big set.
+    groupings = [
+        {("a1", "?x"), ("a2", "?w"), ("a3", "?m")},
+        {("a1", "?x"), ("a3", "?m")},
+        {("a2", "?w"), ("a1", "?x")},
+        {("a1", "?x"), ("a4", "?q")},
+    ]
+    expected_output = {("a1", "?x"), ("a2", "?w"), ("a3", "?m"), ("a4", "?q")}
+    assert combine_groupings(groupings) == [expected_output]
+
+
+def test_combine_groupings_when_there_are_multiple_parameters_mapped_to_the_same_binding_returns_a_single_option_that_matches_everything_paper_example():
+    # All sets should merge into one big set.
+    groupings = [
+        {("a1", "?x"), ("a2", "?w")},
+        {("a1", "?y")},
+        {("a2", "?q"), ("a1", "?z")},
+    ]
+    assert combine_groupings(groupings) == [{("a1", "?x"), ("a2", "?w")}, {("a1", "?y")}, {("a2", "?q"), ("a1", "?z")}]
+
+
+def test_combine_groupings_when_there_are_multiple_parameters_when_there_are_two_literals_that_share_the_same_actions_should_return_a_union_of_all_the_bindings():
+    # All sets should merge into one big set.
+    # First literal is maps the actions a1 and a2 to the same binding
+    # Second literal maps a1 to a bew action a3 with the similar parameters
+    groupings = [
+        {("a1", "?x"), ("a2", "?w")},
+        {("a1", "?y")},
+        {("a2", "?q"), ("a1", "?z")},
+        {("a3", "?m"), ("a1", "?x")},
+        {("a1", "?y")},
+        {("a1", "?z")},
+    ]
+    assert combine_groupings(groupings) == [{("a1", "?x"), ("a2", "?w"), ("a3", "?m")}, {("a1", "?y")}, {("a2", "?q"), ("a1", "?z")}]
 
 
 def test_generate_supersets_does_not_change_original_set_if_cannot_create_supersets():

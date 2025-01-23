@@ -64,14 +64,17 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
         allowed_observations = transitions_based_training_set
         if self._learning_algorithm == LearningAlgorithmType.sam_learning:
             allowed_observations = []
+            # create the allowed observations for the SAM learning algorithm
             for observation in transitions_based_training_set:
                 filtered_observation, num_trivial_triplets, num_non_trivial_triplets = self._filter_baseline_single_agent_trajectory(observation)
                 allowed_observations.append(filtered_observation)
                 num_trivial_action_triplets += num_trivial_triplets
                 num_non_trivial_action_triplets += num_non_trivial_triplets
 
+            # export the dataset statistics (the number of trivial and non-trivial triplets)
             self._export_dataset_statistics(fold_num, num_trivial_action_triplets, num_non_trivial_action_triplets)
 
+        # run the experiments with up to 100 triplets
         iterations_to_run = MAX_NUM_ITERATIONS if partial_domain.name != "rover" else ROVERS_EXPERIMENT_MAX_TRIPLETS
         for index in range(1, iterations_to_run):  # we want to run the experiments with up to 100 triplets
             if self._learning_algorithm == LearningAlgorithmType.sam_learning:

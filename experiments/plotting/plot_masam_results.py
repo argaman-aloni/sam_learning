@@ -33,7 +33,7 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
     # Reset color index for consistent color usage across all subplots
     colorblind_palette = sns.color_palette("colorblind", n_colors=len(grouped_data["learning_algorithm"].unique()))
 
-    for i, policy in enumerate(["no remove", "soft", "hard"]):
+    for i, policy in enumerate(["no remove"]):
         ax = axes[i]
         policy_data = grouped_data[grouped_data["policy"] == policy]
         unique_combinations = policy_data.groupby(["learning_algorithm"])
@@ -79,6 +79,7 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
                 np.clip(group["avg_percent_ok"] + group["std_percent_ok"], 0, 100),
                 alpha=0.2,
             )
+
         plt.xlabel(f"# {'Trajectories' if not using_triplets else 'Triplets'}", fontsize=28)
         plt.ylabel("Average % Solved", fontsize=28)
         plt.tick_params(axis="both", which="major", labelsize=28)
@@ -101,15 +102,6 @@ def plot_solving_results(file_path: Path, output_file_path: Path, using_triplets
         ax.set_xlabel(f"# {'Trajectories' if not using_triplets else 'Triplets'}", fontsize=24)
         ax.set_ylim(0, 100)
         ax.grid(True, alpha=0.3)
-
-    axes[0].set_ylabel("Average % Solved", fontsize=24)
-    handles, legend_labels = plt.gca().get_legend_handles_labels()
-    axes[2].legend(
-        [handles[idx] for idx in legend_order], [legend_labels[idx] for idx in legend_order], fontsize=24,
-    )
-
-    plt.tight_layout()  # Adjust layout for legend
-    plt.savefig(output_file_path, dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":

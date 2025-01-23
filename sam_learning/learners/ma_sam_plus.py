@@ -8,21 +8,37 @@ from pddl_plus_parser.models import Predicate, Domain, MultiAgentObservation, Co
 from sam_learning.core import LearnerDomain, LearnerAction, extract_predicate_data, PGType, group_params_from_clause
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 from utilities import NegativePreconditionPolicy, MacroActionParser, BindingType, MappingElement
+import matplotlib.pyplot as plt
 
 
-def combine_groupings(grouping: List[set]) -> List[set]:
+def visualize_grouping_graph(grouping_graph: nx.Graph) -> None:
+    """Plots the binding graph.
+
+    :param grouping_graph: the graph containing the binding groups.
+    """
+    plt.figure(figsize=(8, 6))
+    pos = nx.spring_layout(grouping_graph)  # Layout for visualization
+    nx.draw(grouping_graph, pos, with_labels=True, node_color="lightblue", edge_color="gray", node_size=1500, font_size=12)
+    plt.title("Graph Representation of Groupings")
+    plt.show()
+
+
+def combine_groupings(binding_groups_sets: PGType, should_plot: bool = False) -> PGType:
     """
     Combine sets that share common elements across all groupings into new groupings.
     """
     grouping_graph = nx.Graph()
 
     # For each group, add edges between all tuples in that group
-    for group in grouping:
-        if len(group) > 1:
-            for node1, node2 in combinations(group, 2):
+    for action_binding_set in binding_groups_sets:
+        if len(action_binding_set) > 1:
+            for node1, node2 in combinations(action_binding_set, 2):
                 grouping_graph.add_edge(node1, node2)  # Connect nodes (tuples)
         else:
-            grouping_graph.add_node(next(iter(group)))  # takes first element
+            grouping_graph.add_node(next(iter(action_binding_set)))  # takes first element
+
+    if should_plot:
+        visualize_grouping_graph(grouping_graph)
 
     # Find the connected components (merged sets)
     maximal_grouping = list(nx.connected_components(grouping_graph))

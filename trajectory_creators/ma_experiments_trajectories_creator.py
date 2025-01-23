@@ -59,7 +59,7 @@ class MAExperimentTrajectoriesCreator:
         enhanced_trajectories_folder = output_folder / ENHANCED_DATASET_FOLDER
         regular_trajectories_folder.mkdir(parents=True, exist_ok=True)
         enhanced_trajectories_folder.mkdir(parents=True, exist_ok=True)
-        regular_domain_path, enhanced_domain_path = self._export_domains(output_folder)
+        regular_domain_path, enhanced_domain_path = self._export_domains(problems_directory=problems_directory, output_folder=output_folder)
         for problem_folder in problems_directory.glob("*"):
             self.logger.info(f"Creating trajectories for {problem_folder.stem}")
             problem_converter = MultiAgentProblemsConverter(working_directory_path=problem_folder, problem_file_prefix="problem")
