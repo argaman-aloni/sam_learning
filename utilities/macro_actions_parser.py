@@ -1,11 +1,12 @@
 import re
 from typing import List, Set, Dict, Tuple
+from uuid import uuid4
 
 from pddl_plus_parser.models import Predicate, SignatureType, PDDLType
 
 from sam_learning.core import LearnerAction
 
-BindingType = Dict[tuple[str, str], str]
+BindingType = Dict[Tuple[str, str], str]
 MappingElement = Tuple[List[str], BindingType]
 
 
@@ -29,9 +30,18 @@ class MacroActionParser:
         return type2
 
     @staticmethod
-    def generate_macro_action_name(action_names: List[str]) -> str:
-        """ function to generate a name for macro actions given the names of the actions """
-        return "-".join(action_names)
+    def generate_macro_action_name(action_names: List[str], other_macro_actions: List[str]) -> str:
+        """function to generate a name for macro actions given the names of the actions.
+
+        :param action_names: the names of the actions that compose the macro action.
+        :param other_macro_actions: the names of the other macro actions in the domain.
+        :return: a unique name for the macro action.
+        """
+        name_candidate = "-".join(action_names)
+        if name_candidate not in other_macro_actions:
+            return name_candidate
+
+        return f"{name_candidate}---{uuid4()}"
 
     @staticmethod
     def generate_macro_action_signature(actions: Set[LearnerAction], mapping: BindingType) -> SignatureType:
@@ -78,7 +88,7 @@ class MacroActionParser:
         return predicate_copy
 
     @staticmethod
-    def generate_macro_mappings(groupings: List[set], lma_set: set[LearnerAction]) -> BindingType:
+    def generate_macro_mappings(groupings: List[set], lma_set: Set[LearnerAction]) -> BindingType:
         """
         returns a mapping between macro action names and macro action names
         the orders of the keys conveys important information:
@@ -102,7 +112,7 @@ class MacroActionParser:
         return param_bindings
 
     @staticmethod
-    def extract_actions_from_macro_action(action_line: str, mapper) -> set[str]:
+    def extract_actions_from_macro_action(action_line: str, mapper: Dict[str, MappingElement]) -> Set[str]:
         """
         This function replaces a single line consisting of macro action, with several micro actions.
 

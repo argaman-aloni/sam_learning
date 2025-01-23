@@ -11,20 +11,11 @@ from experiments.cluster_scripts.common import (
     EXPERIMENTS_CONFIG_STR,
     create_all_experiments_folders,
     submit_job_and_validate_execution,
+    create_execution_arguments,
 )
 
 signal.signal(signal.SIGINT, sigint_handler)
-
-
-def create_execution_arguments(experiment, fold, compared_version):
-    arguments = []
-    arguments.append(f"--fold_number {fold}")
-    arguments.append(f"--learning_algorithm {compared_version}")
-    for key, value in experiment.items():
-        if key != "compared_versions" and key != "parallelization_data":
-            arguments.append(f"--{key} {value}")
-
-    return arguments
+learning_algorithms_map = {1: "sam", 7: "ma-sam", 25: "ma-sam+"}
 
 
 def main():
@@ -59,11 +50,28 @@ def main():
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                     print(
-                        f"{formatted_date_time} - submitted job for the multi-agent experiments with sid {sid} for domain {experiment['domain_file_name']} fold {fold} and iteration {internal_iteration}."
+                        f"{formatted_date_time} - submitted job for the multi-agent experiments with sid {sid} for algorithm {learning_algorithms_map[compared_version]} for domain {experiment['domain_file_name']} fold {fold} and iteration {internal_iteration}."
                     )
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
+
+                print("Creating the job to run the experiment with triplets instead of trajectories.")
+                sid = submit_job_and_validate_execution(
+                    code_directory,
+                    configurations,
+                    experiment,
+                    fold,
+                    arguments,
+                    environment_variables,
+                    f"triplets_{experiment['domain_file_name']}_{fold}_multi_agent_experiment_runner",
+                    None,
+                    python_file=f"{code_directory}/parallel_multi_agent_experiment_runner_with_triplets.py",
+                )
+                formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+                print(
+                    f"{formatted_date_time} - submitted job to run experiment for triplets with sid {sid} for algorithm {learning_algorithms_map[compared_version]} and fold {fold}."
+                )
 
             time.sleep(5)
 

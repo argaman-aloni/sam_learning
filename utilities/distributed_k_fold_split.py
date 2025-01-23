@@ -58,14 +58,16 @@ class DistributedKFoldSplit:
         fold_index: int,
         learning_algorithm: int,
         internal_iteration: Optional[int] = None,
+        additional_suffix: str = "",
     ) -> Tuple[Path, Path]:
         """Creates the content of the train and test set directories."""
         fold_train_dir_path = (
-            self.train_set_dir_path / f"fold_{fold_index}_{learning_algorithm}"
+            self.train_set_dir_path / f"fold_{fold_index}_{learning_algorithm}{additional_suffix}"
             f"{f'_{internal_iteration}' if internal_iteration is not None else ''}"
         )
         fold_test_dir_path = (
-            self.test_set_dir_path / f"fold_{fold_index}_{learning_algorithm}" f"{f'_{internal_iteration}' if internal_iteration is not None else ''}"
+            self.test_set_dir_path / f"fold_{fold_index}_{learning_algorithm}{additional_suffix}"
+            f"{f'_{internal_iteration}{additional_suffix}' if internal_iteration is not None else ''}"
         )
         fold_train_dir_path.mkdir(exist_ok=True)
         fold_test_dir_path.mkdir(exist_ok=True)
@@ -105,6 +107,16 @@ class DistributedKFoldSplit:
                     )
 
                 training_data["internal_iterations"][int(num_used_trajectories)] = [str(p.absolute()) for p in selected_trajectories]
+
+            max_dataset_size = self._internal_iterations[-1]
+            for learning_algorithm in self._learning_algorithms:
+                self.create_directories_content(
+                    test_set_problems=test_set_problems,
+                    selected_training_trajectories=train_set_trajectories[:max_dataset_size],
+                    fold_index=fold_index,
+                    learning_algorithm=learning_algorithm,
+                    additional_suffix="_triplets",
+                )
 
             folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
                 "train": training_data,
@@ -146,6 +158,17 @@ class DistributedKFoldSplit:
                         )
 
                 self.logger.debug("Finished creating fold!")
+                # creating the folder to be used for the triplets based experiments
+                largest_iteration = max([int(i) for i in fold_content["train"]["internal_iterations"].keys()])
+                relevant_paths = [Path(p) for p in fold_content["train"]["internal_iterations"][str(largest_iteration)]]
+                for learning_algorithm in self._learning_algorithms:
+                    self.create_directories_content(
+                        test_set_problems=fold_content["test"],
+                        selected_training_trajectories=relevant_paths,
+                        fold_index=index,
+                        learning_algorithm=learning_algorithm,
+                        additional_suffix="_triplets",
+                    )
 
             return
 

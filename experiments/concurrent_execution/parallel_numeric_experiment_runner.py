@@ -27,12 +27,14 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         learning_algorithm: LearningAlgorithmType,
         fluents_map_path: Optional[Path],
         problem_prefix: str = "pfile",
+        running_triplets_experiment: bool = False,
     ):
         super().__init__(
             working_directory_path=working_directory_path,
             domain_file_name=domain_file_name,
             learning_algorithm=learning_algorithm,
             problem_prefix=problem_prefix,
+            running_triplets_experiment=running_triplets_experiment,
         )
         self.fluents_map = None
         if fluents_map_path is not None:
@@ -60,19 +62,6 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             partial_domain=partial_domain, polynomial_degree=self.polynom_degree, relevant_fluents=self.fluents_map
         )
         return learner.learn_action_model(allowed_observations)
-
-    def run_fold_iteration(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int) -> None:
-        """Runs the numeric action model learning algorithms on the input fold.
-
-        :param fold_num: the number of the fold to run.
-        :param train_set_dir_path: the path to the directory containing the training set problems.
-        :param test_set_dir_path: the path to the directory containing the test set problems.
-        :param iteration_number: the current iteration number.
-        """
-        self.logger.info(f"Running fold {fold_num} iteration {iteration_number}")
-        self._init_semantic_performance_calculator(fold_num)
-        self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path, iteration_number)
-        self.domain_validator.clear_statistics()
 
 
 def parse_arguments() -> argparse.Namespace:

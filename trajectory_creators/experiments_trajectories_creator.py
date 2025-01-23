@@ -11,6 +11,7 @@ from utilities import SolverType
 
 class ExperimentTrajectoriesCreator:
     """Class responsible for creating the trajectories that will be used in the experiments."""
+
     domain_file_name: str
     working_directory_path: Path
     logger: logging.Logger
@@ -57,10 +58,8 @@ class ExperimentTrajectoriesCreator:
                 continue
 
 
-if __name__ == '__main__':
-    trajectory_creator = ExperimentTrajectoriesCreator(
-        domain_file_name=sys.argv[1],
-        working_directory_path=Path(sys.argv[2]))
+if __name__ == "__main__":
+    trajectory_creator = ExperimentTrajectoriesCreator(domain_file_name=sys.argv[1], working_directory_path=Path(sys.argv[2]))
     selected_solver = SolverType.enhsp
     trajectory_creator.fix_solution_files(selected_solver)
     trajectory_creator.create_domain_trajectories()

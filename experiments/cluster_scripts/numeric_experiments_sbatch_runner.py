@@ -13,10 +13,11 @@ from experiments.cluster_scripts.common import (
     create_all_experiments_folders,
     EXPERIMENTS_CONFIG_STR,
     submit_job_and_validate_execution,
+    create_execution_arguments,
 )
-from experiments.cluster_scripts.multi_agent_experiments_sbatch_runner import create_execution_arguments
 
 signal.signal(signal.SIGINT, sigint_handler)
+learning_algorithms_map = {3: "nsam", 15: "naive_nsam"}
 
 
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids, internal_iterations):
@@ -75,10 +76,29 @@ def main():
 
                     experiment_sids.append(sid)
                     formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-                    print(f"{formatted_date_time} - submitted job with sid {sid} for fold {fold} and iteration {internal_iteration}.")
+                    print(
+                        f"{formatted_date_time} - submitted job with sid {sid} for algorithm {learning_algorithms_map[compared_version]} fold {fold} and iteration {internal_iteration}."
+                    )
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
+
+                print("Creating the job to run the experiment with triplets instead of trajectories.")
+                sid = submit_job_and_validate_execution(
+                    code_directory,
+                    configurations,
+                    experiment,
+                    fold,
+                    arguments,
+                    environment_variables,
+                    f"triplets_numeric_{experiment['domain_file_name']}_{fold}_experiment_runner",
+                    None,
+                    python_file=f"{code_directory}/parallel_numeric_experiment_runner_with_triplets.py",
+                )
+                formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+                print(
+                    f"{formatted_date_time} - submitted job to run experiment for triplets with sid {sid} for algorithm {learning_algorithms_map[compared_version]} and fold {fold}."
+                )
 
             time.sleep(5)
 

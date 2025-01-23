@@ -2,7 +2,7 @@
 import csv
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 
 import sklearn
 from pddl_plus_parser.lisp_parsers import DomainParser
@@ -106,15 +106,16 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
 
         self.logger.info(f"Finished calculating the numeric learning performance for {self.learning_algorithm.name}.")
 
-    def export_semantic_performance(self, fold_num: int, iteration_num: int = 0) -> None:
+    def export_semantic_performance(self, fold_num: int, iteration_num: Optional[int] = None) -> None:
         """Export the numeric learning statistics to a CSV report file.
 
         :param fold_num: the fold number of the current experiment.
         :param iteration_num: the iteration number of the current experiment.
         """
+        iteration_suffix = f"_{iteration_num}" if iteration_num is not None else ""
         statistics_path = (
             self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}"
-            f"_numeric_learning_performance_stats_fold_{fold_num}_{iteration_num}.csv"
+            f"_numeric_learning_performance_stats_fold_{fold_num}{iteration_suffix}.csv"
         )
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=NUMERIC_PERFORMANCE_STATS)

@@ -96,6 +96,17 @@ def setup_experiments_folds_job(
     return fold_creation_sid
 
 
+def create_execution_arguments(experiment, fold, compared_version):
+    arguments = []
+    arguments.append(f"--fold_number {fold}")
+    arguments.append(f"--learning_algorithm {compared_version}")
+    for key, value in experiment.items():
+        if key != "compared_versions" and key != "parallelization_data":
+            arguments.append(f"--{key} {value}")
+
+    return arguments
+
+
 def create_internal_iterations_list(parallelization_data):
     max_train_size = (
         int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
@@ -197,13 +208,13 @@ def submit_job(
 
 
 def submit_job_and_validate_execution(
-    code_directory, configurations, experiment, fold, arguments, environment_variables, job_name, fold_creation_sid=None
+    code_directory, configurations, experiment, fold, arguments, environment_variables, job_name, fold_creation_sid=None, python_file=None
 ):
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
         conda_env="online_nsam",
         mem="16G",
-        python_file=f"{code_directory}/{configurations['experiments_script_path']}",
+        python_file=python_file or f"{code_directory}/{configurations['experiments_script_path']}",
         jobname=job_name,
         dependency=dependency_argument,
         suppress_output=False,

@@ -22,6 +22,10 @@ from tests.consts import (
     DRIVERLOG_POLY_DOMAIN_PATH,
     DRIVERLOG_POLY_PROBLEM_PATH,
     DRIVERLOG_POLY_TRAJECTORY_PATH,
+    TEST_PPO_OBSERVATIONS_DIRECTORY,
+    TEST_PPO_MINECRAFT_DOMAIN,
+    FARMLAND_DOMAIN_PATH,
+    FARMLAND_TRAJECTORIES_DIRECTORY,
 )
 
 
@@ -43,6 +47,11 @@ def minecraft_medium_preconditions_fluents_map() -> Dict[str, List[str]]:
 @fixture()
 def minecraft_medium_domain() -> Domain:
     return DomainParser(MINECRAFT_MEDIUM_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def minecraft_ppo_domain() -> Domain:
+    return DomainParser(TEST_PPO_MINECRAFT_DOMAIN, partial_parsing=True).parse_domain()
 
 
 @fixture()
@@ -121,6 +130,17 @@ def satellite_nsam(satellite_numeric_domain: Domain, satellite_fluents_map: Dict
 @fixture()
 def minecraft_nsam(minecraft_domain: Domain, minecraft_fluents_map: Dict[str, List[str]]) -> NumericSAMLearner:
     return NumericSAMLearner(minecraft_domain, minecraft_fluents_map)
+
+
+@fixture()
+def farmland_domain() -> Domain:
+    return DomainParser(FARMLAND_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def farmland_nsam(farmland_domain: Domain) -> NumericSAMLearner:
+    nsam = NumericSAMLearner(farmland_domain, polynomial_degree=0)
+    return nsam
 
 
 def test_add_new_action_adds_action_to_fluents_storage(depot_nsam: NumericSAMLearner, depot_observation: Observation):
@@ -290,3 +310,39 @@ def test_learn_action_model_when_applying_multiple_times_with_different_trajecto
     learned_model2, learning_metadata = depot_nsam.learn_action_model([observation2])
     num_learned_actions_model2 = len(learned_model2.actions)
     assert num_learned_actions_model1 < num_learned_actions_model2
+
+
+def test_learn_action_model_with_ppo_observations_and_nsam_returns_preconditions_without_duplications_while_using_the_trajectories_incrementally(
+    minecraft_ppo_domain: Domain,
+):
+    minecraft_ppo_nsam = NumericSAMLearner(minecraft_ppo_domain)
+    parser = TrajectoryParser(minecraft_ppo_domain)
+    learned_model = None
+    for observation in TEST_PPO_OBSERVATIONS_DIRECTORY.glob("*.trajectory"):
+        trajectory = parser.parse_trajectory(observation)
+        learned_model, _ = minecraft_ppo_nsam.learn_action_model([trajectory])
+
+    print()
+    print(learned_model.to_pddl())
+
+
+def test_learn_action_model_with_multiple_farmland_observations_increases_the_size_of_the_dataset_between_iterations(
+    farmland_domain: Domain, farmland_nsam: NumericSAMLearner
+):
+    observations = []
+    learned_model = None
+    for problem_path in FARMLAND_TRAJECTORIES_DIRECTORY.glob("*.pddl"):
+        trajectory_path = FARMLAND_TRAJECTORIES_DIRECTORY / f"{problem_path.stem}.trajectory"
+        problem = ProblemParser(problem_path, farmland_domain).parse_problem()
+        observation = TrajectoryParser(farmland_domain, problem).parse_trajectory(trajectory_path)
+        observations.append(observation)
+        learned_model, _ = farmland_nsam.learn_action_model([observation])
+        assert len(learned_model.actions) > 0
+
+    one_shot_nsam = NumericSAMLearner(farmland_domain, polynomial_degree=0)
+    learned_model_one_shot, _ = one_shot_nsam.learn_action_model(observations)
+    assert len(learned_model.actions) == len(learned_model_one_shot.actions)
+    # assert learned_model.to_pddl() == learned_model_one_shot.to_pddl()
+
+    print(learned_model_one_shot.to_pddl())
+    print(learned_model.to_pddl())

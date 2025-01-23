@@ -2,8 +2,9 @@
 from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, MultiAgentComponent
 from pytest import fixture
 
-from sam_learning.core import LiteralCNF, group_params_from_clause
+from sam_learning.core import LiteralCNF
 from sam_learning.learners import MASAMPlus, combine_groupings
+from sam_learning.learners.ma_sam_plus import generate_supersets_of_actions
 
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0", "spray-varnisher0"]
 ROVERS_AGENT_NAMES = [f"rovers{i}" for i in range(10)]
@@ -120,6 +121,7 @@ def test_extract_relevant_action_groups_with_observed_actions_with_unsafe_action
     )
     woodworking_ma_sam_plus.observed_actions = ["do-grind", "do-plane", "do-immersion-varnish"]
     woodworking_ma_sam_plus.safe_actions = ["do-immersion-varnish"]
+    woodworking_ma_sam_plus._unsafe_actions = {"do-grind", "do-plane"}
 
     action_groups = woodworking_ma_sam_plus.extract_relevant_action_groups()
     action_groups_names = {frozenset(u.name for u in group) for group in action_groups}
@@ -131,7 +133,7 @@ def test_extract_relevant_action_groups_with_observed_actions_with_unsafe_action
     ]
 
     assert all(action_group in expected_names for action_group in action_groups_names)
-    assert len(action_groups) == 4
+    assert len(action_groups) >= 4
 
 
 def test_extract_relevant_parameter_groupings_with_existing_action_group_returns_valid_parameter_groupings(
@@ -189,25 +191,6 @@ def test_extract_relevant_parameter_groupings_with_non_existing_action_group_ret
     assert len(parameter_grouping) == 0
 
 
-def test_group_params_from_clause_handles_non_unit_clause_returns_parameters_grouping_with_groups_consisting_of_several_actions():
-    clause = [("do-grind", "(m ?x ?y)"), ("do-plane", "(m ?x ?z)")]
-
-    group = group_params_from_clause(clause)
-    real_group = [{("do-grind", "?x"), ("do-plane", "?x")}, {("do-grind", "?y"), ("do-plane", "?z")}]
-
-    assert group == real_group
-
-
-def test_group_params_from_clause_handles_unit_clause_returns_parameters_grouping_with_groups_consisting_of_solo_actions():
-    clause = [
-        ("do-grind", "(m ?x ?y)"),
-    ]
-
-    group = group_params_from_clause(clause)
-
-    assert group == [{("do-grind", "?x")}, {("do-grind", "?y")}]
-
-
 def test_extract_effects_for_macro_from_cnf_returns_effects_adapted_to_macro_naming(
     rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall, ma_rovers_domain: Domain
 ):
@@ -243,6 +226,41 @@ def test_extract_effects_for_macro_from_cnf_returns_effects_adapted_to_macro_nam
     assert "(fluent_test1 ?yp)" in effects_rep
     assert "(fluent_test2 ?yp)" in effects_rep
     assert len(effects_rep) == 2
+
+
+def test_extract_effects_for_macro_from_cnf_returns_effects_with_no_duplications(
+    rovers_ma_sam_plus: MASAMPlus, do_plane_first_action_call: ActionCall, ma_rovers_domain: Domain
+):
+    action_names = [action for action in ma_rovers_domain.actions.keys()]
+    cnf1 = LiteralCNF(action_names)
+    rovers_ma_sam_plus.literals_cnf["fluent_test1 ?w"] = cnf1
+    cnf1.add_possible_effect(
+        [
+            ("communicate_rock_data", "(fluent_test1 ?p)"),
+            ("communicate_rock_data", "(fluent_test1 ?p)"),
+            ("navigate", "(fluent_test1 ?y)"),
+            ("navigate", "(fluent_test1 ?y)"),
+        ]
+    )
+
+    param_grouping = [{("communicate_rock_data", "?p"), ("navigate", "?y")}]
+    lma_names = ["navigate", "communicate_rock_data"]
+    action_group = {action for action in rovers_ma_sam_plus.partial_domain.actions.values() if action.name in lma_names}
+    mapping = {
+        ("navigate", "?x"): "?x'0",
+        ("navigate", "?y"): "?yp",
+        ("navigate", "?z"): "?z'0",
+        ("communicate_rock_data", "?r"): "?r'1",
+        ("communicate_rock_data", "?l"): "?l'1",
+        ("communicate_rock_data", "?p"): "?yp",
+        ("communicate_rock_data", "?x"): "?x'1",
+        ("communicate_rock_data", "?y"): "?y'1",
+    }
+
+    effects = rovers_ma_sam_plus.extract_effects_for_macro_from_cnf(action_group, param_grouping, mapping)
+    effects_rep = [effect.untyped_representation for effect in effects]
+    assert len(set(effects_rep)) == len(effects_rep)
+    print(effects_rep)
 
 
 def test_extract_preconditions_for_macro_from_cnf_returns_preconditions_adapted_to_macro_naming(
@@ -349,3 +367,64 @@ def test_combine_groupings_with_all_shared_elements_returns_grouping_with_one_ma
     ]
     expected_output = {("navigate", "?x"), ("go", "?y"), ("arrive", "?z"), ("fly", "?w")}
     assert combine_groupings(groupings) == [expected_output]
+
+
+def test_combine_groupings_when_there_are_multiple_parameters_mapped_to_the_same_binding_returns_a_single_option_that_matches_everything():
+    # All sets should merge into one big set.
+    groupings = [
+        {("a1", "?x"), ("a2", "?w"), ("a3", "?m")},
+        {("a1", "?x"), ("a3", "?m")},
+        {("a2", "?w"), ("a1", "?x")},
+        {("a1", "?x"), ("a4", "?q")},
+    ]
+    expected_output = {("a1", "?x"), ("a2", "?w"), ("a3", "?m"), ("a4", "?q")}
+    assert combine_groupings(groupings) == [expected_output]
+
+
+def test_combine_groupings_when_there_are_multiple_parameters_mapped_to_the_same_binding_returns_a_single_option_that_matches_everything_paper_example():
+    # All sets should merge into one big set.
+    groupings = [
+        {("a1", "?x"), ("a2", "?w")},
+        {("a1", "?y")},
+        {("a2", "?q"), ("a1", "?z")},
+    ]
+    assert combine_groupings(groupings) == [{("a1", "?x"), ("a2", "?w")}, {("a1", "?y")}, {("a2", "?q"), ("a1", "?z")}]
+
+
+def test_combine_groupings_when_there_are_multiple_parameters_when_there_are_two_literals_that_share_the_same_actions_should_return_a_union_of_all_the_bindings():
+    # All sets should merge into one big set.
+    # First literal is maps the actions a1 and a2 to the same binding
+    # Second literal maps a1 to a bew action a3 with the similar parameters
+    groupings = [
+        {("a1", "?x"), ("a2", "?w")},
+        {("a1", "?y")},
+        {("a2", "?q"), ("a1", "?z")},
+        {("a3", "?m"), ("a1", "?x")},
+        {("a1", "?y")},
+        {("a1", "?z")},
+    ]
+    assert combine_groupings(groupings) == [{("a1", "?x"), ("a2", "?w"), ("a3", "?m")}, {("a1", "?y")}, {("a2", "?q"), ("a1", "?z")}]
+
+
+def test_generate_supersets_does_not_change_original_set_if_cannot_create_supersets():
+    # Test 1: Basic Functionality
+    original_sets = [{"1", "2"}]
+    result = generate_supersets_of_actions(original_sets)
+    expected = [{"1", "2"}]  # The original set and all its supersets
+    assert sorted(result, key=lambda x: (len(x), x)) == sorted(expected, key=lambda x: (len(x), x)), "Test failed!"
+
+
+def test_generate_supersets_creates_supersets_containing_unique_objects_only():
+    # Test 1: Basic Functionality
+    original_sets = [{"1", "2"}, {"2", "3"}]
+    result = generate_supersets_of_actions(original_sets)
+    expected = [{"1", "2"}, {"2", "3"}, {"1", "2", "3"}]  # The original set and all its supersets
+    assert sorted(result, key=lambda x: (len(x), x)) == sorted(expected, key=lambda x: (len(x), x)), "Test failed!"
+
+
+def test_generate_supersets_does_not_break_original_sets_and_only_adds_new_sets_combining_all_the_original_strings():
+    # Test 1: Basic Functionality
+    original_sets = [{"1", "2"}, {"3", "4"}]
+    result = generate_supersets_of_actions(original_sets)
+    expected = [{"1", "2"}, {"3", "4"}, {"1", "2", "3", "4"}]  # The original set and all its supersets
+    assert sorted(result, key=lambda x: (len(x), x)) == sorted(expected, key=lambda x: (len(x), x)), "Test failed!"

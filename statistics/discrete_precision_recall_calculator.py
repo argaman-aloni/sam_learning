@@ -74,6 +74,7 @@ def calculate_syntactic_precision(learned_predicates: Set[str], actual_predicate
 
 class PrecisionRecallCalculator:
     """Class that manages the calculation of the precision and recall of the learned model."""
+
     preconditions: Dict[str, Set[str]]
     ground_truth_preconditions: Dict[str, Set[str]]
     discrete_effects: Dict[str, Set[str]]
@@ -85,8 +86,7 @@ class PrecisionRecallCalculator:
         self.ground_truth_preconditions = defaultdict(set)
         self.discrete_effects = defaultdict(set)
         self.ground_discrete_effects = defaultdict(set)
-        self._compared_tuples = [(self.preconditions, self.ground_truth_preconditions),
-                                 (self.discrete_effects, self.ground_discrete_effects)]
+        self._compared_tuples = [(self.preconditions, self.ground_truth_preconditions), (self.discrete_effects, self.ground_discrete_effects)]
         self._learned_actions = []
 
     def add_action_data(self, learned_action: LearnerAction, model_action: Action) -> None:
@@ -96,15 +96,14 @@ class PrecisionRecallCalculator:
         :param model_action: the expected action of the original domain.
         """
         self._learned_actions.append(learned_action.name)
-        self.preconditions[learned_action.name] = \
-            {p.untyped_representation for _, p in learned_action.preconditions if isinstance(p, Predicate)}
+        self.preconditions[learned_action.name] = {p.untyped_representation for _, p in learned_action.preconditions if isinstance(p, Predicate)}
 
-        self.ground_truth_preconditions[model_action.name] = \
-            {p.untyped_representation for _, p in model_action.preconditions if isinstance(p, Predicate)}
+        self.ground_truth_preconditions[model_action.name] = {
+            p.untyped_representation for _, p in model_action.preconditions if isinstance(p, Predicate)
+        }
 
         self.discrete_effects[learned_action.name] = {p.untyped_representation for p in learned_action.discrete_effects}
-        self.ground_discrete_effects[model_action.name] = {p.untyped_representation for p in
-                                                           model_action.discrete_effects}
+        self.ground_discrete_effects[model_action.name] = {p.untyped_representation for p in model_action.discrete_effects}
 
     def calculate_action_precision(self, action_name: str) -> float:
         """calculates the precision value of a certain action.
@@ -112,10 +111,8 @@ class PrecisionRecallCalculator:
         :param action_name: the name of the action that is being tested.
         :return: the action's precision.
         """
-        true_positives = sum(
-            calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
-        false_positives = sum(
-            calculate_number_false_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+        true_positives = sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+        false_positives = sum(calculate_number_false_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
         if true_positives == 0 and false_positives == 0:
             return 1
 
@@ -127,10 +124,8 @@ class PrecisionRecallCalculator:
         :param action_name: the name of the action that is being tested.
         :return: the action's recall.
         """
-        true_positives = sum(
-            calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
-        false_negatives = sum(
-            calculate_number_false_negatives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+        true_positives = sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+        false_negatives = sum(calculate_number_false_negatives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
 
         if true_positives == 0 and false_negatives == 0:
             return 1
@@ -142,10 +137,18 @@ class PrecisionRecallCalculator:
 
         :return: the model's precision.
         """
-        true_positives = sum([sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in
-                                  self._compared_tuples) for action_name in self._learned_actions])
-        false_positives = sum([sum(calculate_number_false_positives(tup[0][action_name], tup[1][action_name]) for tup in
-                                   self._compared_tuples) for action_name in self._learned_actions])
+        true_positives = sum(
+            [
+                sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+                for action_name in self._learned_actions
+            ]
+        )
+        false_positives = sum(
+            [
+                sum(calculate_number_false_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+                for action_name in self._learned_actions
+            ]
+        )
         if true_positives == 0 and false_positives == 0:
             return 1
 
@@ -156,10 +159,18 @@ class PrecisionRecallCalculator:
 
         :return: the model's recall.
         """
-        true_positives = sum([sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in
-                                  self._compared_tuples) for action_name in self._learned_actions])
-        false_negatives = sum([sum(calculate_number_false_negatives(tup[0][action_name], tup[1][action_name]) for tup in
-                                   self._compared_tuples) for action_name in self._learned_actions])
+        true_positives = sum(
+            [
+                sum(calculate_number_true_positives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+                for action_name in self._learned_actions
+            ]
+        )
+        false_negatives = sum(
+            [
+                sum(calculate_number_false_negatives(tup[0][action_name], tup[1][action_name]) for tup in self._compared_tuples)
+                for action_name in self._learned_actions
+            ]
+        )
         if true_positives == 0 and false_negatives == 0:
             return 1
 
@@ -173,19 +184,16 @@ class PrecisionRecallCalculator:
         """
         action_precision = self.calculate_action_precision(action_name)
         action_recall = self.calculate_action_recall(action_name)
-        action_f1_score = 0 if action_precision == 0 and action_recall == 0 else \
-            2 * (action_precision * action_recall) / (action_precision + action_recall)
+        action_f1_score = (
+            0 if action_precision == 0 and action_recall == 0 else 2 * (action_precision * action_recall) / (action_precision + action_recall)
+        )
 
         return {
-            "preconditions_precision": calculate_syntactic_precision(self.preconditions[action_name],
-                                                                     self.ground_truth_preconditions[action_name]),
-            "effects_precision": calculate_syntactic_precision(self.discrete_effects[action_name],
-                                                               self.ground_discrete_effects[action_name]),
-            "preconditions_recall": calculate_syntactic_recall(self.preconditions[action_name],
-                                                               self.ground_truth_preconditions[action_name]),
-            "effects_recall": calculate_syntactic_recall(self.discrete_effects[action_name],
-                                                         self.ground_discrete_effects[action_name]),
+            "preconditions_precision": calculate_syntactic_precision(self.preconditions[action_name], self.ground_truth_preconditions[action_name]),
+            "effects_precision": calculate_syntactic_precision(self.discrete_effects[action_name], self.ground_discrete_effects[action_name]),
+            "preconditions_recall": calculate_syntactic_recall(self.preconditions[action_name], self.ground_truth_preconditions[action_name]),
+            "effects_recall": calculate_syntactic_recall(self.discrete_effects[action_name], self.ground_discrete_effects[action_name]),
             "action_precision": action_precision,
             "action_recall": action_recall,
-            "f1_score": action_f1_score
+            "f1_score": action_f1_score,
         }
