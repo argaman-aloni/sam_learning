@@ -2,6 +2,7 @@
 from itertools import permutations
 from typing import List, Tuple, Set
 
+import pylab as p
 from pddl_plus_parser.models import State, GroundedPredicate
 
 
@@ -91,16 +92,16 @@ def extract_effects(previous_state: State, next_state: State) -> Tuple[Set[Groun
 
     return add_effects, delete_effects
 
-def extract_not_effects(previous_state: State, next_state: State) -> Set[GroundedPredicate]:
-    """Extracts discrete the effects from the state object.
+def extract_not_effects(next_state: State) -> Set[GroundedPredicate]:
+    """Extracts all negations of grounded predicates that were in post state
 
-    :param previous_state: the previous state object containing the grounded literals.
+    example:
+    if predicate (l ?x) with is_positive==false is in the returned set -> l is not a delete effect.
+    if predicate (l ?x) with is_positive==true is in the returned set -> l is not an add effect.
+
     :param next_state: the next state object containing its grounded literals.
-    :return: tuple containing the add and delete effects of the action.
+    :return: Set of Grounded predicates that each is not an effect.
     """
-    prev_state_predicate = previous_state.state_predicates
-    next_state_predicate = next_state.state_predicates
-    not_effects = set().union(
-        *next_state_predicate.values()).intersection(
-        set().union(*prev_state_predicate.values()))
+    next_state_predicate: set[GroundedPredicate] = set().union(*next_state.state_predicates.values())
+    not_effects = {predicate.copy(is_negated=True) for predicate in next_state_predicate}
     return  not_effects
