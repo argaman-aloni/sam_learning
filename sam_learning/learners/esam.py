@@ -97,25 +97,24 @@ class ExtendedSamLearner(SAMLearner):
         c_eff: list[Var] = list()
         possible_literals = self.matcher.match_predicate_to_action_literals(grounded_effect, grounded_action)
         if len(possible_literals) > 0:
-            c_eff.extend([Var(possible_literals) for possible_literals in possible_literals])
+            l = [Var(possible_literal.untyped_representation) for possible_literal in possible_literals]
+            c_eff.extend(l)
         return  Or(c_eff)
 
     def get_surely_not_eff(self,
-                           previous_state: State,
                            next_state: State,
                            grounded_action: ActionCall) -> set[Predicate]:
         """
         Return the set of predicates representing the negative effects caused by the action between the previous state and the next state.
 
         Parameters:
-            previous_state (State): The previous state before the action is taken.
             next_state (State): The state resulting from taking the action.
             grounded_action (ActionCall): The grounded action that was executed.
 
         Returns:
             set[Predicate]: A set of predicates that cannot be an effect.
         """
-        grounded_not_effect = extract_not_effects(previous_state, next_state)
+        grounded_not_effect = extract_not_effects(next_state)
         lifted_not_eff = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_not_effect))
         return set(lifted_not_eff)
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -165,8 +164,9 @@ class ExtendedSamLearner(SAMLearner):
             or_clause = self.get_is_eff_clause_for_predicate(grounded_action, grounded_effect)
             self.cnf_eff_as_set[grounded_action.name].add(or_clause)
 
-        not_eff_set = self.get_surely_not_eff(previous_state, next_state, grounded_action)
-        self.vars_to_forget[observed_action.name] = not_eff_set
+        not_eff_set_predicates = self.get_surely_not_eff(next_state, grounded_action)
+        not_eff_set_as_string = {eff.untyped_representation for eff in not_eff_set_predicates}
+        self.vars_to_forget[observed_action.name].update(not_eff_set_as_string)
 
         # add all predicates who are surely not an effect for future
         self.logger.debug(f"Done updating the action cnf formulas - {grounded_action.name}")
@@ -225,13 +225,13 @@ class ExtendedSamLearner(SAMLearner):
                 # handle precondition additions
                 else:  # check for contradiction
                     if self.negative_preconditions_policy != NegativePreconditionPolicy.hard:
-                        predicate_opposite_copy = predicate.copy()
+                        predicate_negated_copy = predicate.copy(is_negated=True)
                         #create negated precondition (true-> false, false -> true)
-                        predicate_opposite_copy.is_positive = not predicate_opposite_copy.is_positive
+
 
                         # check for negated precond in preconds  to avoid contradictions
                         if self.partial_domain.actions[action_name].preconditions.root.operands.__contains__(
-                            predicate_opposite_copy):
+                            predicate_negated_copy):
                             is_skip_proxy = True
                             break
 
@@ -405,14 +405,15 @@ def get_minimize_parameters_equality_dict(model_dict: dict[Hashable, bool],
             if predicate_to_param_act_inds[predicate][i] not in not_to_minimize:
                 ind_occ[predicate.name][i].add(predicate_to_param_act_inds[predicate][i])
 
-    for i in set(range(num_of_act_params)).difference(not_to_minimize):
-        for f, set_list in ind_occ.items():
-            for sett in set_list:
+
+    for f, set_list in ind_occ.items():
+        for sett in set_list:
+            if len(sett) > 0:
                 set_as_sorted_list = list(sett)
                 set_as_sorted_list.sort()
-                if i in set_as_sorted_list:
-                    for j in sett:
-                        ind_sets.union_by_rank(i, j)
+                i=set_as_sorted_list[0]
+                for j in set_as_sorted_list:
+                    ind_sets.union(i, j)
 
     ret_dict_by_indexes: dict[int, int] = dict()
     ugly_inds: list[int] = list({ind_sets.find(i) for i in range(len(param_index_in_action.keys()))})
