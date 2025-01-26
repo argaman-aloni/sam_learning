@@ -93,7 +93,7 @@ class ExtendedSamLearner(SAMLearner):
             Or[Var]: The Or clause composed of is_effect for the given predicate.
 
         """
-        c_eff: list[Var] = list()
+        c_eff: List[Var] = []
         possible_literals = self.matcher.match_predicate_to_action_literals(grounded_effect, grounded_action)
         if len(possible_literals) > 0:
             l = [Var(possible_literal.untyped_representation) for possible_literal in possible_literals]
@@ -211,7 +211,7 @@ class ExtendedSamLearner(SAMLearner):
 
         act_signature = self.partial_domain.actions[action_name].signature
 
-        proxies = list()
+        proxies = []
         for model in self.cnf_eff[action_name].models():
             effect = set()
             preconds_to_add = set()
@@ -258,7 +258,7 @@ class ExtendedSamLearner(SAMLearner):
 
     def add_lifted_action_instance(self,
                                    action_name: str,
-                                   proxies: List[tuple[Set[Predicate], Set[Predicate], Dict[str, str]]]):
+                                   proxies: List[Tuple[Set[Predicate], Set[Predicate], Dict[str, str]]]):
         """
         adds the lifted action additional information to the partial domain, if proxys are needed, the adds proxys to
         the partial domain.
@@ -281,12 +281,12 @@ class ExtendedSamLearner(SAMLearner):
                 # unpack tuple fields to get properties of proxy action
                 name = f"{action_name}_{proxy_number}"
                 signature = self.partial_domain.actions[action_name].signature
-                preconds: set[Predicate] = proxy[proxy_preconds]
+                preconds: Set[Predicate] = proxy[proxy_preconds]
                 preconds.update(p for p in self.partial_domain.actions[action_name].preconditions.root.operands
                                 if isinstance(p,Predicate))
 
                 proxy_signature_modified_param_dict = proxy[proxy_model_dict]
-                effects: set[Predicate] = modify_predicate_signature(proxy[proxy_effects],
+                effects: Set[Predicate] = modify_predicate_signature(proxy[proxy_effects],
                                                                      proxy_signature_modified_param_dict)
                 preconds = modify_predicate_signature(preconds, proxy_signature_modified_param_dict)
                 reversed_proxy_signature_modified_param_dict: Dict[str, str] = {
@@ -431,14 +431,14 @@ def get_minimize_parameters_equality_dict(model_dict: Dict[Hashable, bool],
 
     return ret_dict_by_param_name
 
-def modify_predicate_signature(predicates: set[Predicate],
-                         param_dict: dict[str, str]) -> set[Predicate]:
+def modify_predicate_signature(predicates: Set[Predicate],
+                         param_dict: Dict[str, str]) -> Set[Predicate]:
     """
     modifies a set of predicates to fit the proxy minimized parameter list if minimization is needed
     """
-    new_set: set[Predicate] = set()
+    new_set: Set[Predicate] = set()
     for predicate in predicates:
-        new_signature: dict[str, PDDLType] = {
+        new_signature: Dict[str, PDDLType] = {
             param_dict[param]: predicate.signature[param] for param in predicate.signature.keys()}
         new_predicate = Predicate(name=predicate.name, signature= new_signature, is_positive=predicate.is_positive)
         new_set.add(new_predicate)
