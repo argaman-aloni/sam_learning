@@ -6,61 +6,61 @@ from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, D
 from sam_learning.core import  extract_effects, LearnerDomain, LearnerAction, extract_not_effects
 from sam_learning.learners.sam_learning import SAMLearner
 from nnf import And, Or, Var
-
+from scipy.cluster.hierarchy import DisjointSet
 from utilities import NegativePreconditionPolicy
 
 
-class DisjointSet:  # this class was taken from geeksForGeeks
-    def __init__(self, size):
-        self.parent = [i for i in range(size)]
-        self.rank = [0] * size
-
-    # Function to find the representative (or the root node) of a set
-    def find(self, i):
-        # If the index 'i' is not the representative of its set, recursively find the representative
-        if self.parent[i] != i:
-            self.parent[i] = self.find(self.parent[i])  # Path compression
-        return self.parent[i]
-
-    def union(self, i, j):
-        irep = self.find(i)
-        jrep = self.find(j)
-        if irep == jrep:
-            return
-        else:
-            self.parent[jrep] = irep
-
-
-    # Unites the set that includes i and the set that includes j by rank
-    def union_by_rank(self, i, j):
-        # Find the representatives (or the root nodes) for the set that includes i and j
-        irep = self.find(i)
-        jrep = self.find(j)
-
-        # Elements are in the same set, no need to unite anything
-        if irep == jrep:
-            return
-
-        # Get the rank of i's tree
-        irank = self.rank[irep]
-
-        # Get the rank of j's tree
-        jrank = self.rank[jrep]
-
-        # If i's rank is less than j's rank
-        if irank < jrank:
-            # Move i under j
-            self.parent[irep] = jrep
-        # Else if j's rank is less than i's rank
-        elif jrank < irank:
-            # Move j under i
-            self.parent[jrep] = irep
-        # Else if their ranks are the same
-        else:
-            # Move i under j (doesn't matter which one goes where)
-            self.parent[jrep] = irep
-            # Increment the result tree's rank by 1
-            self.rank[irep] += 1
+# class DisjointSet:  # this class was taken from geeksForGeeks
+#     def __init__(self, size):
+#         self.parent = [i for i in range(size)]
+#         self.rank = [0] * size
+#
+#     # Function to find the representative (or the root node) of a set
+#     def find(self, i):
+#         # If the index 'i' is not the representative of its set, recursively find the representative
+#         if self.parent[i] != i:
+#             self.parent[i] = self.find(self.parent[i])  # Path compression
+#         return self.parent[i]
+#
+#     def union(self, i, j):
+#         irep = self.find(i)
+#         jrep = self.find(j)
+#         if irep == jrep:
+#             return
+#         else:
+#             self.parent[jrep] = irep
+#
+#
+#     # Unites the set that includes i and the set that includes j by rank
+#     def union_by_rank(self, i, j):
+#         # Find the representatives (or the root nodes) for the set that includes i and j
+#         irep = self.find(i)
+#         jrep = self.find(j)
+#
+#         # Elements are in the same set, no need to unite anything
+#         if irep == jrep:
+#             return
+#
+#         # Get the rank of i's tree
+#         irank = self.rank[irep]
+#
+#         # Get the rank of j's tree
+#         jrank = self.rank[jrep]
+#
+#         # If i's rank is less than j's rank
+#         if irank < jrank:
+#             # Move i under j
+#             self.parent[irep] = jrep
+#         # Else if j's rank is less than i's rank
+#         elif jrank < irank:
+#             # Move j under i
+#             self.parent[jrep] = irep
+#         # Else if their ranks are the same
+#         else:
+#             # Move i under j (doesn't matter which one goes where)
+#             self.parent[jrep] = irep
+#             # Increment the result tree's rank by 1
+#             self.rank[irep] += 1
 
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
@@ -74,7 +74,6 @@ class ExtendedSamLearner(SAMLearner):
                  partial_domain: Domain,
                  negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard_but_allow_proxy):
         super().__init__(partial_domain=partial_domain,
-                         is_esam=True,
                          negative_preconditions_policy=negative_preconditions_policy)
         self.possible_effect = dict()
         self.cnf_eff_as_set = dict()
@@ -399,7 +398,7 @@ def get_minimize_parameters_equality_dict(model_dict: dict[Hashable, bool],
         if not val:
             not_to_minimize.update(predicate_to_param_act_inds[predicate])
 
-    ind_sets = DisjointSet(len(param_index_in_action.keys()))
+    ind_sets = DisjointSet(i for i in range(len(param_index_in_action.keys())))
     for predicate, val in new_model_dict.items():
         for i in range(len(predicate_to_param_act_inds[predicate])):
             if predicate_to_param_act_inds[predicate][i] not in not_to_minimize:
@@ -413,14 +412,14 @@ def get_minimize_parameters_equality_dict(model_dict: dict[Hashable, bool],
                 set_as_sorted_list.sort()
                 i=set_as_sorted_list[0]
                 for j in set_as_sorted_list:
-                    ind_sets.union(i, j)
+                    ind_sets.merge(i, j)
 
     ret_dict_by_indexes: dict[int, int] = dict()
-    ugly_inds: list[int] = list({ind_sets.find(i) for i in range(len(param_index_in_action.keys()))})
+    ugly_inds: list[int] = list({ind_sets.__getitem__(i) for i in range(len(param_index_in_action.keys()))})
     ugly_inds.sort()
 
     for i in range(len(param_index_in_action.keys())):
-        ret_dict_by_indexes[i] = ugly_inds.index(ind_sets.find(i))
+        ret_dict_by_indexes[i] = ugly_inds.index(ind_sets.__getitem__(i))
 
 # transform all indexes back to  str to fit sam learning conventions
     ret_dict_by_param_name: [str, str] = {
