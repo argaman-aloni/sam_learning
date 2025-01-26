@@ -1,8 +1,7 @@
 from typing import List, Tuple, Dict, Hashable, Set
-
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, \
-    PDDLType, GroundedPredicate
+from pddl_plus_parser.models import (Observation, Predicate, ActionCall, State, Domain, ObservedComponent,
+                                     SignatureType, PDDLType, GroundedPredicate)
 from sam_learning.core import  extract_effects, LearnerDomain, LearnerAction, extract_not_effects
 from sam_learning.learners.sam_learning import SAMLearner
 from nnf import And, Or, Var
@@ -65,7 +64,6 @@ from utilities import NegativePreconditionPolicy
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
 
-
     possible_effect: Dict[str, Set[Predicate]]
     cnf_eff: Dict[str, And[Or[Var]]]
     cnf_eff_as_set: Dict[str, Set[Or[Var]]]
@@ -74,8 +72,10 @@ class ExtendedSamLearner(SAMLearner):
     def __init__(self,
                  partial_domain: Domain,
                  negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard_but_allow_proxy):
+
         super().__init__(partial_domain=partial_domain,
                          negative_preconditions_policy=negative_preconditions_policy)
+
         self.possible_effect = {}
         self.cnf_eff_as_set = {}
         self.vars_to_forget = {}
@@ -437,8 +437,7 @@ def get_minimize_parameters_equality_dict(model_dict: Dict[Hashable, bool],
 
     return ret_dict_by_param_name
 
-def modify_predicate_signature(predicates: Set[Predicate],
-                         param_dict: Dict[str, str]) -> Set[Predicate]:
+def modify_predicate_signature(predicates: Set[Predicate], param_dict: Dict[str, str]) -> Set[Predicate]:
     """
     modifies a set of predicates to fit the proxy minimized parameter list if minimization is needed
     """
