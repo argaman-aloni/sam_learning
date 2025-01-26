@@ -361,9 +361,9 @@ def get_minimize_parameters_equality_dict(model_dict: Dict[Hashable, bool],
     """
     the method computes the minimization of parameter list
     Args:
-        act_signature: the signature of the action
-        model_dict: represents the cnf, maps each literal to its value in the cnf formula solution
-        domain_types: the domain types
+        model_dict (Dict[Hashable, bool]): represents the cnf, maps each literal to its value in the cnf formula solution
+        act_signature (SignatureType): the signature of the action
+        domain_types (Dict[str, PddlType]): the domain types
     Returns:
         a dictionary mapping each original param act ind_ to the new actions minimized parameter list
     """
