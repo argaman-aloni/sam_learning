@@ -22,6 +22,15 @@ class DisjointSet:  # this class was taken from geeksForGeeks
             self.parent[i] = self.find(self.parent[i])  # Path compression
         return self.parent[i]
 
+    def union(self, i, j):
+        irep = self.find(i)
+        jrep = self.find(j)
+        if irep == jrep:
+            return
+        else:
+            self.parent[jrep] = irep
+
+
     # Unites the set that includes i and the set that includes j by rank
     def union_by_rank(self, i, j):
         # Find the representatives (or the root nodes) for the set that includes i and j
@@ -131,8 +140,8 @@ class ExtendedSamLearner(SAMLearner):
             self.cnf_eff_as_set[grounded_action.name].add(or_clause)
 
         # extract predicated who are surely not an effect
-        not_eff_set = self.get_surely_not_eff(previous_state, next_state, grounded_action)
-        self.vars_to_forget[observed_action.name] = not_eff_set
+        not_eff_set = self.get_surely_not_eff(next_state, grounded_action)
+        self.vars_to_forget[observed_action.name] = {eff.untyped_representation for eff in not_eff_set}
         self.observed_actions.append(observed_action.name)
         self.logger.debug(f"Finished adding the action {grounded_action.name}.")
 
