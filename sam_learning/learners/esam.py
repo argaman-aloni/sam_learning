@@ -70,6 +70,7 @@ class ExtendedSamLearner(SAMLearner):
     cnf_eff: Dict[str, And[Or[Var]]]
     cnf_eff_as_set: Dict[str, Set[Or[Var]]]
     vars_to_forget: Dict[str, Set[str]]
+
     def __init__(self,
                  partial_domain: Domain,
                  negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard_but_allow_proxy):
@@ -95,9 +96,11 @@ class ExtendedSamLearner(SAMLearner):
         """
         c_eff: List[Var] = []
         possible_literals = self.matcher.match_predicate_to_action_literals(grounded_effect, grounded_action)
+
         if len(possible_literals) > 0:
             l = [Var(possible_literal.untyped_representation) for possible_literal in possible_literals]
             c_eff.extend(l)
+
         return  Or(c_eff)
 
     def get_surely_not_eff(self,
@@ -116,6 +119,7 @@ class ExtendedSamLearner(SAMLearner):
         grounded_not_effect = extract_not_effects(next_state)
         lifted_not_eff = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_not_effect))
         return set(lifted_not_eff)
+
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
 
@@ -325,6 +329,7 @@ class ExtendedSamLearner(SAMLearner):
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
                 self.handle_single_trajectory_component(component)
+
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
