@@ -49,10 +49,12 @@ def test_get_is_eff_clause_for_predicate(rovers_esam_learner: ExtendedSamLearner
         if add_grounded_effect.name == "communicated_soil_data":
             grounded_predicate = add_grounded_effect
 
-    expected_strs: set[str] = {"(communicated_soil_data ?p - waypoint)", "(communicated_soil_data ?x - waypoint)"}
+    expected_strs: set[str] = {"(communicated_soil_data ?p)", "(communicated_soil_data ?x)"}
     or_clause: Or[Var] = rovers_esam_learner.get_is_eff_clause_for_predicate(grounded_action, grounded_predicate)
     literals = or_clause.vars()
     predicates: set[str] = {var.__str__() for var in literals}
+    print("first test predicates are")
+    print(predicates)
     assert len(list(predicates)) == 2
     assert expected_strs.issubset(predicates)
 
@@ -66,10 +68,12 @@ def test_get_is_eff_clause_for_predicate(rovers_esam_learner: ExtendedSamLearner
     for add_grounded_effect in add_grounded_effects:
         if add_grounded_effect.name == "calibrated":
             grounded_predicate = add_grounded_effect
-    expected_strs = {"(calibrated ?i - camera ?r - rover)"}
+    expected_strs = {"(calibrated ?i ?r)"}
     or_clause = rovers_esam_learner.get_is_eff_clause_for_predicate(grounded_action, grounded_predicate)
     literals: list = or_clause.vars()
     predicates = {var.__str__() for var in literals}
+    print("second test predicates are")
+    print(predicates)
     assert expected_strs.__eq__(predicates)
 
 
@@ -78,11 +82,10 @@ def test_get_surely_not_eff(rovers_esam_learner: ExtendedSamLearner, rovers_esam
     rovers_esam_learner.logger.setLevel(level=logging.WARNING)
     comp = rovers_esam_observation.components[-1]
     # ======= first test, multiple binding=======
-    prev_state = comp.previous_state
     next_state = comp.next_state
     grounded_action = comp.grounded_action_call
     esam_not_eff: set[str] = {p.untyped_representation for p in
-                              rovers_esam_learner.get_surely_not_eff(prev_state, next_state, grounded_action)}
+                              rovers_esam_learner.get_surely_not_eff(next_state, grounded_action)}
     effects: set[str] = {"(channel_free ?l - lander)", "(communicated_soil_data ?p - waypoint)", "(available ?r - rover)"}
     assert (effects.intersection(esam_not_eff) == set())
 
@@ -91,11 +94,10 @@ def test_get_surely_not_eff(rovers_esam_learner: ExtendedSamLearner, rovers_esam
     # ======= second test, injective binding=======
 
     comp = rovers_esam_observation.components[0]
-    prev_state = comp.previous_state
     next_state = comp.next_state
     grounded_action = comp.grounded_action_call
     esam_not_eff: set[str] = {p.untyped_representation for p in
-                              rovers_esam_learner.get_surely_not_eff(prev_state, next_state, grounded_action)}
+                              rovers_esam_learner.get_surely_not_eff(next_state, grounded_action)}
 
     effects: set[str] = {"(calibrated ?i - camera ?r - rover)"}
     assert (effects.intersection(esam_not_eff) == set())
