@@ -122,114 +122,132 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
 # ========================================================================
 # ========================test set 1======================================
 # ========================================================================
-    communicate_soil_dict1: dict[Hashable, bool] = {pred1: True, pred2: True}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?x": "?p",
-                      "?y": "?x",
-                      "?p": "?p",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test1_1():
+        communicate_soil_dict1: dict[Hashable, bool] = {pred1: True, pred2: True}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?x": "?p",
+                          "?y": "?x",
+                          "?p": "?p",
+                          "?r": "?r",
+                          "?l": "?l"}
 #===================================================================================
-    communicate_soil_dict2: dict[Hashable, bool] = {pred1: False, pred2: True}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
+    def test1_2():
+        communicate_soil_dict2: dict[Hashable, bool] = {pred1: False, pred2: True}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
 
-    assert output == {"?x": "?x",
-                      "?y": "?y",
-                      "?p": "?p",
-                      "?r": "?r",
-                      "?l": "?l"}
+        assert output == {"?x": "?x",
+                          "?y": "?y",
+                          "?p": "?p",
+                          "?r": "?r",
+                          "?l": "?l"}
 # ===================================================================================
-    communicate_soil_dict3: dict[Hashable, bool] = {pred1: True, pred2: False}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?x": "?x",
-                      "?y": "?y",
-                      "?p": "?p",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test1_3():
+        communicate_soil_dict3: dict[Hashable, bool] = {pred1: True, pred2: False}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?x": "?x",
+                          "?y": "?y",
+                          "?p": "?p",
+                          "?r": "?r",
+                          "?l": "?l"}
 
 #========================================================================
 #========================test set 2======================================
 #========================================================================
 
     # ============================================1
-    communicate_soil_dict1: dict[Hashable, bool] = {pred1: True, pred2: True, pred3: True}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?p": "?p",
-                      "?x": "?p",
-                      "?y": "?p",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test2_1():
+        communicate_soil_dict1: dict[Hashable, bool] = {pred1: True, pred2: True, pred3: True}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?p": "?p",
+                          "?x": "?p",
+                          "?y": "?p",
+                          "?r": "?r",
+                          "?l": "?l"}
 
     # ============================================2
-
-    communicate_soil_dict2: dict[Hashable, bool] = {pred1: True, pred2: True, pred3: False}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?p": "?p",
-                      "?x": "?p",
-                      "?y": "?x",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test2_2():
+        communicate_soil_dict2: dict[Hashable, bool] = {pred1: True, pred2: True, pred3: False}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?p": "?p",
+                          "?x": "?p",
+                          "?y": "?x",
+                          "?r": "?r",
+                          "?l": "?l"}
 
     #3============================================3
-    communicate_soil_dict3: dict[Hashable, bool] = {pred1: True, pred2: False, pred3: True}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?p": "?p",
-                      "?x": "?x",
-                      "?y": "?p",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test2_3():
+        communicate_soil_dict3: dict[Hashable, bool] = {pred1: True, pred2: False, pred3: True}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?p": "?p",
+                          "?x": "?x",
+                          "?y": "?p",
+                          "?r": "?r",
+                          "?l": "?l"}
     #4============================================4
-    communicate_soil_dict4: dict[Hashable, bool] = {pred1: False, pred2: True, pred3: True}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict4,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?p": "?p",
-                      "?x": "?x",
-                      "?y": "?x",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test2_4():
+        communicate_soil_dict4: dict[Hashable, bool] = {pred1: False, pred2: True, pred3: True}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict4,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?p": "?p",
+                          "?x": "?x",
+                          "?y": "?x",
+                          "?r": "?r",
+                          "?l": "?l"}
     #5============================================5
-    communicate_soil_dict5: dict[Hashable, bool] = {pred1: True, pred2: False, pred3: False}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict5,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?p": "?p",
-                      "?x": "?x",
-                      "?y": "?y",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test2_5():
+        communicate_soil_dict5: dict[Hashable, bool] = {pred1: True, pred2: False, pred3: False}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict5,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?p": "?p",
+                          "?x": "?x",
+                          "?y": "?y",
+                          "?r": "?r",
+                          "?l": "?l"}
     #6============================================6
-    communicate_soil_dict6: dict[Hashable, bool] = {pred1: False, pred2: True, pred3: False}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict6,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?p": "?p",
-                      "?x": "?x",
-                      "?y": "?y",
-                      "?r": "?r",
-                      "?l": "?l"}
+    def test2_6():
+        communicate_soil_dict6: dict[Hashable, bool] = {pred1: False, pred2: True, pred3: False}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict6,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?p": "?p",
+                          "?x": "?x",
+                          "?y": "?y",
+                          "?r": "?r",
+                          "?l": "?l"}
     #7============================================7
-    communicate_soil_dict7: dict[Hashable, bool] = {pred1: False, pred2: False, pred3: True}
-    output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict7,
-                                                   act_signature=action_signature,
-                                                   domain_types=types)
-    assert output == {"?p": "?p",
-                      "?x": "?x",
-                      "?y": "?y",
-                      "?r": "?r",
-                      "?l": "?l"}
-
+    def test2_7():
+        communicate_soil_dict7: dict[Hashable, bool] = {pred1: False, pred2: False, pred3: True}
+        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict7,
+                                                       act_signature=action_signature,
+                                                       domain_types=types)
+        assert output == {"?p": "?p",
+                          "?x": "?x",
+                          "?y": "?y",
+                          "?r": "?r",
+                          "?l": "?l"}
+    test1_1()
+    test1_2()
+    test1_3()
+    test2_1()
+    test2_2()
+    test2_3()
+    test2_4()
+    test2_5()
+    test2_6()
+    test2_7()
 
 
