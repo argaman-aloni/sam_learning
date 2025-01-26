@@ -60,7 +60,7 @@ class DisjointSet:  # this class was taken from geeksForGeeks
             # Move i under j (doesn't matter which one goes where)
             self.parent[jrep] = irep
             # Increment the result tree's rank by 1
-            self.rank[jrep] += 1
+            self.rank[irep] += 1
 
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
@@ -69,7 +69,7 @@ class ExtendedSamLearner(SAMLearner):
     possible_effect: dict[str, set[Predicate]]
     cnf_eff: dict[str, And[Or[Var]]]
     cnf_eff_as_set: dict[str, set[Or[Var]]]
-    vars_to_forget: dict[str, set[Predicate]]
+    vars_to_forget: dict[str, set[str]]
     def __init__(self,
                  partial_domain: Domain,
                  negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard_but_allow_proxy):
