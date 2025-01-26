@@ -1,6 +1,6 @@
 """module tests for the ESAM learning algorithm"""
 import logging
-from typing import Hashable
+from typing import Hashable, Set, Dict
 
 from nnf import Or, Var
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
@@ -43,19 +43,19 @@ def test_get_is_eff_clause_for_predicate(rovers_esam_learner: ExtendedSamLearner
     grounded_action = comp.grounded_action_call
     add_grounded_effects, _ = extract_effects(prev_state, next_state)
     grounded_predicate: GroundedPredicate = GroundedPredicate(
-        "communicated_soil_data", dict(),dict(), True )
+        "communicated_soil_data", {}, {}, True )
 
     for add_grounded_effect in add_grounded_effects:
         if add_grounded_effect.name == "communicated_soil_data":
             grounded_predicate = add_grounded_effect
 
-    expected_strs: set[str] = {"(communicated_soil_data ?p)", "(communicated_soil_data ?x)"}
+    expected_strs: Set[str] = {"(communicated_soil_data ?p)", "(communicated_soil_data ?x)"}
     or_clause: Or[Var] = rovers_esam_learner.get_is_eff_clause_for_predicate(grounded_action, grounded_predicate)
     literals = or_clause.vars()
-    predicates: set[str] = {var.__str__() for var in literals}
+    predicates: Set[str] = {str(var) for var in literals}
     print("first test predicates are")
     print(predicates)
-    assert len(list(predicates)) == 2
+    assert len(predicates) == 2
     assert expected_strs.issubset(predicates)
 
 # ======= second test, injective binding=======
@@ -84,9 +84,9 @@ def test_get_surely_not_eff(rovers_esam_learner: ExtendedSamLearner, rovers_esam
     # ======= first test, multiple binding=======
     next_state = comp.next_state
     grounded_action = comp.grounded_action_call
-    esam_not_eff: set[str] = {p.untyped_representation for p in
+    esam_not_eff: Set[str] = {p.untyped_representation for p in
                               rovers_esam_learner.get_surely_not_eff(next_state, grounded_action)}
-    effects: set[str] = {"(channel_free ?l - lander)", "(communicated_soil_data ?p - waypoint)", "(available ?r - rover)"}
+    effects: Set[str] = {"(channel_free ?l - lander)", "(communicated_soil_data ?p - waypoint)", "(available ?r - rover)"}
     assert (effects.intersection(esam_not_eff) == set())
 
 
@@ -123,7 +123,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
 # ========================test set 1======================================
 # ========================================================================
     def test1_1():
-        communicate_soil_dict1: dict[Hashable, bool] = {pred1: True, pred2: True}
+        communicate_soil_dict1: Dict[Hashable, bool] = {pred1: True, pred2: True}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -134,7 +134,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
                           "?l": "?l"}
 #===================================================================================
     def test1_2():
-        communicate_soil_dict2: dict[Hashable, bool] = {pred1: False, pred2: True}
+        communicate_soil_dict2: Dict[Hashable, bool] = {pred1: False, pred2: True}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -146,7 +146,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
                           "?l": "?l"}
 # ===================================================================================
     def test1_3():
-        communicate_soil_dict3: dict[Hashable, bool] = {pred1: True, pred2: False}
+        communicate_soil_dict3: Dict[Hashable, bool] = {pred1: True, pred2: False}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -162,7 +162,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
 
     # ============================================1
     def test2_1():
-        communicate_soil_dict1: dict[Hashable, bool] = {pred1: True, pred2: True, pred3: True}
+        communicate_soil_dict1: Dict[Hashable, bool] = {pred1: True, pred2: True, pred3: True}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -174,7 +174,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
 
     # ============================================2
     def test2_2():
-        communicate_soil_dict2: dict[Hashable, bool] = {pred1: True, pred2: True, pred3: False}
+        communicate_soil_dict2: Dict[Hashable, bool] = {pred1: True, pred2: True, pred3: False}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -186,7 +186,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
 
     #3============================================3
     def test2_3():
-        communicate_soil_dict3: dict[Hashable, bool] = {pred1: True, pred2: False, pred3: True}
+        communicate_soil_dict3: Dict[Hashable, bool] = {pred1: True, pred2: False, pred3: True}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -197,7 +197,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
                           "?l": "?l"}
     #4============================================4
     def test2_4():
-        communicate_soil_dict4: dict[Hashable, bool] = {pred1: False, pred2: True, pred3: True}
+        communicate_soil_dict4: Dict[Hashable, bool] = {pred1: False, pred2: True, pred3: True}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict4,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -208,7 +208,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
                           "?l": "?l"}
     #5============================================5
     def test2_5():
-        communicate_soil_dict5: dict[Hashable, bool] = {pred1: True, pred2: False, pred3: False}
+        communicate_soil_dict5: Dict[Hashable, bool] = {pred1: True, pred2: False, pred3: False}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict5,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -219,7 +219,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
                           "?l": "?l"}
     #6============================================6
     def test2_6():
-        communicate_soil_dict6: dict[Hashable, bool] = {pred1: False, pred2: True, pred3: False}
+        communicate_soil_dict6: Dict[Hashable, bool] = {pred1: False, pred2: True, pred3: False}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict6,
                                                        act_signature=action_signature,
                                                        domain_types=types)
@@ -230,7 +230,7 @@ def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamL
                           "?l": "?l"}
     #7============================================7
     def test2_7():
-        communicate_soil_dict7: dict[Hashable, bool] = {pred1: False, pred2: False, pred3: True}
+        communicate_soil_dict7: Dict[Hashable, bool] = {pred1: False, pred2: False, pred3: True}
         output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict7,
                                                        act_signature=action_signature,
                                                        domain_types=types)
