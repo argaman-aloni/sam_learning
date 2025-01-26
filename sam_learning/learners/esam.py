@@ -120,6 +120,19 @@ class ExtendedSamLearner(SAMLearner):
         lifted_not_eff = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_not_effect))
         return set(lifted_not_eff)
 
+    def handle_effects(self, previous_state: State, next_state: State, grounded_action : ActionCall):
+        # handle effects
+        add_grounded_effects, del_grounded_effects = extract_effects(previous_state, next_state)
+        # add 'Or' clauses to set of 'Or' clauses
+        for grounded_effect in add_grounded_effects.union(del_grounded_effects):
+            or_clause = self.get_is_eff_clause_for_predicate(grounded_action, grounded_effect)
+            self.cnf_eff_as_set[grounded_action.name].add(or_clause)
+
+        not_eff_set_predicates = self.get_surely_not_eff(next_state, grounded_action)
+        not_eff_set_as_string = {eff.untyped_representation for eff in not_eff_set_predicates}
+
+        self.vars_to_forget[grounded_action.name].update(not_eff_set_as_string)
+
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
 
@@ -133,19 +146,9 @@ class ExtendedSamLearner(SAMLearner):
         super()._add_new_action_preconditions(grounded_action)
 
         # handling effects
-        add_grounded_effects, del_grounded_effects = extract_effects(previous_state, next_state)
         self.cnf_eff_as_set[observed_action.name] = set()
-
-        # add 'Or' clauses to set of 'Or' clauses
-        for grounded_effect in add_grounded_effects.union(del_grounded_effects):
-            or_clause = self.get_is_eff_clause_for_predicate(grounded_action, grounded_effect)
-            self.cnf_eff_as_set[grounded_action.name].add(or_clause)
-
-        # extract predicated who are surely not an effect
-        not_eff_set = self.get_surely_not_eff(next_state, grounded_action)
-        self.vars_to_forget[observed_action.name] = {eff.untyped_representation for eff in not_eff_set}
-        self.observed_actions.append(observed_action.name)
-        self.logger.debug(f"Finished adding the action {grounded_action.name}.")
+        self.vars_to_forget[observed_action.name] = set()
+        self.handle_effects(previous_state, next_state, grounded_action)
 
     def update_action(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -160,19 +163,8 @@ class ExtendedSamLearner(SAMLearner):
         observed_action = self.partial_domain.actions[action_name]
         # handle preconditions
         super()._update_action_preconditions(grounded_action)
-        # handle effects
-        add_grounded_effects, del_grounded_effects = extract_effects(previous_state, next_state)
-        # add 'Or' clauses to set of 'Or' clauses
-        for grounded_effect in add_grounded_effects.union(del_grounded_effects):
-            or_clause = self.get_is_eff_clause_for_predicate(grounded_action, grounded_effect)
-            self.cnf_eff_as_set[grounded_action.name].add(or_clause)
+        self.handle_effects(previous_state, next_state, grounded_action)
 
-        not_eff_set_predicates = self.get_surely_not_eff(next_state, grounded_action)
-        not_eff_set_as_string = {eff.untyped_representation for eff in not_eff_set_predicates}
-        self.vars_to_forget[observed_action.name].update(not_eff_set_as_string)
-
-        # add all predicates who are surely not an effect for future
-        self.logger.debug(f"Done updating the action cnf formulas - {grounded_action.name}")
 
     def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
         """Handles a single trajectory component as a part of the learning process.
@@ -204,7 +196,6 @@ class ExtendedSamLearner(SAMLearner):
             self.cnf_eff[action_name] = self.cnf_eff[action_name].forget(self.vars_to_forget[action_name])
             # minimize sentence to prime implicates
             self.cnf_eff[action_name] = self.cnf_eff[action_name].implicates()
-
 
     def create_lifted_action_data(self, action_name: str) -> None:
         """
@@ -260,6 +251,11 @@ class ExtendedSamLearner(SAMLearner):
         self.add_lifted_action_instance(action_name, proxies)
 
 
+    def construct_proxy(self, action_name: str,
+                        proxy_effects: Set[Predicate],
+                        proxy_param_dict: Dict[str, str], ) -> None:
+        pass
+
     def add_lifted_action_instance(self,
                                    action_name: str,
                                    proxies: List[Tuple[Set[Predicate], Set[Predicate], Dict[str, str]]]):
@@ -289,12 +285,17 @@ class ExtendedSamLearner(SAMLearner):
                 preconds.update(p for p in self.partial_domain.actions[action_name].preconditions.root.operands
                                 if isinstance(p,Predicate))
 
+                # maps each param to its set representative param
                 proxy_signature_modified_param_dict = proxy[proxy_model_dict]
+                # use new mapping to modify effects bindings
                 effects: Set[Predicate] = modify_predicate_signature(proxy[proxy_effects],
                                                                      proxy_signature_modified_param_dict)
+                # use new mapping to modify preconditions bindings
                 preconds = modify_predicate_signature(preconds, proxy_signature_modified_param_dict)
+
+                # use reverse the new mapping for min minimizing action's signature
                 reversed_proxy_signature_modified_param_dict: Dict[str, str] = {
-                    v: k for k, v in proxy_signature_modified_param_dict.items()}
+                    new_repr: old_repr for old_repr, new_repr in proxy_signature_modified_param_dict.items()}
 
                 new_signature = {parameter: signature[parameter] for
                                  parameter in reversed_proxy_signature_modified_param_dict.keys()}
