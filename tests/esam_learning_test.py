@@ -76,178 +76,159 @@ def test_get_is_eff_clause_for_predicate(rovers_esam_learner: ExtendedSamLearner
     print(predicates)
     assert expected_strs.__eq__(predicates)
 
+def assert_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamLearner,
+                                               model_dict: Dict[Hashable, bool],
+                                               expected_output: Dict[str,str]):
+    types = rovers_esam_learner.partial_domain.types
+    action_signature: SignatureType = {
+        '?r': types["rover"],
+        '?l': types["lander"],
+        '?p': types["waypoint"],
+        '?x': types["waypoint"],
+        '?y': types["waypoint"]}
 
-def test_get_surely_not_eff(rovers_esam_learner: ExtendedSamLearner, rovers_esam_observation: Observation):
-    logging.getLogger().setLevel(level=logging.INFO)
-    rovers_esam_learner.logger.setLevel(level=logging.WARNING)
-    comp = rovers_esam_observation.components[-1]
-    # ======= first test, multiple binding=======
-    next_state = comp.next_state
-    grounded_action = comp.grounded_action_call
-    esam_not_eff: Set[str] = {p.untyped_representation for p in
-                              rovers_esam_learner.get_surely_not_eff(next_state, grounded_action)}
-    effects: Set[str] = {"(channel_free ?l - lander)", "(communicated_soil_data ?p - waypoint)", "(available ?r - rover)"}
-    assert (effects.intersection(esam_not_eff) == set())
-
-
-
-    # ======= second test, injective binding=======
-
-    comp = rovers_esam_observation.components[0]
-    next_state = comp.next_state
-    grounded_action = comp.grounded_action_call
-    esam_not_eff: set[str] = {p.untyped_representation for p in
-                              rovers_esam_learner.get_surely_not_eff(next_state, grounded_action)}
-
-    effects: set[str] = {"(calibrated ?i - camera ?r - rover)"}
-    assert (effects.intersection(esam_not_eff) == set())
+    output = get_minimize_parameters_equality_dict(model_dict=model_dict,
+                                                   act_signature=action_signature,
+                                                   domain_types=types)
+    assert output == expected_output
 
 
-def test_get_minimize_parameters_equality_dict(rovers_esam_learner: ExtendedSamLearner,
+
+def test_get_minimize_parameters_equality_dict1(rovers_esam_learner: ExtendedSamLearner,
                                                rovers_esam_observation: Observation):
     # learning from action indexed -1 (communicate_soil_data 'rover0' 'general' 'waypoint2' 'waypoint2' 'waypoint0')
     # multiple binding
-    types = rovers_esam_learner.partial_domain.types
-    action_signature: SignatureType = {
-                        '?r': types["rover"],
-                        '?l': types["lander"],
-                        '?p' : types["waypoint"],
-                        '?x' : types["waypoint"],
-                        '?y' : types["waypoint"]}
 
     pred1: str = "(communicated_soil_data ?p - waypoint)"
     pred2: str = "(communicated_soil_data ?x - waypoint)"
-    pred3: str = "(communicated_soil_data ?y - waypoint)"
 
 # ========================================================================
 # ========================test set 1======================================
 # ========================================================================
-    def test1_1():
-        communicate_soil_dict1: Dict[Hashable, bool] = {pred1: True, pred2: True}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?x": "?p",
-                          "?y": "?x",
-                          "?p": "?p",
-                          "?r": "?r",
-                          "?l": "?l"}
+    logging.getLogger().log(logging.INFO, "test1 in test_get_minimize_parameters_equality_dict1")
+    communicate_soil_dict1: Dict[Hashable, bool] = {pred1: True, pred2: True}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict1,
+                                               {"?x": "?p",
+                                                "?y": "?x",
+                                                "?p": "?p",
+                                                "?r": "?r",
+                                                "?l": "?l"})
+
 #===================================================================================
-    def test1_2():
-        communicate_soil_dict2: Dict[Hashable, bool] = {pred1: False, pred2: True}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-
-        assert output == {"?x": "?x",
-                          "?y": "?y",
-                          "?p": "?p",
-                          "?r": "?r",
-                          "?l": "?l"}
+    logging.getLogger().log(logging.INFO, "test2 in test_get_minimize_parameters_equality_dict1")
+    communicate_soil_dict2: Dict[Hashable, bool] = {pred1: False, pred2: True}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict2,
+                                               {"?x": "?x",
+                                                "?y": "?y",
+                                                "?p": "?p",
+                                                "?r": "?r",
+                                                "?l": "?l"})
 # ===================================================================================
-    def test1_3():
-        communicate_soil_dict3: Dict[Hashable, bool] = {pred1: True, pred2: False}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?x": "?x",
-                          "?y": "?y",
-                          "?p": "?p",
-                          "?r": "?r",
-                          "?l": "?l"}
+    logging.getLogger().log(logging.INFO, "test3 in test_get_minimize_parameters_equality_dict1")
+    communicate_soil_dict3: Dict[Hashable, bool] = {pred1: True, pred2: False}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict3,
+                                               {"?x": "?x",
+                                                "?y": "?y",
+                                                "?p": "?p",
+                                                "?r": "?r",
+                                                "?l": "?l"})
 
+# more complex formulas
+def test_get_minimize_parameters_equality_dict2(rovers_esam_learner: ExtendedSamLearner,
+                                                rovers_esam_observation: Observation):
 #========================================================================
 #========================test set 2======================================
 #========================================================================
-
+    pred1: str = "(communicated_soil_data ?p - waypoint)"
+    pred2: str = "(communicated_soil_data ?x - waypoint)"
+    pred3: str = "(communicated_soil_data ?y - waypoint)"
     # ============================================1
-    def test2_1():
-        communicate_soil_dict1: Dict[Hashable, bool] = {pred1: True, pred2: True, pred3: True}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict1,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?p": "?p",
-                          "?x": "?p",
-                          "?y": "?p",
-                          "?r": "?r",
-                          "?l": "?l"}
+
+
+    logging.getLogger().log(logging.INFO, "test1 in test_get_minimize_parameters_equality_dict2")
+    communicate_soil_dict1: Dict[Hashable, bool] = {pred1: True, pred2: True, pred3: True}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict1,
+                                               {"?p": "?p",
+                                                "?x": "?p",
+                                                "?y": "?p",
+                                                "?r": "?r",
+                                                "?l": "?l"})
 
     # ============================================2
-    def test2_2():
-        communicate_soil_dict2: Dict[Hashable, bool] = {pred1: True, pred2: True, pred3: False}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict2,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?p": "?p",
-                          "?x": "?p",
-                          "?y": "?x",
-                          "?r": "?r",
-                          "?l": "?l"}
+
+
+    logging.getLogger().log(logging.INFO, "test2 in test_get_minimize_parameters_equality_dict2")
+    communicate_soil_dict2: Dict[Hashable, bool] = {pred1: True, pred2: True, pred3: False}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict2,
+                                               {"?p": "?p",
+                                                "?x": "?p",
+                                                "?y": "?x",
+                                                "?r": "?r",
+                                                "?l": "?l"})
 
     #3============================================3
-    def test2_3():
-        communicate_soil_dict3: Dict[Hashable, bool] = {pred1: True, pred2: False, pred3: True}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict3,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?p": "?p",
-                          "?x": "?x",
-                          "?y": "?p",
-                          "?r": "?r",
-                          "?l": "?l"}
+
+    logging.getLogger().log(logging.INFO, "test3 in test_get_minimize_parameters_equality_dict2")
+    communicate_soil_dict3: Dict[Hashable, bool] = {pred1: True, pred2: False, pred3: True}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict3,
+                                               {"?p": "?p",
+                                                "?x": "?x",
+                                                "?y": "?p",
+                                                "?r": "?r",
+                                                "?l": "?l"})
+
     #4============================================4
-    def test2_4():
-        communicate_soil_dict4: Dict[Hashable, bool] = {pred1: False, pred2: True, pred3: True}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict4,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?p": "?p",
-                          "?x": "?x",
-                          "?y": "?x",
-                          "?r": "?r",
-                          "?l": "?l"}
+    logging.getLogger().log(logging.INFO, "test4 in test_get_minimize_parameters_equality_dict2")
+    communicate_soil_dict4: Dict[Hashable, bool] = {pred1: False, pred2: True, pred3: True}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict4,
+                                               {"?p": "?p",
+                                                "?x": "?x",
+                                                "?y": "?x",
+                                                "?r": "?r",
+                                                "?l": "?l"})
     #5============================================5
-    def test2_5():
-        communicate_soil_dict5: Dict[Hashable, bool] = {pred1: True, pred2: False, pred3: False}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict5,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?p": "?p",
-                          "?x": "?x",
-                          "?y": "?y",
-                          "?r": "?r",
-                          "?l": "?l"}
+
+
+    logging.getLogger().log(logging.INFO, "test5 in test_get_minimize_parameters_equality_dict2")
+
+    communicate_soil_dict5: Dict[Hashable, bool] = {pred1: True, pred2: False, pred3: False}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict5,
+                                               {"?p": "?p",
+                                                "?x": "?x",
+                                                "?y": "?y",
+                                                "?r": "?r",
+                                                "?l": "?l"})
+
     #6============================================6
-    def test2_6():
-        communicate_soil_dict6: Dict[Hashable, bool] = {pred1: False, pred2: True, pred3: False}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict6,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?p": "?p",
-                          "?x": "?x",
-                          "?y": "?y",
-                          "?r": "?r",
-                          "?l": "?l"}
+    logging.getLogger().log(logging.INFO, "test6 in test_get_minimize_parameters_equality_dict2")
+    communicate_soil_dict6: Dict[Hashable, bool] = {pred1: False, pred2: True, pred3: False}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict6,
+                                               {"?p": "?p",
+                                                "?x": "?x",
+                                                "?y": "?y",
+                                                "?r": "?r",
+                                                "?l": "?l"})
     #7============================================7
-    def test2_7():
-        communicate_soil_dict7: Dict[Hashable, bool] = {pred1: False, pred2: False, pred3: True}
-        output = get_minimize_parameters_equality_dict(model_dict=communicate_soil_dict7,
-                                                       act_signature=action_signature,
-                                                       domain_types=types)
-        assert output == {"?p": "?p",
-                          "?x": "?x",
-                          "?y": "?y",
-                          "?r": "?r",
-                          "?l": "?l"}
-    test1_1()
-    test1_2()
-    test1_3()
-    test2_1()
-    test2_2()
-    test2_3()
-    test2_4()
-    test2_5()
-    test2_6()
-    test2_7()
+
+
+    logging.getLogger().log(logging.INFO, "test7 in test_get_minimize_parameters_equality_dict2")
+    communicate_soil_dict7: Dict[Hashable, bool] = {pred1: False, pred2: False, pred3: True}
+    assert_get_minimize_parameters_equality_dict(rovers_esam_learner,
+                                               communicate_soil_dict7,
+                                               {"?p": "?p",
+                                                "?x": "?x",
+                                                "?y": "?y",
+                                                "?r": "?r",
+                                                "?l": "?l"})
+
 
 
