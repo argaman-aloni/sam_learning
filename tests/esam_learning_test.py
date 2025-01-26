@@ -41,7 +41,7 @@ def test_get_is_eff_clause_for_predicate(rovers_esam_learner: ExtendedSamLearner
     prev_state = comp.previous_state
     next_state = comp.next_state
     grounded_action = comp.grounded_action_call
-    add_grounded_effects, del_grounded_effects = extract_effects(prev_state, next_state)
+    add_grounded_effects, _ = extract_effects(prev_state, next_state)
     grounded_predicate: GroundedPredicate = GroundedPredicate(
         "communicated_soil_data", dict(),dict(), True )
 
@@ -64,7 +64,7 @@ def test_get_is_eff_clause_for_predicate(rovers_esam_learner: ExtendedSamLearner
     prev_state = comp.previous_state
     next_state = comp.next_state
     grounded_action = comp.grounded_action_call
-    add_grounded_effects, del_grounded_effects = extract_effects(prev_state, next_state)
+    add_grounded_effects, _ = extract_effects(prev_state, next_state)
     for add_grounded_effect in add_grounded_effects:
         if add_grounded_effect.name == "calibrated":
             grounded_predicate = add_grounded_effect
