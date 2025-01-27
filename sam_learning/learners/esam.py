@@ -1,3 +1,4 @@
+import logging
 from typing import List, Tuple, Dict, Hashable, Set
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
 from pddl_plus_parser.models import (Observation, Predicate, ActionCall, State, Domain, ObservedComponent,
@@ -8,58 +9,6 @@ from nnf import And, Or, Var
 from scipy.cluster.hierarchy import DisjointSet
 from utilities import NegativePreconditionPolicy
 
-
-# class DisjointSet:  # this class was taken from geeksForGeeks
-#     def __init__(self, size):
-#         self.parent = [i for i in range(size)]
-#         self.rank = [0] * size
-#
-#     # Function to find the representative (or the root node) of a set
-#     def find(self, i):
-#         # If the index 'i' is not the representative of its set, recursively find the representative
-#         if self.parent[i] != i:
-#             self.parent[i] = self.find(self.parent[i])  # Path compression
-#         return self.parent[i]
-#
-#     def union(self, i, j):
-#         irep = self.find(i)
-#         jrep = self.find(j)
-#         if irep == jrep:
-#             return
-#         else:
-#             self.parent[jrep] = irep
-#
-#
-#     # Unites the set that includes i and the set that includes j by rank
-#     def union_by_rank(self, i, j):
-#         # Find the representatives (or the root nodes) for the set that includes i and j
-#         irep = self.find(i)
-#         jrep = self.find(j)
-#
-#         # Elements are in the same set, no need to unite anything
-#         if irep == jrep:
-#             return
-#
-#         # Get the rank of i's tree
-#         irank = self.rank[irep]
-#
-#         # Get the rank of j's tree
-#         jrank = self.rank[jrep]
-#
-#         # If i's rank is less than j's rank
-#         if irank < jrank:
-#             # Move i under j
-#             self.parent[irep] = jrep
-#         # Else if j's rank is less than i's rank
-#         elif jrank < irank:
-#             # Move j under i
-#             self.parent[jrep] = irep
-#         # Else if their ranks are the same
-#         else:
-#             # Move i under j (doesn't matter which one goes where)
-#             self.parent[jrep] = irep
-#             # Increment the result tree's rank by 1
-#             self.rank[irep] += 1
 
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
@@ -76,6 +25,7 @@ class ExtendedSamLearner(SAMLearner):
         super().__init__(partial_domain=partial_domain,
                          negative_preconditions_policy=negative_preconditions_policy)
 
+        self.logger = logging.getLogger(__name__)
         self.possible_effect = {}
         self.cnf_eff_as_set = {}
         self.vars_to_forget = {}
@@ -122,6 +72,7 @@ class ExtendedSamLearner(SAMLearner):
 
     def handle_effects(self, previous_state: State, next_state: State, grounded_action : ActionCall):
         # handle effects
+        self.logger.debug(f"handling action {grounded_action.name} effects.")
         add_grounded_effects, del_grounded_effects = extract_effects(previous_state, next_state)
         # add 'Or' clauses to set of 'Or' clauses
         for grounded_effect in add_grounded_effects.union(del_grounded_effects):
@@ -132,6 +83,8 @@ class ExtendedSamLearner(SAMLearner):
         not_eff_set_as_string = {eff.untyped_representation for eff in not_eff_set_predicates}
 
         self.vars_to_forget[grounded_action.name].update(not_eff_set_as_string)
+        self.logger.debug(f"finished handling action {grounded_action.name} effects.")
+
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
@@ -143,12 +96,14 @@ class ExtendedSamLearner(SAMLearner):
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
+        self.observed_actions.append(observed_action.name)
         super()._add_new_action_preconditions(grounded_action)
 
         # handling effects
         self.cnf_eff_as_set[observed_action.name] = set()
         self.vars_to_forget[observed_action.name] = set()
         self.handle_effects(previous_state, next_state, grounded_action)
+
 
     def update_action(
             self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
@@ -159,11 +114,13 @@ class ExtendedSamLearner(SAMLearner):
         :param next_state: the state that was created after executing the action on the previous
             state.
         """
+        self.logger.debug(f"updating action {str(grounded_action)}.")
         action_name = grounded_action.name
         observed_action = self.partial_domain.actions[action_name]
         # handle preconditions
         super()._update_action_preconditions(grounded_action)
         self.handle_effects(previous_state, next_state, grounded_action)
+        self.logger.debug(f"finished updating action {str(grounded_action)}.")
 
 
     def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
@@ -192,14 +149,136 @@ class ExtendedSamLearner(SAMLearner):
         # build initial deducted cnf sentence for each action
         self.cnf_eff = {action_name: And(clauses) for action_name, clauses in self.cnf_eff_as_set.items()}
         for action_name in self.cnf_eff.keys():
+            self.logger.debug(f"building action {action_name} cnf formula.")
             # forget all effect who are surely not an effect
             self.cnf_eff[action_name] = self.cnf_eff[action_name].forget(self.vars_to_forget[action_name])
             # minimize sentence to prime implicates
             self.cnf_eff[action_name] = self.cnf_eff[action_name].implicates()
 
-    def create_lifted_action_data(self, action_name: str) -> None:
+    def is_proxy_contradiction(self, negative_assinged_predicates: Set[Hashable], action_name: str) -> bool:
         """
         creates and adds the proxy action by its name in the domain to the learned domain.
+
+        Args:
+            negative_assinged_predicates (Set[Hashable]):
+                all predicates with negative assignment in cnf satisfying assignment
+            action_name (str): the original action's name.
+
+        Returns:
+        True if contradiction is found, False otherwise.
+        """
+        for parameter_bound_literal in negative_assinged_predicates:
+            predicate = parse_predicate_from_string(str(parameter_bound_literal), self.partial_domain.types)
+            if self.negative_preconditions_policy != NegativePreconditionPolicy.hard:
+                # create negated precondition (true-> false, false -> true)
+                predicate_negated_copy = predicate.copy(is_negated=True)
+
+                # check for negated precondition is in action preconditions to avoid contradictions
+                if predicate_negated_copy in self.partial_domain.actions[action_name].preconditions.root.operands:
+                    #negated precondition found, therefore contradiction, return false.
+                    return True
+
+            else:  # if no negative preconditions are allowed by policy
+                if not predicate.is_positive:
+                    # predicate is negative, no neg preconds are allowed, therefore contradiction
+                    return True
+
+        return False
+
+    def construct_proxy_action(self,
+                               action_name: str,
+                               proxy_missing_precondition: Set[Predicate],
+                               proxy_effects: Set[Predicate],
+                               modified_parameter_mapping_dict: Dict[str, str],
+                               proxy_number: int) -> LearnerAction:
+        """
+            constructs a proxy action based on information learned.
+
+            Args:
+                action_name (str): the name of the Original lifted action.
+                proxy_missing_precondition (Set[Predicate]): A unique set of predicates to add for the action's preconditions.
+                proxy_effects (Set[Predicate]): set of predicates that are deducted as effects after solving
+                 cnf_effect formula.
+                modified_parameter_mapping_dict (Dict[str, str]): a dictionary that maps each argument of the original
+                  action to its new representative in the signature.
+                proxy_number (int): the index of proxy to be generated
+
+            Returns:
+                constructed proxy action
+        """
+        proxy_action_name = f"{action_name}_{proxy_number}"
+        self.logger.debug(f" constructing proxy action: {proxy_action_name}")
+        signature = self.partial_domain.actions[action_name].signature
+        preconds: Set[Predicate] = proxy_missing_precondition
+        preconds.update(p for p in self.partial_domain.actions[action_name].preconditions.root.operands
+                        if isinstance(p, Predicate))
+
+        # maps each param to its set representative param
+        # use new mapping to modify effects bindings
+        effects: Set[Predicate] = modify_predicate_signature(proxy_effects,
+                                                             modified_parameter_mapping_dict)
+        # use new mapping to modify preconditions bindings
+        preconds = modify_predicate_signature(preconds, modified_parameter_mapping_dict)
+
+        # use reverse the new mapping for min minimizing action's signature
+        reversed_proxy_signature_modified_param_dict: Dict[str, str] = {
+            new_repr: old_repr for old_repr, new_repr in modified_parameter_mapping_dict.items()}
+
+        new_signature = {parameter: signature[parameter] for
+                         parameter in reversed_proxy_signature_modified_param_dict.keys()}
+        proxy_action = LearnerAction(proxy_action_name, signature=new_signature)
+        proxy_action.discrete_effects = effects
+        proxy_action.preconditions.root.operands = preconds
+        self.logger.debug(f" finished construction of proxy action: {proxy_action_name}")
+        return proxy_action
+
+    def handle_lifted_action_instances(self,
+                                       action_name: str,
+                                       action_proxies_data: List[Tuple[Set[Predicate], Set[Predicate], Dict[str, str]]]
+                                       ):
+        """
+        adds the lifted action additional information to the partial domain, if proxys are needed, the adds proxys to
+        the partial domain.
+        Args:
+            action_name: the name of the lifted action.
+            action_proxies_data: list of Tuples where each tuple has preconditions, effect and dictionary.
+        """
+        proxy_preconds = 0
+        proxy_effects = 1
+        proxy_model_dict = 2
+
+        if len(action_proxies_data) == 1: # to avoid index in the action name if not needed
+            self.logger.debug(f" updating single instance of action: {action_name}")
+            preconds: Set[Predicate] = action_proxies_data[0][proxy_preconds]
+            self.partial_domain.actions[action_name].preconditions.root.operands.update(preconds)
+            self.partial_domain.actions[action_name].discrete_effects = action_proxies_data[0][proxy_effects]
+
+        elif len(action_proxies_data) > 1:
+            self.logger.debug(f" creating proxy actions for action: {action_name}")
+            proxy_number = 1
+            for proxy_data in action_proxies_data:
+                # unpack tuple fields to get properties of proxy action into arguments of action constructor
+                new_proxy = self.construct_proxy_action(action_name=action_name,
+                                                        proxy_missing_precondition=proxy_data[proxy_preconds],
+                                                        proxy_effects=proxy_data[proxy_effects],
+                                                        modified_parameter_mapping_dict=proxy_data[proxy_model_dict],
+                                                        proxy_number=proxy_number)
+
+                #add proxy action to Learned domain action model
+                self.partial_domain.actions[new_proxy.name] = new_proxy
+                proxy_number+=1
+
+            # pop original unsafe action from learned Domain action model
+            self.partial_domain.actions.pop(action_name)
+
+    def add_lifted_action_instances(self, action_name: str) -> None:
+        """
+        creates and adds all safe instances of action.
+        if injective binding assumption holds for at least 1 observation,
+            only 1 instance is initialized in the learned domain
+        if injective binding assumption does not hold for all observations of the action,
+            proxy actions are created and added to the domain.
+
         Args:
             action_name: the name of the action to build proxys.
         """
@@ -208,106 +287,37 @@ class ExtendedSamLearner(SAMLearner):
 
         proxies = []
         for model in self.cnf_eff[action_name].models():
-            effect = set()
-            preconds_to_add = set()
-            is_skip_proxy = False
-            for parameter_bound_literal, assignment in model.items():
-                predicate = parse_predicate_from_string(str(parameter_bound_literal), self.partial_domain.types)
-                if assignment:
-                    effect.add(predicate)
-
-                # handle precondition additions
-                else:  # check for contradiction
-                    if self.negative_preconditions_policy != NegativePreconditionPolicy.hard:
-                        predicate_negated_copy = predicate.copy(is_negated=True)
-                        #create negated precondition (true-> false, false -> true)
-
-
-                        # check for negated precond in preconds  to avoid contradictions
-                        if self.partial_domain.actions[action_name].preconditions.root.operands.__contains__(
-                            predicate_negated_copy):
-                            is_skip_proxy = True
-                            break
-
-                    else:  # if no negative preconditions are allowed by policy, so skip proxy
-                        if not predicate.is_positive:
-                            is_skip_proxy = True
-                            break
-
-                    # all ok add it to preconds
-                    preconds_to_add.add(predicate)
-
-            # check to see if the action needs to be skipped
-            if is_skip_proxy:
+            negative_assigned_predicates = set(pred for pred in model.keys() if not model[pred])
+            positive_assigned_predicates = set(model.keys()).difference(negative_assigned_predicates)
+            #check for contradiction before running
+            self.logger.debug(f"checking for contradiction action: {action_name} cnf assignment.")
+            if self.is_proxy_contradiction(negative_assigned_predicates, action_name):
+                self.logger.debug(f"contradiction found in action: {action_name} cnf assignment, skipping assignment.")
                 continue
+            self.logger.debug(f"No contradiction found for action: {action_name} cnf assignment.")
+            # take all positive assigned predicates and construct a Predicate with hashable instance from provided model
+            # add them as effects
+            effect: Set[Predicate] = {
+                parse_predicate_from_string(str(parameter_bound_literal), self.partial_domain.types)
+                                            for parameter_bound_literal in positive_assigned_predicates }
+
+            # take all negative assigned predicates and construct a Predicate with hashable instance from provided model
+            # add them as preconditions
+            preconds_to_add: Set[Predicate]= {
+                parse_predicate_from_string(str(parameter_bound_literal), self.partial_domain.types)
+                for parameter_bound_literal in negative_assigned_predicates }
 
             # assemble proxy info
+            self.logger.debug(f"assigning new representatives for parameters list of action {action_name}")
             proxy_signature_modified_param_dict = get_minimize_parameters_equality_dict(model_dict=model,
                                                                                 act_signature=act_signature,
                                                                                 domain_types=self.partial_domain.types)
 
-            proxies.append((preconds_to_add, effect, proxy_signature_modified_param_dict))
+            proxies.append((preconds_to_add,
+                            effect,
+                            proxy_signature_modified_param_dict))
 
-        self.add_lifted_action_instance(action_name, proxies)
-
-
-    def construct_proxy(self, action_name: str,
-                        proxy_effects: Set[Predicate],
-                        proxy_param_dict: Dict[str, str], ) -> None:
-        pass
-
-    def add_lifted_action_instance(self,
-                                   action_name: str,
-                                   proxies: List[Tuple[Set[Predicate], Set[Predicate], Dict[str, str]]]):
-        """
-        adds the lifted action additional information to the partial domain, if proxys are needed, the adds proxys to
-        the partial domain.
-        Args:
-            action_name: the name of the lifted action.
-            proxies: the proxies of the lifted action data, if len 1, no proxy needed.
-        """
-        proxy_preconds = 0
-        proxy_effects = 1
-        proxy_model_dict = 2
-
-        if len(proxies) == 1: # to avoid index in the action name if not needed
-            self.partial_domain.actions[action_name].discrete_effects = proxies[0][proxy_effects]
-            preconds: Set[Predicate] = proxies[0][proxy_preconds]
-            self.partial_domain.actions[action_name].preconditions.root.operands.update(preconds)
-
-        elif len(proxies) > 1:
-            proxy_number = 1
-            for proxy in proxies:
-                # unpack tuple fields to get properties of proxy action
-                name = f"{action_name}_{proxy_number}"
-                signature = self.partial_domain.actions[action_name].signature
-                preconds: Set[Predicate] = proxy[proxy_preconds]
-                preconds.update(p for p in self.partial_domain.actions[action_name].preconditions.root.operands
-                                if isinstance(p,Predicate))
-
-                # maps each param to its set representative param
-                proxy_signature_modified_param_dict = proxy[proxy_model_dict]
-                # use new mapping to modify effects bindings
-                effects: Set[Predicate] = modify_predicate_signature(proxy[proxy_effects],
-                                                                     proxy_signature_modified_param_dict)
-                # use new mapping to modify preconditions bindings
-                preconds = modify_predicate_signature(preconds, proxy_signature_modified_param_dict)
-
-                # use reverse the new mapping for min minimizing action's signature
-                reversed_proxy_signature_modified_param_dict: Dict[str, str] = {
-                    new_repr: old_repr for old_repr, new_repr in proxy_signature_modified_param_dict.items()}
-
-                new_signature = {parameter: signature[parameter] for
-                                 parameter in reversed_proxy_signature_modified_param_dict.keys()}
-
-                #initialize action
-                self.partial_domain.actions[name] = LearnerAction(name, signature=new_signature)
-                # set effects
-                self.partial_domain.actions[name].discrete_effects = effects
-                #update union all proxy cnf_eff negative literals to be preconditions
-                self.partial_domain.actions[name].preconditions.root.operands = preconds
-                proxy_number+=1
-            self.partial_domain.actions.pop(action_name)
+        self.handle_lifted_action_instances(action_name, proxies)
 
     def esam_handle_negative_preconditions_policy(self):
         for action_name in self.partial_domain.actions.keys():
@@ -331,6 +341,11 @@ class ExtendedSamLearner(SAMLearner):
             for component in observation.components:
                 self.handle_single_trajectory_component(component)
 
+    def construct_safe_actions(self) -> None:
+        """Constructs the single-agent actions that are safe to execute."""
+        for action_name in self.observed_actions:
+            self.add_lifted_action_instances(action_name)
+
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
@@ -342,14 +357,13 @@ class ExtendedSamLearner(SAMLearner):
         self._complete_possibly_missing_actions()
         self.handle_observations(observations)
         # note that creating will reset all the actions effects and precondition due to cnf solver usage.
-        self.logger.debug("creating updated actions")
+
         #build all cnf sentences for action's effects
         self.esam_handle_negative_preconditions_policy()
         self._remove_unobserved_actions_from_partial_domain()
+        self.logger.debug(f"building domain actions CNF formulas")
         self.build_cnf_formulas()
-        for action_name in self.observed_actions:
-            self.create_lifted_action_data(action_name)
-
+        self.construct_safe_actions()
         self.handle_negative_preconditions_policy()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
