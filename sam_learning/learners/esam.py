@@ -157,7 +157,7 @@ class ExtendedSamLearner(SAMLearner):
 
     def is_proxy_contradiction(self, negative_assinged_predicates: Set[Hashable], action_name: str) -> bool:
         """
-        creates and adds the proxy action by its name in the domain to the learned domain.
+        creates and adds the proxy action by its name in the domain to the learned partial-domain.
 
         Args:
             negative_assinged_predicates (Set[Hashable]):
