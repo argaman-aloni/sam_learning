@@ -270,6 +270,10 @@ class ParallelExperimentRunner:
         )
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         portfolio = [SolverType.metric_ff, SolverType.enhsp] if self._learning_algorithm in NUMERIC_ALGORITHMS else [SolverType.fast_downward]
+        if "ABORT_SOLVING" in os.environ:
+            self.logger.debug("Skipping the validation of the learned domain due to request in the experiment.")
+            return domain_file_path
+
         self.domain_validator.validate_domain(
             tested_domain_file_path=domain_file_path,
             test_set_directory_path=test_set_dir_path,
