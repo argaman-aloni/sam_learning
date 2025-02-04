@@ -90,7 +90,8 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
 
         self.semantic_performance_calc.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
-        self.domain_validator.write_statistics(fold_num)
+        if "ABORT_SOLVING" not in os.environ:
+            self.domain_validator.write_statistics(fold_num)
 
 
 def parse_arguments() -> argparse.Namespace:

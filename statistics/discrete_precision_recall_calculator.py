@@ -43,10 +43,10 @@ def calculate_syntactic_recall(learned_predicates: Set[str], actual_predicates: 
     :param actual_predicates: the predicates belonging to the model domain.
     :return: the recall value.
     """
-    if len(learned_predicates) == 0:
+    if len(actual_predicates) == 0:
         return 1
 
-    if len(actual_predicates) == 0:
+    if len(learned_predicates) == 0:
         return 0
 
     true_positives = calculate_number_true_positives(learned_predicates, actual_predicates)
