@@ -143,6 +143,12 @@ def farmland_nsam(farmland_domain: Domain) -> NumericSAMLearner:
     return nsam
 
 
+@fixture()
+def elevators_nsam(elevators_domain: Domain) -> NumericSAMLearner:
+    nsam = NumericSAMLearner(elevators_domain, polynomial_degree=0)
+    return nsam
+
+
 def test_add_new_action_adds_action_to_fluents_storage(depot_nsam: NumericSAMLearner, depot_observation: Observation):
     initial_state = depot_observation.components[0].previous_state
     action_call = depot_observation.components[0].grounded_action_call
@@ -346,3 +352,13 @@ def test_learn_action_model_with_multiple_farmland_observations_increases_the_si
 
     print(learned_model_one_shot.to_pddl())
     print(learned_model.to_pddl())
+
+
+def test_learn_action_model_with_non_numeric_domain_does_not_fail_and_returns_action_model(
+    elevators_observation: Observation, elevators_nsam: NumericSAMLearner
+):
+    try:
+        learned_model, _ = elevators_nsam.learn_action_model([elevators_observation])
+        print(learned_model.to_pddl())
+    except Exception:
+        assert False, "An error occurred while learning the action model."

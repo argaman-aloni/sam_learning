@@ -192,6 +192,11 @@ class NumericSAMLearner(SAMLearner):
         :return: a domain containing the actions that were learned and the metadata about the learning.
         """
         self.logger.info("Starting to learn the action model!")
+        if len(self.partial_domain.functions) == 0:
+            self.logger.info(f"The domain {self.partial_domain.name} does not have any numeric state variables.")
+            return super().learn_action_model(observations)
+
+        # The domain has numeric state variables.
         super().start_measure_learning_time()
         super().deduce_initial_inequality_preconditions()
         self._complete_possibly_missing_actions()
