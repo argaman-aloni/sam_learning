@@ -53,8 +53,12 @@ WOODWORKING_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_combined_pr
 WOODWORKING_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "ma_woodworking_trajectory.trajectory"
 
 ROVERS_COMBINED_DOMAIN_PATH = EXAMPLES_DIR_PATH / "rover_combined_domain.pddl"
+ROVERS_ESAM_DOMAIN_PATH = EXAMPLES_DIR_PATH / "rovers_esam_domain.pddl"
 ROVERS_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "rovers_conflicing_actions_problem.pddl"
 ROVERS_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "rovers_conflicting_actions_trajectory.trajectory"
+ROVERS_COMBINED_ESAM_PROBLEM_PATH = EXAMPLES_DIR_PATH / "rovers_esam_problem.pddl"
+ROVERS_COMBINED_ESAM_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "rovers_esam_problem.trajectory"
+
 
 SPIDER_DOMAIN_PATH = EXAMPLES_DIR_PATH / "spider_domain.pddl"
 SPIDER_PROBLEM_PATH = EXAMPLES_DIR_PATH / "spider_problem.pddl"

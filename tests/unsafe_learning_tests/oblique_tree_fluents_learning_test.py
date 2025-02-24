@@ -4,7 +4,7 @@ from collections import defaultdict
 from pddl_plus_parser.models import Domain, Observation, PDDLFunction, State, ActionCall
 from pytest import fixture
 
-from sam_learning.core import ObliqueTreeFluentsLearning
+from sam_learning.core.unsafe_learning.oblique_tree_fluents_learning import ObliqueTreeFluentsLearning
 from sam_learning.core.unsafe_learning.unsafe_numeric_fluents_learning_base import UnsafeFluentsLearning
 from tests.consts import FUEL_COST_FUNCTION, \
     LOAD_LIMIT_TRAJECTORY_FUNCTION, TRUCK_TYPE
