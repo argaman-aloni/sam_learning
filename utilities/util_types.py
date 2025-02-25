@@ -49,5 +49,4 @@ class NegativePreconditionPolicy(Enum):
     no_remove = (1,) # keep all learned preconditions
     soft = (2,)
     hard = (3,) # no negative preconditions are allowed
-    hard_but_allow_proxy = 4  # remove all negative preconditions that got learned from observations solely
     # allow only negative preconditions deducted form cnf solution

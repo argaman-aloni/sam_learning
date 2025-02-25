@@ -1,10 +1,10 @@
 import logging
-from typing import List, Tuple, Dict, Hashable, Set
+from typing import List, Tuple, Dict, Hashable, Set, Callable
 
-from conda_build.render import actions_to_pins
 from nnf import And, Or, Var
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, PDDLType, GroundedPredicate
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, \
+    PDDLType, GroundedPredicate
 from scipy.cluster.hierarchy import DisjointSet
 
 from sam_learning.core import extract_effects, LearnerDomain, LearnerAction, extract_not_effects
@@ -20,13 +20,23 @@ class ExtendedSamLearner(SAMLearner):
     cannot_be_effects: Dict[str, Set[str]]
 
     def __init__(
-        self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard_but_allow_proxy
+        self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard
     ):
         super().__init__(partial_domain=partial_domain, negative_preconditions_policy=negative_preconditions_policy)
         self.logger = logging.getLogger(__name__)
         self.cnf_eff = {}
         self.action_effects_cnfs = {action_name: set() for action_name in self.partial_domain.actions.keys()}
         self.cannot_be_effects = {action_name: set() for action_name in self.partial_domain.actions.keys()}
+        self.encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]] = {}
+        self.decoders: Dict[str, Callable[[ActionCall], ActionCall]] = {}
+
+    def encode(self, action_call: ActionCall) -> List[ActionCall]:
+        encoders: List[Callable] = self.encoders[action_call.name]
+        possible_action_calls: List[ActionCall] = [encoder(action_call) for encoder in encoders]
+        return possible_action_calls
+
+    def decode(self, action_call: ActionCall) -> ActionCall:
+        return self.decoders[action_call.name](action_call)
 
     def _get_is_eff_clause_for_predicate(self, grounded_action: ActionCall, grounded_effect: GroundedPredicate) -> Or[Var]:
         """
@@ -145,7 +155,6 @@ class ExtendedSamLearner(SAMLearner):
     def is_proxy_contradiction(self, negative_assigned_predicates: Set[Hashable], action_name: str) -> bool:
         """
         Creates and adds the proxy action by its name in the domain to the learned partial-domain.
-
         Args:
             negative_assigned_predicates: all predicates with negative assignment in cnf satisfying assignment
             action_name: the original action's name.
@@ -155,19 +164,12 @@ class ExtendedSamLearner(SAMLearner):
         """
         for parameter_bound_literal in negative_assigned_predicates:
             predicate = parse_predicate_from_string(str(parameter_bound_literal), self.partial_domain.types)
-            if self.negative_preconditions_policy != NegativePreconditionPolicy.hard:
-                # create negated precondition (true-> false, false -> true)
-                predicate_negated_copy = predicate.copy(is_negated=True)
+            predicate_negated_copy = predicate.copy(is_negated=True)
+            # check for negated precondition is in action preconditions to avoid contradictions
+            if predicate_negated_copy in self.partial_domain.actions[action_name].preconditions.root.operands:
+                # negated precondition found, therefore contradiction, return false.
+                return True
 
-                # check for negated precondition is in action preconditions to avoid contradictions
-                if predicate_negated_copy in self.partial_domain.actions[action_name].preconditions.root.operands:
-                    # negated precondition found, therefore contradiction, return false.
-                    return True
-
-            else:  # if no negative preconditions are allowed by policy
-                if not predicate.is_positive:
-                    # predicate is negative, no neg preconds are allowed, therefore contradiction
-                    return True
 
         return False
 
@@ -251,6 +253,31 @@ class ExtendedSamLearner(SAMLearner):
 
                 # add proxy action to Learned domain action model
                 self.partial_domain.actions[new_proxy.name] = new_proxy
+                def decoder(proxy_action_call: ActionCall) -> ActionCall:
+                    original_signature = self.partial_domain.actions[action_name].signature
+                    proxy_param_list = list(new_proxy.signature.keys())
+                    proxy_parameter_reversed_map = {new_param: old_param for
+                                                    old_param, new_param in proxy_data[proxy_model_dict].items()}
+
+                    grounded_proxy_obj_list: List[str] = proxy_action_call.parameters
+                    original_action_map = {old_param: grounded_proxy_obj_list[proxy_param_list.index(new_param)]
+                                           for new_param, old_param in proxy_parameter_reversed_map.keys()}
+
+                    new_obj_list = [original_action_map[param] for param in original_signature.keys()]
+
+                    return ActionCall(action_name, new_obj_list)
+
+
+                # TODO: complete encoder, figure out how not injective therefore return multiple optional action calls!
+                def encoder(original_action_call: ActionCall) -> ActionCall:
+                    original_signature = self.partial_domain.actions[action_name].signature
+                    proxy_param_mapping = proxy_data[proxy_model_dict]
+
+
+                    return ActionCall("", [])
+
+                self.decoders[new_proxy.name] = decoder
+                self.encoders[action_name].append(encoder)
                 proxy_number += 1
 
             # pop original unsafe action from learned Domain action model
@@ -321,16 +348,77 @@ class ExtendedSamLearner(SAMLearner):
         self.logger.debug(f"building domain actions CNF formulas")
         self.build_cnf_formulas()
         self.construct_safe_actions()
-        self.handle_negative_preconditions_policy()
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
-
 
 def get_minimize_parameters_equality_dict(
     model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types: Dict[str, PDDLType]
 ) -> Dict[str, str]:
     """
-    the method computes the minimization of parameter list
+    The method computes the minimization of parameter list
+    Args:
+        model_dict (Dict[Hashable, bool]): represents the cnf, maps each literal to its value in the cnf formula solution
+        act_signature (SignatureType): the signature of the action
+        domain_types (Dict[str, PddlType]): the domain types
+    Returns:
+        a dictionary mapping each original param act ind_ to the new actions minimized parameter list
+    """
+    # make a table that determines if an act ind 'i' is an effect in all occurrences of F, nad is bound to index 'j'
+
+    new_model_dict: Dict[Predicate, bool] = {parse_predicate_from_string(str(h), domain_types): v for h, v in model_dict.items()}
+
+    # start algorithm of parameters equality check
+    if len(new_model_dict.keys()) == 0:
+        return {}
+
+    param_occ: Dict[str, List[set[str]]] = {}
+    for predicate in new_model_dict.keys():
+        param_occ[predicate.name] = []
+        for _ in range(len(predicate.signature.keys())):
+            param_occ[predicate.name].append(set())
+
+    not_to_minimize: Set[str] = set()
+    for predicate, val in new_model_dict.items():
+        if not val:
+            not_to_minimize.update(predicate.signature.keys())
+
+    param_eq_sets = DisjointSet(param for param in act_signature.keys())
+
+    for predicate, val in new_model_dict.items():
+        for index, param in enumerate(predicate.signature.keys()):
+            if param not in not_to_minimize:
+                param_occ[predicate.name][index].add(param)
+
+    for equality_set_list in param_occ.values():
+        for equality_set in equality_set_list:
+            sorted_list = [param for param in act_signature.keys() if param in equality_set]
+            if len(equality_set) > 0:
+                i = sorted_list[0]
+                for j in sorted_list:
+                    param_eq_sets.merge(i, j)
+
+    ret_dict_by_param_name: Dict[str, str] = {param: param_eq_sets.__getitem__(param) for param in act_signature.keys()}
+
+    return ret_dict_by_param_name
+
+def modify_predicate_signature(predicates: Set[Predicate], param_dict: Dict[str, str]) -> Set[Predicate]:
+    """
+    modifies a set of predicates to fit the proxy minimized parameter list if minimization is needed
+    """
+    new_set: Set[Predicate] = set()
+    for predicate in predicates:
+        new_signature: Dict[str, PDDLType] = {param_dict[param]: predicate.signature[param] for param in predicate.signature.keys()}
+        new_predicate = Predicate(name=predicate.name, signature=new_signature, is_positive=predicate.is_positive)
+        new_set.add(new_predicate)
+    return new_set
+
+
+def get_minimize_parameters_equality_dict_legacy(
+    model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types: Dict[str, PDDLType]
+) -> Dict[str, str]:
+    """
+    old implementation for documentation purposes only!
+    The method computes the minimization of parameter list.
     Args:
         model_dict (Dict[Hashable, bool]): represents the cnf, maps each literal to its value in the cnf formula solution
         act_signature (SignatureType): the signature of the action
@@ -404,15 +492,3 @@ def get_minimize_parameters_equality_dict(
     }
 
     return ret_dict_by_param_name
-
-
-def modify_predicate_signature(predicates: Set[Predicate], param_dict: Dict[str, str]) -> Set[Predicate]:
-    """
-    modifies a set of predicates to fit the proxy minimized parameter list if minimization is needed
-    """
-    new_set: Set[Predicate] = set()
-    for predicate in predicates:
-        new_signature: Dict[str, PDDLType] = {param_dict[param]: predicate.signature[param] for param in predicate.signature.keys()}
-        new_predicate = Predicate(name=predicate.name, signature=new_signature, is_positive=predicate.is_positive)
-        new_set.add(new_predicate)
-    return new_set
