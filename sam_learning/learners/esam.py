@@ -326,7 +326,9 @@ class ExtendedSamLearner(SAMLearner):
         return self.partial_domain, learning_report
 
 
-def get_minimize_parameters_equality_dict(model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types) -> Dict[str, str]:
+def get_minimize_parameters_equality_dict(
+    model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types: Dict[str, PDDLType]
+) -> Dict[str, str]:
     """
     the method computes the minimization of parameter list
     Args:
