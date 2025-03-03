@@ -107,7 +107,7 @@ class ExtendedSamLearner(SAMLearner):
         cannot_be_effects = self._get_surely_not_eff(grounded_action)
 
         self.cannot_be_effects[grounded_action.name].update({eff.untyped_representation for eff in cannot_be_effects})
-        self.logger.debug(f"finished handling action {grounded_action.name} effects.")
+        self.logger.debug(f"finished handling action- {grounded_action.name} effects.")
 
     def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Create a new action in the domain.
