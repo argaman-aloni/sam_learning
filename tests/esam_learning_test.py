@@ -9,7 +9,7 @@ from pddl_plus_parser.models.observation import Observation
 import pytest
 
 from sam_learning.core import extract_effects
-from sam_learning.learners.esam import ExtendedSamLearner, get_minimize_parameters_equality_dict
+from sam_learning.learners.esam import ExtendedSamLearner, minimize_parameters_equality_dict
 from tests.consts import (
     ROVERS_COMBINED_ESAM_PROBLEM_PATH,
     ROVERS_COMBINED_ESAM_TRAJECTORY_PATH,
@@ -51,9 +51,7 @@ def assert_get_minimize_parameters_equality_dict(
         "?x": types["waypoint"],
         "?y": types["waypoint"],
     }
-    output = get_minimize_parameters_equality_dict(
-        model_dict=model_dict, act_signature=action_signature, domain_types=types
-    )
+    output = minimize_parameters_equality_dict(model_dict=model_dict, act_signature=action_signature, domain_types=types)
     assert output == expected_output
 
 
@@ -110,87 +108,91 @@ def test_is_eff_clause_injective_binding(rovers_esam_learner: ExtendedSamLearner
 # ---------------------------
 # Tests for get_minimize_parameters_equality_dict (basic cases)
 # ---------------------------
-@pytest.mark.parametrize("model_dict,expected", [
-    (
-        {"(communicated_soil_data ?p - waypoint)": True, "(communicated_soil_data ?x - waypoint)": True},
-        {"?x": "?p", "?y": "?y", "?p": "?p", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {"(communicated_soil_data ?p - waypoint)": False, "(communicated_soil_data ?x - waypoint)": True},
-        {"?x": "?x", "?y": "?y", "?p": "?p", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {"(communicated_soil_data ?p - waypoint)": True, "(communicated_soil_data ?x - waypoint)": False},
-        {"?x": "?x", "?y": "?y", "?p": "?p", "?r": "?r", "?l": "?l"}
-    ),
-])
-def test_minimize_parameters_equality_dict_basic(
-    rovers_esam_learner: ExtendedSamLearner, model_dict: Dict[Hashable, bool], expected: Dict[str, str]
-):
+@pytest.mark.parametrize(
+    "model_dict,expected",
+    [
+        (
+            {"(communicated_soil_data ?p - waypoint)": True, "(communicated_soil_data ?x - waypoint)": True},
+            {"?x": "?p", "?y": "?y", "?p": "?p", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {"(communicated_soil_data ?p - waypoint)": False, "(communicated_soil_data ?x - waypoint)": True},
+            {"?x": "?x", "?y": "?y", "?p": "?p", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {"(communicated_soil_data ?p - waypoint)": True, "(communicated_soil_data ?x - waypoint)": False},
+            {"?x": "?x", "?y": "?y", "?p": "?p", "?r": "?r", "?l": "?l"},
+        ),
+    ],
+)
+def test_minimize_parameters_equality_dict_basic(rovers_esam_learner: ExtendedSamLearner, model_dict: Dict[Hashable, bool], expected: Dict[str, str]):
     assert_get_minimize_parameters_equality_dict(rovers_esam_learner, model_dict, expected)
 
 
 # ---------------------------
 # Tests for get_minimize_parameters_equality_dict (complex cases)
 # ---------------------------
-@pytest.mark.parametrize("model_dict,expected", [
-    (
-        {
-            "(communicated_soil_data ?p - waypoint)": True,
-            "(communicated_soil_data ?x - waypoint)": True,
-            "(communicated_soil_data ?y - waypoint)": True,
-        },
-        {"?p": "?p", "?x": "?p", "?y": "?p", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {
-            "(communicated_soil_data ?p - waypoint)": True,
-            "(communicated_soil_data ?x - waypoint)": True,
-            "(communicated_soil_data ?y - waypoint)": False,
-        },
-        {"?p": "?p", "?x": "?p", "?y": "?y", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {
-            "(communicated_soil_data ?p - waypoint)": True,
-            "(communicated_soil_data ?x - waypoint)": False,
-            "(communicated_soil_data ?y - waypoint)": True,
-        },
-        {"?p": "?p", "?x": "?x", "?y": "?p", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {
-            "(communicated_soil_data ?p - waypoint)": False,
-            "(communicated_soil_data ?x - waypoint)": True,
-            "(communicated_soil_data ?y - waypoint)": True,
-        },
-        {"?p": "?p", "?x": "?x", "?y": "?x", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {
-            "(communicated_soil_data ?p - waypoint)": True,
-            "(communicated_soil_data ?x - waypoint)": False,
-            "(communicated_soil_data ?y - waypoint)": False,
-        },
-        {"?p": "?p", "?x": "?x", "?y": "?y", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {
-            "(communicated_soil_data ?p - waypoint)": False,
-            "(communicated_soil_data ?x - waypoint)": True,
-            "(communicated_soil_data ?y - waypoint)": False,
-        },
-        {"?p": "?p", "?x": "?x", "?y": "?y", "?r": "?r", "?l": "?l"}
-    ),
-    (
-        {
-            "(communicated_soil_data ?p - waypoint)": False,
-            "(communicated_soil_data ?x - waypoint)": False,
-            "(communicated_soil_data ?y - waypoint)": True,
-        },
-        {"?p": "?p", "?x": "?x", "?y": "?y", "?r": "?r", "?l": "?l"}
-    ),
-])
+@pytest.mark.parametrize(
+    "model_dict,expected",
+    [
+        (
+            {
+                "(communicated_soil_data ?p - waypoint)": True,
+                "(communicated_soil_data ?x - waypoint)": True,
+                "(communicated_soil_data ?y - waypoint)": True,
+            },
+            {"?p": "?p", "?x": "?p", "?y": "?p", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {
+                "(communicated_soil_data ?p - waypoint)": True,
+                "(communicated_soil_data ?x - waypoint)": True,
+                "(communicated_soil_data ?y - waypoint)": False,
+            },
+            {"?p": "?p", "?x": "?p", "?y": "?y", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {
+                "(communicated_soil_data ?p - waypoint)": True,
+                "(communicated_soil_data ?x - waypoint)": False,
+                "(communicated_soil_data ?y - waypoint)": True,
+            },
+            {"?p": "?p", "?x": "?x", "?y": "?p", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {
+                "(communicated_soil_data ?p - waypoint)": False,
+                "(communicated_soil_data ?x - waypoint)": True,
+                "(communicated_soil_data ?y - waypoint)": True,
+            },
+            {"?p": "?p", "?x": "?x", "?y": "?x", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {
+                "(communicated_soil_data ?p - waypoint)": True,
+                "(communicated_soil_data ?x - waypoint)": False,
+                "(communicated_soil_data ?y - waypoint)": False,
+            },
+            {"?p": "?p", "?x": "?x", "?y": "?y", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {
+                "(communicated_soil_data ?p - waypoint)": False,
+                "(communicated_soil_data ?x - waypoint)": True,
+                "(communicated_soil_data ?y - waypoint)": False,
+            },
+            {"?p": "?p", "?x": "?x", "?y": "?y", "?r": "?r", "?l": "?l"},
+        ),
+        (
+            {
+                "(communicated_soil_data ?p - waypoint)": False,
+                "(communicated_soil_data ?x - waypoint)": False,
+                "(communicated_soil_data ?y - waypoint)": True,
+            },
+            {"?p": "?p", "?x": "?x", "?y": "?y", "?r": "?r", "?l": "?l"},
+        ),
+    ],
+)
 def test_minimize_parameters_equality_dict_complex(
     rovers_esam_learner: ExtendedSamLearner, model_dict: Dict[Hashable, bool], expected: Dict[str, str]
 ):

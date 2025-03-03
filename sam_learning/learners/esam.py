@@ -1,15 +1,22 @@
 import logging
-from typing import List, Tuple, Dict, Hashable, Set, Callable
+from dataclasses import dataclass
+from typing import List, Tuple, Dict, Hashable, Set, Callable, Optional
 
 from nnf import And, Or, Var
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, \
-    PDDLType, GroundedPredicate
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, PDDLType, GroundedPredicate
 from scipy.cluster.hierarchy import DisjointSet
 
 from sam_learning.core import extract_effects, LearnerDomain, LearnerAction, extract_not_effects
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
+
+
+@dataclass
+class ProxyActionData:
+    preconditions: Set[Predicate]
+    effects: Set[Predicate]
+    signature: Dict[str, str]
 
 
 class ExtendedSamLearner(SAMLearner):
@@ -18,17 +25,17 @@ class ExtendedSamLearner(SAMLearner):
     cnf_eff: Dict[str, And[Or[Var]]]
     action_effects_cnfs: Dict[str, Set[Or[Var]]]
     cannot_be_effects: Dict[str, Set[str]]
+    encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]]
+    decoders: Dict[str, Callable[[ActionCall], ActionCall]]
 
-    def __init__(
-        self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard
-    ):
+    def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard):
         super().__init__(partial_domain=partial_domain, negative_preconditions_policy=negative_preconditions_policy)
         self.logger = logging.getLogger(__name__)
         self.cnf_eff = {}
         self.action_effects_cnfs = {action_name: set() for action_name in self.partial_domain.actions.keys()}
         self.cannot_be_effects = {action_name: set() for action_name in self.partial_domain.actions.keys()}
-        self.encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]] = {}
-        self.decoders: Dict[str, Callable[[ActionCall], ActionCall]] = {}
+        self.encoders = {}
+        self.decoders = {}
 
     def encode(self, action_call: ActionCall) -> List[ActionCall]:
         encoders: List[Callable] = self.encoders[action_call.name]
@@ -170,7 +177,6 @@ class ExtendedSamLearner(SAMLearner):
                 # negated precondition found, therefore contradiction, return false.
                 return True
 
-
         return False
 
     def construct_proxy_action(
@@ -179,7 +185,7 @@ class ExtendedSamLearner(SAMLearner):
         proxy_missing_precondition: Set[Predicate],
         proxy_effects: Set[Predicate],
         modified_parameter_mapping_dict: Dict[str, str],
-        proxy_number: int,
+        proxy_number: Optional[int] = None,
     ) -> LearnerAction:
         """
             constructs a proxy action based on information learned.
@@ -196,17 +202,14 @@ class ExtendedSamLearner(SAMLearner):
             Returns:
                 constructed proxy action
         """
-        proxy_action_name = f"{action_name}_{proxy_number}"
-        self.logger.debug(f" constructing proxy action: {proxy_action_name}")
+        proxy_action_name = f"{action_name}{'_' + str(proxy_number) if proxy_number else ''}"
+        self.logger.debug(f"Starting the constructing proxy action: {proxy_action_name}")
         signature = self.partial_domain.actions[action_name].signature
-        preconds: Set[Predicate] = proxy_missing_precondition
-        preconds.update(p for p in self.partial_domain.actions[action_name].preconditions.root.operands if isinstance(p, Predicate))
-
-        # maps each param to its set representative param
-        # use new mapping to modify effects bindings
-        effects: Set[Predicate] = modify_predicate_signature(proxy_effects, modified_parameter_mapping_dict)
+        discrete_effects = modify_predicate_signature(proxy_effects, modified_parameter_mapping_dict)
         # use new mapping to modify preconditions bindings
-        preconds = modify_predicate_signature(preconds, modified_parameter_mapping_dict)
+        preconds = modify_predicate_signature(
+            {*proxy_missing_precondition, *self.partial_domain.actions[action_name].preconditions.root.operands}, modified_parameter_mapping_dict
+        )
 
         # use reverse the new mapping for min minimizing action's signature
         reversed_proxy_signature_modified_param_dict: Dict[str, str] = {
@@ -215,12 +218,12 @@ class ExtendedSamLearner(SAMLearner):
 
         new_signature = {parameter: signature[parameter] for parameter in reversed_proxy_signature_modified_param_dict.keys()}
         proxy_action = LearnerAction(proxy_action_name, signature=new_signature)
-        proxy_action.discrete_effects = effects
+        proxy_action.discrete_effects = discrete_effects
         proxy_action.preconditions.root.operands = preconds
-        self.logger.debug(f" finished construction of proxy action: {proxy_action_name}")
+        self.logger.debug(f"Finished construction of proxy action: {proxy_action_name}")
         return proxy_action
 
-    def handle_lifted_action_instances(self, action_name: str, action_proxies_data: List[Tuple[Set[Predicate], Set[Predicate], Dict[str, str]]]):
+    def handle_lifted_action_instances(self, action_name: str, action_proxies_data: List[ProxyActionData]):
         """
         adds the lifted action additional information to the partial domain, if proxys are needed, the adds proxys to
         the partial domain.
@@ -228,60 +231,49 @@ class ExtendedSamLearner(SAMLearner):
             action_name: the name of the lifted action.
             action_proxies_data: list of Tuples where each tuple has preconditions, effect and dictionary.
         """
-        proxy_preconds = 0
-        proxy_effects = 1
-        proxy_model_dict = 2
+        self.logger.debug(f"Creating proxy actions for action: {action_name}")
+        proxy_number = 1
+        for proxy_data in action_proxies_data:
+            # unpack tuple fields to get properties of proxy action into arguments of action constructor
+            new_proxy = self.construct_proxy_action(
+                action_name=action_name,
+                proxy_missing_precondition=proxy_data.preconditions,
+                proxy_effects=proxy_data.effects,
+                modified_parameter_mapping_dict=proxy_data.signature,
+                proxy_number=proxy_number,
+            )
 
-        if len(action_proxies_data) == 1:  # to avoid index in the action name if not needed
-            self.logger.debug(f" updating single instance of action: {action_name}")
-            preconds: Set[Predicate] = action_proxies_data[0][proxy_preconds]
-            self.partial_domain.actions[action_name].preconditions.root.operands.update(preconds)
-            self.partial_domain.actions[action_name].discrete_effects = action_proxies_data[0][proxy_effects]
+            # add proxy action to Learned domain action model
+            self.partial_domain.actions[new_proxy.name] = new_proxy
 
-        elif len(action_proxies_data) > 1:
-            self.logger.debug(f" creating proxy actions for action: {action_name}")
-            proxy_number = 1
-            for proxy_data in action_proxies_data:
-                # unpack tuple fields to get properties of proxy action into arguments of action constructor
-                new_proxy = self.construct_proxy_action(
-                    action_name=action_name,
-                    proxy_missing_precondition=proxy_data[proxy_preconds],
-                    proxy_effects=proxy_data[proxy_effects],
-                    modified_parameter_mapping_dict=proxy_data[proxy_model_dict],
-                    proxy_number=proxy_number,
-                )
+            def decoder(proxy_action_call: ActionCall) -> ActionCall:
+                original_signature = self.partial_domain.actions[action_name].signature
+                proxy_param_list = list(new_proxy.signature.keys())
+                proxy_parameter_reversed_map = {new_param: old_param for old_param, new_param in proxy_data.signature.items()}
 
-                # add proxy action to Learned domain action model
-                self.partial_domain.actions[new_proxy.name] = new_proxy
-                def decoder(proxy_action_call: ActionCall) -> ActionCall:
-                    original_signature = self.partial_domain.actions[action_name].signature
-                    proxy_param_list = list(new_proxy.signature.keys())
-                    proxy_parameter_reversed_map = {new_param: old_param for
-                                                    old_param, new_param in proxy_data[proxy_model_dict].items()}
+                grounded_proxy_obj_list: List[str] = proxy_action_call.parameters
+                original_action_map = {
+                    old_param: grounded_proxy_obj_list[proxy_param_list.index(new_param)]
+                    for new_param, old_param in proxy_parameter_reversed_map.keys()
+                }
 
-                    grounded_proxy_obj_list: List[str] = proxy_action_call.parameters
-                    original_action_map = {old_param: grounded_proxy_obj_list[proxy_param_list.index(new_param)]
-                                           for new_param, old_param in proxy_parameter_reversed_map.keys()}
+                new_obj_list = [original_action_map[param] for param in original_signature.keys()]
 
-                    new_obj_list = [original_action_map[param] for param in original_signature.keys()]
+                return ActionCall(action_name, new_obj_list)
 
-                    return ActionCall(action_name, new_obj_list)
+            # TODO: complete encoder, figure out how not injective therefore return multiple optional action calls!
+            def encoder(original_action_call: ActionCall) -> ActionCall:
+                original_signature = self.partial_domain.actions[action_name].signature
+                proxy_param_mapping = proxy_data.signature
 
+                return ActionCall("", [])
 
-                # TODO: complete encoder, figure out how not injective therefore return multiple optional action calls!
-                def encoder(original_action_call: ActionCall) -> ActionCall:
-                    original_signature = self.partial_domain.actions[action_name].signature
-                    proxy_param_mapping = proxy_data[proxy_model_dict]
+            self.decoders[new_proxy.name] = decoder
+            self.encoders[action_name].append(encoder)
+            proxy_number += 1
 
-
-                    return ActionCall("", [])
-
-                self.decoders[new_proxy.name] = decoder
-                self.encoders[action_name].append(encoder)
-                proxy_number += 1
-
-            # pop original unsafe action from learned Domain action model
-            self.partial_domain.actions.pop(action_name)
+        # pop original unsafe action from learned Domain action model
+        self.partial_domain.actions.pop(action_name)
 
     def construct_safe_actions(self) -> None:
         """
@@ -294,7 +286,9 @@ class ExtendedSamLearner(SAMLearner):
             action_proxies = []
             self.logger.debug(f"Going over all the possible assignments that are true after for the action {action_name}.")
             for model in self.cnf_eff[action_name].models():
+                # represent the literals that were not selected as effects for the action -- will be added as preconditions
                 negative_assigned_predicates = set(pred for pred in model.keys() if not model[pred])
+                # represent the literals that were selected as effects for the action
                 positive_assigned_predicates = set(model.keys()).difference(negative_assigned_predicates)
                 # check for contradiction before running
                 self.logger.debug(f"checking for contradiction action: {action_name} cnf assignment.")
@@ -303,29 +297,36 @@ class ExtendedSamLearner(SAMLearner):
                     continue
 
                 self.logger.debug(f"No contradiction found for action: {action_name} cnf assignment.")
-                # take all positive assigned predicates and construct a Predicate with hashable instance from provided model
-                # add them as effects
-                effect: Set[Predicate] = {
+                effects: Set[Predicate] = {
                     parse_predicate_from_string(str(parameter_bound_literal), self.partial_domain.types)
                     for parameter_bound_literal in positive_assigned_predicates
                 }
 
-                # take all negative assigned predicates and construct a Predicate with hashable instance from provided model
-                # add them as preconditions
-                preconds_to_add: Set[Predicate] = {
+                additional_preconditions: Set[Predicate] = {
                     parse_predicate_from_string(str(parameter_bound_literal), self.partial_domain.types)
                     for parameter_bound_literal in negative_assigned_predicates
                 }
 
                 # assemble proxy info
                 self.logger.debug(f"assigning new representatives for parameters list of action {action_name}")
-                proxy_signature_modified_param_dict = get_minimize_parameters_equality_dict(
+                proxy_signature_modified_param_dict = minimize_parameters_equality_dict(
                     model_dict=model, act_signature=self._action_signatures[action_name], domain_types=self.partial_domain.types
                 )
 
-                action_proxies.append((preconds_to_add, effect, proxy_signature_modified_param_dict))
+                action_proxies.append(ProxyActionData(additional_preconditions, effects, proxy_signature_modified_param_dict))
 
-            self.handle_lifted_action_instances(action_name, action_proxies)
+            if len(action_proxies) == 1:
+                self.logger.debug(f"No proxy actions needed for action: {action_name}")
+                action_data = action_proxies[0]
+                self.partial_domain.actions[action_name].preconditions.root.operands.update(action_data.preconditions)
+                self.partial_domain.actions[action_name].discrete_effects = action_data.effects
+
+            elif len(action_proxies) > 1:
+                self.logger.debug(f"Creating proxy actions for action: {action_name}")
+                self.handle_lifted_action_instances(action_name, action_proxies)
+
+            else:
+                raise ValueError(f"No valid assignments found for action: {action_name}")
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
@@ -340,9 +341,6 @@ class ExtendedSamLearner(SAMLearner):
             for component in observation.components:
                 self.handle_single_trajectory_component(component)
 
-        # note that creating will reset all the actions effects and precondition due to cnf solver usage.
-
-        # build all cnf sentences for action's effects
         super().handle_negative_preconditions_policy()
         self._remove_unobserved_actions_from_partial_domain()
         self.logger.debug(f"building domain actions CNF formulas")
@@ -351,7 +349,8 @@ class ExtendedSamLearner(SAMLearner):
         learning_report = self._construct_learning_report()
         return self.partial_domain, learning_report
 
-def get_minimize_parameters_equality_dict(
+
+def minimize_parameters_equality_dict(
     model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types: Dict[str, PDDLType]
 ) -> Dict[str, str]:
     """
@@ -363,8 +362,7 @@ def get_minimize_parameters_equality_dict(
     Returns:
         a dictionary mapping each original param act ind_ to the new actions minimized parameter list
     """
-    # make a table that determines if an act ind 'i' is an effect in all occurrences of F, nad is bound to index 'j'
-
+    # make a table that determines if an act ind 'i' is an effect in all occurrences of F, nad is bound to index 'other_param'
     new_model_dict: Dict[Predicate, bool] = {parse_predicate_from_string(str(h), domain_types): v for h, v in model_dict.items()}
 
     # start algorithm of parameters equality check
@@ -373,33 +371,33 @@ def get_minimize_parameters_equality_dict(
 
     param_occ: Dict[str, List[set[str]]] = {}
     for predicate in new_model_dict.keys():
-        param_occ[predicate.name] = []
-        for _ in range(len(predicate.signature.keys())):
-            param_occ[predicate.name].append(set())
+        param_occ[predicate.name] = [set() for _ in range(len(predicate.signature.keys()))]
 
-    not_to_minimize: Set[str] = set()
-    for predicate, val in new_model_dict.items():
-        if not val:
-            not_to_minimize.update(predicate.signature.keys())
+    params_not_to_minimize = set()
+    for predicate, is_selected in new_model_dict.items():
+        if not is_selected:
+            params_not_to_minimize.update(predicate.signature.keys())
 
     param_eq_sets = DisjointSet(param for param in act_signature.keys())
 
-    for predicate, val in new_model_dict.items():
-        for index, param in enumerate(predicate.signature.keys()):
-            if param not in not_to_minimize:
-                param_occ[predicate.name][index].add(param)
+    for predicate, is_selected in new_model_dict.items():
+        for signature_index, parameter_name in enumerate(predicate.signature.keys()):
+            if parameter_name not in params_not_to_minimize:
+                param_occ[predicate.name][signature_index].add(parameter_name)
 
     for equality_set_list in param_occ.values():
         for equality_set in equality_set_list:
-            sorted_list = [param for param in act_signature.keys() if param in equality_set]
-            if len(equality_set) > 0:
-                i = sorted_list[0]
-                for j in sorted_list:
-                    param_eq_sets.merge(i, j)
+            if len(equality_set) < 0:
+                continue
 
-    ret_dict_by_param_name: Dict[str, str] = {param: param_eq_sets.__getitem__(param) for param in act_signature.keys()}
+            sorted_list = [param for param in act_signature.keys() if param in equality_set]
+            for param_to_merge in sorted_list:
+                param_eq_sets.merge(sorted_list[0], param_to_merge)
+
+    ret_dict_by_param_name = {param: param_eq_sets[param] for param in act_signature.keys()}
 
     return ret_dict_by_param_name
+
 
 def modify_predicate_signature(predicates: Set[Predicate], param_dict: Dict[str, str]) -> Set[Predicate]:
     """
@@ -410,85 +408,5 @@ def modify_predicate_signature(predicates: Set[Predicate], param_dict: Dict[str,
         new_signature: Dict[str, PDDLType] = {param_dict[param]: predicate.signature[param] for param in predicate.signature.keys()}
         new_predicate = Predicate(name=predicate.name, signature=new_signature, is_positive=predicate.is_positive)
         new_set.add(new_predicate)
+
     return new_set
-
-
-def get_minimize_parameters_equality_dict_legacy(
-    model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types: Dict[str, PDDLType]
-) -> Dict[str, str]:
-    """
-    old implementation for documentation purposes only!
-    The method computes the minimization of parameter list.
-    Args:
-        model_dict (Dict[Hashable, bool]): represents the cnf, maps each literal to its value in the cnf formula solution
-        act_signature (SignatureType): the signature of the action
-        domain_types (Dict[str, PddlType]): the domain types
-    Returns:
-        a dictionary mapping each original param act ind_ to the new actions minimized parameter list
-    """
-    # make a table that determines if an act ind 'i' is an effect in all occurrences of F, nad is bound to index 'j'
-    #  in F, minimize i with all indexes t who are bound to 'j' in F in all true occurrences of F
-
-    # reduce the problem to instance of macq, transform params from str too int by index in action
-    # transformation is for deciding what parameters to reduce by order in action signature
-    new_model_dict: Dict[Predicate, bool] = {parse_predicate_from_string(str(h), domain_types): v for h, v in model_dict.items()}
-
-    param_index_in_action = {param: index for index, param in enumerate(act_signature.keys())}
-    reversed_param_index_in_action = {index: param for param, index in param_index_in_action.items()}
-
-    param_index_in_predicate: Dict[Predicate, Dict[str, int]] = {}
-    for predicate in new_model_dict.keys():
-        param_index_in_predicate[predicate] = dict()
-        for index, param in enumerate(predicate.signature.keys()):
-            param_index_in_predicate[predicate][param] = index
-
-    predicate_to_param_act_inds: Dict[Predicate, list[int]] = {}
-    for predicate in new_model_dict.keys():
-        predicate_to_param_act_inds[predicate] = []
-        for param in predicate.signature.keys():
-            predicate_to_param_act_inds[predicate].append(param_index_in_action[param])
-
-    # start algorithm of parameters equality check
-    if len(new_model_dict.keys()) == 0:
-        return {}
-
-    ind_occ: Dict[str, List[set[int]]] = {}
-    for predicate in new_model_dict.keys():
-        ind_occ[predicate.name] = []
-        for _ in range(len(predicate_to_param_act_inds[predicate])):
-            ind_occ[predicate.name].append(set())
-
-    not_to_minimize: Set[int] = set()
-
-    for predicate, val in new_model_dict.items():
-        if not val:
-            not_to_minimize.update(predicate_to_param_act_inds[predicate])
-
-    ind_sets = DisjointSet(i for i in range(len(param_index_in_action.keys())))
-    for predicate, val in new_model_dict.items():
-        for i in range(len(predicate_to_param_act_inds[predicate])):
-            if predicate_to_param_act_inds[predicate][i] not in not_to_minimize:
-                ind_occ[predicate.name][i].add(predicate_to_param_act_inds[predicate][i])
-
-    for f, set_list in ind_occ.items():
-        for sett in set_list:
-            if len(sett) > 0:
-                set_as_sorted_list = list(sett)
-                set_as_sorted_list.sort()
-                i = set_as_sorted_list[0]
-                for j in set_as_sorted_list:
-                    ind_sets.merge(i, j)
-
-    ret_dict_by_indexes: Dict[int, int] = {}
-    ugly_inds: List[int] = list({ind_sets.__getitem__(i) for i in range(len(param_index_in_action.keys()))})
-    ugly_inds.sort()
-
-    for i in range(len(param_index_in_action.keys())):
-        ret_dict_by_indexes[i] = ugly_inds.index(ind_sets.__getitem__(i))
-
-    # transform all indexes back to  str to fit sam learning conventions
-    ret_dict_by_param_name: Dict[str, str] = {
-        reversed_param_index_in_action[k1]: reversed_param_index_in_action[k2] for k1, k2 in ret_dict_by_indexes.items()
-    }
-
-    return ret_dict_by_param_name
