@@ -43,7 +43,8 @@ class ExtendedSamLearner(SAMLearner):
         possible_action_calls: List[ActionCall] = []
         for encoder in encoders:
             try:
-                encoder(action_call)
+                encoded_action_call = encoder(action_call)
+                possible_action_calls.append(encoded_action_call)
             except NotSafeActionError as e:
                 logging.log(level=logging.INFO,
                             msg=f"skipped an unsafe encoding of {action_call.name} to {e.action_name}")
