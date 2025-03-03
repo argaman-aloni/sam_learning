@@ -38,7 +38,10 @@ class SAMLearner:
     cannot_be_effect: Dict[str, Set[Predicate]]
     negative_preconditions_policy: NegativePreconditionPolicy
 
-    def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+    def __init__(self,
+                 partial_domain: Domain,
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
         self.matcher = PredicatesMatcher(partial_domain)
@@ -149,6 +152,7 @@ class SAMLearner:
         :param previous_state: the state that the action was executed on.
         :param next_state: the state that was created after executing the action on the previous
         """
+
         self.logger.info(f"Adding the action {str(grounded_action)} to the domain.")
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
@@ -218,7 +222,8 @@ class SAMLearner:
         next_state = component.next_state
 
         if self._verify_parameter_duplication(grounded_action):
-            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM.")
+            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM."
+                                f"aborting learning from component")
             return
 
         self.triplet_snapshot.create_triplet_snapshot(

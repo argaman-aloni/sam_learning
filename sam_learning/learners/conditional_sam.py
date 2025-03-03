@@ -10,6 +10,7 @@ from sam_learning.core import DependencySet, LearnerDomain, extract_effects, Lea
     extract_predicate_data
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
+from utilities import NegativePreconditionPolicy
 
 
 class ConditionalSAM(SAMLearner):
@@ -21,8 +22,8 @@ class ConditionalSAM(SAMLearner):
     observed_effects: Dict[str, Set[str]]
 
     def __init__(self, partial_domain: Domain, max_antecedents_size: int = 1,
-                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None):
-        super().__init__(partial_domain)
+                 preconditions_fluent_map: Optional[Dict[str, List[str]]] = None, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+        super().__init__(partial_domain, negative_preconditions_policy)
         self.logger = logging.getLogger(__name__)
         self.preconditions_fluent_map = preconditions_fluent_map if preconditions_fluent_map else {}
         self.safe_actions = []

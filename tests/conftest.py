@@ -5,12 +5,11 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, Trajector
 from pddl_plus_parser.models import Domain, Problem, Observation, PDDLObject, MultiAgentObservation
 from pytest import fixture
 
-from sam_learning.learners import SAMLearner, MASAMPlus
+from sam_learning.learners import SAMLearner, MASAMPlus, ExtendedSamLearner
 from tests.consts import (
     ELEVATORS_DOMAIN_PATH,
     ELEVATORS_PROBLEM_PATH,
     ELEVATORS_TRAJECTORY_PATH,
-    WOODWORKING_DOMAIN_PATH,
     WOODWORKING_PROBLEM_PATH,
     WOODWORKING_TRAJECTORY_PATH,
     WOODWORKING_COMBINED_DOMAIN_PATH,
@@ -19,6 +18,9 @@ from tests.consts import (
     ROVERS_COMBINED_DOMAIN_PATH,
     ROVERS_COMBINED_PROBLEM_PATH,
     ROVERS_COMBINED_TRAJECTORY_PATH,
+    ROVERS_COMBINED_ESAM_PROBLEM_PATH,
+    ROVERS_COMBINED_ESAM_TRAJECTORY_PATH,
+    ROVERS_ESAM_DOMAIN_PATH,
     LOGISTICS_DOMAIN_PATH,
     SPIDER_DOMAIN_PATH,
     SPIDER_PROBLEM_PATH,
@@ -47,6 +49,7 @@ from tests.consts import (
     DRIVERLOG_COMBINED_PROBLEM_PATH,
     DRIVERLOG_COMBINED_TRAJECTORY_PATH,
     ROVERS_COMBINED_WITH_MACRO_DOMAIN_PATH,
+
 )
 from tests.multi_agent_learning_tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
 from utilities import NegativePreconditionPolicy
@@ -98,10 +101,9 @@ def logistics_domain() -> Domain:
 
 
 @fixture()
-def woodworking_domain() -> Domain:
-    domain_parser = DomainParser(WOODWORKING_DOMAIN_PATH, partial_parsing=True)
+def rovers_domain() -> Domain:
+    domain_parser = DomainParser(ROVERS_COMBINED_DOMAIN_PATH, partial_parsing=True)
     return domain_parser.parse_domain()
-
 
 @fixture()
 def woodworking_problem(woodworking_domain: Domain) -> Problem:
