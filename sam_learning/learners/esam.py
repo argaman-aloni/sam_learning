@@ -20,6 +20,10 @@ class ProxyActionData:
     signature: Dict[str, str]
 
 
+# class ActionEncoder:
+#     def __init__(self, )
+
+
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
 
@@ -35,10 +39,12 @@ class ExtendedSamLearner(SAMLearner):
         self.cnf_eff = {}
         self.action_effects_cnfs = {action_name: set() for action_name in self.partial_domain.actions.keys()}
         self.cannot_be_effects = {action_name: set() for action_name in self.partial_domain.actions.keys()}
+        self.popped_actions_archive: Dict[str, LearnerAction] = {}
         self.encoders = {}
         self.decoders = {}
 
     def encode(self, action_call: ActionCall) -> List[ActionCall]:
+        """"""
         encoders: List[Callable] = self.encoders[action_call.name]
         possible_action_calls: List[ActionCall] = []
         for encoder in encoders:
@@ -234,7 +240,7 @@ class ExtendedSamLearner(SAMLearner):
         self.logger.debug(f"Finished construction of proxy action: {proxy_action_name}")
         return proxy_action
 
-    def decoder(self, proxy_action_call: ActionCall, new_proxy: LearnerAction, proxy_data: ProxyActionData,
+    def decoder_method(self, proxy_action_call: ActionCall, new_proxy: LearnerAction, proxy_data: ProxyActionData,
                 action_name: str) -> ActionCall:
         """
         method for translating grounded call of the learned domain to grounded call in the original domain
@@ -247,20 +253,21 @@ class ExtendedSamLearner(SAMLearner):
         Returns:
             ActionCall: equal action call in the original domain
         """
-        original_signature = self.partial_domain.actions[action_name].signature
+        original_lifted_action = self.partial_domain.actions[action_name] if action_name in self.partial_domain.actions\
+            else self.popped_actions_archive[action_name]
+        original_signature = list(original_lifted_action.signature.keys())
         proxy_param_list = list(new_proxy.signature.keys())
-        proxy_parameter_reversed_map = {new_param: old_param for old_param, new_param in proxy_data.signature.items()}
+        proxy_parameter_reversed_map = [(new_param, old_param) for old_param, new_param in proxy_data.signature.items()]
 
         grounded_proxy_obj_list: List[str] = proxy_action_call.parameters
         original_action_map = {
             old_param: grounded_proxy_obj_list[proxy_param_list.index(new_param)]
-            for new_param, old_param in proxy_parameter_reversed_map.keys()
+            for new_param, old_param in proxy_parameter_reversed_map
         }
 
-        new_obj_list = [original_action_map[param] for param in original_signature.keys()]
-
+        new_obj_list = [original_action_map[param] for param in original_signature]
         return ActionCall(action_name, new_obj_list)
-    def encoder(self, original_action_call: ActionCall, proxy_data: ProxyActionData, new_proxy: LearnerAction,
+    def encoder_method(self, original_action_call: ActionCall, proxy_data: ProxyActionData, new_proxy: LearnerAction,
                 action_name: str) -> ActionCall:
         """
         method for translating grounded call of the original domain to grounded call in the learned domain
@@ -273,25 +280,45 @@ class ExtendedSamLearner(SAMLearner):
         Returns:
             ActionCall: equal proxy action call
         """
-        res = ActionCall("", [])
-        if len(set(original_action_call.parameters)) != len(proxy_data.signature.keys()):
-            return res
+        encoded_action_call = ActionCall("", [])
+        lifted_action = self.partial_domain.actions[action_name] if action_name in self.partial_domain.actions\
+            else self.popped_actions_archive[action_name]
 
         original_signature = {param_name: index for index, param_name in
-                              enumerate(self.partial_domain.actions[action_name].signature.keys())}
+                              enumerate(list(lifted_action.signature.keys()))}
+
         original_param_mapping = {param_name: original_action_call.parameters[index]
                                   for param_name, index in original_signature.items()}
         grounded_proxy_parameters = {proxy_data.signature[param_name]: obj
                                      for param_name, obj in original_param_mapping.items()}
-        for param, obj_pddl_type in new_proxy.signature.items():
-            if self.partial_domain.types[grounded_proxy_parameters[param]].is_sub_type(obj_pddl_type):
+        for param_name, obj in original_param_mapping.items():
+            if grounded_proxy_parameters[proxy_data.signature[param_name]] != obj:
                 raise NotSafeActionError(name=f"{new_proxy.name}",
                                          reason="proxy action parameter mapping"
                                                 "does not align with the action call",
                                          solution_type=EquationSolutionType.no_solution_found)
-        res.parameters = [grounded_proxy_parameters[param] for param in new_proxy.signature.keys()]
-        res.name = new_proxy.name
-        return res
+
+        encoded_action_call.parameters = [grounded_proxy_parameters[param] for param in new_proxy.signature.keys()]
+        encoded_action_call.name = new_proxy.name
+        return encoded_action_call
+
+    def create_encoder(self, proxy_data, new_proxy, action_name):
+        """Creates an encoder function with bound values."""
+        return lambda original_action_call: self.encoder_method(
+            original_action_call=original_action_call,
+            proxy_data=proxy_data,
+            new_proxy=new_proxy,
+            action_name=action_name
+        )
+
+    def create_decoder(self, proxy_data, new_proxy, action_name):
+        """Creates a decoder function with bound values."""
+        return lambda proxy_action_call: self.decoder_method(
+            proxy_action_call=proxy_action_call,
+            proxy_data=proxy_data,
+            new_proxy=new_proxy,
+            action_name=action_name
+        )
 
     def handle_lifted_action_instances(self, action_name: str, action_proxies_data: List[ProxyActionData]):
         """
@@ -315,20 +342,16 @@ class ExtendedSamLearner(SAMLearner):
 
             # add proxy action to Learned domain action model
             self.partial_domain.actions[new_proxy.name] = new_proxy
-            decoder = lambda proxy_action_call: self.decoder(proxy_action_call=proxy_action_call,
-                                                             proxy_data=proxy_data,
-                                                             new_proxy=new_proxy,
-                                                             action_name=action_name)
-            encoder = lambda original_action_call: self.encoder(original_action_call=original_action_call,
-                                                                proxy_data=proxy_data,
-                                                                new_proxy=new_proxy,
-                                                                action_name=action_name)
-            self.decoders[new_proxy.name] = decoder
-            self.encoders[action_name].append(encoder)
+
+            # create decoder and encoder callable objects
+            self.decoders[new_proxy.name] = self.create_decoder(proxy_data, new_proxy, action_name)
+            self.encoders[action_name].append(self.create_encoder(proxy_data, new_proxy, action_name))
             proxy_number += 1
 
-        # pop original unsafe action from learned Domain action model
-        self.partial_domain.actions.pop(action_name)
+        #  pop original unsafe action from learned Domain action mode
+        popped_action = self.partial_domain.actions.pop(action_name)
+        self.popped_actions_archive[popped_action.name]= popped_action
+        
 
     def construct_safe_actions(self) -> None:
         """
@@ -338,6 +361,7 @@ class ExtendedSamLearner(SAMLearner):
                 proxy actions are created and added to the domain.
         """
         for action_name in self.observed_actions:
+            self.encoders[action_name] = []
             action_proxies = []
             self.logger.debug(f"Going over all the possible assignments that are true after for the action {action_name}.")
             for model in self.cnf_eff[action_name].models():
