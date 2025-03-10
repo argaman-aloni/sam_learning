@@ -302,23 +302,6 @@ class ExtendedSamLearner(SAMLearner):
         encoded_action_call.name = new_proxy.name
         return encoded_action_call
 
-    def create_encoder(self, proxy_data, new_proxy, action_name):
-        """Creates an encoder function with bound values."""
-        return lambda original_action_call: self.encoder_method(
-            original_action_call=original_action_call,
-            proxy_data=proxy_data,
-            new_proxy=new_proxy,
-            action_name=action_name
-        )
-
-    def create_decoder(self, proxy_data, new_proxy, action_name):
-        """Creates a decoder function with bound values."""
-        return lambda proxy_action_call: self.decoder_method(
-            proxy_action_call=proxy_action_call,
-            proxy_data=proxy_data,
-            new_proxy=new_proxy,
-            action_name=action_name
-        )
 
     def handle_lifted_action_instances(self, action_name: str, action_proxies_data: List[ProxyActionData]):
         """
@@ -328,6 +311,25 @@ class ExtendedSamLearner(SAMLearner):
             action_name: the name of the lifted action.
             action_proxies_data: list of Tuples where each tuple has preconditions, effect and dictionary.
         """
+
+        def create_encoder(proxy_data, new_proxy, action_name):
+            """Creates an encoder function with bound values."""
+            return lambda original_action_call: self.encoder_method(
+                original_action_call=original_action_call,
+                proxy_data=proxy_data,
+                new_proxy=new_proxy,
+                action_name=action_name
+            )
+
+        def create_decoder(proxy_data, new_proxy, action_name):
+            """Creates a decoder function with bound values."""
+            return lambda proxy_action_call: self.decoder_method(
+                proxy_action_call=proxy_action_call,
+                proxy_data=proxy_data,
+                new_proxy=new_proxy,
+                action_name=action_name
+            )
+
         self.logger.debug(f"Creating proxy actions for action: {action_name}")
         proxy_number = 1
         for proxy_data in action_proxies_data:
@@ -344,8 +346,8 @@ class ExtendedSamLearner(SAMLearner):
             self.partial_domain.actions[new_proxy.name] = new_proxy
 
             # create decoder and encoder callable objects
-            self.decoders[new_proxy.name] = self.create_decoder(proxy_data, new_proxy, action_name)
-            self.encoders[action_name].append(self.create_encoder(proxy_data, new_proxy, action_name))
+            self.decoders[new_proxy.name] = create_decoder(proxy_data, new_proxy, action_name)
+            self.encoders[action_name].append(create_encoder(proxy_data, new_proxy, action_name))
             proxy_number += 1
 
         #  pop original unsafe action from learned Domain action mode
