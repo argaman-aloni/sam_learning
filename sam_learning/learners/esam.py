@@ -311,7 +311,7 @@ class ExtendedSamLearner(SAMLearner):
             action_name: the name of the lifted action.
             action_proxies_data: list of Tuples where each tuple has preconditions, effect and dictionary.
         """
-
+        # methods to binds variables to lambda in loop
         def create_encoder(proxy_data, new_proxy, action_name):
             """Creates an encoder function with bound values."""
             return lambda original_action_call: self.encoder_method(
