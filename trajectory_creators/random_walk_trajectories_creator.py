@@ -14,7 +14,7 @@ from sam_learning.core import VocabularyCreator
 from utilities import SolverType
 
 MAX_NUM_STEPS_IN_TRAJECTORY = 100
-inapplicable_action_probability = 0.05
+inapplicable_action_probability = 0.15
 random.seed(42)
 
 

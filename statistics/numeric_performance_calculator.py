@@ -1,20 +1,23 @@
 """Module responsible for calculating our approach for numeric precision and recall."""
 import csv
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Union, Optional
 
-import sklearn
+import numpy as np
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
 
 from statistics.performance_calculation_utils import _ground_executed_action
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from utilities import LearningAlgorithmType
+from utilities.util_types import NUMERIC_PRECISION
 
 NUMERIC_PERFORMANCE_STATS = [
     "learning_algorithm",
     "action_name",
+    "epsilon_precision",
     "num_trajectories",
     "precondition_precision",
     "precondition_recall",
@@ -36,6 +39,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         learning_algorithm: LearningAlgorithmType,
     ):
         super().__init__(model_domain, model_domain_path, observations, working_directory_path, learning_algorithm)
+        self.epsilon_precision = 10 ** (-int(os.environ.get(NUMERIC_PRECISION, 4)))
 
     def calculate_effects_mse(self, learned_domain: Domain) -> Dict[str, float]:
         """Calculates the effects MSE value using the actual state fluents and the ones generated using the learned
@@ -73,8 +77,8 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                     for fluent in next_state.state_fluents.keys()
                 ]
                 actual_values, expected_values = zip(*values)
-                state_mse = sklearn.metrics.mean_squared_error(expected_values, actual_values)
-                squared_errors[action_call.name].append(state_mse)
+                state_squared_error = (np.array(expected_values) - np.array(actual_values)) ** 2
+                squared_errors[action_call.name].append(state_squared_error)
 
         mse_values.update({action_name: sum(square_errors) / len(square_errors) for action_name, square_errors in squared_errors.items()})
         return mse_values
@@ -95,6 +99,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
             action_stats = {
                 "learning_algorithm": self.learning_algorithm.name,
                 "action_name": action_name,
+                "epsilon_precision": self.epsilon_precision,
                 "num_trajectories": num_used_observations,
                 "precondition_precision": preconditions_precision.get(action_name, 1),
                 "precondition_recall": preconditions_recall.get(action_name, 0),

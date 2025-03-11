@@ -2,9 +2,12 @@
 import logging
 import sys
 from pathlib import Path
+from typing import Set, Dict
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Operator
+from pddl_plus_parser.models import Operator, GroundedPredicate, PDDLFunction
+
+from sam_learning.core.environment_snapshot import EnvironmentSnapshot
 
 
 class PlanMinerTrajectoriesCreator:
@@ -13,6 +16,7 @@ class PlanMinerTrajectoriesCreator:
     Note:
         This assumes that there are regular trajectories to be converted to the correct format.
     """
+
     domain_file_name: str
     working_directory_path: Path
     logger: logging.Logger
@@ -22,15 +26,38 @@ class PlanMinerTrajectoriesCreator:
         self.working_directory_path = working_directory_path
         self.logger = logging.getLogger(__name__)
 
+    @staticmethod
+    def create_complete_state(state_predicates: Set[GroundedPredicate], state_functions: Dict[str, PDDLFunction]) -> str:
+        """Creates the complete state string from the state predicates and functions in the format that PlanMiner requires.
+
+        :param state_predicates: the positive and negative state predicates.
+        :param state_functions: the numeric functions in the state.
+        :return: the complete state string in the PlanMiner format.
+        """
+        positive_state_predicates = [str(predicate).upper() for predicate in state_predicates if predicate.is_positive]
+        negative_state_predicates = []
+        for predicate in state_predicates:
+            if not predicate.is_positive:
+                negated_predicate = GroundedPredicate(
+                    name=predicate.name, signature=predicate.signature, object_mapping=predicate.object_mapping, is_positive=True
+                )
+                negative_state_predicates.append(f"(not {str(negated_predicate).upper()})")
+
+        functions = [function.state_typed_representation.upper() for function in state_functions.values()]
+        return f"({' '.join(positive_state_predicates)} {' '.join(functions)} {' '.join(negative_state_predicates)})"
+
     def create_plan_miner_trajectories(self) -> None:
         """Creates the trajectories in the format file that PlanMiner requires.."""
         domain_file_path = self.working_directory_path / self.domain_file_name
         domain = DomainParser(domain_file_path).parse_domain()
-        for trajectory_file_path in self.working_directory_path.glob("*.trajectory"):
-            plan_miner_trajectory_file_path = self.working_directory_path / f"{trajectory_file_path.stem}.pts"
-            if plan_miner_trajectory_file_path.exists():
-                continue
+        triplet_snapshot = EnvironmentSnapshot(domain)
+        plan_miner_trajectory_file_path = self.working_directory_path / "plan_miner_trajectories.pts"
+        if plan_miner_trajectory_file_path.exists():
+            return
 
+        trajectories = []
+        for trajectory_file_path in self.working_directory_path.glob("*.trajectory"):
+            self.logger.info(f"Processing trajectory file: {trajectory_file_path}")
             problem_file_path = self.working_directory_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_file_path, domain).parse_problem()
             observation = TrajectoryParser(domain, problem).parse_trajectory(trajectory_file_path)
@@ -40,23 +67,26 @@ class PlanMinerTrajectoriesCreator:
                 action = action_triplet.grounded_action_call
                 prev_state = action_triplet.previous_state
                 next_state = action_triplet.next_state
+                previous_state_predicates = triplet_snapshot._create_state_discrete_snapshot(prev_state, observation.grounded_objects)
+                next_state_predicates = triplet_snapshot._create_state_discrete_snapshot(next_state, observation.grounded_objects)
                 op = Operator(action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters)
-                plan_sequence.append(f"[{index}, {index + 1}]: {op.typed_action_call}")
+                plan_sequence.append(f"[{index}, {index + 1}]: {op.typed_action_call.upper()}")
                 if index == 0:
-                    state_sequence.append(f"[{index}]: {prev_state.typed_serialize()}")
+                    state_str = self.create_complete_state(state_predicates=previous_state_predicates, state_functions=prev_state.state_fluents)
+                    state_sequence.append(f"[{index}]: {state_str}")
 
-                state_sequence.append(f"[{index + 1}]: {next_state.typed_serialize()}")
+                state_str = self.create_complete_state(state_predicates=next_state_predicates, state_functions=next_state.state_fluents)
+                state_sequence.append(f"[{index + 1}]: {state_str}")
 
             action_trace = "\n".join(plan_sequence)
             state_trace = "\n".join(state_sequence)
-            plan_miner_trajectory = f"New plan!!!\n\n" \
-                                    f"{action_trace}\n\n" \
-                                    f"{state_trace}"
+            plan_miner_trajectory = f"New plan!!!\n\n" f"{action_trace}\n\n\n" f"{state_trace}"
+            trajectories.append(plan_miner_trajectory)
 
-            with open(plan_miner_trajectory_file_path, "wt") as plan_miner_trajectory_file:
-                plan_miner_trajectory_file.write(plan_miner_trajectory)
+        with open(plan_miner_trajectory_file_path, "wt") as plan_miner_trajectory_file:
+            plan_miner_trajectory_file.write("\n\n".join(trajectories))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     trajectory_creator = PlanMinerTrajectoriesCreator(sys.argv[1], Path(sys.argv[2]))
     trajectory_creator.create_plan_miner_trajectories()

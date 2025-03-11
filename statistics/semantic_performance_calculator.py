@@ -3,7 +3,6 @@ import csv
 import logging
 import uuid
 from collections import defaultdict
-from itertools import permutations
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Union, Optional
 
@@ -57,17 +56,8 @@ def _calculate_precision_recall(
 
         precision_dict[action_name] = tp_rate / (tp_rate + num_false_positives[action_name])
         recall_dict[action_name] = tp_rate / (tp_rate + num_false_negatives[action_name])
+
     return precision_dict, recall_dict
-
-
-def choose_objects_subset(array: List[str], subset_size: int) -> List[Tuple[str]]:
-    """Choose r items our of a list size n.
-
-    :param array: the input list.
-    :param subset_size: the size of the subset.
-    :return: a list containing subsets of the original list.
-    """
-    return list(permutations(array, subset_size))
 
 
 class SemanticPerformanceCalculator:

@@ -17,11 +17,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     construct_linear_equation_string,
     prettify_coefficients,
     construct_numeric_conditions,
-    filter_constant_features,
-    detect_linear_dependent_features,
 )
-
-EPSILON = 1e-10
 
 
 class NaiveConvexHullLearnerNoDependencyRemoval:

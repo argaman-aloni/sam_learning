@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from pddl_plus_parser.models import Predicate, SignatureType, PDDLType
 
-from sam_learning.core import LearnerAction
+from sam_learning.core.learner_domain import LearnerAction
 
 BindingType = Dict[Tuple[str, str], str]
 MappingElement = Tuple[List[str], BindingType]
