@@ -6,6 +6,7 @@ from typing import Optional
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 
+from statistics.encoded_performance_calculator import EncodedPerformanceCalculator
 from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
@@ -75,6 +76,15 @@ def init_semantic_performance_calculator(
             model_domain=model_domain,
             observations=observations,
             model_domain_path=domain_path,
+            working_directory_path=working_directory_path,
+            learning_algorithm=learning_algorithm,
+        )
+
+    elif learning_algorithm == LearningAlgorithmType.esam_learning:
+        return EncodedPerformanceCalculator(
+            model_domain=model_domain,
+            model_domain_path=domain_path,
+            observations=observations,
             working_directory_path=working_directory_path,
             learning_algorithm=learning_algorithm,
         )
