@@ -6,6 +6,7 @@ from typing import Optional
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 
+from statistics.encoded_performance_calculator import EncodedPerformanceCalculator
 from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
@@ -44,7 +45,6 @@ def init_semantic_performance_calculator(
     :param learning_algorithm: the type of learning algorithm to use.
     :param executing_agents: the agents that are executing the domain.
     :param test_set_dir_path: the path to the directory containing the test set.
-    :param is_numeric: whether the performance calculator is numeric or not.
     :param problem_prefix: the prefix of the problem files.
     :return: the initialized numeric performance calculator object.
     """
@@ -72,6 +72,15 @@ def init_semantic_performance_calculator(
             model_domain=model_domain,
             observations=observations,
             model_domain_path=domain_path,
+            working_directory_path=working_directory_path,
+            learning_algorithm=learning_algorithm,
+        )
+
+    elif learning_algorithm == LearningAlgorithmType.esam_learning:
+        return EncodedPerformanceCalculator(
+            model_domain=model_domain,
+            model_domain_path=domain_path,
+            observations=observations,
             working_directory_path=working_directory_path,
             learning_algorithm=learning_algorithm,
         )
