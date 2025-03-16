@@ -5,17 +5,18 @@ from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Union, Optional
 
-import numpy as np
+import sklearn
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
 
 from statistics.performance_calculation_utils import _ground_executed_action
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from utilities import LearningAlgorithmType
-from utilities.util_types import NUMERIC_PRECISION
+from utilities.util_types import NUMERIC_PRECISION, NegativePreconditionPolicy
 
 NUMERIC_PERFORMANCE_STATS = [
     "learning_algorithm",
+    "policy",
     "action_name",
     "epsilon_precision",
     "num_trajectories",
@@ -77,37 +78,28 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                     for fluent in next_state.state_fluents.keys()
                 ]
                 actual_values, expected_values = zip(*values)
-                state_squared_error = (np.array(expected_values) - np.array(actual_values)) ** 2
-                squared_errors[action_call.name].append(state_squared_error)
+                state_mse = sklearn.metrics.mean_squared_error(expected_values, actual_values)
+                squared_errors[action_call.name].append(state_mse)
 
         mse_values.update({action_name: sum(square_errors) / len(square_errors) for action_name, square_errors in squared_errors.items()})
         return mse_values
 
-    def calculate_performance(self, learned_domain_path: Path, num_used_observations: int) -> None:
+    def calculate_performance(self, learned_domain_path: Path, num_used_observations: int, policy: NegativePreconditionPolicy) -> None:
         """Calculates the model's performance with both the precision and the recall values calculated.
 
         :param learned_domain_path: the path to the learned action model.
         :param num_used_observations: the number of observations used to learn the action model.
+        :param policy: the policy to use for the negative preconditions.
         """
+        super().calculate_performance(learned_domain_path, num_used_observations, policy)
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
-        self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
-        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
-        self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
-        effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         effects_mse = self.calculate_effects_mse(learned_domain)
-        for action_name in self.model_domain.actions:
-            action_stats = {
-                "learning_algorithm": self.learning_algorithm.name,
-                "action_name": action_name,
-                "epsilon_precision": self.epsilon_precision,
-                "num_trajectories": num_used_observations,
-                "precondition_precision": preconditions_precision.get(action_name, 1),
-                "precondition_recall": preconditions_recall.get(action_name, 0),
-                "effects_precision": effects_precision.get(action_name, 1),
-                "effects_recall": effects_recall.get(action_name, 1),
-                "effects_mse": effects_mse.get(action_name, 0),
-            }
-            self.combined_stats.append(action_stats)
+        for action in self.model_domain.actions:
+            for action_stats in self.combined_stats:
+                if action_stats["action_name"] == action and action_stats["num_trajectories"] == num_used_observations:
+                    action_stats["effects_mse"] = effects_mse.get(action, 0)
+                    action_stats["epsilon_precision"] = self.epsilon_precision
+                    break
 
         self.logger.info(f"Finished calculating the numeric learning performance for {self.learning_algorithm.name}.")
 

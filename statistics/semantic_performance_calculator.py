@@ -20,7 +20,7 @@ from pddl_plus_parser.models import (
 )
 
 from sam_learning.core import VocabularyCreator
-from utilities import LearningAlgorithmType
+from utilities import LearningAlgorithmType, NegativePreconditionPolicy
 from validators import run_validate_script, VALID_PLAN
 
 SEMANTIC_PRECISION_STATS = [
@@ -260,11 +260,12 @@ class SemanticPerformanceCalculator:
 
         return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
 
-    def calculate_performance(self, learned_domain_path: Path, num_used_observations: int) -> None:
+    def calculate_performance(self, learned_domain_path: Path, num_used_observations: int, policy: NegativePreconditionPolicy) -> None:
         """Calculate the semantic precision and recall of the learned domain.
 
         :param learned_domain_path: the path to the learned domain.
         :param num_used_observations: the number of observations used to learn the domain.
+        :param policy: the policy to use for the negative preconditions.
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
         self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
@@ -273,6 +274,8 @@ class SemanticPerformanceCalculator:
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         for action_name in self.model_domain.actions:
             action_stats = {
+                "learning_algorithm": self.learning_algorithm.name,
+                "policy": policy.name,
                 "action_name": action_name,
                 "num_trajectories": num_used_observations,
                 "precondition_precision": preconditions_precision.get(action_name, 1),

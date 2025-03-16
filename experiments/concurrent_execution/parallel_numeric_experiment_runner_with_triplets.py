@@ -79,7 +79,9 @@ class SingleIterationTripletsNSAMExperimentRunner(SingleIterationNSAMExperimentR
         learned_domain_path = self.validate_learned_domain(
             allowed_observations, learned_domain, test_set_dir_path, fold_num, float(learning_report["learning_time"]), policy
         )
-        self.semantic_performance_calc.calculate_performance(learned_domain_path, sum([len(observation) for observation in allowed_observations]))
+        self.semantic_performance_calc.calculate_performance(
+            learned_domain_path, sum([len(observation) for observation in allowed_observations]), policy
+        )
         self.logger.info(f"Finished the learning phase for the fold - {fold_num} and {len(allowed_observations)} observations!")
 
     def run_action_triplets_experiment(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:

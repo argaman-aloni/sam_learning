@@ -16,10 +16,10 @@ DEFAULT_SIZE = 10
 
 NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.numeric_sam,
-    LearningAlgorithmType.polynomial_sam,
     LearningAlgorithmType.naive_nsam,
     LearningAlgorithmType.naive_polysam,
     LearningAlgorithmType.incremental_nsam,
+    LearningAlgorithmType.plan_miner,
 ]
 
 MULTI_AGENT_ALGORITHMS = [

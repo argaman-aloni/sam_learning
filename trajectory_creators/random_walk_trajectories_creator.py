@@ -14,7 +14,7 @@ from sam_learning.core import VocabularyCreator
 from utilities import SolverType
 
 MAX_NUM_STEPS_IN_TRAJECTORY = 100
-inapplicable_action_probability = 0.15
+inapplicable_action_probability = 0.25
 random.seed(42)
 
 
@@ -165,7 +165,11 @@ class RandomWalkTrajectoriesCreator:
         return legal_actions
 
     def create_domain_trajectories(self, problems_prefix: str = "pfile", output_directory_path: Optional[Path] = None) -> None:
-        """Creates the domain trajectory files."""
+        """Creates the domain trajectory files.
+
+        :param problems_prefix: the prefix of the problem files.
+        :param output_directory_path: the path to the output directory.
+        """
         domain_file_path = self.working_directory_path / self.domain_file_name
         output_dir = output_directory_path or self.working_directory_path
         domain = DomainParser(domain_file_path).parse_domain()

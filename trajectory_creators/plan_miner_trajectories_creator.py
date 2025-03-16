@@ -4,8 +4,9 @@ import sys
 from pathlib import Path
 from typing import Set, Dict
 
+from pddl_plus_parser.exporters import DomainExporter
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
-from pddl_plus_parser.models import Operator, GroundedPredicate, PDDLFunction
+from pddl_plus_parser.models import Operator, GroundedPredicate, PDDLFunction, Domain
 
 from sam_learning.core.environment_snapshot import EnvironmentSnapshot
 
@@ -25,6 +26,33 @@ class PlanMinerTrajectoriesCreator:
         self.domain_file_name = domain_file_name
         self.working_directory_path = working_directory_path
         self.logger = logging.getLogger(__name__)
+
+    def convert_domain_to_plan_miner_form(self, domain: Domain) -> None:
+        """Converts the domain to the format that PlanMiner later outputs.
+
+        Note:
+            This is a helper function for the experiments where the comparison between the learned domain and the
+            original domain is needed.
+        """
+        export_path = self.working_directory_path / f"{self.domain_file_name.split('.')[0]}_plan_miner.pddl"
+        # change the names of the parameters in the predicates to be in the form of ?param_<index>
+        for predicate in domain.predicates.values():
+            old_to_new_parameter_names = {param_name: f"?param_{index}" for index, param_name in enumerate(predicate.signature.keys())}
+            predicate.change_signature(old_to_new_parameter_names)
+
+        # change the names of the parameters in the numeric functions to be in the form of ?param_<index>
+        for function in domain.functions.values():
+            old_to_new_parameter_names = {param_name: f"?param_{index}" for index, param_name in enumerate(function.signature.keys())}
+            function.change_signature(old_to_new_parameter_names)
+
+        # change the names of the parameters in the actions to be in the form of ?param_<index>
+        for action in domain.actions.values():
+            old_to_new_parameter_names = {param_name: f"?param_{index}" for index, param_name in enumerate(action.signature.keys())}
+            action.change_signature(old_to_new_parameter_names)
+
+        # export the new domain to a file
+        domain_exporter = DomainExporter()
+        domain_exporter.export_domain(domain=domain, export_path=export_path)
 
     @staticmethod
     def create_complete_state(state_predicates: Set[GroundedPredicate], state_functions: Dict[str, PDDLFunction]) -> str:
@@ -50,6 +78,7 @@ class PlanMinerTrajectoriesCreator:
         """Creates the trajectories in the format file that PlanMiner requires.."""
         domain_file_path = self.working_directory_path / self.domain_file_name
         domain = DomainParser(domain_file_path).parse_domain()
+        self.convert_domain_to_plan_miner_form(domain)
         triplet_snapshot = EnvironmentSnapshot(domain)
         plan_miner_trajectory_file_path = self.working_directory_path / "plan_miner_trajectories.pts"
         if plan_miner_trajectory_file_path.exists():
@@ -69,7 +98,9 @@ class PlanMinerTrajectoriesCreator:
                 next_state = action_triplet.next_state
                 previous_state_predicates = triplet_snapshot._create_state_discrete_snapshot(prev_state, observation.grounded_objects)
                 next_state_predicates = triplet_snapshot._create_state_discrete_snapshot(next_state, observation.grounded_objects)
-                op = Operator(action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters)
+                op = Operator(
+                    action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters, problem_objects=problem.objects
+                )
                 plan_sequence.append(f"[{index}, {index + 1}]: {op.typed_action_call.upper()}")
                 if index == 0:
                     state_str = self.create_complete_state(state_predicates=previous_state_predicates, state_functions=prev_state.state_fluents)
@@ -79,7 +110,7 @@ class PlanMinerTrajectoriesCreator:
                 state_sequence.append(f"[{index + 1}]: {state_str}")
 
             action_trace = "\n".join(plan_sequence)
-            state_trace = "\n".join(state_sequence)
+            state_trace = "\n\n".join(state_sequence)
             plan_miner_trajectory = f"New plan!!!\n\n" f"{action_trace}\n\n\n" f"{state_trace}"
             trajectories.append(plan_miner_trajectory)
 
