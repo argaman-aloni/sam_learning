@@ -56,7 +56,6 @@ class SingleIterationTripletsNSAMExperimentRunner(SingleIterationNSAMExperimentR
         :param test_set_dir_path: the path to the directory containing the test problems.
         :return: the learned action model and the learned action model's learning statistics.
         """
-
         learner = NUMERIC_SAM_ALGORITHM_VERSIONS[self._learning_algorithm](
             partial_domain=partial_domain, polynomial_degree=self.polynom_degree, relevant_fluents=self.fluents_map
         )
@@ -92,6 +91,10 @@ class SingleIterationTripletsNSAMExperimentRunner(SingleIterationNSAMExperimentR
         :param test_set_dir_path: the directory containing the test set problems in which the learned model should be
             used to solve.
         """
+        if self._learning_algorithm == LearningAlgorithmType.plan_miner:
+            self.logger.warning("The plan-miner algorithm is not currently supported.")
+            return
+
         self.logger.info(f"Executing the experiments on the action triplets instead of the trajectories for the fold - {fold_num}!")
         self._init_semantic_performance_calculator(fold_num)
         partial_domain = self.read_domain_file(train_set_dir_path)
