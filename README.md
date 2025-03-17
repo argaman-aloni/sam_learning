@@ -4,6 +4,10 @@
 # Safe Action Model Learning Framework
 SAM learning algorithms for multiple purposes.
 
+## Notice
+This code is NOT the published research and contains underdeveloped code.
+Please contact me if you want to use this code for research purposes.
+
 ## Features
 
 The SAM-Learning framework is a multi-purpose framework for learning safe action models. 
