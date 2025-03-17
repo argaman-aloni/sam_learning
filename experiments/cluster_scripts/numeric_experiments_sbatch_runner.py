@@ -17,7 +17,7 @@ from experiments.cluster_scripts.common import (
 )
 
 signal.signal(signal.SIGINT, sigint_handler)
-learning_algorithms_map = {3: "nsam", 15: "naive_nsam"}
+learning_algorithms_map = {3: "nsam", 15: "naive_nsam", 5: "plan_miner"}
 
 
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids, internal_iterations):
