@@ -83,23 +83,28 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         :param plan_miner_output_domain_path: the path to the Plan-Miner output domain.
         :return: the learned domain for evaluation.
         """
-        plan_miner_domain = DomainParser(plan_miner_output_domain_path).parse_domain()
-        temp_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
-        learned_domain = LearnerDomain(plan_miner_domain)
-        learned_domain.name = temp_domain.name
-        learned_domain.requirements = temp_domain.requirements
+        try:
+            plan_miner_domain = DomainParser(plan_miner_output_domain_path).parse_domain()
+            temp_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
+            learned_domain = LearnerDomain(plan_miner_domain)
+            learned_domain.name = temp_domain.name
+            learned_domain.requirements = temp_domain.requirements
 
-        for action_name, action_data in plan_miner_domain.actions.items():
-            learned_domain.actions[action_name].signature = action_data.signature
-            learned_domain.actions[action_name].preconditions = action_data.preconditions
-            learned_domain.actions[action_name].discrete_effects = action_data.discrete_effects
-            learned_domain.actions[action_name].numeric_effects = action_data.numeric_effects
+            for action_name, action_data in plan_miner_domain.actions.items():
+                learned_domain.actions[action_name].signature = action_data.signature
+                learned_domain.actions[action_name].preconditions = action_data.preconditions
+                learned_domain.actions[action_name].discrete_effects = action_data.discrete_effects
+                learned_domain.actions[action_name].numeric_effects = action_data.numeric_effects
+
+        except Exception as e:
+            self.logger.debug(f"Failed to parse the learned domain for PlanMiner. Probably PlanMiner created a domain with syntax errors.: {e}")
+            plan_miner_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
+            learned_domain = LearnerDomain(plan_miner_domain)
 
         with open(plan_miner_output_domain_path, "wt") as domain_file:
             # This should keep the domain name in the correct format and maintain the correct domain name in the PDDL file.
             domain_file.write(learned_domain.to_pddl())
-
-        return learned_domain
+            return learned_domain
 
     def _run_plan_miner_process(self, plan_miner_trajectory_file_path: Path) -> Optional[Path]:
         """Runs the Plan-Miner process to learn the action model.
