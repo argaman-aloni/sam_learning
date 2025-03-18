@@ -20,10 +20,6 @@ class ProxyActionData:
     signature: Dict[str, str]
 
 
-# class ActionEncoder:
-#     def __init__(self, )
-
-
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
 
@@ -253,11 +249,13 @@ class ExtendedSamLearner(SAMLearner):
         Returns:
             ActionCall: equal action call in the original domain
         """
-        original_lifted_action = self.partial_domain.actions[action_name] if action_name in self.partial_domain.actions\
-            else self.popped_actions_archive[action_name]
+        original_lifted_action = (self.partial_domain.actions[action_name]
+                                  if action_name in self.partial_domain.actions
+                                  else self.popped_actions_archive[action_name])
         original_signature = list(original_lifted_action.signature.keys())
         proxy_param_list = list(new_proxy.signature.keys())
-        proxy_parameter_reversed_map = [(new_param, old_param) for old_param, new_param in proxy_data.signature.items()]
+        proxy_parameter_reversed_map = [(new_param, old_param)
+                                        for old_param, new_param in proxy_data.signature.items()]
 
         grounded_proxy_obj_list: List[str] = proxy_action_call.parameters
         original_action_map = {
@@ -267,6 +265,7 @@ class ExtendedSamLearner(SAMLearner):
 
         new_obj_list = [original_action_map[param] for param in original_signature]
         return ActionCall(action_name, new_obj_list)
+
     def encoder_method(self, original_action_call: ActionCall, proxy_data: ProxyActionData, new_proxy: LearnerAction,
                 action_name: str) -> ActionCall:
         """

@@ -205,7 +205,7 @@ def test_minimize_parameters_equality_dict_complex(
     assert_get_minimize_parameters_equality_dict(rovers_esam_learner, model_dict, expected)
 
 
-def make_learner_action(name, signature_params, types_dict):
+def make_learner_action(name: str, signature_params: Dict[str, str], types_dict: SignatureType):
     """Create a LearnerAction with the correct types from the types_dict"""
     signature = {}
     for param, type_name in signature_params.items():
