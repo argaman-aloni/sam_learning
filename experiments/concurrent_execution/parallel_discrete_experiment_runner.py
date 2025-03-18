@@ -109,13 +109,10 @@ def parse_arguments() -> argparse.Namespace:
         required=False,
         type=int,
         choices=[2],
-        help="The solver that should be used for the sake of validation.\nMetric-FF - 2, ENHSP - 3.",
+        help="The solver that should be used for the sake of validation.\nMetric-FF - 2",
         default=2,
     )
 
-    parser.add_argument(
-        "--polynom_degree", required=False, help="The degree of the polynomial to set in the learning algorithm.", default=0,
-    )
 
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
