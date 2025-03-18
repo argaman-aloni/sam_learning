@@ -36,21 +36,20 @@ SEMANTIC_PRECISION_STATS = [
 
 
 def _calculate_precision_recall(
-    num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int], learned_actions: List[str]
+    num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int]
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """Calculates the precision and recall values for each action.
 
     :param num_false_negatives: the number of false negatives for each action.
     :param num_false_positives: the number of false positives for each action.
     :param num_true_positives: the number of true positives for each action.
-    :param learned_actions: the list of actions that were learned in the action model learning process.
     :return: a tuple of two dictionaries, one for the precision values and one for the recall values.
     """
     precision_dict = defaultdict(float)
     recall_dict = defaultdict(float)
     for action_name, tp_rate in num_true_positives.items():
         if tp_rate == 0:
-            precision_dict[action_name] = 0 if action_name in learned_actions else 1
+            precision_dict[action_name] = 1 if num_false_positives[action_name] == 0 else 0
             recall_dict[action_name] = 0
             continue
 
@@ -237,7 +236,7 @@ class SemanticPerformanceCalculator:
                 num_false_positives[action.name] += false_positive
                 num_false_negatives[action.name] += false_negative
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
 
     def calculate_effects_semantic_performance(self, learned_domain: Domain) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Calculates the precision recall values of the learned effects.
@@ -258,7 +257,7 @@ class SemanticPerformanceCalculator:
         for observation in self.dataset_observations:
             self._calculate_effects_difference_rate(observation, learned_domain, num_false_negatives, num_false_positives, num_true_positives)
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
 
     def calculate_performance(self, learned_domain_path: Path, num_used_observations: int, policy: NegativePreconditionPolicy) -> None:
         """Calculate the semantic precision and recall of the learned domain.

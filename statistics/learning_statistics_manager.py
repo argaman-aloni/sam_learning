@@ -44,6 +44,9 @@ LEARNED_ACTIONS_STATS_COLUMNS = [
     "action_recall",
     "f1_score",
 ]
+UNSAFE_LEARNING_ALGORITHMS = [
+    LearningAlgorithmType.plan_miner,
+]
 
 
 class LearningStatisticsManager:
@@ -169,9 +172,9 @@ class LearningStatisticsManager:
                     "num_learned_add_effects": 0,
                     "num_learned_delete_effects": 0,
                     "preconditions_precision": 0,
-                    "effects_precision": 0,
+                    "effects_precision": 1,
                     "preconditions_recall": 1,
-                    "effects_recall": 1,
+                    "effects_recall": 0,
                     "action_precision": 0,
                     "action_recall": 1,
                     "f1_score": 0,

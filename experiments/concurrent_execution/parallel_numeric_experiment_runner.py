@@ -162,6 +162,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             "learning_time": time.time() - plan_miner_start_time,
         }
         if plan_miner_output_domain_path is None:
+            self.logger.info("Plan-Miner failed to learn the action model.")
             return self._handle_plan_miner_failure()
 
         learned_domain = self._create_learned_domain_for_evaluation(plan_miner_output_domain_path)
