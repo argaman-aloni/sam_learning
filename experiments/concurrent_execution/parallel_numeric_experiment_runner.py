@@ -6,6 +6,7 @@ import shutil
 import signal
 import subprocess
 import time
+import uuid
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
 
@@ -94,6 +95,10 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             learned_domain.actions[action_name].discrete_effects = action_data.discrete_effects
             learned_domain.actions[action_name].numeric_effects = action_data.numeric_effects
 
+        with open(plan_miner_output_domain_path, "wt") as domain_file:
+            # This should keep the domain name in the correct format and maintain the correct domain name in the PDDL file.
+            domain_file.write(learned_domain.to_pddl())
+
         return learned_domain
 
     def _run_plan_miner_process(self, plan_miner_trajectory_file_path: Path) -> Optional[Path]:
@@ -102,9 +107,10 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         :param plan_miner_trajectory_file_path: the path to the Plan-Miner trajectory file.
         :return: the path to the learned action model (if successful).
         """
+        plan_miner_domain_name = f"{self.domain_file_name.split('.')[0]}_{uuid.uuid4()}"
         os.chdir(PLAN_MINER_DIR_PATH)
         # cmd = ./PlanMiner {path to pts file} {domain name without extension}
-        process = subprocess.Popen(f"./bin/PlanMiner {plan_miner_trajectory_file_path} {self.domain_file_name.split('.')[0]}", shell=True)
+        process = subprocess.Popen(f"./bin/PlanMiner {plan_miner_trajectory_file_path} {plan_miner_domain_name}", shell=True)
         try:
             process.wait(timeout=LEARNING_TIMEOUT)
 
@@ -117,7 +123,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             self.logger.error(f"PlanMiner failed with the following return code: {e.returncode}")
             return None
 
-        plan_miner_output_domain_path = Path(PLAN_MINER_DIR_PATH) / self.domain_file_name
+        plan_miner_output_domain_path = Path(PLAN_MINER_DIR_PATH) / f"{plan_miner_domain_name}.pddl"
         if plan_miner_output_domain_path.exists():
             self.logger.info("PlanMiner finished successfully!")
             return plan_miner_output_domain_path
@@ -125,7 +131,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         self.logger.error("Plan-Miner failed to learn the action model.")
         return None
 
-    def _apply_plan_miner(self, test_set_dir_path) -> Tuple[LearnerDomain, Dict[str, Any]]:
+    def _apply_plan_miner(self, test_set_dir_path: Path) -> Tuple[LearnerDomain, Dict[str, Any]]:
         """Applies the learning algorithm Plan-Miner to learn the action model.
 
         :param test_set_dir_path: the path to the directory containing the test problems.
@@ -154,7 +160,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             return self._handle_plan_miner_failure()
 
         learned_domain = self._create_learned_domain_for_evaluation(plan_miner_output_domain_path)
-        shutil.move(plan_miner_output_domain_path, test_set_dir_path)
+        shutil.move(plan_miner_output_domain_path, test_set_dir_path / self.domain_file_name)
         return learned_domain, learning_report
 
     def _apply_learning_algorithm(
