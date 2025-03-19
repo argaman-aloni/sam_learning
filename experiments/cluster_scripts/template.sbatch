@@ -24,6 +24,7 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 ### Print some data to output file ###
 echo `date`
 ${job_info_print}
+echo "Job name is: $SLURM_JOB_NAME"
 
 ${environment_variables}
 

@@ -70,7 +70,7 @@ def main():
                             fold,
                             arguments,
                             environment_variables,
-                            f"{experiment['domain_file_name']}_{fold}_numeric_experiment_runner",
+                            f"{experiment['domain_file_name']}_{fold}_{internal_iteration}_{learning_algorithms_map[compared_version]}_numeric_experiment_runner",
                             None,
                         )
 
