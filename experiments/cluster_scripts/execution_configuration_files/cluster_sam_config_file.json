@@ -1,5 +1,5 @@
 {
-  "environment_variables_file_path": "/sise/home/omereliy/numeric_planning/esam_experiments/environment.json",
+  "environment_variables_file_path": "/sise/home/omereliy/esam_experiments/environment.json",
   "code_directory_path": "/sise/home/mordocha/code/sam_learning/experiments/concurrent_execution",
   "experiments_script_path": "parallel_numeric_experiment_runner.py",
   "num_folds": 1,
