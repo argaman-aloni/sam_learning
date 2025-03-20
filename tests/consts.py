@@ -146,7 +146,6 @@ CURRENT_LOAD_GROUNDED_TRAJECTORY_FUNCTION = PDDLFunction(name="current_load", si
 WEIGHT_FUNCTION = PDDLFunction(name="weight", signature={"?c": CRATE_TYPE})
 
 
-# TODO ORI ADDED
 DRIVERLOG_COMBINED_DOMAIN_PATH = EXAMPLES_DIR_PATH / "driverlog_combined_domain.pddl"
 DRIVERLOG_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "driverlog_conflicting_problem.pddl"
 DRIVERLOG_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "driverlog_ma_sam_pfile2.trajectory"

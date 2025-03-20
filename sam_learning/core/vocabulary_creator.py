@@ -4,8 +4,7 @@ from collections import defaultdict
 from itertools import permutations
 from typing import List, Tuple, Dict, Set, Union, Optional
 
-from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, \
-    ActionCall, Action
+from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, ActionCall, Action
 
 from sam_learning.core.learner_domain import LearnerDomain, LearnerAction
 
@@ -26,9 +25,9 @@ class VocabularyCreator:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def _validate_type_matching(self, grounded_signatures: Dict[str, PDDLType],
-                                lifted_variable_to_match: Union[
-                                    Predicate, PDDLFunction, Action, LearnerAction]) -> bool:
+    def _validate_type_matching(
+        self, grounded_signatures: Dict[str, PDDLType], lifted_variable_to_match: Union[Predicate, PDDLFunction, Action, LearnerAction]
+    ) -> bool:
         """Validates that the types of the grounded signature match the types of the predicate signature.
 
         :param grounded_signatures: the grounded predicate signature.
@@ -44,16 +43,13 @@ class VocabularyCreator:
             parameter_type = lifted_variable_to_match.signature[predicate_parameter]
             grounded_type = grounded_signatures[object_name]
             if not grounded_type.is_sub_type(parameter_type):
-                self.logger.debug(f"The combination of objects - {grounded_signatures}"
-                                  f" does not fit {lifted_variable_to_match.name}'s signature")
+                self.logger.debug(f"The combination of objects - {grounded_signatures}" f" does not fit {lifted_variable_to_match.name}'s signature")
                 return False
 
         return True
 
-
-    #TODO: vocabulary to allow duplicates in grounded_signature for future use
-    def create_vocabulary(self, domain: Union[LearnerDomain, Domain],
-                          observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
+    # TODO: vocabulary to allow duplicates in grounded_signature for future use
+    def create_vocabulary(self, domain: Union[LearnerDomain, Domain], observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
         """Create a vocabulary of random combinations of the predicates parameters and objects.
 
         :param domain: the domain containing the predicates and the action signatures.
@@ -67,22 +63,28 @@ class VocabularyCreator:
             predicate_name = predicate.name
             signature_permutations = choose_objects_subset(possible_objects_str, len(predicate.signature))
             for signature_permutation in signature_permutations:
-                grounded_signature = {object_name: objects_and_consts[possible_objects_str.index(object_name)].type
-                                      for object_name in signature_permutation}
+                grounded_signature = {
+                    object_name: objects_and_consts[possible_objects_str.index(object_name)].type for object_name in signature_permutation
+                }
                 if not self._validate_type_matching(grounded_signature, predicate):
                     continue
 
-                grounded_predicate = GroundedPredicate(name=predicate_name, signature=predicate.signature,
-                                                       object_mapping={parameter_name: object_name for
-                                                                       object_name, parameter_name in
-                                                                       zip(grounded_signature, predicate.signature)})
+                matching_grounded_type_hierarchy_signature = {
+                    parameter_name: objects_and_consts[possible_objects_str.index(object_name)].type
+                    for object_name, parameter_name in zip(grounded_signature, predicate.signature)
+                }
+                grounded_predicate = GroundedPredicate(
+                    name=predicate_name,
+                    signature=matching_grounded_type_hierarchy_signature,
+                    object_mapping={parameter_name: object_name for object_name, parameter_name in zip(grounded_signature, predicate.signature)},
+                )
                 vocabulary[predicate.untyped_representation].add(grounded_predicate)
 
         return vocabulary
 
     def create_lifted_functions_vocabulary(
-            self, domain: Union[LearnerDomain, Domain], possible_parameters: Dict[str, PDDLType],
-            must_be_parameter: Optional[str] = None) -> Dict[str, PDDLFunction]:
+        self, domain: Union[LearnerDomain, Domain], possible_parameters: Dict[str, PDDLType], must_be_parameter: Optional[str] = None
+    ) -> Dict[str, PDDLFunction]:
         """Create a function vocabulary from a domain containing action signatures and function definitions.
 
         :param domain: the domain containing the functions and the action signatures.
@@ -98,8 +100,9 @@ class VocabularyCreator:
             function_name = predicate.name
             signature_permutations = choose_objects_subset(possible_parameters_names, len(predicate.signature))
             for signature_permutation in signature_permutations:
-                bounded_lifted_signature = {param_name: parameter_types[possible_parameters_names.index(param_name)]
-                                            for param_name in signature_permutation}
+                bounded_lifted_signature = {
+                    param_name: parameter_types[possible_parameters_names.index(param_name)] for param_name in signature_permutation
+                }
 
                 if not self._validate_type_matching(bounded_lifted_signature, predicate):
                     continue
@@ -113,9 +116,9 @@ class VocabularyCreator:
         self.logger.debug(f"Created a lifted function vocabulary of size {len(vocabulary)}")
         return vocabulary
 
-    def create_lifted_vocabulary(self, domain: Union[LearnerDomain, Domain],
-                                 possible_parameters: Dict[str, PDDLType],
-                                 must_be_parameter: Optional[str] = None) -> Set[Predicate]:
+    def create_lifted_vocabulary(
+        self, domain: Union[LearnerDomain, Domain], possible_parameters: Dict[str, PDDLType], must_be_parameter: Optional[str] = None
+    ) -> Set[Predicate]:
         """Create a vocabulary of random combinations of parameters that match the predicates.
 
         :param domain: the domain containing the predicates and the action signatures.
@@ -131,8 +134,9 @@ class VocabularyCreator:
             predicate_name = predicate.name
             signature_permutations = choose_objects_subset(possible_parameters_names, len(predicate.signature))
             for signature_permutation in signature_permutations:
-                bounded_lifted_signature = {param_name: parameter_types[possible_parameters_names.index(param_name)]
-                                            for param_name in signature_permutation}
+                bounded_lifted_signature = {
+                    param_name: parameter_types[possible_parameters_names.index(param_name)] for param_name in signature_permutation
+                }
 
                 if not self._validate_type_matching(bounded_lifted_signature, predicate):
                     continue
@@ -148,8 +152,7 @@ class VocabularyCreator:
         self.logger.debug(f"Created vocabulary of size {len(vocabulary)}")
         return vocabulary
 
-    def create_grounded_actions_vocabulary(self, domain: Union[LearnerDomain, Domain],
-                                           observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
+    def create_grounded_actions_vocabulary(self, domain: Union[LearnerDomain, Domain], observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
         """"Create a vocabulary of random combinations of the actions parameters and objects.
 
         :param domain: the domain containing the actions and the action signatures.
@@ -161,11 +164,11 @@ class VocabularyCreator:
         for action_name, action in domain.actions.items():
             possible_objects_for_parameters = {
                 parameter_name: [obj for obj in objects_and_consts if obj.type.is_sub_type(parameter_type)]
-                for parameter_name, parameter_type in action.signature.items()}
+                for parameter_name, parameter_type in action.signature.items()
+            }
             signature_options = list(itertools.product(*possible_objects_for_parameters.values()))
             for signature_option in signature_options:
-                grounded_action = ActionCall(
-                    name=action_name, grounded_parameters=[obj.name for obj in signature_option])
+                grounded_action = ActionCall(name=action_name, grounded_parameters=[obj.name for obj in signature_option])
                 self.logger.debug(f"Created grounded action {str(grounded_action)}")
                 vocabulary.add(grounded_action)
 
