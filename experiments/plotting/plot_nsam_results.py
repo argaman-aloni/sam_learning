@@ -27,13 +27,14 @@ def plot_results(results_directory_path: Path, file_template: str = "*solving_co
         labels = {
             "numeric_sam": "NSAM*",
             "naive_nsam": "NSAM",
+            "plan_miner": "Plan Miner",
         }
 
         # Plotting
         sns.set(style="whitegrid")
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
 
-        legend_order = [0, 1]
+        legend_order = [0, 2, 1]
 
         x_lim = max(grouped_data["num_trajectories"]) * 1.25 if not using_triplets else max(grouped_data["num_trajectory_triplets"]) * 1.25
         # Plot a line for each learning algorithm
@@ -108,9 +109,6 @@ def plot_results(results_directory_path: Path, file_template: str = "*solving_co
 
         output_file_path = file_path.parent / f"{file_path.stem}_plot.png"
         plt.savefig(output_file_path, bbox_inches="tight")
-
-        # Show the plot
-        plt.show()
 
 
 if __name__ == "__main__":
