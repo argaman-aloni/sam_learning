@@ -25,6 +25,8 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 echo `date`
 ${job_info_print}
 echo "Job name is: ${job_name}"
+mkdir ${cluster_temp_logs_path}/logs
+chmod -R 777 ${cluster_temp_logs_path}/logs
 
 ${environment_variables}
 
