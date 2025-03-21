@@ -16,7 +16,7 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 # Note: the following 4 lines are commented out
 ##SBATCH --mail-type=ALL			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
 #SBATCH --mem=${mem}				### amount of RAM memory, allocating more than 60G requires IT team's permission
-#SBATCH --tmp=100G        ### amount of temporary storage space, used for node's local storage
+#SBATCH --tmp=10G        ### amount of temporary storage space, used for node's local storage
 
 
 ################  Following lines will be executed by a compute node    #######################
@@ -25,7 +25,8 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 echo `date`
 ${job_info_print}
 echo "Job name is: ${job_name}"
-mkdir ${cluster_temp_logs_path}/logs
+echo "${cluster_temp_logs_path}"
+mkdir -p ${cluster_temp_logs_path}/logs
 chmod -R 777 ${cluster_temp_logs_path}/logs
 
 ${environment_variables}
