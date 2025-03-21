@@ -29,7 +29,12 @@ def configure_iteration_logger(args: argparse.Namespace):
     local_logs_parent_path = os.environ.get("LOCAL_LOGS_PATH", args.working_directory_path)
     working_directory_path = Path(local_logs_parent_path)
     logs_directory_path = working_directory_path / "logs"
-    logs_directory_path.mkdir(exist_ok=True)
+    try:
+        logs_directory_path.mkdir(exist_ok=True)
+    except PermissionError:
+        # This is a hack to not fail and just avoid logging in case the directory cannot be created
+        return
+
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
