@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import List, Dict, Union, Optional
 
 import sklearn
-from astropy.io.fits.tests.test_compression_failures import MAX_INT
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
 
@@ -27,6 +26,8 @@ NUMERIC_PERFORMANCE_STATS = [
     "effects_recall",
     "effects_mse",
 ]
+
+MAX_INT = 10 ** 6
 
 
 class NumericPerformanceCalculator(SemanticPerformanceCalculator):
