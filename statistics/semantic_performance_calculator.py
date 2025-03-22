@@ -181,8 +181,14 @@ class SemanticPerformanceCalculator:
                 # cannot apply when the action is inapplicable since the linear regression is fitted on applicable numeric points.
                 try:
                     learned_next_state = learned_operator.apply(model_previous_state)
+
                 except ValueError:
                     self.logger.debug("The action is not applicable in the state.")
+                    learned_next_state = model_previous_state.copy()
+                    model_next_state = model_previous_state.copy()
+
+                except ZeroDivisionError:
+                    self.logger.debug("Tried to perform a division by zero!")
                     learned_next_state = model_previous_state.copy()
                     model_next_state = model_previous_state.copy()
 

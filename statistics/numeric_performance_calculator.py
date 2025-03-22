@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Dict, Union, Optional
 
 import sklearn
+from astropy.io.fits.tests.test_compression_failures import MAX_INT
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation
 
@@ -72,6 +73,11 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                     # since the learned action is not applicable in the state there is no point to compare
                     # with an action that is not applicable in the model domain.
                     model_next_state = previous_state.copy()
+
+                except ZeroDivisionError:
+                    # If the action performed division by zero the MSE is set to the maximum value.
+                    squared_errors[action_call.name].append(MAX_INT)
+                    continue
 
                 values = [
                     (next_state.state_fluents[fluent].value, model_next_state.state_fluents[fluent].value)
