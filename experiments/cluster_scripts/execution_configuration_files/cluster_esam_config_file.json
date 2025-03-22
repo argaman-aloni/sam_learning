@@ -1,7 +1,7 @@
 {
   "environment_variables_file_path": "/sise/home/omereliy/esam_experiments/environment.json",
-  "code_directory_path": "/sise/home/mordocha/code/sam_learning/experiments/concurrent_execution",
-  "experiments_script_path": "parallel_numeric_experiment_runner.py",
+  "code_directory_path": "/sise/home/omereliy/esam_experiments/sam_learning/experiments/concurrent_execution",
+  "experiments_script_path": "parallel_discrete_experiment_runner.py",
   "num_folds": 1,
   "RAM": "32G",
   "experiment_configurations": [
