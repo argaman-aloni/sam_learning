@@ -27,6 +27,7 @@ def plot_solo_results(results_directory_path: Path, file_template: str = "*solvi
         labels = {
             "numeric_sam": "NSAM*",
             "naive_nsam": "NSAM",
+            "plan_miner": "Plan Miner",
         }
 
         # Plotting
@@ -60,13 +61,11 @@ def plot_solo_results(results_directory_path: Path, file_template: str = "*solvi
         plt.ylim(0, 100)
         plt.tick_params(axis="both", which="major", labelsize=46)
         plt.grid(True)
-        stand_alone_fig.legend(
-            fontsize=48, loc="right", frameon=True,  # Inside the grid, on the right  # Optional: frame around legend
-        )
+        plt.legend(fontsize=44)
 
-        output_file_path = file_path.parent / f"{file_path.stem}_plot_solo.png"
+        output_file_path = file_path.parent / f"{file_path.stem}_plot_solo.pdf"
         plt.tight_layout()  # Ensures no overlap between plot elements
-        plt.savefig(output_file_path, bbox_inches="tight")
+        plt.savefig(output_file_path, bbox_inches="tight", dpi=300)
 
 
 if __name__ == "__main__":

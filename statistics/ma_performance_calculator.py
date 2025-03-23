@@ -67,7 +67,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
                     num_false_positives[action.name] += false_positive
                     num_false_negatives[action.name] += false_negative
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
 
     def _calculate_effects_difference_rate_for_multi_agent_experiments(
         self,
@@ -145,7 +145,7 @@ class MASamPerformanceCalculator(SemanticPerformanceCalculator):
                 observation, learned_domain, multi_agent_trajectory_exporter, num_false_negatives, num_false_positives, num_true_positives
             )
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
 
     def calculate_performance_for_ma_sam_experiments(
         self, learned_domain_path: Path, num_used_observations: int, policy: NegativePreconditionPolicy

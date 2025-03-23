@@ -29,7 +29,12 @@ def configure_iteration_logger(args: argparse.Namespace):
     local_logs_parent_path = os.environ.get("LOCAL_LOGS_PATH", args.working_directory_path)
     working_directory_path = Path(local_logs_parent_path)
     logs_directory_path = working_directory_path / "logs"
-    logs_directory_path.mkdir(exist_ok=True)
+    try:
+        logs_directory_path.mkdir(exist_ok=True)
+    except PermissionError:
+        # This is a hack to not fail and just avoid logging in case the directory cannot be created
+        return
+
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
@@ -229,7 +234,7 @@ class ParallelExperimentRunner:
         learned_domain_path = self.validate_learned_domain(
             allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
         )
-        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations), policy=negative_preconditions_policy)
 
     def run_fold_iteration(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int) -> None:
         """Runs the numeric action model learning algorithms on the input fold.

@@ -17,7 +17,7 @@ from experiments.cluster_scripts.common import (
 )
 
 signal.signal(signal.SIGINT, sigint_handler)
-learning_algorithms_map = {3: "nsam", 15: "naive_nsam"}
+learning_algorithms_map = {3: "nsam", 15: "naive_nsam", 5: "plan_miner"}
 
 
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids, internal_iterations):
@@ -70,7 +70,7 @@ def main():
                             fold,
                             arguments,
                             environment_variables,
-                            f"{experiment['domain_file_name']}_{fold}_numeric_experiment_runner",
+                            f"{experiment['domain_file_name']}_{fold}_{internal_iteration}_{learning_algorithms_map[compared_version]}_numeric_experiment_runner",
                             None,
                         )
 
@@ -82,23 +82,6 @@ def main():
                     pathlib.Path("temp.sbatch").unlink()
                     progress_bar(version_index, len(experiment["compared_versions"]))
                     arguments.pop(-1)  # removing the internal iteration from the arguments list
-
-                print("Creating the job to run the experiment with triplets instead of trajectories.")
-                sid = submit_job_and_validate_execution(
-                    code_directory,
-                    configurations,
-                    experiment,
-                    fold,
-                    arguments,
-                    environment_variables,
-                    f"triplets_numeric_{experiment['domain_file_name']}_{fold}_experiment_runner",
-                    None,
-                    python_file=f"{code_directory}/parallel_numeric_experiment_runner_with_triplets.py",
-                )
-                formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-                print(
-                    f"{formatted_date_time} - submitted job to run experiment for triplets with sid {sid} for algorithm {learning_algorithms_map[compared_version]} and fold {fold}."
-                )
 
             time.sleep(5)
 

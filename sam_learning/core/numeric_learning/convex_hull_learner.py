@@ -10,7 +10,8 @@ from pandas import DataFrame, Series
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from scipy.spatial import ConvexHull, QhullError
 
-from sam_learning.core.learning_types import ConditionType
+from sam_learning.core.exceptions import NotSafeActionError
+from sam_learning.core.learning_types import ConditionType, EquationSolutionType
 from sam_learning.core.numeric_learning.numeric_utils import (
     construct_multiplication_strings,
     construct_linear_equation_string,
@@ -139,7 +140,7 @@ class ConvexHullLearner:
         shifted_points = points - shift_axis
         self.logger.debug("Finding the basis vectors for the projected CH using the extended Gram-Schmidt method.")
         projection_basis = extended_gram_schmidt(shifted_points)
-        if len(shifted_points) > len(points_df.columns.tolist()) and len(projection_basis) == len(points_df.columns.tolist()):
+        if len(shifted_points) > len(points_df.columns.tolist()) and len(projection_basis) >= len(points_df.columns.tolist()):
             self.logger.debug("The points are spanning the original space and the basis is full rank, " "no need to project the points.")
             coefficients, border_point = self._execute_convex_hull(points, display_mode, epsilon=epsilon, qhull_options=qhull_options)
             return coefficients, border_point, points_df.columns.tolist(), []
@@ -286,4 +287,6 @@ class ConvexHullLearner:
                 "(probably since the rank of the matrix is 2 and it cannot create a degraded "
                 "convex hull)."
             )
-            return self._create_disjunctive_preconditions(state_data, [])
+            raise NotSafeActionError(
+                name=self.action_name, reason="Convex hull failed to create a convex hull", solution_type=EquationSolutionType.convex_hull_not_found
+            )

@@ -15,9 +15,10 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.linear_model import LinearRegression
 
 from sam_learning.core.learning_types import ConditionType
+from utilities.util_types import NUMERIC_PRECISION
 
-DECIMAL_DIGITS = os.environ.get("NUMERIC_PRECISION", 4)
-EPSILON = 1e-4
+DECIMAL_DIGITS = int(os.environ.get(NUMERIC_PRECISION, 4))
+EPSILON = 10 ** (-DECIMAL_DIGITS)
 ELIMINATION_THRESHOLD = 0.01
 
 

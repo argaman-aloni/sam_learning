@@ -21,19 +21,30 @@ from utilities import SolutionOutputTypes, LearningAlgorithmType
 FAULTY_DOMAIN_PDDL = "faulty_domain.pddl"
 
 random.seed(42)
-DIAGNOSIS_COLUMNS = ["repair_method", "domain_type", "problems_type", "ok", "no_solution", "timeout", "not_applicable",
-                     "goal_not_achieved", "state_difference", "action_name", "defect_type"]
+DIAGNOSIS_COLUMNS = [
+    "repair_method",
+    "domain_type",
+    "problems_type",
+    "ok",
+    "no_solution",
+    "timeout",
+    "not_applicable",
+    "goal_not_achieved",
+    "state_difference",
+    "action_name",
+    "defect_type",
+]
 
 REPAIR_TO_LEARNING_ALGORITHM = {
     RepairAlgorithmType.oblique_tree: LearningAlgorithmType.oblique_tree,
     RepairAlgorithmType.extended_svc: LearningAlgorithmType.extended_svc,
     RepairAlgorithmType.numeric_sam: LearningAlgorithmType.numeric_sam,
-    RepairAlgorithmType.raw_numeric_sam: LearningAlgorithmType.raw_numeric_sam
 }
 
 
 class ModelFaultDiagnosis:
     """Class that contains the logic to conduct fault diagnosis experimentation."""
+
     logger: logging.Logger
     working_directory_path: Path
     k_fold: KFoldSplit
@@ -48,8 +59,7 @@ class ModelFaultDiagnosis:
     def __init__(self, work_dir_path: Path, original_domain_file_name: str, fluents_map_path: Path):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = work_dir_path
-        self.k_fold = KFoldSplit(working_directory_path=work_dir_path, domain_file_name=original_domain_file_name,
-                                 only_train_test=True)
+        self.k_fold = KFoldSplit(working_directory_path=work_dir_path, domain_file_name=original_domain_file_name, only_train_test=True)
         self.model_domain_file_name = original_domain_file_name
         self.solver = ENHSPSolver()
         self.fault_repair = FaultRepair(work_dir_path, original_domain_file_name, fluents_map_path)
@@ -60,30 +70,34 @@ class ModelFaultDiagnosis:
         self.model_domain = DomainParser(domain_path=self.model_domain_file_path).parse_domain()
         self.numeric_performance_calc = None
         self.learning_statistics_manager = LearningStatisticsManager(
-            working_directory_path=work_dir_path,
-            domain_path=self.model_domain_file_path,
-            learning_algorithm=LearningAlgorithmType.numeric_sam)
+            working_directory_path=work_dir_path, domain_path=self.model_domain_file_path, learning_algorithm=LearningAlgorithmType.numeric_sam
+        )
 
-    def _export_domain(self, domain: LearnerDomain, domain_directory_path: Path,
-                       domain_file_name: Optional[str] = None,
-                       is_faulty: bool = False,
-                       defect_type: DefectType = DefectType.numeric_precondition_sign,
-                       action_name: str = "", repair_type: str = "") -> NoReturn:
+    def _export_domain(
+        self,
+        domain: LearnerDomain,
+        domain_directory_path: Path,
+        domain_file_name: Optional[str] = None,
+        is_faulty: bool = False,
+        defect_type: DefectType = DefectType.numeric_precondition_sign,
+        action_name: str = "",
+        repair_type: str = "",
+    ) -> NoReturn:
         """Exports a domain into a file so that it will be used to solve the test set problems.
 
         :param domain: the domain to export
         :param domain_directory_path: the path to the directory in which the domain will be copied to.
         :param domain_file_name: the name of the domain file in case it differs from the original name.
         """
-        domain_path = domain_directory_path / domain_file_name if domain_file_name is not None else \
-            domain_directory_path / self.model_domain_file_name
+        domain_path = (
+            domain_directory_path / domain_file_name if domain_file_name is not None else domain_directory_path / self.model_domain_file_name
+        )
         with open(domain_path, "wt") as domain_file:
             domain_file.write(domain.to_pddl())
 
         self.logger.debug("Exporting the domain to the results directory!")
         faulty = "faulty" if is_faulty else "repaired"
-        with open(self.results_dir_path / f"{faulty}_domain_{action_name}_{repair_type}_{defect_type.name}.pddl",
-                  "wt") as domain_file:
+        with open(self.results_dir_path / f"{faulty}_domain_{action_name}_{repair_type}_{defect_type.name}.pddl", "wt") as domain_file:
             domain_file.write(domain.to_pddl())
 
     @staticmethod
@@ -95,8 +109,7 @@ class ModelFaultDiagnosis:
         for solver_output_path in working_directory.glob("*.solution"):
             solver_output_path.unlink(missing_ok=True)
 
-    def _generate_faulty_domain_based_on_defect_type(
-            self, action_name: str, directory_path: Path, defect_type: DefectType) -> LearnerDomain:
+    def _generate_faulty_domain_based_on_defect_type(self, action_name: str, directory_path: Path, defect_type: DefectType) -> LearnerDomain:
         """Generates a domain with a defect based on the defect type and the action name.
 
         :param action_name: the name of the action that should be altered.
@@ -104,11 +117,9 @@ class ModelFaultDiagnosis:
         :param defect_type: the type of defect to be introduced.
         :return: the generated domain.
         """
-        faulty_domain = self.fault_generator.generate_faulty_domain(
-            defect_type=defect_type, action_to_alter=action_name)
+        faulty_domain = self.fault_generator.generate_faulty_domain(defect_type=defect_type, action_to_alter=action_name)
         (directory_path / self.model_domain_file_name).unlink(missing_ok=True)
-        self._export_domain(faulty_domain, directory_path, FAULTY_DOMAIN_PDDL,
-                            is_faulty=True, defect_type=defect_type, action_name=action_name)
+        self._export_domain(faulty_domain, directory_path, FAULTY_DOMAIN_PDDL, is_faulty=True, defect_type=defect_type, action_name=action_name)
         return faulty_domain
 
     def _generate_faulty_domain(self, directory_path: Path) -> Iterator[Tuple[str, LearnerDomain, DefectType]]:
@@ -122,23 +133,21 @@ class ModelFaultDiagnosis:
         """
         for action_name, action_data in self.model_domain.actions.items():
             if len(action_data.numeric_preconditions) > 0:
-                self.logger.info(f"Generating faulty domain for action: {action_name} "
-                                 f"by altering its numeric preconditions!")
+                self.logger.info(f"Generating faulty domain for action: {action_name} " f"by altering its numeric preconditions!")
                 faulty_domain = self._generate_faulty_domain_based_on_defect_type(
-                    action_name, directory_path, DefectType.numeric_precondition_numeric_change)
+                    action_name, directory_path, DefectType.numeric_precondition_numeric_change
+                )
                 yield action_name, faulty_domain, DefectType.numeric_precondition_numeric_change
 
-                self.logger.info(f"Generating faulty domain for action: {action_name} "
-                                 f"by removing one numeric precondition!")
+                self.logger.info(f"Generating faulty domain for action: {action_name} " f"by removing one numeric precondition!")
                 faulty_domain = self._generate_faulty_domain_based_on_defect_type(
-                    action_name, directory_path, DefectType.removed_numeric_precondition)
+                    action_name, directory_path, DefectType.removed_numeric_precondition
+                )
                 yield action_name, faulty_domain, DefectType.removed_numeric_precondition
 
             if len(action_data.numeric_effects) > 0:
-                self.logger.info(f"Generating faulty domain for action: {action_name} "
-                                 f"by altering its numeric effect!")
-                faulty_domain = self._generate_faulty_domain_based_on_defect_type(
-                    action_name, directory_path, DefectType.numeric_effect)
+                self.logger.info(f"Generating faulty domain for action: {action_name} " f"by altering its numeric effect!")
+                faulty_domain = self._generate_faulty_domain_based_on_defect_type(action_name, directory_path, DefectType.numeric_effect)
                 yield action_name, faulty_domain, DefectType.numeric_effect
 
     def _write_diagnosis(self, all_diagnosis_stats: List[Dict[str, Any]]) -> NoReturn:
@@ -147,14 +156,14 @@ class ModelFaultDiagnosis:
         :param all_diagnosis_stats: the collected diagnosis statistics.
         """
         output_path = self.results_dir_path / f"diagnosis_statistics.csv"
-        with open(output_path, 'wt', newline='') as csv_file:
+        with open(output_path, "wt", newline="") as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=DIAGNOSIS_COLUMNS)
             writer.writeheader()
             writer.writerows(all_diagnosis_stats)
 
     def _solve_and_validate(
-            self, problems_dir_path: Path, domain_file_path: Path,
-            domain_type: str, problems_type: str) -> Tuple[List[Observation], List[Observation], Dict[str, Any]]:
+        self, problems_dir_path: Path, domain_file_path: Path, domain_type: str, problems_type: str
+    ) -> Tuple[List[Observation], List[Observation], Dict[str, Any]]:
         """Solves a set of problems and validates the solutions.
 
         :param problems_dir_path: the path to the directory containing the problems.
@@ -165,10 +174,7 @@ class ModelFaultDiagnosis:
             faulty execution and the solving statistics.
         """
         self.logger.info(f"Starting to work on solving the problems in the directory - {problems_dir_path.absolute()}")
-        solving_report = self.solver.execute_solver(
-            problems_directory_path=problems_dir_path,
-            domain_file_path=domain_file_path
-        )
+        solving_report = self.solver.execute_solver(problems_directory_path=problems_dir_path, domain_file_path=domain_file_path)
         self.logger.info(f"Finished solving the problems in the directory - {problems_dir_path.absolute()}")
         statistics = {solution_type.name: 0 for solution_type in SolutionOutputTypes}
         counted_stats = Counter(list(solving_report.values()))
@@ -177,7 +183,8 @@ class ModelFaultDiagnosis:
         statistics["problems_type"] = problems_type
 
         valid_observations, faulty_observations, faults_detected = self.fault_repair.execute_plans_on_agent(
-            problems_dir_path, domain_file_path, solving_report, is_repaired_model=domain_type == "repaired")
+            problems_dir_path, domain_file_path, solving_report, is_repaired_model=domain_type == "repaired"
+        )
 
         counted_fault_detection = Counter(list(faults_detected.values()))
         statistics["ok"] = counted_fault_detection["ok"]
@@ -196,10 +203,16 @@ class ModelFaultDiagnosis:
         (test_set_dir_path / self.model_domain_file_name).unlink(missing_ok=True)
         (train_set_dir_path / FAULTY_DOMAIN_PDDL).unlink(missing_ok=True)
 
-    def _repair_action_model(self, defect_type: DefectType, faulty_action_name: str, faulty_domain: LearnerDomain,
-                             test_set_dir_path: Path, valid_observations: List[Observation],
-                             faulty_observations: List[Observation],
-                             repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam) -> Path:
+    def _repair_action_model(
+        self,
+        defect_type: DefectType,
+        faulty_action_name: str,
+        faulty_domain: LearnerDomain,
+        test_set_dir_path: Path,
+        valid_observations: List[Observation],
+        faulty_observations: List[Observation],
+        repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam,
+    ) -> Path:
         """Repairs the action model of the faulty action by learning the preconditions and effects from valid
             observations.
 
@@ -211,21 +224,34 @@ class ModelFaultDiagnosis:
         :return: the path to the repaired domain file.
         """
         self.logger.debug(f"Found a defected action! action - {faulty_action_name}")
-        repaired_domain, report = self.fault_repair.repair_model(faulty_domain, valid_observations, faulty_observations,
-                                                                 faulty_action_name, repair_algorithm_type)
+        repaired_domain, report = self.fault_repair.repair_model(
+            faulty_domain, valid_observations, faulty_observations, faulty_action_name, repair_algorithm_type
+        )
         used_observations = [*valid_observations, *faulty_observations]
         self.numeric_performance_calc.learning_algorithm = REPAIR_TO_LEARNING_ALGORITHM[repair_algorithm_type]
         self.learning_statistics_manager.add_to_action_stats(used_observations, repaired_domain, report)
-        self._export_domain(domain=repaired_domain, domain_directory_path=test_set_dir_path,
-                            domain_file_name=None, is_faulty=False, defect_type=defect_type,
-                            action_name=faulty_action_name, repair_type=repair_algorithm_type.name)
+        self._export_domain(
+            domain=repaired_domain,
+            domain_directory_path=test_set_dir_path,
+            domain_file_name=None,
+            is_faulty=False,
+            defect_type=defect_type,
+            action_name=faulty_action_name,
+            repair_type=repair_algorithm_type.name,
+        )
         learned_domain_file_path = test_set_dir_path / self.model_domain_file_name
         self.numeric_performance_calc.calculate_performance(learned_domain_file_path, len(used_observations))
         return learned_domain_file_path
 
-    def _run_repaired_model_on_test(self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str,
-                                    learned_domain_file_path: Path, test_set_dir_path: Path,
-                                    repair_method: RepairAlgorithmType, defect_type: DefectType) -> NoReturn:
+    def _run_repaired_model_on_test(
+        self,
+        all_diagnosis_stats: List[Dict[str, Any]],
+        faulty_action_name: str,
+        learned_domain_file_path: Path,
+        test_set_dir_path: Path,
+        repair_method: RepairAlgorithmType,
+        defect_type: DefectType,
+    ) -> NoReturn:
         """Tries to solve the test set problems using the repaired domain.
 
         :param all_diagnosis_stats: the collected diagnosis statistics.
@@ -237,17 +263,23 @@ class ModelFaultDiagnosis:
         """
         self.logger.debug("Solving the test set problems using the learned REPAIRED domain.")
         _, _, safe_test_stats = self._solve_and_validate(
-            problems_dir_path=test_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="repaired",
-            problems_type="test")
+            problems_dir_path=test_set_dir_path, domain_file_path=learned_domain_file_path, domain_type="repaired", problems_type="test"
+        )
         safe_test_stats["action_name"] = faulty_action_name
         safe_test_stats["repair_method"] = repair_method.name
         safe_test_stats["defect_type"] = defect_type.name
         all_diagnosis_stats.append(safe_test_stats)
         self._clear_plans(test_set_dir_path)
 
-    def run_faulty_model_on_test(self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action_name: str,
-                                 faulty_domain_path: Path, test_set_dir_path: Path,
-                                 repair_method: RepairAlgorithmType, defect_type: DefectType) -> NoReturn:
+    def run_faulty_model_on_test(
+        self,
+        all_diagnosis_stats: List[Dict[str, Any]],
+        faulty_action_name: str,
+        faulty_domain_path: Path,
+        test_set_dir_path: Path,
+        repair_method: RepairAlgorithmType,
+        defect_type: DefectType,
+    ) -> NoReturn:
         """Tries to solve the test set problems using the faulty domain.
 
         :param all_diagnosis_stats: the collected diagnosis statistics.
@@ -259,8 +291,8 @@ class ModelFaultDiagnosis:
         """
         self.logger.debug("solving the test set problems using the FAULTY domain.")
         _, _, faulty_test_set_stats = self._solve_and_validate(
-            problems_dir_path=test_set_dir_path, domain_file_path=faulty_domain_path, domain_type="faulty",
-            problems_type="test")
+            problems_dir_path=test_set_dir_path, domain_file_path=faulty_domain_path, domain_type="faulty", problems_type="test"
+        )
         faulty_test_set_stats["action_name"] = faulty_action_name
         faulty_test_set_stats["repair_method"] = repair_method.name
         faulty_test_set_stats["defect_type"] = defect_type.name
@@ -281,9 +313,15 @@ class ModelFaultDiagnosis:
             writer.writerows(action_diagnosis_stats)
 
     def _run_single_fault_detection(
-            self, all_diagnosis_stats: List[Dict[str, Any]], faulty_action: str, faulty_domain: LearnerDomain,
-            test_set_dir_path: Path, train_set_dir_path: Path, defect_type: DefectType,
-            repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam) -> NoReturn:
+        self,
+        all_diagnosis_stats: List[Dict[str, Any]],
+        faulty_action: str,
+        faulty_domain: LearnerDomain,
+        test_set_dir_path: Path,
+        train_set_dir_path: Path,
+        defect_type: DefectType,
+        repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam,
+    ) -> NoReturn:
         """Runs a single fault detection experiment, i.e. tries to detect a single fault in an action.
 
         :param all_diagnosis_stats: the list of all diagnosis statistics.
@@ -296,8 +334,8 @@ class ModelFaultDiagnosis:
         self.logger.debug("Solving the train set problems using the faulty domain.")
         faulty_domain_path = train_set_dir_path / FAULTY_DOMAIN_PDDL
         valid_observations, faulty_observations, faulty_train_stats = self._solve_and_validate(
-            problems_dir_path=train_set_dir_path, domain_file_path=faulty_domain_path, domain_type="faulty",
-            problems_type="train")
+            problems_dir_path=train_set_dir_path, domain_file_path=faulty_domain_path, domain_type="faulty", problems_type="train"
+        )
         self._clear_plans(train_set_dir_path)
 
         if len(valid_observations) == 0:
@@ -306,13 +344,13 @@ class ModelFaultDiagnosis:
 
         faulty_action_name = valid_observations[0].components[0].grounded_action_call.name
         learned_domain_file_path = self._repair_action_model(
-            defect_type, faulty_action_name, faulty_domain,
-            test_set_dir_path, valid_observations, faulty_observations, repair_algorithm_type)
+            defect_type, faulty_action_name, faulty_domain, test_set_dir_path, valid_observations, faulty_observations, repair_algorithm_type
+        )
 
-        self._run_repaired_model_on_test(all_diagnosis_stats, faulty_action_name, learned_domain_file_path,
-                                         test_set_dir_path, repair_algorithm_type, defect_type)
-        self.run_faulty_model_on_test(all_diagnosis_stats, faulty_action, faulty_domain_path, test_set_dir_path,
-                                      repair_algorithm_type, defect_type)
+        self._run_repaired_model_on_test(
+            all_diagnosis_stats, faulty_action_name, learned_domain_file_path, test_set_dir_path, repair_algorithm_type, defect_type
+        )
+        self.run_faulty_model_on_test(all_diagnosis_stats, faulty_action, faulty_domain_path, test_set_dir_path, repair_algorithm_type, defect_type)
 
     def evaluate_fault_diagnosis(self, train_set_dir_path: Path, test_set_dir_path: Path) -> NoReturn:
         """Conducts the experiments to evaluate the efficiency of the 'repair' property.
@@ -328,8 +366,8 @@ class ModelFaultDiagnosis:
                 try:
                     self.learning_statistics_manager.learning_algorithm = REPAIR_TO_LEARNING_ALGORITHM[repair_method]
                     self._run_single_fault_detection(
-                        all_diagnosis_stats, faulty_action, faulty_domain, test_set_dir_path, train_set_dir_path,
-                        defect_type, repair_method)
+                        all_diagnosis_stats, faulty_action, faulty_domain, test_set_dir_path, train_set_dir_path, defect_type, repair_method
+                    )
                     self._write_action_diagnosis_stats(all_diagnosis_stats, faulty_action)
 
                 except ValueError:
@@ -348,31 +386,25 @@ class ModelFaultDiagnosis:
     def run_fault_diagnosis(self) -> NoReturn:
         """Runs that cross validation process on the domain's working directory and validates the results."""
         self.learning_statistics_manager.create_results_directory()
-        self.numeric_performance_calc = init_semantic_performance_calculator(self.working_directory_path,
-                                                                             self.model_domain_file_name,
-                                                                             LearningAlgorithmType.numeric_sam)
+        self.numeric_performance_calc = init_semantic_performance_calculator(
+            self.working_directory_path, self.model_domain_file_name, LearningAlgorithmType.numeric_sam
+        )
         for train_dir_path, test_dir_path in self.k_fold.create_k_fold():
             self.evaluate_fault_diagnosis(train_dir_path, test_dir_path)
 
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the fault diagnosis simulation on a selected domain.")
-    parser.add_argument("--work_dir_path", required=True,
-                        help="The path to the directory that containing the defected domain.")
-    parser.add_argument("--fluents_map_path", required=True,
-                        help="The path to the fluents map file (mapping of the numeric fluents preconditions).")
+    parser.add_argument("--work_dir_path", required=True, help="The path to the directory that containing the defected domain.")
+    parser.add_argument("--fluents_map_path", required=True, help="The path to the fluents map file (mapping of the numeric fluents preconditions).")
     parser.add_argument("--original_domain_file_name", required=True, help="the name of the original domain file.")
     return parser.parse_args()
 
 
-if __name__ == '__main__':
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.DEBUG)
+if __name__ == "__main__":
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
     args = parse_arguments()
     diagnoser = ModelFaultDiagnosis(
-        work_dir_path=Path(args.work_dir_path),
-        fluents_map_path=Path(args.fluents_map_path),
-        original_domain_file_name=args.original_domain_file_name)
+        work_dir_path=Path(args.work_dir_path), fluents_map_path=Path(args.fluents_map_path), original_domain_file_name=args.original_domain_file_name
+    )
     diagnoser.run_fault_diagnosis()

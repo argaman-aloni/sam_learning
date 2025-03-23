@@ -16,13 +16,15 @@ from pddl_plus_parser.models import (
     NumericalExpressionTree,
 )
 
+from utilities.util_types import NUMERIC_PRECISION
+
 DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
 NEGATIVE_PRECONDITIONS_REQ = ":negative-preconditions"
 EQUALITY_REQ = ":equality"
 UNIVERSAL_PRECONDITIONS_REQ = ":universal-preconditions"
 CONDITIONAL_EFFECTS_REQ = ":conditional-effects"
 ADDED_LEARNING_REQUIREMENTS = [NEGATIVE_PRECONDITIONS_REQ, EQUALITY_REQ]
-DEFAULT_DIGITS = os.environ.get("NUMERIC_PRECISION", 4)
+DEFAULT_DIGITS = int(os.environ.get(NUMERIC_PRECISION, 4))
 
 
 class LearnerAction:

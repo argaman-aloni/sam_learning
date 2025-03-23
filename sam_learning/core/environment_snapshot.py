@@ -41,12 +41,19 @@ class EnvironmentSnapshot:
         for lifted_predicate_name, vocabulary_predicates in vocabulary.items():
             if lifted_predicate_name not in state.state_predicates:
                 # updates all the grounded predicates where there of a lifted predicate that does not appear in the state.
-                negative_state_predicates.update(
-                    [
-                        GroundedPredicate(name=p.name, signature=p.signature, object_mapping=p.object_mapping, is_positive=False)
-                        for p in vocabulary_predicates
-                    ]
-                )
+                for grounded_predicate in vocabulary_predicates:
+                    grounded_signature = {
+                        param_name: relevant_objects[object_name].type for param_name, object_name in grounded_predicate.object_mapping.items()
+                    }
+                    negative_state_predicates.add(
+                        GroundedPredicate(
+                            name=grounded_predicate.name,
+                            signature=grounded_signature,
+                            object_mapping=grounded_predicate.object_mapping,
+                            is_positive=False,
+                        )
+                    )
+
                 continue
 
             for grounded_vocabulary_predicate in vocabulary_predicates:
@@ -57,12 +64,18 @@ class EnvironmentSnapshot:
                         break
 
             # Updates the grounded predicates of the predicates that appear in the state.
-            negative_state_predicates.update(
-                [
-                    GroundedPredicate(name=p.name, signature=p.signature, object_mapping=p.object_mapping, is_positive=False)
-                    for p in vocabulary_predicates.difference(positive_state_predicates)
-                ]
-            )
+            for grounded_predicate in vocabulary_predicates.difference(positive_state_predicates):
+                grounded_signature = {
+                    param_name: relevant_objects[object_name].type for param_name, object_name in grounded_predicate.object_mapping.items()
+                }
+                negative_state_predicates.add(
+                    GroundedPredicate(
+                        name=grounded_predicate.name,
+                        signature=grounded_signature,
+                        object_mapping=grounded_predicate.object_mapping,
+                        is_positive=False,
+                    )
+                )
 
         return positive_state_predicates.union(negative_state_predicates)
 

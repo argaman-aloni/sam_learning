@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, MultiAgentComponent, Predicate
 
-from sam_learning.core import LearnerDomain
+from sam_learning.core import LearnerDomain, VocabularyCreator
 from statistics.discrete_precision_recall_calculator import PrecisionRecallCalculator
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy
 
@@ -21,6 +21,8 @@ LEARNED_ACTIONS_STATS_COLUMNS = [
     "total_number_of_actions",
     "learned_action_name",
     "num_triplets_action_appeared",
+    "num_pb_literals",
+    "num_pb_functions",
     "learned_discrete_preconditions",
     "num_learned_positive_preconditions",
     "num_learned_negative_preconditions",
@@ -41,6 +43,9 @@ LEARNED_ACTIONS_STATS_COLUMNS = [
     "action_precision",
     "action_recall",
     "f1_score",
+]
+UNSAFE_LEARNING_ALGORITHMS = [
+    LearningAlgorithmType.plan_miner,
 ]
 
 
@@ -65,6 +70,7 @@ class LearningStatisticsManager:
         self.merged_action_stats = []
         self.merged_numeric_stats = []
         self.results_dir_path = self.working_directory_path / "results_directory"
+        self.vocabulary_creator = VocabularyCreator()
 
     @staticmethod
     def _update_action_appearances(used_observations: List[Union[Observation, MultiAgentObservation]]) -> Counter:
@@ -101,19 +107,25 @@ class LearningStatisticsManager:
         policy: NegativePreconditionPolicy,
         used_observations: List[Union[Observation, MultiAgentObservation]],
     ) -> Dict[str, Any]:
-        """
+        """Adds the default fields to the action statistics (those not inferred from the learning process).
 
-        :param action_name:
-        :param learning_time:
-        :param num_trajectories:
-        :param num_triplets:
-        :return:
+        :param action_name: the name of the action.
+        :param learning_report: the report on the status of the learned actions, whether they were safe to learn or not.
+        :param policy: the policy used to remove the negative preconditions from the action.
+        :param used_observations: the observations that were used to learn the action.
+        :return: the dictionary containing the default fields.
         """
         learning_time = float(learning_report["learning_time"])
         action_appearance_counter = self._update_action_appearances(used_observations)
         num_triplets = sum([len(observation.components) for observation in used_observations])
         ground_truth_preconditions = [p for _, p in self.model_domain.actions[action_name].preconditions if isinstance(p, Predicate)]
         ground_truth_effects = [p for p in self.model_domain.actions[action_name].discrete_effects]
+        action_pbls_vocabulary = self.vocabulary_creator.create_lifted_vocabulary(
+            domain=self.model_domain, possible_parameters=self.model_domain.actions[action_name].signature
+        )
+        action_pb_function_vocabulary = self.vocabulary_creator.create_lifted_functions_vocabulary(
+            domain=self.model_domain, possible_parameters=self.model_domain.actions[action_name].signature
+        )
         return {
             "learning_algorithm": self.learning_algorithm.name,
             "policy": policy.name,
@@ -124,6 +136,8 @@ class LearningStatisticsManager:
             "total_number_of_actions": len(self.model_domain.actions),
             "learned_action_name": action_name,
             "num_triplets_action_appeared": action_appearance_counter[action_name],
+            "num_pb_literals": len(action_pbls_vocabulary),
+            "num_pb_functions": len(action_pb_function_vocabulary),
             "num_ground_truth_positive_preconditions": len([p for p in ground_truth_preconditions if p.is_positive]),
             "num_ground_truth_negative_preconditions": len([p for p in ground_truth_preconditions if not p.is_positive]),
             "num_ground_truth_add_effects": len([p for p in ground_truth_effects if p.is_positive]),
@@ -158,9 +172,9 @@ class LearningStatisticsManager:
                     "num_learned_add_effects": 0,
                     "num_learned_delete_effects": 0,
                     "preconditions_precision": 0,
-                    "effects_precision": 0,
+                    "effects_precision": 1,
                     "preconditions_recall": 1,
-                    "effects_recall": 1,
+                    "effects_recall": 0,
                     "action_precision": 0,
                     "action_recall": 1,
                     "f1_score": 0,
