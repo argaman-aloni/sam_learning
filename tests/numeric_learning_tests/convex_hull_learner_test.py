@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import pytest
+from unittest.mock import patch
 from pandas import DataFrame
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 from scipy.spatial import ConvexHull
@@ -196,6 +197,25 @@ def test_create_convex_hull_linear_inequalities_returns_correct_conditions_when_
     assert coefficients == [[-1], [1]]
     assert transformed_vars == ["(* (- (x) 2) -1)"]
     assert border_point == [2, 1]
+
+
+def test_create_convex_hull_linear_inequalities_when_for_some_reason_the_gs_returns_a_base_with_larger_dimension_than_original_points_just_uses_original_points(
+    convex_hull_learner: ConvexHullLearner,
+):
+    with patch("sam_learning.core.numeric_learning.numeric_utils.extended_gram_schmidt") as mock_gs:
+        mock_gs.return_value = [[1, 0], [0, 1], [0, 0], [0, 23]]
+
+        pre_state_data = {
+            "(x)": [0, -1, 0],
+            "(y)": [0, 0, -1],
+        }
+        pre_state_df = DataFrame(pre_state_data)
+        (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._create_convex_hull_linear_inequalities(
+            pre_state_df, display_mode=False
+        )
+        assert len(coefficients) == 3
+        assert len(span_verification_conditions) == 0
+        assert len(transformed_vars) == 2
 
 
 def test_create_convex_hull_linear_inequalities_returns_correct_conditions_with_paper_example(convex_hull_learner: ConvexHullLearner,):
