@@ -24,7 +24,7 @@ def execute_statistics_collection_job(code_directory, configuration, environment
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
     filtered_sids = [sid for sid in job_ids if validate_job_running(sid) is not None]
     statistics_collection_job = submit_job(
-        conda_env="online_nsam",
+        conda_env="macq_env",
         mem="4G",
         python_file=f"{code_directory}/distributed_results_collector.py",
         dependency=f"afterok:{':'.join([str(e) for e in filtered_sids])}",
@@ -70,7 +70,7 @@ def main():
                             fold,
                             arguments,
                             environment_variables,
-                            f"{experiment['domain_file_name']}_{fold}_numeric_experiment_runner",
+                            f"{experiment['domain_file_name']}_{fold}_discrete_experiment_runner",
                             None,
                         )
 
@@ -93,7 +93,7 @@ def main():
                     environment_variables,
                     f"triplets_numeric_{experiment['domain_file_name']}_{fold}_experiment_runner",
                     None,
-                    python_file=f"{code_directory}/parallel_numeric_experiment_runner_with_triplets.py",
+                    python_file=f"{code_directory}/parallel_discrete_experiment_runner.py",
                 )
                 formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                 print(
