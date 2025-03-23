@@ -46,12 +46,18 @@ Next we provide some information on the external tools and their installation pr
    1. We use version 2.1 of Metric-FF which is the latest version (although we created a version that enables numeric tolerance).
 3. **VAL plan validation algorithm** - can be downloaded from [here](https://github.com/KCL-Planning/VAL). Use the instructions given in the repository to install VAL.
 4. **Fast Downward planner** - Discrete planner, used for the conditional effects experiments as well as the multi-agent ones. Can be downloaded from [here](https://www.fast-downward.org/HomePage).
+5. **Plan Miner** - The plan miner algorithm is used for learning numeric action models from observations. The code can be found [here](https://github.com/Leontes/PlanMiner). 
+   1. The code is written in C++ and needs to be compiled using the provided instructions.
+   2. The compiled code should be placed in the bin directory of the PlanMiner directory.
+   3. Only needed when you want to execute the numeric experiments and perform a comparison against it.
 
 
 ### Environment variables
 
 * 'METRIC_FF_DIRECTORY': Directory of the compiled metric-FF planner.
   * \<path to containing directory>/Metric-FF-v2.1/
+* 'FF_DIRECTORY': Directory of the compiled Fast Forward planner.
+  * \<path to containing directory>/FF-v2.3/
 * 'ENHSP_FILE_PATH': Path to the compiled ENHSP planner (the jar file).
   * \<path to containing directory>/enhsp.jar
 * 'CONVEX_HULL_ERROR_PATH': Path to the file that will contain the errors raised from the convex hull algorithm. Used for future debugging purposes.
@@ -62,6 +68,8 @@ Next we provide some information on the external tools and their installation pr
   * \<path to containing directory>/VAL/
 * 'FAST_DOWNWARD_DIR_PATH': The directory containing the compiled Fast Downward planner.
   * \<path to containing directory>/fast-downward-22.06/
+* 'PLAN_MINER_DIR_PATH': The directory containing the compiled Plan Miner learning algorithm. Only relevant for numeric experiments.
+  * \<path to containing directory>/PlanMiner/bin/
 
 ### Code initialization
 
