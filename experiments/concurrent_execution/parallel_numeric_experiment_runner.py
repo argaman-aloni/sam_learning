@@ -20,6 +20,7 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
 from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
 from sam_learning.core import LearnerDomain
 from statistics import LearningStatisticsManager
+from statistics.utils import init_semantic_performance_calculator
 from trajectory_creators import PlanMinerTrajectoriesCreator
 from utilities import LearningAlgorithmType
 from validators import DomainValidator
@@ -71,6 +72,21 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             self.domain_validator = DomainValidator(
                 self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
             )
+
+    def _init_semantic_performance_calculator(self, fold_num: int) -> None:
+        """Initializes the algorithm of the semantic precision - recall calculator."""
+        if self._learning_algorithm != LearningAlgorithmType.plan_miner:
+            super()._init_semantic_performance_calculator(fold_num)
+            return
+
+        self.semantic_performance_calc = init_semantic_performance_calculator(
+            working_directory_path=self.working_directory_path,
+            domain_file_path=self.plan_miner_workdir / self.plan_miner_domain_file_name,
+            learning_algorithm=self._learning_algorithm,
+            test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
+            problem_prefix=self.problem_prefix,
+            executing_agents=self.executing_agents,
+        )
 
     def _handle_plan_miner_failure(self) -> Tuple[LearnerDomain, Dict[str, Any]]:
         plan_miner_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
