@@ -72,7 +72,7 @@ def setup_experiments_folds_job(
 ):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     fold_creation_sid = submit_job(
-        conda_env="online_nsam",
+        conda_env="macq_env",
         mem="4G",
         python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
@@ -183,8 +183,9 @@ def submit_job(
     template_mapping = {
         "job_name": jobname if jobname else "job",
         "cpus_per_task": cpus_per_task if cpus_per_task else 1,
-        "dependency_exists": "#" if not dependency else "",
-        "dependency": dependency or "",
+        "dependency_exists": "" if dependency else "#",
+        "dependency": dependency if dependency else "NONE",
+        "dependency_directive" : f"#SBATCH --dependency={dependency}" if dependency else "",
         "mem": mem or "8G",
         "conda_env": conda_env or "online_nsam",
         "script": python_file,
@@ -196,13 +197,14 @@ def submit_job(
         "error": "#" if suppress_error else "",
     }
 
-    sbatch_code = sbatch_template.substitute(template_mapping)
+    sbatch_code = sbatch_template.safe_substitute(template_mapping)
     try:
         return write_sbatch_and_submit_job(sbatch_code)
 
     except subprocess.CalledProcessError as e:
         template_mapping["dependency_exists"] = "#"  # Remove the dependency if it exists
         template_mapping["dependency"] = ""  # Remove the dependency if it exists
+        template_mapping["dependency_directive"] = f"#SBATCH --dependency={dependency}" if dependency else ""
         sbatch_code = sbatch_template.substitute(template_mapping)
         return write_sbatch_and_submit_job(sbatch_code)
 
@@ -212,7 +214,7 @@ def submit_job_and_validate_execution(
 ):
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
-        conda_env="online_nsam",
+        conda_env="macq_env",
         mem="16G",
         python_file=python_file or f"{code_directory}/{configurations['experiments_script_path']}",
         jobname=job_name,

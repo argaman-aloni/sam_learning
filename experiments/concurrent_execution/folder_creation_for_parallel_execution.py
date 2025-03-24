@@ -90,7 +90,6 @@ class FoldsCreator:
             # copy the test set problems, solution and trajectories to use in case none of the random trajectories are valid
             for test_set_problem in test_set_directory.glob(f"{problem_prefix}*.pddl"):
                 shutil.copy(test_set_problem, output_directory_path)
-                shutil.copy(self.working_directory_path / f"{test_set_problem.stem}.solution", output_directory_path)
                 shutil.copy(self.working_directory_path / f"{test_set_problem.stem}.trajectory", output_directory_path)
 
             (test_set_directory / self.domain_file_name).unlink()
