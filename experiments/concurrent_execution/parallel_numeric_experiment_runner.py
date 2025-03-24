@@ -10,8 +10,8 @@ import uuid
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
 
-from pddl_plus_parser.models import Observation, Domain
 from pddl_plus_parser.lisp_parsers import DomainParser
+from pddl_plus_parser.models import Observation, Domain
 
 from experiments.concurrent_execution.parallel_basic_experiment_runner import (
     ParallelExperimentRunner,
@@ -42,6 +42,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         problem_prefix: str = "pfile",
         running_triplets_experiment: bool = False,
         plan_miner_workdir: Path = None,
+        fold_num: int = 0,
     ):
         super().__init__(
             working_directory_path=working_directory_path,
@@ -56,6 +57,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
                 self.fluents_map = json.load(json_file)
 
         self.polynom_degree = polynom_degree
+        self.fold_num = fold_num
         self.semantic_performance_calc = None
         self.plan_miner_domain_file_name = None
         self.plan_miner_workdir = plan_miner_workdir
@@ -73,17 +75,13 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
                 self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
             )
 
-    def _init_semantic_performance_calculator(self, fold_num: int) -> None:
-        """Initializes the algorithm of the semantic precision - recall calculator."""
-        if self._learning_algorithm != LearningAlgorithmType.plan_miner:
-            super()._init_semantic_performance_calculator(fold_num)
-            return
-
+    def _init_plan_miner_performance_evaluation(self) -> None:
+        """Initializes the algorithm of the semantic precision - recall calculator - for plan miner only."""
         self.semantic_performance_calc = init_semantic_performance_calculator(
             working_directory_path=self.working_directory_path,
             domain_file_path=self.plan_miner_workdir / self.plan_miner_domain_file_name,
             learning_algorithm=self._learning_algorithm,
-            test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
+            test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{self.fold_num}",
             problem_prefix=self.problem_prefix,
             executing_agents=self.executing_agents,
         )
@@ -163,6 +161,8 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             domain_file_name=self.domain_file_name, working_directory_path=self.plan_miner_workdir
         )
         plan_miner_trajectory_creator.create_plan_miner_trajectories()
+        # initializing the specific numeric performance calculator for Plan-Miner
+        self._init_plan_miner_performance_evaluation()
         # Since only after this part the domain is created in the format that Plan-Miner can understand
         # we initialize the statistics manager here
         self.learning_statistics_manager = LearningStatisticsManager(
@@ -248,6 +248,7 @@ def main():
         polynom_degree=int(args.polynom_degree),
         problem_prefix=args.problems_prefix,
         plan_miner_workdir=plan_miner_workdir,
+        fold_num=int(args.fold_number),
     )
     offline_learner.run_fold_iteration(
         fold_num=args.fold_number,
