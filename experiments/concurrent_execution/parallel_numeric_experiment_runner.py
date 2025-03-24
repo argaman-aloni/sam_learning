@@ -88,6 +88,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
 
     def _handle_plan_miner_failure(self) -> Tuple[LearnerDomain, Dict[str, Any]]:
         plan_miner_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
+        plan_miner_domain.actions = {}
         learned_domain = LearnerDomain(plan_miner_domain)
         return learned_domain, {"learning_time": -1}
 
@@ -97,6 +98,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         :param plan_miner_output_domain_path: the path to the Plan-Miner output domain.
         :return: the learned domain for evaluation.
         """
+        self.logger.info("Creating the learned domain for PlanMiner's evaluation.")
         try:
             plan_miner_domain = DomainParser(plan_miner_output_domain_path).parse_domain()
             temp_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
@@ -111,8 +113,9 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
                 learned_domain.actions[action_name].numeric_effects = action_data.numeric_effects
 
         except Exception as e:
-            self.logger.debug(f"Failed to parse the learned domain for PlanMiner. Probably PlanMiner created a domain with syntax errors.: {e}")
+            self.logger.warning(f"Failed to parse the learned domain for PlanMiner. Probably PlanMiner created a domain with syntax errors.: {e}")
             plan_miner_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
+            plan_miner_domain.actions = {}
             learned_domain = LearnerDomain(plan_miner_domain)
 
         with open(plan_miner_output_domain_path, "wt") as domain_file:
