@@ -14,7 +14,7 @@ from pddl_plus_parser.models import (
     Problem,
 )
 
-from semantic_performance_calculator import (SemanticPerformanceCalculator, _calculate_precision_recall)
+from statistics import SemanticPerformanceCalculator, _calculate_precision_recall
 from utilities import LearningAlgorithmType
 from validators import run_validate_script, VALID_PLAN
 

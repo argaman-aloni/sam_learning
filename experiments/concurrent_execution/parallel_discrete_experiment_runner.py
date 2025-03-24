@@ -31,7 +31,7 @@ class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
         domain_file_name: str,
         learning_algorithm: LearningAlgorithmType,
         problem_prefix: str = "pfile",
-        running_triplets_experiment: bool = False,
+        running_triplets_experiment: bool = True,
         executing_agents: List[str] = None,
     ):
         super().__init__(working_directory_path, domain_file_name, learning_algorithm, problem_prefix,

@@ -9,9 +9,9 @@
 #SBATCH --time 7-00:00:00			### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
 #SBATCH --job-name ${job_name}				### name of the job
 #SBATCH --cpus-per-task=${cpus_per_task}
-#SBATCH --output slurm-%J.out			### output log for running job - %J for job number
+#SBATCH --output slurm_out/slurm-%J.out			### output log for running job - %J for job number
 ${error}#SBATCH --error slurm-error-%J.out			### output log for running job - %J for job number
-${dependency_exists}#SBATCH --dependency=${dependency}
+${dependency_directive}
 
 # Note: the following 4 lines are commented out
 ##SBATCH --mail-type=ALL			### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
@@ -22,16 +22,25 @@ ${dependency_exists}#SBATCH --dependency=${dependency}
 ################  Following lines will be executed by a compute node    #######################
 
 ### Print some data to output file ###
-echo `date`
+echo $(date)
 ${job_info_print}
-
 ${environment_variables}
 
-### Start your code below ####
-module load anaconda				### load anaconda module (must be present when working with conda environments)
-source activate ${conda_env}				### activate a conda environment, replace my_env with your conda environment
-python ${script}	${arguments}			### this command executes python script – replace with your own command
+### Load conda and activate environment ###
+module load anaconda
+source ~/.bashrc
+conda activate ${conda_env}
 
-cp -r ${cluster_temp_logs_path}/logs/* ${logs_dir}		### copy logs to the logs directory
+echo "Python being used:"
+which python
+python -c "import sys; print('Python Executable:', sys.executable)"
+
+### Run the Python script ###
+python ${script} ${arguments}
+
+### Copy logs if they exist ###
+if [ -d "${cluster_temp_logs_path}/logs/" ]; then
+    cp -r ${cluster_temp_logs_path}/logs/* ${logs_dir}
+fi
 
 
