@@ -69,7 +69,6 @@ class ParallelExperimentRunner:
         problem_prefix: str = "pfile",
         running_triplets_experiment: bool = False,
         executing_agents: List[str] = None,
-        is_encoded=False
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path

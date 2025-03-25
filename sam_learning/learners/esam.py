@@ -362,7 +362,6 @@ class ExtendedSamLearner(SAMLearner):
                 proxy actions are created and added to the domain.
         """
         for action_name in self.observed_actions:
-            self.encoders[action_name] = []
             action_proxies = []
             self.logger.debug(f"Going over all the possible assignments that are true after for the action {action_name}.")
             for model in self.cnf_eff[action_name].models():
@@ -400,8 +399,12 @@ class ExtendedSamLearner(SAMLearner):
                 action_data = action_proxies[0]
                 self.partial_domain.actions[action_name].preconditions.root.operands.update(action_data.preconditions)
                 self.partial_domain.actions[action_name].discrete_effects = action_data.effects
+                id_encoder: Callable[[ActionCall], ActionCall] = lambda action_call: ActionCall(action_call.name,
+                                                                                                action_call.parameters)
+                self.encoders[action_name] = [id_encoder]
 
             elif len(action_proxies) > 1:
+                self.encoders[action_name] = []
                 self.logger.debug(f"Creating proxy actions for action: {action_name}")
                 self.handle_lifted_action_instances(action_name, action_proxies)
 

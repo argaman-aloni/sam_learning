@@ -34,8 +34,12 @@ class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
         running_triplets_experiment: bool = True,
         executing_agents: List[str] = None,
     ):
-        super().__init__(working_directory_path, domain_file_name, learning_algorithm, problem_prefix,
-                         running_triplets_experiment, executing_agents)
+        super().__init__(working_directory_path=working_directory_path,
+                         domain_file_name=domain_file_name,
+                         learning_algorithm=learning_algorithm,
+                         problem_prefix=problem_prefix,
+                         running_triplets_experiment=running_triplets_experiment,
+                         executing_agents=executing_agents)
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
             self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
