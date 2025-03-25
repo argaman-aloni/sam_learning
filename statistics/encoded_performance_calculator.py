@@ -55,7 +55,7 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
 
     def _calculate_action_applicability_rate(
         self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
-            possible_proxy_calls=None
+            possible_proxy_calls: List[ActionCall]=None
     ) -> Tuple[int, int, int]:
         """Test whether an action is applicable in both the model domain and the generated domain.
 
@@ -66,8 +66,8 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
         :param possible_proxy_calls: possible calls for action if injective binding assumption does not hold.
         :return: a tuple containing the number of true positives, false positives and false negatives.
         """
-        if possible_proxy_calls is None:
-            possible_proxy_calls = [action_call]
+        if possible_proxy_calls is None or len(possible_proxy_calls)==0:
+            return 0,0,0
 
         self.logger.debug(f"Calculating the applicability rate for the action - {action_call.name}")
         applicability_validation_problem = Problem(domain=self.model_domain)
@@ -232,16 +232,15 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
                 if action.name not in learned_domain.actions and action.name not in self.encoders:
                     continue
 
-                possible_proxy_calls = None
                 if action.name in self.encoders:
                     possible_proxy_calls = [encode(action) for encode in self.encoders[action.name]]
+                    true_positive, false_positive, false_negative = self._calculate_action_applicability_rate(
+                        action, learned_domain_path, component.previous_state, observation_objects, possible_proxy_calls
+                    )
 
-                true_positive, false_positive, false_negative = self._calculate_action_applicability_rate(
-                    action, learned_domain_path, component.previous_state, observation_objects, possible_proxy_calls
-                )
+                    num_true_positives[action.name] += true_positive
+                    num_false_positives[action.name] += false_positive
+                    num_false_negatives[action.name] += false_negative
 
-                num_true_positives[action.name] += true_positive
-                num_false_positives[action.name] += false_positive
-                num_false_negatives[action.name] += false_negative
 
         return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives, list(learned_domain.actions.keys()))
