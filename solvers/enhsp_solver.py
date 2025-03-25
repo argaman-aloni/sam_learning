@@ -77,6 +77,7 @@ class ENHSPSolver:
         else:
             self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDOUT - {stdout}")
             self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDERR - {stderr}")
+            solving_stats[problem_file_path.stem] = "solver_error"
             return False
 
     def solve_problem(
@@ -119,9 +120,6 @@ class ENHSPSolver:
         while not solver_output_ok and num_retries < 3:
             solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
             num_retries += 1
-        if not solver_output_ok:
-            # in any other case the value is set correctly.
-            solving_stats[problem_file_path.stem] = "solver_error"
 
     def execute_solver(
         self,

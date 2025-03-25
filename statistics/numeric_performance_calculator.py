@@ -67,7 +67,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
                 grounded_model_operator = _ground_executed_action(action_call, self.model_domain, observation.grounded_objects)
                 try:
                     next_state = grounded_operator.apply(previous_state, allow_inapplicable_actions=False)
-                    model_next_state = grounded_model_operator.apply(next_state, allow_inapplicable_actions=False)
+                    model_next_state = grounded_model_operator.apply(previous_state, allow_inapplicable_actions=False)
 
                 except ValueError:
                     self.logger.debug("The action is not applicable in the state.")
