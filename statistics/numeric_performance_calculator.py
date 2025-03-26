@@ -55,7 +55,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         :return: a mapping between the action name and its MSE value.
         """
         squared_errors = defaultdict(list)
-        mse_values = {action_name: 1 for action_name in learned_domain.actions.keys()}
+        mse_values = {action_name: 0 for action_name in learned_domain.actions.keys()}
         for observation in self.dataset_observations:
             for observation_component in observation.components:
                 action_call = observation_component.grounded_action_call

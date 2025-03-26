@@ -26,7 +26,7 @@ def execute_statistics_collection_job(code_directory, configuration, environment
     statistics_collection_job = submit_job(
         conda_env="online_nsam",
         mem="4G",
-        python_file=f"{code_directory}/distributed_results_collector.py",
+        python_file=f"{code_directory}/numeric_distributed_results_collector.py",
         dependency=f"afterok:{':'.join([str(e) for e in filtered_sids])}",
         jobname=f"collect_statistics_{experiment['domain_file_name']}",
         suppress_output=False,
