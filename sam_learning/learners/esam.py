@@ -23,21 +23,15 @@ class ProxyActionData:
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
 
-    cnf_eff: Dict[str, And[Or[Var]]]
-    action_effects_cnfs: Dict[str, Set[Or[Var]]]
-    cannot_be_effects: Dict[str, Set[str]]
-    encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]]
-    decoders: Dict[str, Callable[[ActionCall], ActionCall]]
-
-    def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard):
+    def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
         super().__init__(partial_domain=partial_domain, negative_preconditions_policy=negative_preconditions_policy)
         self.logger = logging.getLogger(__name__)
-        self.cnf_eff = {}
-        self.action_effects_cnfs = {action_name: set() for action_name in self.partial_domain.actions.keys()}
-        self.cannot_be_effects = {action_name: set() for action_name in self.partial_domain.actions.keys()}
+        self.cnf_eff: Dict[str, And[Or[Var]]] = {}
+        self.action_effects_cnfs: Dict[str, Set[Or[Var]]] = {action_name: set() for action_name in self.partial_domain.actions.keys()}
+        self.cannot_be_effects: Dict[str, Set[str]] = {action_name: set() for action_name in self.partial_domain.actions.keys()}
         self.popped_actions_archive: Dict[str, LearnerAction] = {}
-        self.encoders = {}
-        self.decoders = {}
+        self.encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]] = {}
+        self.decoders: Dict[str, Callable[[ActionCall], ActionCall]] = {}
 
     def encode(self, action_call: ActionCall) -> List[ActionCall]:
         """"""
@@ -343,7 +337,6 @@ class ExtendedSamLearner(SAMLearner):
 
             # add proxy action to Learned domain action model
             self.partial_domain.actions[new_proxy.name] = new_proxy
-
             # create decoder and encoder callable objects
             self.decoders[new_proxy.name] = create_decoder(proxy_data, new_proxy, action_name)
             self.encoders[action_name].append(create_encoder(proxy_data, new_proxy, action_name))
@@ -361,6 +354,8 @@ class ExtendedSamLearner(SAMLearner):
             if injective binding assumption does not hold for all observations of the action,
                 proxy actions are created and added to the domain.
         """
+        self.encoders={} # reinitialize\initialize encoders and decoders to remove old decoders and encoders methods
+        self.decoders={}
         for action_name in self.observed_actions:
             action_proxies = []
             self.logger.debug(f"Going over all the possible assignments that are true after for the action {action_name}.")

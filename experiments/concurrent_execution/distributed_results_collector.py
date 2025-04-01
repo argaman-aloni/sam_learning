@@ -120,9 +120,9 @@ class DistributedResultsCollector:
             else self.working_directory_path / "results_directory" / "performance_combined_statistics_with_triplets.csv"
         )
         file_path_template = (
-            "{learning_algorithm}_" + domain.name + "_learning_performance_stats_fold_{fold}_{iteration}.csv"
+            "{learning_algorithm}_" + domain.name + "_semantic_performance_stats_fold_{fold}_{iteration}.csv"
             if not collecting_triplets
-            else "{learning_algorithm}_" + domain.name + "_learning_performance_stats_fold_{fold}.csv"
+            else "{learning_algorithm}_" + domain.name + "_semantic_performance_stats_fold_{fold}.csv"
         )
         combined_statistics_data = []
         self._combine_statistics_data(file_path_template, combined_statistics_data, using_triplets=collecting_triplets)
@@ -168,7 +168,7 @@ class DistributedResultsCollector:
         self.logger.info("Collecting the semantic performance statistics from the results directory.")
         combined_semantic_performance_file_path = self.working_directory_path / "results_directory" / "semantic_performance_combined_statistics.csv"
         combined_semantic_performance_statistics_data = []
-        file_path_template = "{learning_algorithm}_" + domain.name + "_{fold}_{iteration}_semantic_performance.csv"
+        file_path_template = "{learning_algorithm}_" + domain.name + "_{iteration}_semantic_performance.csv"
         self._combine_statistics_data(file_path_template, combined_semantic_performance_statistics_data, exclude_algorithm=exclude_algorithm)
         with open(combined_semantic_performance_file_path, "wt") as combined_statistics_file:
             writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *SEMANTIC_PRECISION_STATS])
@@ -216,7 +216,6 @@ class DistributedResultsCollector:
         self.logger.info("Collecting the solving statistics from the results directory.")
         self._collect_solving_statistics_internal(collecting_triplets=True)
         self.logger.info("Done collecting the solving statistics from the results directory!")
-        results_directory = self.working_directory_path / "results_directory"
         self._collect_discrete_semantic_performance_statistics_internal(collecting_triplets=collecting_triplets)
 
 

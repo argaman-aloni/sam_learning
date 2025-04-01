@@ -17,7 +17,6 @@
       ],
       "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/barman/",
       "domain_file_name": "domain.pddl",
-      "learning_algorithm": 2,
       "solver_type": 2,
       "problems_prefix": "pfile"
     },
@@ -33,7 +32,6 @@
       ],
       "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/depots/",
       "domain_file_name": "domain.pddl",
-      "learning_algorithm": 2,
       "solver_type": 2,
       "problems_prefix": "pfile"
     },
@@ -49,14 +47,13 @@
       ],
       "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/floortile/",
       "domain_file_name": "domain.pddl",
-      "learning_algorithm": 2,
       "solver_type": 2,
       "problems_prefix": "pfile"
     },
-        	{
+            	{
       "parallelization_data": {
         "min_index": 0,
-        "max_index": 10,
+        "max_index": 5,
         "hop": 1
       },
       "compared_versions": [
@@ -65,10 +62,10 @@
       ],
       "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/hanoi/",
       "domain_file_name": "domain.pddl",
-      "learning_algorithm": 2,
       "solver_type": 2,
       "problems_prefix": "pfile"
     },
+
         	{
       "parallelization_data": {
         "min_index": 0,
@@ -81,7 +78,6 @@
       ],
       "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/satellite/",
       "domain_file_name": "domain.pddl",
-      "learning_algorithm": 2,
       "solver_type": 2,
       "problems_prefix": "pfile"
     },
@@ -97,14 +93,13 @@
       ],
       "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/scanalyzer/",
       "domain_file_name": "domain.pddl",
-      "learning_algorithm": 2,
       "solver_type": 2,
       "problems_prefix": "pfile"
     },
             	{
       "parallelization_data": {
         "min_index": 0,
-        "max_index": 17,
+        "max_index": 10,
         "hop": 1
       },
       "compared_versions": [
@@ -113,7 +108,6 @@
       ],
       "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/storage/",
       "domain_file_name": "domain.pddl",
-      "learning_algorithm": 2,
       "solver_type": 2,
       "problems_prefix": "pfile"
     }

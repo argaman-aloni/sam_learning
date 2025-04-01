@@ -66,8 +66,7 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
         :param possible_proxy_calls: possible calls for action if injective binding assumption does not hold.
         :return: a tuple containing the number of true positives, false positives and false negatives.
         """
-        if possible_proxy_calls is None or len(possible_proxy_calls)==0:
-            return 0,0,0
+
 
         self.logger.debug(f"Calculating the applicability rate for the action - {action_call.name}")
         applicability_validation_problem = Problem(domain=self.model_domain)
@@ -85,11 +84,22 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
         with open(current_solution_file_path, "wt") as solution_file:
             solution_file.write(str(action_call))
 
+        ProblemExporter().export_problem(problem=applicability_validation_problem,
+                                         export_path=current_problem_file_path)
+
+        # check applicability
         applicable_in_model = self._calculate_applicability_in_state(current_problem_file_path,
                                                                      current_solution_file_path,
                                                                      self.model_domain_path)
-        ProblemExporter().export_problem(problem=applicability_validation_problem,
-                                         export_path=current_problem_file_path)
+
+        if possible_proxy_calls is None or len(possible_proxy_calls)==0: # handle case were it has not been learned
+            applicable_in_learned = False
+
+            return\
+            (int(applicable_in_learned == applicable_in_model and applicable_in_learned),
+            int(applicable_in_learned and not applicable_in_model),
+            int(not applicable_in_learned and applicable_in_model),)
+
 
         # unlink original action solution file
         current_solution_file_path.unlink()
@@ -99,7 +109,7 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
             with open(current_encoded_solution_file_path, "wt") as encoded_solution_file:
                 encoded_solution_file.write(str(proxy_call))
             self.logger.debug(
-                f"Exported the problem to {current_problem_file_path}, now validating the action's applicability.")
+            f"Exported the problem to {current_encoded_solution_file_path}, now validating the action's applicability.")
 
             applicable_in_learned = self._calculate_applicability_in_state(current_problem_file_path,
                                                                            current_encoded_solution_file_path,
@@ -130,6 +140,38 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
         return proxy_results[possible_proxy_calls[0].name]
 
 
+    @staticmethod
+    def compare(model_next_state:State,
+                learned_next_state: State,
+                num_true_positives: Dict[str,int],
+                num_false_positives: Dict[str,int],
+                num_false_negatives: Dict[str,int],
+                action_name: str) -> bool:
+
+        model_state_predicates = {
+            predicate.untyped_representation
+            for grounded_predicate in model_next_state.state_predicates.values()
+            for predicate in grounded_predicate
+        }
+
+        learned_state_predicates = {
+            predicate.untyped_representation
+            for grounded_predicate in learned_next_state.state_predicates.values()
+            for predicate in grounded_predicate
+        }
+
+        if len(model_state_predicates) == 0 and len(learned_state_predicates) == 0:
+            num_true_positives[action_name] += 1
+
+        num_true_positives[action_name] += len(
+            model_state_predicates.intersection(learned_state_predicates))
+        num_false_positives[action_name] += len(
+            learned_state_predicates.difference(model_state_predicates))
+        num_false_negatives[action_name] += len(
+            model_state_predicates.difference(learned_state_predicates))
+
+        return True
+
     def _calculate_effects_difference_rate(
         self,
         observation: Observation,
@@ -152,12 +194,10 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
             model_previous_state = observation_triplet.previous_state
             executed_action = observation_triplet.grounded_action_call
             model_next_state = observation_triplet.next_state
-            possible_proxy_calls: List[ActionCall] = []
-            if executed_action.name not in learned_domain.actions:
-                if executed_action not in self.encoders:
-                    possible_proxy_calls = [executed_action]
-                else:
-                    possible_proxy_calls = [encode(executed_action) for encode in self.encoders[executed_action.name]]
+            if executed_action.name not in self.encoders:
+                continue
+
+            possible_proxy_calls = [encode(executed_action) for encode in self.encoders[executed_action.name]]
 
             proxy_operators: Dict[str, Union[Operator,None]] = {}
             for proxy_call in possible_proxy_calls:
@@ -178,38 +218,27 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
                 continue
 
             else:
+                is_sucsses = False
                 for proxy_name, proxy_operator in proxy_operators.items():
                     if proxy_operator is not None:
                         try:
                             learned_next_state = proxy_operator.apply(model_previous_state)
                             self.logger.debug("Validating if there are any false negatives.")
-                            model_state_predicates = {
-                                predicate.untyped_representation
-                                for grounded_predicate in model_next_state.state_predicates.values()
-                                for predicate in grounded_predicate
-                            }
 
-                            learned_state_predicates = {
-                                predicate.untyped_representation
-                                for grounded_predicate in learned_next_state.state_predicates.values()
-                                for predicate in grounded_predicate
-                            }
-
-                            if len(model_state_predicates) == 0 and len(learned_state_predicates) == 0:
-                                num_true_positives[executed_action.name] += 1
+                            is_sucsses = self.compare(model_next_state, learned_next_state,num_true_positives,
+                                                      num_false_positives, num_false_negatives, executed_action.name)
+                            if is_sucsses:
                                 break
-
-                            num_true_positives[executed_action.name] += len(
-                                model_state_predicates.intersection(learned_state_predicates))
-                            num_false_positives[executed_action.name] += len(
-                                learned_state_predicates.difference(model_state_predicates))
-                            num_false_negatives[executed_action.name] += len(
-                                model_state_predicates.difference(learned_state_predicates))
-                            break
 
                         except ValueError:
                             # not applicable, try another proxy
                             continue
+                if not is_sucsses:
+                    learned_next_state = model_previous_state.copy()
+                    model_next_state = model_previous_state.copy()
+                    self.compare(model_next_state, learned_next_state, num_true_positives,
+                                 num_false_positives, num_false_negatives, executed_action.name)
+
 
 
     def calculate_preconditions_semantic_performance(
@@ -229,7 +258,7 @@ class EncodedPerformanceCalculator(SemanticPerformanceCalculator):
             observation_objects = observation.grounded_objects
             for component in observation.components:
                 action = component.grounded_action_call
-                if action.name not in learned_domain.actions and action.name not in self.encoders:
+                if action.name not in self.encoders:
                     continue
 
                 if action.name in self.encoders:

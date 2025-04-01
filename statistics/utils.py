@@ -26,7 +26,6 @@ NUMERIC_ALGORITHMS = [
 MULTI_AGENT_ALGORITHMS = [
     LearningAlgorithmType.ma_sam,
     LearningAlgorithmType.ma_sam_plus,
-    LearningAlgorithmType.sam_learning,
 ]
 
 
@@ -37,7 +36,8 @@ def init_semantic_performance_calculator(
     executing_agents: Optional[List[str]] = None,
     test_set_dir_path: Path = None,
     problem_prefix: str = "pfile",
-) -> Union[NumericPerformanceCalculator, SemanticPerformanceCalculator, MASamPerformanceCalculator]:
+) -> Union[NumericPerformanceCalculator, SemanticPerformanceCalculator,
+            MASamPerformanceCalculator, EncodedPerformanceCalculator]:
     """Initializes a numeric performance calculator object.
 
     :param working_directory_path: the directory path where the domain and problem files are located.

@@ -77,8 +77,7 @@ class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
 
     def _learn_model_offline(
             self, allowed_observations: List[Observation], partial_domain: Domain, test_set_dir_path: Path,
-            fold_num: int,
-    ) -> None:
+            fold_num: int) -> None:
         """Learns the model of the environment by learning from the input trajectories.
             used to solve.
         """
@@ -97,7 +96,7 @@ class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
         self.logger.info(f"Finished the learning phase for the fold - {fold_num} and {len(allowed_observations)} observations!")
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Runs the numeric action model learning algorithms evaluation experiments.")
+    parser = argparse.ArgumentParser(description="Runs action model learning algorithms evaluation experiments.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
@@ -107,7 +106,7 @@ def parse_arguments() -> argparse.Namespace:
         choices=[1,2],
         help="the type of action model learning algorithm to use.\n SAM- 1, Extended-SAM- 2.",
     )
-
+    parser.add_argument("--iteration_number", required=False, help="The current iteration to execute", type=int)
     parser.add_argument(
         "--solver_type",
         required=False,

@@ -25,7 +25,8 @@ NUM_TRIPLETS_PER_TESTING = 10
 
 def configure_iteration_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
-    iteration_number = int(args.iteration_number) if "iteration_number" in args else "all"
+    iteration_number = int(args.iteration_number) if ("iteration_number" in args and
+                                                      isinstance(args.iteration_number, str)) else "all"
     learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
     local_logs_parent_path = os.environ.get("LOCAL_LOGS_PATH", args.working_directory_path)
     working_directory_path = Path(local_logs_parent_path)

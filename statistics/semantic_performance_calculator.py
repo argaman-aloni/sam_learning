@@ -298,9 +298,9 @@ class SemanticPerformanceCalculator:
         :param fold_num: the fold number.
         :param iteration_num: the iteration number.
         """
-        iterations_suffix = f"{iteration_num}" if iteration_num is not None else ""
+        iterations_suffix = f"_{iteration_num}" if iteration_num is not None else ""
         statistics_path = (
-            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_{fold_num}_{iterations_suffix}_semantic_performance.csv"
+            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_semantic_performance_stats_fold_{fold_num}{iterations_suffix}.csv"
         )
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PRECISION_STATS)
