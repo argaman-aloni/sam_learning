@@ -49,6 +49,8 @@ def init_semantic_performance_calculator(
     :param problem_prefix: the prefix of the problem files.
     :return: the initialized numeric performance calculator object.
     """
+    if domain_file_name is None and domain_file_path is None:
+        raise ValueError("Either 'domain_file_name' or 'domain_file_path' must be provided.")
     domain_path = domain_file_path if domain_file_path is not None else working_directory_path / domain_file_name
     model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
     observations = []
