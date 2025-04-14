@@ -1,8 +1,8 @@
 import random
+from unittest.mock import patch
 
 import numpy as np
 import pytest
-from unittest.mock import patch
 from pandas import DataFrame
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 from scipy.spatial import ConvexHull
