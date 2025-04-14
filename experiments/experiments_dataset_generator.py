@@ -95,6 +95,7 @@ def parse_arguments() -> argparse.Namespace:
         help="The type of trajectories to create for the experiments",
         type=str,
         choices=["regular", "random"],
+        default="regular",
     )
     args = parser.parse_args()
     return args
