@@ -36,7 +36,7 @@ class DistributedResultsCollector:
         self,
         working_directory_path: Path,
         domain_file_name: str,
-        learning_algorithms: List[int] = None,
+        learning_algorithms: List[str] = None,
         num_folds: int = 5,
         iterations: List[int] = None,
     ):
