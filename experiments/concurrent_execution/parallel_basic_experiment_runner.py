@@ -95,9 +95,9 @@ class ParallelExperimentRunner:
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
         self.semantic_performance_calc = init_semantic_performance_calculator(
-            self.working_directory_path,
-            self.domain_file_name,
-            self._learning_algorithm,
+            working_directory_path=self.working_directory_path,
+            domain_file_name=self.domain_file_name,
+            learning_algorithm=self._learning_algorithm,
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
             problem_prefix=self.problem_prefix,
             executing_agents=self.executing_agents,

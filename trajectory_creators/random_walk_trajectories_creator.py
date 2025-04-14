@@ -13,7 +13,7 @@ from pddl_plus_parser.models import PDDLObject, Domain, ActionCall, Problem, Sta
 from sam_learning.core import VocabularyCreator
 from utilities import SolverType
 
-MAX_NUM_STEPS_IN_TRAJECTORY = 100
+MAX_NUM_STEPS_IN_TRAJECTORY = 200
 inapplicable_action_probability = 0.25
 random.seed(42)
 
@@ -89,7 +89,7 @@ class RandomWalkTrajectoriesCreator:
                 action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters, problem_objects=problem.objects
             )
 
-        if len(action_queue) == 0:
+        if len(action_queue) == 0 and not operator.is_applicable(current_state):
             raise ValueError("No applicable actions found.")
 
         next_state = operator.apply(current_state, skip_validation=True)

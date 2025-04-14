@@ -182,6 +182,9 @@ class LearnerDomain:
         :return: the PDDL string representing the types.
         """
         parent_child_map = defaultdict(list)
+        if set(self.types.keys()) == {"object"}:
+            return "object"
+
         for type_name, type_obj in self.types.items():
             if type_name == "object":
                 continue

@@ -1,16 +1,13 @@
 import argparse
-import csv
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from pddl_plus_parser.lisp_parsers import DomainParser
-from pddl_plus_parser.models import Domain
 
-from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector, FOLD_FIELD
-from experiments.plotting.plot_masam_results import plot_solving_results
-from statistics.semantic_performance_calculator import SEMANTIC_PRECISION_STATS
-from utilities import LearningAlgorithmType
+from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector
+from experiments.plotting.plot_nsam_results import plot_results
+from experiments.plotting.plot_nsam_solo_results import plot_solo_results
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -24,38 +21,37 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
+class NumericResultsCollector(DistributedResultsCollector):
     logger: logging.Logger
 
     def __init__(
         self,
         working_directory_path: Path,
         domain_file_name: str,
-        learning_algorithms: List[int] = None,
+        learning_algorithms: List[str] = None,
         num_folds: int = 5,
         iterations: List[int] = None,
     ):
         super().__init__(working_directory_path, domain_file_name, learning_algorithms, num_folds, iterations)
 
-    def _collect_performance_statistics(self, exclude_algorithm: Optional[LearningAlgorithmType] = None) -> None:
-        domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
-        self._collect_semantic_performance_statistics(domain, exclude_algorithm=exclude_algorithm)
-        self._collect_semantic_performance_statistics(domain, exclude_algorithm=exclude_algorithm, using_triplets=True)
-        self._collect_syntactic_performance_statistics(domain, exclude_algorithm=exclude_algorithm)
-        self._collect_syntactic_performance_statistics(domain, exclude_algorithm=exclude_algorithm, using_triplets=True)
-        self.logger.info("Done collecting the statistics from the results directory!")
-
-    def collect_multi_agent_statistics(self) -> None:
+    def collect_numeric_statistics(self) -> None:
+        """Collects the statistics from the results directory."""
         self._collect_solving_statistics(collecting_triplets=False)
+        results_directory = self.working_directory_path / "results_directory"
+        plot_results(results_directory, file_template="*solving_combined_statistics.csv")
+        plot_solo_results(results_directory, file_template="*solving_combined_statistics.csv")
+        domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
+        self._collect_syntactic_performance_statistics(domain)
+        self._collect_numeric_semantic_performance_statistics(collecting_triplets=False)
+
+    def collect_numeric_statistics_with_triplets_statistics(self) -> None:
         self._collect_solving_statistics(collecting_triplets=True)
         results_directory = self.working_directory_path / "results_directory"
-        combined_statistics_file_path = results_directory / "solving_combined_statistics.csv"
-        combined_statistics_file_path_with_triplets = results_directory / "solving_combined_statistics_with_triplets.csv"
-        plot_solving_results(combined_statistics_file_path, results_directory / "solving_combined_statistics.pdf")
-        plot_solving_results(
-            combined_statistics_file_path_with_triplets, results_directory / "solving_combined_statistics_with_triplets.pdf", using_triplets=True
-        )
-        self._collect_performance_statistics(exclude_algorithm=LearningAlgorithmType.ma_sam_plus)
+        plot_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv", using_triplets=True)
+        plot_solo_results(results_directory, file_template="*solving_combined_statistics_with_triplets.csv", using_triplets=True)
+        domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
+        self._collect_syntactic_performance_statistics(domain)
+        self._collect_numeric_semantic_performance_statistics(collecting_triplets=True)
 
 
 if __name__ == "__main__":
@@ -63,10 +59,10 @@ if __name__ == "__main__":
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     internal_iterations = [int(val) for val in args.internal_iterations.split(",")]
-    MultiAgentExperimentsResultsCollector(
+    NumericResultsCollector(
         working_directory_path=Path(args.working_directory_path),
         domain_file_name=args.domain_file_name,
         learning_algorithms=experiment_learning_algorithms,
         num_folds=args.num_folds,
         iterations=internal_iterations,
-    ).collect_multi_agent_statistics()
+    ).collect_numeric_statistics()

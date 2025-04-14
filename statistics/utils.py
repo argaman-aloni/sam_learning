@@ -31,8 +31,9 @@ MULTI_AGENT_ALGORITHMS = [
 
 def init_semantic_performance_calculator(
     working_directory_path: Path,
-    domain_file_name: str,
-    learning_algorithm: LearningAlgorithmType,
+    domain_file_name: Optional[str] = None,
+    domain_file_path: Optional[Path] = None,
+    learning_algorithm: LearningAlgorithmType = LearningAlgorithmType.sam_learning,
     executing_agents: Optional[List[str]] = None,
     test_set_dir_path: Path = None,
     problem_prefix: str = "pfile",
@@ -41,14 +42,16 @@ def init_semantic_performance_calculator(
 
     :param working_directory_path: the directory path where the domain and problem files are located.
     :param domain_file_name: the name of the domain file.
+    :param domain_file_path: the path to the domain file.
     :param learning_algorithm: the type of learning algorithm to use.
     :param executing_agents: the agents that are executing the domain.
     :param test_set_dir_path: the path to the directory containing the test set.
-    :param is_numeric: whether the performance calculator is numeric or not.
     :param problem_prefix: the prefix of the problem files.
     :return: the initialized numeric performance calculator object.
     """
-    domain_path = working_directory_path / domain_file_name
+    if domain_file_name is None and domain_file_path is None:
+        raise ValueError("Either 'domain_file_name' or 'domain_file_path' must be provided.")
+    domain_path = domain_file_path if domain_file_path is not None else working_directory_path / domain_file_name
     model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
     observations = []
     problem_files = list(test_set_dir_path.glob(f"{problem_prefix}*.pddl"))
