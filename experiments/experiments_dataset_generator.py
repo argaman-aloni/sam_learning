@@ -42,7 +42,7 @@ class DatasetGenerator:
         domain_file_path: Path,
         solving_timeout: int = MAX_RUNNING_TIME,
         problems_prefix: str = "pfile",
-        solver_type: int = SolverType.fast_downward,
+        solver_type: SolverType = SolverType.fast_downward,
         trajectory_creation_method: Literal["regular", "random"] = "regular",
     ):
         """Initializes the dataset generator with the given problems."""
