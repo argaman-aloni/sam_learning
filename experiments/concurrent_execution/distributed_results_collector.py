@@ -142,7 +142,7 @@ class DistributedResultsCollector:
         file_path_template = (
             "{learning_algorithm}_" + domain.name + "_{fold}_{iteration}_semantic_performance.csv"
             if not using_triplets
-            else "{learning_algorithm}_" + domain.name + "_{fold}__semantic_performance.csv"
+            else "{learning_algorithm}_" + domain.name + "_{fold}_semantic_performance.csv"
         )
         self._combine_statistics_data(file_path_template, combined_semantic_performance_statistics_data, exclude_algorithm=exclude_algorithm)
         with open(combined_semantic_performance_file_path, "wt") as combined_statistics_file:
