@@ -218,14 +218,6 @@ def parse_arguments() -> argparse.Namespace:
         "--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' " "fluents", default=None,
     )
     parser.add_argument(
-        "--solver_type",
-        required=False,
-        type=int,
-        choices=[2, 3],
-        help="The solver that should be used for the sake of validation.\nMetric-FF - 2, ENHSP - 3.",
-        default=3,
-    )
-    parser.add_argument(
         "--polynom_degree", required=False, help="The degree of the polynomial to set in the learning algorithm.", default=0,
     )
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
