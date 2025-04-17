@@ -81,7 +81,7 @@ def test_add_new_point_when_adding_two_points_creates_a_base_for_the_points_and_
     assert convex_hull_learner.data.iloc[1].to_dict() == second_sample
     assert convex_hull_learner._convex_hull is None
     assert convex_hull_learner._gsp_base is not None
-    assert len(convex_hull_learner._complementary_base) == 2
+    assert len(convex_hull_learner.additional_dependency_conditions) == 2
 
 
 def test_add_new_point_when_adding_three_points_with_that_create_larger_base_changes_the_base_created_by_the_algorithm(
@@ -99,8 +99,6 @@ def test_add_new_point_when_adding_three_points_with_that_create_larger_base_cha
     convex_hull_learner.add_new_point(third_sample)
     assert convex_hull_learner.data.shape == (3, 3)
     assert len(convex_hull_learner._gsp_base) == len(normal_base) + 1
-    assert convex_hull_learner._gsp_base[0] == normal_base[0]
-
 
 def test_add_new_point_when_adding_three_points_when_gsp_returns_two_dimensions_sets_the_convex_hull_with_enough_data(
     convex_hull_learner: IncrementalConvexHullLearner,
@@ -200,13 +198,13 @@ def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_c
     convex_hull_learner.add_new_point(first_sample)
     second_sample = {"(x )": 1, "(y )": 0, "(z )": 0}
     convex_hull_learner.add_new_point(second_sample)
-    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._incremental_create_ch_inequalities(
+    (coefficients, border_point, transformed_vars, _) = convex_hull_learner._incremental_create_ch_inequalities(
         display_mode=True
     )
     assert coefficients == [[-1], [1]]
-    assert border_point == [0, 1.4142]
-    assert transformed_vars == ["(+ (* (x ) 0.7071) (* (- (y ) 1) -0.7071))"]
-    assert set(span_verification_conditions) == {"(= (z ) 0.0)", "(= (+ (x ) (- (y ) 1)) 0.0)"}
+    assert border_point == [0.0, 1.0]
+    assert transformed_vars == ['(* (- (y ) 1) -1)']
+    assert set(convex_hull_learner.additional_dependency_conditions) == {"(= (z ) 0)", "(= (x ) (+ (* (y ) -1) 1))"}
 
 
 def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_conditions_and_correct_complementary_conditions(
@@ -225,7 +223,9 @@ def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_c
     )
     assert coefficients == [[-1], [1]]
     assert border_point == [0, 4]
-    assert set(span_verification_conditions) == {"(= (z ) 0.0)", "(= (- (y ) 1) 0.0)"}
+    assert set(convex_hull_learner.additional_dependency_conditions) == {"(= (y ) 1)", "(= (z ) 0)"}
+    assert len(span_verification_conditions) == 0
+    assert transformed_vars == ['(x )']
 
 
 def test_incremental_create_ch_inequalities_with_point_spanning_standard_base_returns_correct_convex_hull_with_no_verification_conditions(

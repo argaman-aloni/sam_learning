@@ -7,7 +7,8 @@ from pandas import DataFrame
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from scipy.spatial import ConvexHull, QhullError
 
-from sam_learning.core.learning_types import ConditionType
+from sam_learning.core.learning_types import ConditionType, EquationSolutionType
+from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
 from sam_learning.core.numeric_learning.numeric_utils import (
     prettify_coefficients,
@@ -98,7 +99,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         self._gsp_base = self._calculate_orthonormal_base(self.affine_independent_data)
         self._complementary_base = self._calculate_orthonormal_complementary_base(self._gsp_base, self.affine_independent_data.shape[1])
         self._complementary_base = divide_span_by_common_denominator(self._complementary_base)
-        if len(self._gsp_base) == self.affine_independent_data.shape[1]:
+        if (len(self._gsp_base) > 1) and (len(self._gsp_base) == self.affine_independent_data.shape[1]):
             self.logger.debug("The points are spanning the original space, no need to project the points.")
             self._gsp_base = [list(vector) for vector in np.eye(self.affine_independent_data.shape[1])]
             self._spanning_standard_base = True
@@ -164,8 +165,8 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                 recalculate_ch = True
             else:
                 # add the new point to the convex hull
-                projected_new_point = np.dot(self._shift_new_point(), np.array(self._gsp_base).T)
                 if self._convex_hull is not None:
+                    projected_new_point = np.dot(self._shift_new_point(), np.array(self._gsp_base).T)
                     try:
                         self._convex_hull.add_points([projected_new_point])
                     except QhullError:
@@ -174,13 +175,13 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                         )
                         recalculate_ch = True
 
-            if len(self._gsp_base) == 1:
+        if recalculate_base:
+            self._learn_new_bases()
+
+        if len(self._gsp_base) <= 1:
                 self.logger.debug("The created base is one dimensional, cannot create a convex hull.")
                 return
         
-        if recalculate_base:
-            self._learn_new_bases()
-            
         if recalculate_ch:
             self._learn_new_convex_hull()
 
@@ -216,7 +217,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         points = self.affine_independent_data.to_numpy()
         shift_axis = points[0].tolist()  # selected the first vector to be the start of the axis.
 
-        if len(self._gsp_base) == self.affine_independent_data.shape[1]:
+        if (len(self._gsp_base) > 1) and (len(self._gsp_base) == self.affine_independent_data.shape[1]):
             self.logger.debug("The points are spanning the original space and the basis is full rank.")
             coefficients, border_point = self._create_ch_coefficients_data(display_mode)
             return coefficients, border_point, self.affine_independent_data.columns.tolist(), None
@@ -246,15 +247,21 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
-        if len(self.affine_independent_data) == 0:
+        if len(self.data) == 0:
             self.logger.debug("No observations were given to learn any conditions.")
             return Precondition("and")
 
-        if len(self.affine_independent_data.columns.tolist()) == 1:
+        if len(self.data.columns.tolist()) == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")
-            return self._construct_single_dimension_inequalities(self.affine_independent_data.loc[:, self.affine_independent_data.columns.tolist()[0]])
+            return self._construct_single_dimension_inequalities(self.data.loc[:, self.data.columns.tolist()[0]])
 
         try:
+            if len(self.affine_independent_data) == 0:
+                self.logger.warning("The matrix is empty, no need to create a convex hull.")
+                return construct_numeric_conditions(
+                    self.additional_dependency_conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions
+                )
+        
             A, b, column_names, additional_projection_conditions = self._incremental_create_ch_inequalities()
             self.logger.debug(f"Constructing the PDDL inequality scheme for the action {self.action_name}.")
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
@@ -274,4 +281,6 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                 "(probably since the rank of the matrix is 2 and it cannot create a degraded "
                 "convex hull)."
             )
-            return self._create_disjunctive_preconditions(self.affine_independent_data, [])
+            raise NotSafeActionError(
+                name=self.action_name, reason="Convex hull failed to create a convex hull", solution_type=EquationSolutionType.convex_hull_not_found
+            )
