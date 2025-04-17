@@ -321,8 +321,9 @@ def display_convex_hull_2d(action_name: str, hull: ConvexHull) -> None:
     :param action_name: the name of the action with its convex hull displayed.
     :param hull: the convex hull to display.
     """
-    plt.title(f"{action_name} - convex hull")
-    _ = convex_hull_plot_2d(hull)
+    fig = convex_hull_plot_2d(hull)
+    ax = fig.gca()
+    ax.set_title(f"{action_name} - convex hull")
     plt.show()
 
 
@@ -332,9 +333,9 @@ def display_convex_hull_3d(action_name: str, hull: ConvexHull) -> None:
     :param action_name: the name of the action with its convex hull displayed.
     :param hull: the convex hull to display.
     """
-    plt.title(f"{action_name} - convex hull")
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
+    ax.set_title(f"{action_name} - convex hull")
     for simplex in hull.simplices:
         simplex = np.append(simplex, simplex[0])  # Repeat the first point to create a closed shape
         ax.plot(hull.points[simplex, 0], hull.points[simplex, 1], hull.points[simplex, 2], "b-")
