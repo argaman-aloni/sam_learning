@@ -120,6 +120,7 @@ TEST_PPO_MINECRAFT_DOMAIN = EXAMPLES_DIR_PATH / "ppo_minecraft_domain.pddl"
 
 FARMLAND_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data.csv"
 FARMLAND_PAPER_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data_for_paper.csv"
+FARMLAND_SPAN_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "span_convex_state_data.csv"
 
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
