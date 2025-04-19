@@ -367,6 +367,41 @@ def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns
     precondition = learner.construct_safe_linear_inequalities()
     assert len(precondition.operands) == 4
 
+def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns_with_one_constant_variable(farmland_domain: Domain):
+    dataframe = pd.read_csv(FARMLAND_EXAMPLES_PATH)
+    vocabulary_creator = VocabularyCreator()
+    possible_bounded_functions = vocabulary_creator.create_lifted_functions_vocabulary(
+        domain=farmland_domain, possible_parameters=farmland_domain.actions["move-slow"].signature
+    )
+    learner = IncrementalConvexHullLearner("move-slow", domain_functions=possible_bounded_functions)
+    for index, (_, row) in enumerate(dataframe.iterrows()):
+        if learner._spanning_standard_base:
+            break
+
+        point_data = {key: row[key] for key in dataframe.columns.tolist()}
+        learner.add_new_point(point_data)
+    
+    assert len(learner._gsp_base) == 2
+    assert set(learner.additional_dependency_conditions) == {"(= (x ?f2) 0)"}
+    assert len(learner._convex_hull.points) == 6
+
+def test_construct_convex_hull_inequalities_when_not_spanning_standard_basis_returns_with_two_constant_variables(farmland_domain: Domain):
+    dataframe = pd.read_csv(FARMLAND_EXAMPLES_PATH)[:4]
+    vocabulary_creator = VocabularyCreator()
+    possible_bounded_functions = vocabulary_creator.create_lifted_functions_vocabulary(
+        domain=farmland_domain, possible_parameters=farmland_domain.actions["move-slow"].signature
+    )
+    learner = IncrementalConvexHullLearner("move-slow", domain_functions=possible_bounded_functions)
+    for index, (_, row) in enumerate(dataframe.iterrows()):
+        if learner._spanning_standard_base:
+            assert len(learner._gsp_base) == 1
+            assert learner._convex_hull.points is None
+
+        point_data = {key: row[key] for key in dataframe.columns.tolist()}
+        learner.add_new_point(point_data)
+    
+    assert len(learner._gsp_base) == 1
+    assert set(learner.additional_dependency_conditions) == {"(= (cost ) 1)", "(= (x ?f2) 0)"}
 
 def test_construct_convex_hull_inequalities_when_given_too_few_examples_returns_lower_dimensional_convex_hull_with_real_dataset_example(
     farmland_domain: Domain,
