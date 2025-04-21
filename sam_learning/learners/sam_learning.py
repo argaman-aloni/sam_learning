@@ -220,7 +220,7 @@ class SAMLearner:
         next_state = component.next_state
 
         if self._verify_parameter_duplication(grounded_action):
-            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM." f"aborting learning from component")
+            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not supported in SAM." f"aborting learning from component")
             return
 
         self.triplet_snapshot.create_triplet_snapshot(
