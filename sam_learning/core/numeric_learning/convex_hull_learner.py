@@ -38,7 +38,9 @@ class ConvexHullLearner:
     convex_hull_error_file_path: Path
     data: DataFrame
 
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
+    def __init__(
+        self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0, epsilon: float = 0.0, qhull_options: str = ""
+    ):
         self.logger = logging.getLogger(__name__)
         self.convex_hull_error_file_path = Path(os.environ["CONVEX_HULL_ERROR_PATH"])
         functions = list([function.untyped_representation for function in domain_functions.values()])
@@ -46,6 +48,8 @@ class ConvexHullLearner:
         self.data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in monomials])
         self.action_name = action_name
         self.domain_functions = {function.name: function for function in domain_functions.values()}
+        self._epsilon = epsilon
+        self._qhull_options = qhull_options
 
     def add_new_point(self, point: Dict[str, float]) -> None:
         """Adds a new point to the convex hull learner.
@@ -69,18 +73,17 @@ class ConvexHullLearner:
 
         self.data = concat_data
 
-    def _epsilon_approximate_hull(self, points: np.ndarray, epsilon: float = 0.0, qhull_options: str = "") -> ConvexHull:
+    def _epsilon_approximate_hull(self, points: np.ndarray, incremental: bool = False) -> ConvexHull:
         """Approximates the convex hull of the given points with a margin of epsilon and a set of options for the qhull algorithm..
 
         :param points: The points comprising the convex hull.
-        :param epsilon: The margin to add to the convex hull.
-        :param qhull_options: the options to pass to the qhull algorithm.
+        :param incremental: whether to use the incremental version of the qhull algorithm.
         :return: the approximated convex hull.
         """
-        self.logger.debug(f"Approximating the convex hull with epsilon {epsilon}.")
+        self.logger.debug(f"Approximating the convex hull with epsilon {self._epsilon}.")
         # Step 1: Compute the original convex hull
-        hull = ConvexHull(points)
-        if epsilon == 0.0 and qhull_options == "":
+        hull = ConvexHull(points, incremental=incremental)
+        if self._epsilon == 0.0 and self._qhull_options == "":
             return hull
 
         # Step 2: Find the centroid of the original hull (for expanding outward)
@@ -94,26 +97,24 @@ class ConvexHullLearner:
             # Calculate the direction vectors from the centroid to each facet point
             directions = facet_points - centroid
             # Normalize directions and expand each point by (1 + epsilon)
-            expanded_facet = centroid + (1 + epsilon) * directions
+            expanded_facet = centroid + (1 + self._epsilon) * directions
             expanded_points.extend(expanded_facet)
 
         # Combine original points with expanded points
         all_points = np.vstack([points, expanded_points])
 
         # Step 4: Compute the approximated convex hull on the expanded point set
-        approx_hull = ConvexHull(all_points, qhull_options=qhull_options)
+        approx_hull = ConvexHull(all_points, qhull_options=self._qhull_options, incremental=incremental)
         return approx_hull
 
-    def _execute_convex_hull(
-        self, points: np.ndarray, display_mode: bool = True, epsilon=0.0, qhull_options=""
-    ) -> Tuple[List[List[float]], List[float]]:
+    def _execute_convex_hull(self, points: np.ndarray, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
         """Runs the convex hull algorithm on the given input points.
 
         :param points: the points to run the convex hull algorithm on.
         :param display_mode: whether to display the convex hull.
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
-        hull = self._epsilon_approximate_hull(points, epsilon=epsilon, qhull_options=qhull_options)
+        hull = self._epsilon_approximate_hull(points)
         display_convex_hull(self.action_name, display_mode, hull)
         equations = np.unique(hull.equations, axis=0)
 
@@ -124,7 +125,7 @@ class ConvexHullLearner:
         return coefficients, border_point
 
     def _create_convex_hull_linear_inequalities(
-        self, points_df: DataFrame, display_mode: bool = True, epsilon=0.0, qhull_options=""
+        self, points_df: DataFrame, display_mode: bool = True
     ) -> Tuple[List[List[float]], List[float], List[str], Optional[List[str]]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
@@ -143,7 +144,7 @@ class ConvexHullLearner:
         projection_basis = extended_gram_schmidt(shifted_points)
         if len(shifted_points) > len(points_df.columns.tolist()) and len(projection_basis) >= len(points_df.columns.tolist()):
             self.logger.debug("The points are spanning the original space and the basis is full rank, " "no need to project the points.")
-            coefficients, border_point = self._execute_convex_hull(points, display_mode, epsilon=epsilon, qhull_options=qhull_options)
+            coefficients, border_point = self._execute_convex_hull(points, display_mode)
             return coefficients, border_point, points_df.columns.tolist(), []
 
         projected_points = np.dot(shifted_points, np.array(projection_basis).T)
@@ -151,7 +152,7 @@ class ConvexHullLearner:
             border_point, coefficients = self._construct_single_dimension_convex_hull(projected_points)
 
         else:
-            coefficients, border_point = self._execute_convex_hull(projected_points, display_mode, epsilon=epsilon, qhull_options=qhull_options)
+            coefficients, border_point = self._execute_convex_hull(projected_points, display_mode)
 
         transformed_vars = construct_projected_variable_strings(points_df.columns.tolist(), shift_axis, projection_basis)
 
@@ -243,9 +244,10 @@ class ConvexHullLearner:
 
         return construct_numeric_conditions(conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions)
 
-    def construct_safe_linear_inequalities(self, relevant_fluents: Optional[List[str]] = None, epsilon=0.0, qhull_options="") -> Precondition:
+    def construct_safe_linear_inequalities(self, relevant_fluents: Optional[List[str]] = None) -> Precondition:
         """Constructs the linear inequalities strings that will be used in the learned model later.
 
+        :param relevant_fluents: the relevant fluents that are used to create the convex hull.
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
         irrelevant_fluents = (
@@ -274,7 +276,7 @@ class ConvexHullLearner:
                 )
 
             A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(
-                filtered_dataframe, display_mode=False, epsilon=epsilon, qhull_options=qhull_options
+                filtered_dataframe, display_mode=False
             )
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:

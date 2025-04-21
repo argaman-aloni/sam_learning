@@ -30,6 +30,8 @@ class NumericSAMLearner(SAMLearner):
         allow_unsafe: bool = False,
         polynomial_degree: int = 0,
         negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
+        epsilon: float = 0.0,
+        qhull_options: str = "",
         **kwargs,
     ):
         super().__init__(partial_domain, negative_preconditions_policy=negative_preconditions_policy)
@@ -38,7 +40,8 @@ class NumericSAMLearner(SAMLearner):
         self.relevant_fluents = relevant_fluents
         self._allow_unsafe = allow_unsafe
         self.polynom_degree = polynomial_degree
-        self.approximation_params = kwargs["approximation_params"] if "approximation_params" in kwargs else None
+        self._epsilon = epsilon
+        self._qhull_options = qhull_options
 
     def _remove_deprecated_numeric_preconditions(self, action: LearnerAction) -> None:
         """Removes the deprecated numeric preconditions from the input action (used when the learning process is iterative).
@@ -105,12 +108,13 @@ class NumericSAMLearner(SAMLearner):
         self.logger.debug(f"No feature selection applied, using the numeric preconditions as is.")
         return learned_perfectly
 
-    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
+    def add_new_action(self, grounded_action: ActionCall, previous_state: State, next_state: State, incremental: bool = False) -> None:
         """Adds a new action to the learned domain.
 
         :param grounded_action: the grounded action that was executed according to the observation.
         :param previous_state: the state that the action was executed on.
-        :param next_state: the state that was created after executing the action on the previous
+        :param next_state: the state that was created after executing the action on the previous state.
+        :param incremental: whether the learning process is incremental or not.
         """
         super().add_new_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
@@ -123,7 +127,9 @@ class NumericSAMLearner(SAMLearner):
             action_name=grounded_action.name,
             domain_functions=possible_bounded_functions,
             polynom_degree=self.polynom_degree,
-            approximation_params=self.approximation_params,
+            epsilon=self._epsilon,
+            qhull_options=self._qhull_options,
+            incremental=incremental,
         )
         self.storage[grounded_action.name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[grounded_action.name].add_to_next_state_storage(next_state_lifted_matches)

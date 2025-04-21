@@ -298,7 +298,9 @@ def test_construct_safe_linear_inequalities_with_relevant_fluents_ignores_all_va
 def test_epsilon_approximate_hull_when_given_epsilon_zero_and_no_parameters_returns_original_convex_hull(convex_hull_learner: ConvexHullLearner,):
     # create a three-dimensional np.array with 10 samples of random numbers.
     data = np.random.randint(0, 100, (10, 3))
-    non_approximated_hull = convex_hull_learner._epsilon_approximate_hull(data, epsilon=0, qhull_options="")
+    convex_hull_learner._epsilon = 0
+    convex_hull_learner._qhull_options = ""
+    non_approximated_hull = convex_hull_learner._epsilon_approximate_hull(data)
     expected_convex_hull = ConvexHull(data)
     assert np.equal(non_approximated_hull.points, expected_convex_hull.points).all()
     assert np.equal(non_approximated_hull.equations, expected_convex_hull.equations).all()

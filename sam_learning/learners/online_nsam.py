@@ -2,19 +2,27 @@
 import random
 from typing import Dict, Set, Optional, Tuple, List, Any
 
-from pddl_plus_parser.models import Domain, State, ActionCall, Precondition, Predicate, PDDLFunction, \
-    Action, NumericalExpressionTree, CompoundPrecondition
+from pddl_plus_parser.models import (
+    Domain,
+    State,
+    ActionCall,
+    Precondition,
+    Predicate,
+    PDDLFunction,
+    Action,
+    NumericalExpressionTree,
+    CompoundPrecondition,
+)
 
-from sam_learning.core import InformationGainLearner, LearnerDomain, AbstractAgent, \
-    PriorityQueue, LearnerAction, EpisodeInfoRecord
+from sam_learning.core import InformationGainLearner, LearnerDomain, AbstractAgent, PriorityQueue, LearnerAction, EpisodeInfoRecord
 from sam_learning.core.online_learning.novelty_learner import NoveltyLearner, FAIL_RESULT, SUCCESS_RESULT
-from sam_learning.learners.numeric_sam import NumericSAMLearner
+from sam_learning.learners.incremental_numeric_sam import IncrementalNumericSAMLearner
 
 NON_INFORMATIVE_IG = 0
 MAX_STEPS_PER_EPISODE = 100
 
 
-class OnlineNSAMLearner(NumericSAMLearner):
+class OnlineNSAMLearner(IncrementalNumericSAMLearner):
     """"An online version of the Numeric SAM learner."""
 
     ig_learner: Dict[str, InformationGainLearner]
@@ -27,11 +35,15 @@ class OnlineNSAMLearner(NumericSAMLearner):
     _episode_recorder: EpisodeInfoRecord
     safe_perfect_numeric_effects = Dict[str, Set[NumericalExpressionTree]]
 
-    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, agent: AbstractAgent = None,
-                 episode_recorder: EpisodeInfoRecord = None,
-                 fluents_map: Optional[Dict[str, List[str]]] = None):
-        super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree,
-                         relevant_fluents=fluents_map)
+    def __init__(
+        self,
+        partial_domain: Domain,
+        polynomial_degree: int = 0,
+        agent: AbstractAgent = None,
+        episode_recorder: EpisodeInfoRecord = None,
+        fluents_map: Optional[Dict[str, List[str]]] = None,
+    ):
+        super().__init__(partial_domain=partial_domain, polynomial_degree=polynomial_degree, relevant_fluents=fluents_map)
         self.ig_learner = {}
         self.agent = agent
         self.applicable_actions = PriorityQueue()
@@ -57,11 +69,9 @@ class OnlineNSAMLearner(NumericSAMLearner):
         :param action: the action being applied.
         :return: the features to explore.
         """
-        return self.relevant_fluents[action.name] if \
-            self.relevant_fluents else self.ig_learner[action.name].numeric_positive_samples.columns.tolist()
+        return self.relevant_fluents[action.name] if self.relevant_fluents else self.ig_learner[action.name].numeric_positive_samples.columns.tolist()
 
-    def _get_lifted_bounded_state(
-            self, action: ActionCall, state: State) -> Tuple[Dict[str, PDDLFunction], List[Predicate]]:
+    def _get_lifted_bounded_state(self, action: ActionCall, state: State) -> Tuple[Dict[str, PDDLFunction], List[Predicate]]:
         """Gets the lifted bounded predicates and functions that match the action being executed.
 
         :param action: the action being executed.
@@ -69,8 +79,7 @@ class OnlineNSAMLearner(NumericSAMLearner):
         :return: the lifted bounded functions and predicates.
         """
         state_objects = state.get_state_objects()
-        grounded_state_propositions = self.triplet_snapshot.create_propositional_state_snapshot(
-            state, action, state_objects)
+        grounded_state_propositions = self.triplet_snapshot.create_propositional_state_snapshot(state, action, state_objects)
         lifted_predicates = self.matcher.get_possible_literal_matches(action, list(grounded_state_propositions))
         grounded_state_functions = self.triplet_snapshot.create_numeric_state_snapshot(state, action, state_objects)
         lifted_functions = self.function_matcher.match_state_functions(action, grounded_state_functions)
@@ -82,11 +91,11 @@ class OnlineNSAMLearner(NumericSAMLearner):
         :param grounded_action: the action to calculate the selection probability of.
         :return: the selection probability of the action.
         """
-        normalized_observation_rate = self._action_observation_rate[grounded_action.name] / \
-                                      sum([rate for rate in self._action_observation_rate.values()])
+        normalized_observation_rate = self._action_observation_rate[grounded_action.name] / sum(
+            [rate for rate in self._action_observation_rate.values()]
+        )
         # we prefer actions that failed more than others since they might be more dependent on others to succeed.
-        failure_rate = self._action_failure_rate[grounded_action.name] / \
-                       (sum([rate for rate in self._action_failure_rate.values()]) + 1)
+        failure_rate = self._action_failure_rate[grounded_action.name] / (sum([rate for rate in self._action_failure_rate.values()]) + 1)
         selection_prob = (1 - normalized_observation_rate) + failure_rate
         return selection_prob
 
@@ -97,8 +106,7 @@ class OnlineNSAMLearner(NumericSAMLearner):
         :param allow_unsafe_learning: whether to allow unsafe learning of the effects.
         """
         if action.name in self.safe_perfect_numeric_effects and allow_unsafe_learning:
-            self.logger.debug(f"The effects of action - {action.name} were already learned perfectly, "
-                              f"and can use it for internal calculations.")
+            self.logger.debug(f"The effects of action - {action.name} were already learned perfectly, " f"and can use it for internal calculations.")
             action.numeric_effects = self.safe_perfect_numeric_effects[action.name]
             return True
 
@@ -158,11 +166,10 @@ class OnlineNSAMLearner(NumericSAMLearner):
         :param state: the state in which the action is being evaluated.
         """
         self.logger.info(f"Handling the non-informative applicable action {action.name}.")
-        applicable_action_novelty = self.novelty_calculator.calculate_novelty(
-            action, state, self._unsafe_domain, self.observed_actions)
+        applicable_action_novelty = self.novelty_calculator.calculate_novelty(action, state, self._unsafe_domain, self.observed_actions)
         self.applicable_actions.insert(
-            item=action, priority=applicable_action_novelty,
-            selection_probability=self._calculate_selection_probability(action))
+            item=action, priority=applicable_action_novelty, selection_probability=self._calculate_selection_probability(action)
+        )
 
     def _select_action_to_execute(self, frontier: PriorityQueue) -> ActionCall:
         """Selects the next action to execute from both the frontier and the applicable actions.
@@ -178,8 +185,7 @@ class OnlineNSAMLearner(NumericSAMLearner):
         queue_to_select_from = random.choices([self.applicable_actions, frontier], weights=[0.2, 0.8], k=1)[0]
         return queue_to_select_from.get_item()
 
-    def calculate_state_action_information_gain(
-            self, state: State, action: ActionCall, action_already_calculated: bool = False) -> float:
+    def calculate_state_action_information_gain(self, state: State, action: ActionCall, action_already_calculated: bool = False) -> float:
         """Calculates the information gain of a state.
 
         :param state: the state to calculate the information gain of.
@@ -191,17 +197,19 @@ class OnlineNSAMLearner(NumericSAMLearner):
         self.logger.info(f"Calculating the information gain of applying {str(action)} on the state.")
         lifted_functions, lifted_predicates = self._get_lifted_bounded_state(action, state)
         all_possible_predicates = self.vocabulary_creator.create_lifted_vocabulary(
-            domain=self.partial_domain, possible_parameters=self.partial_domain.actions[action.name].signature)
+            domain=self.partial_domain, possible_parameters=self.partial_domain.actions[action.name].signature
+        )
         if not self.ig_learner[action.name].are_dataframes_initialized():
             self.logger.debug(f"Action {action.name} has yet to be observed. Updating the relevant lifted functions.")
             self.ig_learner[action.name].init_dataframes(
                 valid_lifted_functions=[func for func in lifted_functions.keys()],
-                lifted_predicates=[pred.untyped_representation for pred in all_possible_predicates])
+                lifted_predicates=[pred.untyped_representation for pred in all_possible_predicates],
+            )
 
         features_to_explore = self._apply_feature_selection(action)
         is_informative, is_applicable = self.ig_learner[action.name].is_sample_informative(
-            lifted_functions, lifted_predicates, use_cache=action_already_calculated,
-            relevant_numeric_features=features_to_explore)
+            lifted_functions, lifted_predicates, use_cache=action_already_calculated, relevant_numeric_features=features_to_explore
+        )
         if not is_informative:
             self.logger.debug(f"The action {action.name} is not informative checking if it is applicable in the state.")
             if is_applicable:
@@ -218,8 +226,7 @@ class OnlineNSAMLearner(NumericSAMLearner):
         self._action_failure_rate = {action: 0 for action in self.partial_domain.actions}
         self.agent = new_agent
 
-    def calculate_valid_neighbors(
-            self, grounded_actions: Set[ActionCall], current_state: State, step_number: int) -> PriorityQueue:
+    def calculate_valid_neighbors(self, grounded_actions: Set[ActionCall], current_state: State, step_number: int) -> PriorityQueue:
         """Calculates the valid action neighbors for the current state that the learner is in.
 
         :param grounded_actions: all possible grounded actions.
@@ -231,18 +238,19 @@ class OnlineNSAMLearner(NumericSAMLearner):
         neighbors = PriorityQueue()
 
         action_calculation_cache = {action_name: 0 for action_name in self.partial_domain.actions}
-        lifted_to_grounded = {action_name: [action for action in grounded_actions if action.name == action_name]
-                              for action_name in self.partial_domain.actions}
+        lifted_to_grounded = {
+            action_name: [action for action in grounded_actions if action.name == action_name] for action_name in self.partial_domain.actions
+        }
         actions_to_explore = []
         for action, groundings in lifted_to_grounded.items():
             actions_to_explore.extend(random.sample(groundings, k=min(len(groundings), 2)))
 
         for grounded_action in actions_to_explore:
             self.logger.debug(f"Checking the action {grounded_action.name}.")
-            if step_number % 10 == 0:   # TODO: Delete this abomination.
+            if step_number % 10 == 0:  # TODO: Delete this abomination.
                 action_info_gain = self.calculate_state_action_information_gain(
-                    state=current_state, action=grounded_action,
-                    action_already_calculated=action_calculation_cache[grounded_action.name] > 0)
+                    state=current_state, action=grounded_action, action_already_calculated=action_calculation_cache[grounded_action.name] > 0
+                )
             else:
                 action_info_gain = 1
 
@@ -258,8 +266,7 @@ class OnlineNSAMLearner(NumericSAMLearner):
         self._episode_recorder.add_num_informative_actions_in_step(len(neighbors))
         return neighbors
 
-    def update_failed_action_neighbors(
-            self, neighbors: PriorityQueue, current_state: State, action: ActionCall) -> PriorityQueue:
+    def update_failed_action_neighbors(self, neighbors: PriorityQueue, current_state: State, action: ActionCall) -> PriorityQueue:
         """Calculates the new neighbor queue based on the new information of the failed action.
 
         :param neighbors: the previously calculated neighbors queue.
@@ -278,7 +285,8 @@ class OnlineNSAMLearner(NumericSAMLearner):
                 continue
 
             new_ig = self.calculate_state_action_information_gain(
-                state=current_state, action=neighbor, action_already_calculated=failed_action_observed)
+                state=current_state, action=neighbor, action_already_calculated=failed_action_observed
+            )
             failed_action_observed = True
             selection_prob = self._calculate_selection_probability(neighbor)
             if abs(new_ig) > NON_INFORMATIVE_IG:
@@ -288,8 +296,7 @@ class OnlineNSAMLearner(NumericSAMLearner):
         self._episode_recorder.add_num_informative_actions_in_step(len(new_neighbors))
         return new_neighbors
 
-    def execute_action(
-            self, action_to_execute: ActionCall, previous_state: State, next_state: State, reward: int) -> None:
+    def execute_action(self, action_to_execute: ActionCall, previous_state: State, next_state: State, reward: int) -> None:
         """Executes an action in the environment and updates the action model accordingly.
 
         :param action_to_execute: the action to execute in the environment.
@@ -300,27 +307,27 @@ class OnlineNSAMLearner(NumericSAMLearner):
         self.logger.info(f"Executing the action {action_to_execute.name} in the environment.")
         self._action_observation_rate[action_to_execute.name] += 1
         self.triplet_snapshot.create_triplet_snapshot(
-            previous_state=previous_state, next_state=next_state, current_action=action_to_execute,
-            observation_objects=next_state.get_state_objects())
+            previous_state=previous_state, next_state=next_state, current_action=action_to_execute, observation_objects=next_state.get_state_objects()
+        )
 
         pre_state_functions, pre_state_predicates = self._get_lifted_bounded_state(action_to_execute, previous_state)
         if reward < 0:
             self.logger.debug("The action was not successful, adding the negative sample to the learner.")
             self._action_failure_rate[action_to_execute.name] += 1
-            self.novelty_calculator.add_sample_to_execution_db(
-                action_to_execute.name, pre_state_functions, pre_state_predicates, FAIL_RESULT)
+            self.novelty_calculator.add_sample_to_execution_db(action_to_execute.name, pre_state_functions, pre_state_predicates, FAIL_RESULT)
             self._episode_recorder.add_step_data(action_to_execute.name, FAIL_RESULT)
             self.ig_learner[action_to_execute.name].add_negative_sample(
-                numeric_negative_sample=pre_state_functions, negative_propositional_sample=pre_state_predicates)
+                numeric_negative_sample=pre_state_functions, negative_propositional_sample=pre_state_predicates
+            )
             return
 
         self._reset_action_numeric_data(action_to_execute.name)
         self.logger.debug("The action was successful, adding the positive sample to the learner.")
-        self.novelty_calculator.add_sample_to_execution_db(
-            action_to_execute.name, pre_state_functions, pre_state_predicates, SUCCESS_RESULT)
+        self.novelty_calculator.add_sample_to_execution_db(action_to_execute.name, pre_state_functions, pre_state_predicates, SUCCESS_RESULT)
         self._episode_recorder.add_step_data(action_to_execute.name, SUCCESS_RESULT)
         self.ig_learner[action_to_execute.name].add_positive_sample(
-            positive_numeric_sample=pre_state_functions, positive_propositional_sample=pre_state_predicates)
+            positive_numeric_sample=pre_state_functions, positive_propositional_sample=pre_state_predicates
+        )
         if action_to_execute.name in self.observed_actions:
             super().update_action(action_to_execute, previous_state, next_state)
             self._update_unsafe_model(action_to_execute.name)

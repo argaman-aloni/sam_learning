@@ -7,8 +7,8 @@ from pandas import DataFrame
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from scipy.spatial import ConvexHull, QhullError
 
-from sam_learning.core.learning_types import ConditionType, EquationSolutionType
 from sam_learning.core.exceptions import NotSafeActionError
+from sam_learning.core.learning_types import ConditionType, EquationSolutionType
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
 from sam_learning.core.numeric_learning.numeric_utils import (
     prettify_coefficients,
@@ -19,7 +19,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_monomials,
     create_polynomial_string,
     divide_span_by_common_denominator,
-    remove_complex_linear_dependencies
+    remove_complex_linear_dependencies,
 )
 
 
@@ -35,8 +35,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
     affine_independent_data: DataFrame
     additional_dependency_conditions: List[str]
 
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
-        super().__init__(action_name, {function.name: function for function in domain_functions.values()})
+    def __init__(
+        self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0, epsilon: float = 0.0, qhull_options: str = ""
+    ):
+        super().__init__(action_name, {function.name: function for function in domain_functions.values()}, polynom_degree=polynom_degree)
         self._convex_hull = None
         self._gsp_base = None
         self._complementary_base = None
@@ -47,6 +49,8 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         self.relevant_fluents = None
         self.affine_independent_data = None
         self.additional_dependency_conditions = []
+        self._epsilon = epsilon
+        self._qhull_options = qhull_options
 
     @staticmethod
     def _calculate_orthonormal_complementary_base(orthonormal_base: List[List[float]], num_dimensions: int) -> List[List[float]]:
@@ -117,7 +121,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         points = self.affine_independent_data.to_numpy()
         shift_axis = points[0].tolist() if not self._spanning_standard_base else [0] * len(self.affine_independent_data.columns.tolist())
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
-        self._convex_hull = ConvexHull(projected_points, incremental=True)
+        self._convex_hull = self._epsilon_approximate_hull(points=projected_points, incremental=True)
 
     def add_new_point(self, point: Dict[str, float]) -> None:
         """Adds a new point to the convex hull learner.
@@ -127,9 +131,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         :param point: the point to add to the convex hull learner.
         """
-        new_sample = DataFrame.from_dict(data={key: [value] for key, value in point.items()}, orient="columns")
+        new_sample = pd.DataFrame({k: [v] for k, v in point.items()})
+
         # assuming that if a feature is relevant to the preconditions it should always appear in the dataframe.
-        if len(self.data) == 0:
+        if self.data.empty:
             self.data = new_sample  # This is to avoid observing warnings when adding the first sample.
             self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data)
             self.logger.debug("Added the first sample to the points dataframe.")
@@ -142,48 +147,45 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             return
 
         self.data = concat_data
-
-        old_additional_dependency_conditions = self.additional_dependency_conditions
+        prev_conditions = self.additional_dependency_conditions
         self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data)
-        
-        recalculate_base = False
-        recalculate_ch = False
-        if old_additional_dependency_conditions != self.additional_dependency_conditions:
-            self.logger.debug("The new sample not holds the additional dependency conditions.")
-            recalculate_base = True
-            if self._gsp_base is not None:
-                recalculate_ch = True
-        elif self._gsp_base is None:
-            recalculate_base = True
-        else:
-            # There exists a base, and we need to check if the new point is spanned by the base.
-            self.logger.debug("Validating if the new point is spanned by the GSP base.")
-            point_spanned_by_base = self._is_spanned_in_base()
-            if not point_spanned_by_base:
-                self.logger.debug("The base has changed, need to recalculate the convex hull.")
-                recalculate_base = True
-                recalculate_ch = True
-            else:
-                # add the new point to the convex hull
-                if self._convex_hull is not None:
-                    projected_new_point = np.dot(self._shift_new_point(), np.array(self._gsp_base).T)
-                    try:
-                        self._convex_hull.add_points([projected_new_point])
-                    except QhullError:
-                        self.logger.debug(
-                            f"Failed to add a new point to the convex hull. \n\tPrevious data - {self._convex_hull.points}, new point - {projected_new_point}"
-                        )
-                        recalculate_ch = True
 
-        if recalculate_base:
+        # If dependency conditions changed, retrain base and CH (if needed)
+        if prev_conditions != self.additional_dependency_conditions:
+            self.logger.debug("New point affects the dependency conditions. Relearning base and possibly CH.")
+            self._learn_new_bases()
+            if len(self._gsp_base) >= 2 and len(self.data) >= 3:
+                self._learn_new_convex_hull()
+
+            return
+
+        # If no base exists, train it and CH if possible
+        if self._gsp_base is None:
+            self.logger.debug("No base present. Learning base and CH.")
+            self._learn_new_bases()
+            if self._gsp_base is not None and len(self._gsp_base) >= 2 and len(self.data) >= 3:
+                self._learn_new_convex_hull()
+            return
+
+        # Validate span and try to add to convex hull
+        if not self._is_spanned_in_base():
+            self.logger.debug("New point is not spanned by base. Relearning base and CH.")
             self._learn_new_bases()
 
-        if len(self._gsp_base) <= 1:
-                self.logger.debug("The created base is one dimensional, cannot create a convex hull.")
-                return
-        
-        if recalculate_ch:
-            self._learn_new_convex_hull()
+            if len(self._gsp_base) > 1:
+                self._learn_new_convex_hull()
+            else:
+                self.logger.debug("New base is 1D or empty. Cannot form a convex hull.")
+            return
+
+        if self._convex_hull is not None:
+            projected_point = np.dot(self._shift_new_point(), np.array(self._gsp_base).T)
+            try:
+                self._convex_hull.add_points([projected_point])
+
+            except QhullError:
+                self.logger.debug(f"Failed to add point to convex hull. Recomputing. Previous: {self._convex_hull.points}, New: {projected_point}")
+                self._learn_new_convex_hull()
 
     def _create_ch_coefficients_data(self, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
         """Runs the convex hull algorithm on the given input points.
@@ -261,7 +263,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
                 return construct_numeric_conditions(
                     self.additional_dependency_conditions, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions
                 )
-        
+
             A, b, column_names, additional_projection_conditions = self._incremental_create_ch_inequalities()
             self.logger.debug(f"Constructing the PDDL inequality scheme for the action {self.action_name}.")
             inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
@@ -272,7 +274,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             return construct_numeric_conditions(
                 [*inequalities_strs, *self.additional_dependency_conditions],
                 condition_type=ConditionType.conjunctive,
-                domain_functions=self.domain_functions
+                domain_functions=self.domain_functions,
             )
 
         except (QhullError, ValueError):
