@@ -38,9 +38,7 @@ class SAMLearner:
     cannot_be_effect: Dict[str, Set[Predicate]]
     negative_preconditions_policy: NegativePreconditionPolicy
 
-    def __init__(self,
-                 partial_domain: Domain,
-                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
+    def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
 
         self.logger = logging.getLogger(__name__)
         self.partial_domain = LearnerDomain(domain=partial_domain)
@@ -222,8 +220,7 @@ class SAMLearner:
         next_state = component.next_state
 
         if self._verify_parameter_duplication(grounded_action):
-            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM."
-                                f"aborting learning from component")
+            self.logger.warning(f"{str(grounded_action)} contains duplicated parameters! Not suppoerted in SAM." f"aborting learning from component")
             return
 
         self.triplet_snapshot.create_triplet_snapshot(
@@ -279,22 +276,6 @@ class SAMLearner:
         self.learning_end_time = time.time()
         self.logger.info(f"Finished learning the action model in " f"{self.learning_end_time - self.learning_start_time} seconds.")
 
-    def are_states_different(self, previous_state: State, next_state: State) -> bool:
-        """Checks if the previous state differs from the next state.
-
-        :param previous_state: the previous state.
-        :param next_state: the next state.
-        :return: whether the states differ.
-        """
-        self.logger.debug(f"Checking if the previous state {previous_state} " f"is different from the next state {next_state}")
-        if previous_state == next_state:
-            self.logger.warning(
-                "The previous state is the same as the next state. " "This is not supported by the SAFE action model learning algorithm."
-            )
-            return False
-
-        return True
-
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
@@ -308,7 +289,8 @@ class SAMLearner:
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
-                if not self.are_states_different(component.previous_state, component.next_state):
+                if not component.is_successful:
+                    self.logger.warning("Skipping the transition because it was not successful.")
                     continue
 
                 self.handle_single_trajectory_component(component)

@@ -7,8 +7,6 @@ from typing import List, Optional
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain
 
-from experiments.plotting.plot_nsam_results import plot_results
-from experiments.plotting.plot_nsam_solo_results import plot_solo_results
 from statistics.learning_statistics_manager import LEARNED_ACTIONS_STATS_COLUMNS
 from statistics.numeric_performance_calculator import NUMERIC_PERFORMANCE_STATS
 from statistics.semantic_performance_calculator import SEMANTIC_PRECISION_STATS
