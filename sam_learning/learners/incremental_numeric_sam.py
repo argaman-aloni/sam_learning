@@ -23,8 +23,14 @@ class IncrementalNumericSAMLearner(SAMLearner):
     function_matcher: NumericFunctionMatcher
     preconditions_fluent_map: Dict[str, List[str]]
 
-    def __init__(self, partial_domain: Domain, polynomial_degree: int = 0, allow_unsafe: bool = False,
-                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft, **kwargs):
+    def __init__(
+        self,
+        partial_domain: Domain,
+        polynomial_degree: int = 0,
+        allow_unsafe: bool = False,
+        negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.soft,
+        **kwargs,
+    ):
         super().__init__(partial_domain, negative_preconditions_policy=negative_preconditions_policy)
         self.storage = {}
         self.polynom_degree = polynomial_degree
@@ -157,7 +163,8 @@ class IncrementalNumericSAMLearner(SAMLearner):
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
-                if not super().are_states_different(component.previous_state, component.next_state):
+                if not component.is_successful:
+                    self.logger.warning("Skipping the transition because it was not successful.")
                     continue
 
                 self.handle_single_trajectory_component(component)

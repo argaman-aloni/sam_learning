@@ -36,6 +36,7 @@ class ConvexHullLearner:
     action_name: str
     domain_functions: Dict[str, PDDLFunction]
     convex_hull_error_file_path: Path
+    data: DataFrame
 
     def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
         self.logger = logging.getLogger(__name__)

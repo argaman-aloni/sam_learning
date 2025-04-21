@@ -203,7 +203,8 @@ class NumericSAMLearner(SAMLearner):
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
-                if not super().are_states_different(component.previous_state, component.next_state):
+                if not component.is_successful:
+                    self.logger.warning("Skipping the transition because it was not successful.")
                     continue
 
                 self.handle_single_trajectory_component(component)
