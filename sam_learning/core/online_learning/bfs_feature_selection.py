@@ -1,11 +1,13 @@
 """A greedy algorithm for feature selection."""
+import itertools
 import logging
-from typing import List, Set
+from typing import List
 
-from sam_learning.core.online_learning.consistent_model_validator import NumericConsistencyValidator
+import pandas as pd
+from pandas import DataFrame, Series
 
 
-class BFSFeatureSelector(NumericConsistencyValidator):
+class BFSFeatureSelector:
     """A greedy algorithm for feature selection.
 
     The algorithm works as a Breadth-First Search (BFS) algorithm, where each node in the search tree represents
@@ -17,79 +19,81 @@ class BFSFeatureSelector(NumericConsistencyValidator):
 
     logger: logging.Logger
     action_name: str
-    open_list: List[Set[str]]
-    closed_list: List[Set[str]]
-    _function_vocabulary: List[str]
+    open_list: List[List[str]]
+    _relevant_monomials: List[str]
+    _observations: DataFrame
 
-    def __init__(self, action_name: str):
+    def __init__(self, action_name: str, pb_monomials: List[str], pb_predicates: List[str]):
         self.logger = logging.getLogger(__name__)
-        super().__init__(action_name)
         self.action_name = action_name
         self.open_list = []
-        self.closed_list = []
-        self._function_vocabulary = None
+        self._relevant_monomials = pb_monomials
+        self._pb_predicates = pb_predicates
+        self._observations = None
 
-    # def
+    def _find_matching_successful_transition_row(self, reference_df: DataFrame, single_row_df: DataFrame, columns: list[str]) -> bool:
+        """Searches for a row in the dataframe that matches the values for the specified columns.
 
-    def _expand_node(self) -> Set[str]:
-        """The function executed the node expansion step of the algorithm.
-
-        :return: the next set of features to examine.
+        :param reference_df: The DataFrame to search in.
+        :param single_row_df: The DataFrame containing the row to match.
+        :param columns: List of columns to compare.
+        :return: True if a successful match is found, False otherwise.
         """
-        self.logger.info("Expanding the new node in the features search tree.")
-        if len(self.open_list) == 0:
-            raise ValueError("The open list is empty. This should not happen.")
+        self.logger.debug("Searching for a matching successful transition row based on the input transition.")
+        target_values = single_row_df.iloc[0][columns]
+        matches = reference_df[reference_df[columns].eq(target_values).all(axis=1)]
+        if matches.empty:
+            return False
 
-        selected_feature_set = self.open_list.pop(0)
-        while selected_feature_set in self.closed_list:
-            self.logger.debug(f"The node {selected_feature_set} was already expanded. Skipping.")
-            selected_feature_set = self.open_list.pop(0)
+        for _, match in matches.iterrows():
+            if match["is_successful"]:
+                self.logger.debug("Found a successful match.")
+                return True
 
-        self.logger.debug("Adding the next level of features to the open list.")
-        features_not_in_selected_feature_set = set(self._function_vocabulary).difference(selected_feature_set)
-        for function_name in features_not_in_selected_feature_set:
-            new_set_of_features = selected_feature_set.union({function_name})
-            if new_set_of_features in self.closed_list or new_set_of_features in self.open_list:
-                continue
+        self.logger.debug("No successful match found.")
+        return False
 
-            self.open_list.append(new_set_of_features)
+    def initialize_open_list(self) -> None:
+        """Initialize the open list to contain all possible combinations of the relevant monomials.
 
-        self.closed_list.append(selected_feature_set)
-        self.logger.debug(f"Done expanding node {selected_feature_set}.")
-
-        return selected_feature_set
-
-    def init_search_data_structures(self, lifted_functions: List[str]) -> None:
-        """Initializes the data structures used by the algorithm.
-
-        :param lifted_functions: the names of the lifted numeric functions.
+        The open list is a list of lists, where each inner list contains a combination of monomials.
+        Example: [['a'], ['b'], ['c'], ['a', 'b'], ['a', 'c'], ['b', 'c'], ['a', 'b', 'c']]
         """
-        super().init_numeric_dataframes(lifted_functions)
-        self._function_vocabulary = lifted_functions
-        self.open_list.append(set())
+        self.logger.debug("Initializing the open list.")
+        combinations = [
+            list(combo) for r in range(0, len(self._relevant_monomials) + 1) for combo in itertools.combinations(self._relevant_monomials, r)
+        ]
+        self.open_list = sorted(combinations, key=len)
 
-    def apply_feature_selection(self) -> List[str]:
-        """Applies feature selection and selects the next set of features to use for the active learning.
-
-        Note:
-            The algorithm expands the new node in the tree and validates that the features selected are consistent with
-            the observation the algorithm currently has.
-            If the features are consistent, the algorithm returns the new set of features.
-            Otherwise, the algorithm expands the next node in the tree.
-            We define consistency by validating that no negative sample is consistent with the model created by the set
-            of features selected by the algorithm.
-
+    def add_new_observation(self, observation: DataFrame, is_successful: bool) -> List[str]:
+        """Adds a new observation and determines whether to update the selected features.
+        
+        :param observation:  the observation to add.
+        :param is_successful: whether the observation is successful or not.
         :return: the next set of features to use for the active learning.
         """
-        self.logger.info("Applying feature selection.")
-        next_set_of_features = list(self._expand_node())
-        self.logger.debug(f"Validating the consistency of the features {next_set_of_features}.")
-        while self._in_hull(points_to_test=self.numeric_negative_samples[next_set_of_features],
-                            hull_df=self.numeric_positive_samples[next_set_of_features],
-                            use_cached_ch=True):
-            self.logger.debug(f"The features {next_set_of_features} are consistent with the negative samples "
-                              f"so cannot be used as features for the active learning.")
-            next_set_of_features = list(self._expand_node())
+        if self._observations is None:
+            self.logger.debug("Since this is the first observation, we assume optimistically that there are not numeric features.")
+            self._observations = observation.copy()
+            self._observations["is_successful"] = is_successful
+            return self.open_list[0]
 
-        self.logger.info(f"The features {next_set_of_features} are not consistent with any negative sample.")
-        return next_set_of_features
+        self.logger.debug("Adding new observation to the search data structures.")
+        new_labeled_observation = observation.copy()
+        new_labeled_observation["is_successful"] = is_successful
+
+        # check if the observation is already in the observations dataset
+        if ((self._observations == new_labeled_observation).all(axis=1)).any():
+            self.logger.debug("The observation already exists in the observations dataset.")
+            return self.open_list[0]
+
+        self._observations = pd.concat([self._observations, new_labeled_observation], ignore_index=True)
+        if not is_successful:
+            self.logger.debug("The transition is not successful, we need to check if the selected features need to be updated.")
+            # search for the predicate part of the observation in the observations dataset and see if there exists a successful transition with the same predicates
+            # if there is, we update the selected features, otherwise we return the same features.
+            if self._find_matching_successful_transition_row(self._observations.iloc[:-1], new_labeled_observation, self._pb_predicates):
+                self.open_list.pop(0)
+                return self.open_list[0]
+
+        return self.open_list[0]

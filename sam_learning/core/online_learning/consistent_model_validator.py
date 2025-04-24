@@ -8,8 +8,13 @@ from pandas import DataFrame
 from pddl_plus_parser.models import PDDLFunction
 from scipy.spatial import Delaunay, delaunay_plot_2d
 
-from sam_learning.core.numeric_learning.numeric_utils import get_num_independent_equations, filter_constant_features, \
-    detect_linear_dependent_features, extended_gram_schmidt, EPSILON
+from sam_learning.core.numeric_learning.numeric_utils import (
+    get_num_independent_equations,
+    filter_constant_features,
+    detect_linear_dependent_features,
+    extended_gram_schmidt,
+    EPSILON,
+)
 
 
 class NumericConsistencyValidator:
@@ -63,8 +68,8 @@ class NumericConsistencyValidator:
             plt.show()
 
     def _calculate_whether_in_delanauy_hull(
-            self, convex_hull_points: np.ndarray,
-            new_point: np.ndarray, debug_mode: bool = False, use_cached_ch: bool = False) -> bool:
+        self, convex_hull_points: np.ndarray, new_point: np.ndarray, debug_mode: bool = False, use_cached_ch: bool = False
+    ) -> bool:
         """Calculates whether the new point is inside the convex hull using the delanauy algorith.
 
         :param convex_hull_points: the points composing the convex hull.
@@ -73,8 +78,7 @@ class NumericConsistencyValidator:
         :param use_cached_ch: whether to use the cached convex hull. This reduces runtime.
         :return: whether the new point is inside the convex hull.
         """
-        delaunay_hull = self._cached_convex_hull if self._cached_convex_hull is not None and use_cached_ch \
-            else Delaunay(convex_hull_points)
+        delaunay_hull = self._cached_convex_hull if self._cached_convex_hull is not None and use_cached_ch else Delaunay(convex_hull_points)
         if use_cached_ch:
             self._cached_convex_hull = delaunay_hull
 
@@ -87,9 +91,7 @@ class NumericConsistencyValidator:
 
         return any(result)
 
-    def _in_hull(
-            self, points_to_test: DataFrame, hull_df: DataFrame, debug_mode: bool = False,
-            use_cached_ch: bool = False) -> bool:
+    def _in_hull(self, points_to_test: DataFrame, hull_df: DataFrame, debug_mode: bool = False, use_cached_ch: bool = False) -> bool:
         """
         Test if the points are in `hull`
 
@@ -132,24 +134,20 @@ class NumericConsistencyValidator:
         projected_ch_points = np.dot(shifted_hull_points, np.array(projection_basis).T)
         shifted_new_points = points_to_test.to_numpy() - hull_df.to_numpy()[0]
         projected_new_point = np.dot(shifted_new_points, np.array(projection_basis).T)
-        if (len(orthnormal_span) > 0 and
-                (np.absolute(np.dot(np.array(orthnormal_span), np.array(shifted_new_points).T)) > EPSILON).any()):
+        if len(orthnormal_span) > 0 and (np.absolute(np.dot(np.array(orthnormal_span), np.array(shifted_new_points).T)) > EPSILON).any():
             self.logger.debug("The new points are not in the span of the input points.")
             return False
 
         if projected_ch_points.shape[1] == 1:
-            return all([projected_ch_points.min() <= point <= projected_ch_points.max()
-                        for point in projected_new_point])
+            return all([projected_ch_points.min() <= point <= projected_ch_points.max() for point in projected_new_point])
 
-        return self._calculate_whether_in_delanauy_hull(
-            projected_ch_points, projected_new_point, debug_mode, use_cached_ch)
+        return self._calculate_whether_in_delanauy_hull(projected_ch_points, projected_new_point, debug_mode, use_cached_ch)
 
     def init_numeric_dataframes(self, valid_lifted_functions: List[str]) -> None:
         """Initializes the data frames used to calculate the information gain.
 
         :param valid_lifted_functions: the lifted functions matching the action (used to avoid adding redundant ones).
         """
-
         self.numeric_positive_samples = DataFrame(columns=valid_lifted_functions)
         self.numeric_negative_samples = DataFrame(columns=valid_lifted_functions)
 
@@ -181,8 +179,7 @@ class NumericConsistencyValidator:
         :param positive_numeric_sample: the numeric functions representing the positive sample.
         """
         self.logger.info(f"Adding a new positive sample for the action {self.action_name}.")
-        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
-                           positive_numeric_sample.items()}
+        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in positive_numeric_sample.items()}
         self.numeric_positive_samples.loc[len(self.numeric_positive_samples)] = new_sample_data
 
     def add_negative_numeric_sample(self, numeric_negative_sample: Dict[str, PDDLFunction]) -> None:
@@ -191,8 +188,7 @@ class NumericConsistencyValidator:
         :param numeric_negative_sample: the numeric functions representing the negative sample.
         """
         self.logger.info(f"Adding a new negative numeric sample for the action {self.action_name}.")
-        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in
-                           numeric_negative_sample.items()}
+        new_sample_data = {lifted_fluent_name: fluent.value for lifted_fluent_name, fluent in numeric_negative_sample.items()}
         self.numeric_negative_samples.loc[len(self.numeric_negative_samples)] = new_sample_data
 
     def clear_convex_hull_cache(self) -> None:
