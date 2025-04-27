@@ -4,7 +4,7 @@ import logging
 from typing import List
 
 import pandas as pd
-from pandas import DataFrame, Series
+from pandas import DataFrame
 
 
 class BFSFeatureSelector:
