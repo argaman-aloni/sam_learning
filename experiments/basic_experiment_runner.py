@@ -59,7 +59,7 @@ class OfflineBasicExperimentRunner:
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
+        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=3)
         self.domain_file_name = domain_file_name
         self.learning_statistics_manager = LearningStatisticsManager(
             working_directory_path=working_directory_path,

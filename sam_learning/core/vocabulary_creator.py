@@ -4,7 +4,8 @@ from collections import defaultdict
 from itertools import permutations
 from typing import List, Tuple, Dict, Set, Union, Optional
 
-from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, ActionCall, Action
+from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, \
+    ActionCall, Action
 
 from sam_learning.core.learner_domain import LearnerDomain, LearnerAction
 
@@ -43,7 +44,8 @@ class VocabularyCreator:
             parameter_type = lifted_variable_to_match.signature[predicate_parameter]
             grounded_type = grounded_signatures[object_name]
             if not grounded_type.is_sub_type(parameter_type):
-                self.logger.debug(f"The combination of objects - {grounded_signatures}" f" does not fit {lifted_variable_to_match.name}'s signature")
+                self.logger.debug(f"The combination of objects - {grounded_signatures}"
+                                  f" does not fit {lifted_variable_to_match.name}'s signature")
                 return False
 
         return True

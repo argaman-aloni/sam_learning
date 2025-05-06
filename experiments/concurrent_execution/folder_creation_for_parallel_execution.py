@@ -42,7 +42,7 @@ class FoldsCreator:
         self.k_fold = DistributedKFoldSplit(
             working_directory_path=working_directory_path,
             domain_file_name=domain_file_name,
-            n_split=5,
+            n_split=3,
             learning_algorithms=learning_algorithms,
             internal_iterations=internal_iterations,
         )

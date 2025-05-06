@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Tuple, Any, Union, Optional
+from typing import List, Dict, Tuple, Any, Union, Optional, Set
 
 from pddl_plus_parser.exporters import ProblemExporter
 from pddl_plus_parser.lisp_parsers import DomainParser
@@ -36,27 +36,42 @@ SEMANTIC_PRECISION_STATS = [
 
 
 def _calculate_precision_recall(
-    num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int]
+        num_false_negatives: Dict[str, int], num_false_positives: Dict[str, int], num_true_positives: Dict[str, int],
+        learned_actions: List[str]
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """Calculates the precision and recall values for each action.
 
     :param num_false_negatives: the number of false negatives for each action.
     :param num_false_positives: the number of false positives for each action.
     :param num_true_positives: the number of true positives for each action.
+    :param learned_actions: the list of actions that were learned in the action model learning process.
     :return: a tuple of two dictionaries, one for the precision values and one for the recall values.
     """
     precision_dict = defaultdict(float)
     recall_dict = defaultdict(float)
     for action_name, tp_rate in num_true_positives.items():
         if tp_rate == 0:
-            precision_dict[action_name] = 1 if num_false_positives[action_name] == 0 else 0
+            if num_false_positives[action_name] == 0 or action_name not in learned_actions:
+                precision_dict[action_name] = 1
+            else:
+                precision_dict[action_name] = 0
+
             recall_dict[action_name] = 0
             continue
 
         precision_dict[action_name] = tp_rate / (tp_rate + num_false_positives[action_name])
         recall_dict[action_name] = tp_rate / (tp_rate + num_false_negatives[action_name])
-
     return precision_dict, recall_dict
+
+
+def choose_objects_subset(array: List[str], subset_size: int) -> List[Tuple[str]]:
+    """Choose r items our of a list size n.
+
+    :param array: the input list.
+    :param subset_size: the size of the subset.
+    :return: a list containing subsets of the original list.
+    """
+    return list(permutations(array, subset_size))
 
 
 class SemanticPerformanceCalculator:
@@ -71,12 +86,12 @@ class SemanticPerformanceCalculator:
     _random_actions: List[List[ActionCall]]
 
     def __init__(
-        self,
-        model_domain: Domain,
-        model_domain_path: Path,
-        observations: List[Union[Observation, MultiAgentObservation]],
-        working_directory_path: Path,
-        learning_algorithm: LearningAlgorithmType,
+            self,
+            model_domain: Domain,
+            model_domain_path: Path,
+            observations: List[Union[Observation, MultiAgentObservation]],
+            working_directory_path: Path,
+            learning_algorithm: LearningAlgorithmType,
     ):
         self.logger = logging.getLogger(__name__)
         self.model_domain = model_domain
@@ -90,18 +105,21 @@ class SemanticPerformanceCalculator:
         self.vocabulary_creator = VocabularyCreator()
         self._random_actions = []
 
-    def _calculate_action_applicability_rate(
-        self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
-    ) -> Tuple[int, int, int]:
-        """Test whether an action is applicable in both the model domain and the generated domain.
+
+    def is_applicable(self, action_call: ActionCall, observed_state: State,
+                      problem_objects: Dict[str, PDDLObject], learned_domain_path: Optional[Path] = None):
+        """
+        tests applicability of an action in the learned domain given a learned domain path if no path is given,
+        tests applicability of the action_call in the original domain.
 
         :param action_call: the action call that is tested for applicability.
-        :param learned_domain_path: the domain that was learned using the action model learning algorithm.
         :param observed_state: the state that was observed in the trajectory data.
         :param problem_objects: the objects that were used in the problem definition.
-        :return: a tuple containing the number of true positives, false positives and false negatives.
+        :param learned_domain_path: optional for testing applicability on the learned domain.
+            the domain that was learned using the action model learning algorithm.
+        :return: True if applicable and False otherwise
         """
-        self.logger.debug(f"Calculating the applicability rate for the action - {action_call.name}")
+        self.logger.debug(f"checking applicability of action - {action_call.name}")
         applicability_validation_problem = Problem(domain=self.model_domain)
         applicability_validation_problem.name = f"instance_{uuid.uuid4()}"
         applicability_validation_problem.objects = problem_objects
@@ -115,22 +133,24 @@ class SemanticPerformanceCalculator:
         with open(current_solution_file_path, "wt") as solution_file:
             solution_file.write(str(action_call))
 
-        ProblemExporter().export_problem(problem=applicability_validation_problem, export_path=current_problem_file_path)
-
-        self.logger.debug(f"Exported the problem to {current_problem_file_path}, now validating the action's applicability.")
-        applicable_in_model = self._calculate_applicability_in_state(current_problem_file_path, current_solution_file_path, self.model_domain_path)
-        applicable_in_learned = self._calculate_applicability_in_state(current_problem_file_path, current_solution_file_path, learned_domain_path)
-
+        ProblemExporter().export_problem(problem=applicability_validation_problem,
+                                         export_path=current_problem_file_path)
+        if learned_domain_path is None:
+            is_applicable = self._calculate_applicability_in_state(current_problem_file_path,
+                                                                   current_solution_file_path,
+                                                                   self.model_domain_path)
+        else:
+            is_applicable = self._calculate_applicability_in_state(current_problem_file_path,
+                                                                   current_solution_file_path,
+                                                                   learned_domain_path)
         current_problem_file_path.unlink()
         current_solution_file_path.unlink()
-        return (
-            int(applicable_in_learned == applicable_in_model and applicable_in_learned),
-            int(applicable_in_learned and not applicable_in_model),
-            int(not applicable_in_learned and applicable_in_model),
-        )
+        return is_applicable
+
 
     @staticmethod
-    def _calculate_applicability_in_state(problem_file_path: Path, solution_file_path: Path, domain_file_path: Path) -> bool:
+    def _calculate_applicability_in_state(problem_file_path: Path, solution_file_path: Path,
+                                          domain_file_path: Path) -> bool:
         """Calculate whether the action is applicable in the state.
 
         :param problem_file_path: the path to the problem file.
@@ -139,7 +159,8 @@ class SemanticPerformanceCalculator:
         :return: whether the action is applicable in the state.
         """
         validation_file_path = run_validate_script(
-            domain_file_path=domain_file_path, problem_file_path=problem_file_path, solution_file_path=solution_file_path
+            domain_file_path=domain_file_path, problem_file_path=problem_file_path,
+            solution_file_path=solution_file_path
         )
         with open(validation_file_path, "r", encoding="utf-8") as validation_file:
             validation_file_content = validation_file.read()
@@ -147,13 +168,107 @@ class SemanticPerformanceCalculator:
         validation_file_path.unlink()
         return VALID_PLAN in validation_file_content
 
+
+    def _calculate_action_applicability_rate(
+            self, action_call: ActionCall, learned_domain_path: Path, observed_state: State,
+            problem_objects: Dict[str, PDDLObject],
+            ) -> Tuple[int, int, int]:
+        """Test whether an action is applicable in both the model domain and the generated domain.
+
+        :param action_call: the action call that is tested for applicability.
+        :param learned_domain_path: the domain that was learned using the action model learning algorithm.
+        :param observed_state: the state that was observed in the trajectory data.
+        :param problem_objects: the objects that were used in the problem definition.
+        :return: a tuple containing the number of true positives, false positives and false negatives.
+        """
+        self.logger.debug(f"Calculating the applicability rate for the action - {action_call.name}")
+        applicable_in_model = self.is_applicable(action_call=action_call,
+                                                 observed_state=observed_state,
+                                                 problem_objects=problem_objects)
+
+        applicable_in_learned = self.is_applicable(action_call=action_call,
+                                                   observed_state=observed_state,
+                                                   problem_objects=problem_objects,
+                                                   learned_domain_path=learned_domain_path)
+
+        if applicable_in_learned and not applicable_in_model:
+            self.logger.warning(f"Unsafe learned action:"
+                                f"{action_call.name} applicable in learned domain, but not on original domain")
+
+        return (
+            int(applicable_in_learned == applicable_in_model and applicable_in_learned),
+            int(applicable_in_learned and not applicable_in_model),
+            int(not applicable_in_learned and applicable_in_model),
+        )
+
+    def _calculate_classical_effects_difference_rate(self,
+                                                     observation: Observation,
+                                                     learned_domain: Domain,
+                                                     num_false_negatives: Dict[str, int],
+                                                     num_false_positives: Dict[str, int],
+                                                     num_true_positives: Dict[str, int],
+                                                     ) -> None:
+        self.logger.info("Calculating classical effects difference rate for the observation.")
+        print("classical")
+
+        for observation_triplet in observation.components:
+            model_previous_state = observation_triplet.previous_state
+            executed_action = observation_triplet.grounded_action_call
+            model_next_state = observation_triplet.next_state
+
+            prev_state_predicates = {predicate.untyped_representation
+                                     for grounded_predicate in model_previous_state.state_predicates.values()
+                                     for predicate in grounded_predicate}
+
+            next_state_predicates = {predicate.untyped_representation
+                                     for grounded_predicate in model_next_state.state_predicates.values()
+                                     for predicate in grounded_predicate}
+
+            original_effects: Set[str] = next_state_predicates.difference(prev_state_predicates)
+
+            if executed_action.name not in learned_domain.actions:
+                # if action was not learned, treat learned model as it learned the action but has no effects
+                num_false_negatives[executed_action.name] += len(original_effects)
+                continue
+
+            learned_domain_applied_effects: Set[str] = set()
+            try:
+                learned_operator = Operator(action=learned_domain.actions[executed_action.name],
+                                            domain=learned_domain,
+                                            grounded_action_call=executed_action.parameters,
+                                            problem_objects=observation.grounded_objects)
+
+                if learned_operator.is_applicable(model_previous_state):
+                    learned_next_state = learned_operator.apply(model_previous_state)
+                    learned_next_state_predicates = {predicate.untyped_representation
+                                                     for grounded_predicate in
+                                                     learned_next_state.state_predicates.values()
+                                                     for predicate in grounded_predicate}
+                    learned_domain_applied_effects = learned_next_state_predicates.difference(prev_state_predicates)
+
+            except ValueError:
+                num_false_negatives[executed_action.name] += len(original_effects)
+                continue
+
+            # original effects = next_state_predicates - prev_state_predicates
+            # learned domain effects fromm prev state = learned_domain_next_state_predicates - prev_state_predicates
+            # TP = |(original effects) intersection (learned domain effects fromm prev state)|
+            # FP = |(learned domain effects fromm prev state) - (original effects)|
+            # FN = |(original effects)- (learned domain effects fromm prev state)|
+            num_true_positives[executed_action.name] += len(original_effects.intersection(
+                learned_domain_applied_effects))
+            num_false_positives[executed_action.name] += len(learned_domain_applied_effects.difference(
+                original_effects))
+            num_false_negatives[executed_action.name] += len(original_effects.difference(
+                learned_domain_applied_effects))
+
     def _calculate_effects_difference_rate(
-        self,
-        observation: Observation,
-        learned_domain: Domain,
-        num_false_negatives: Dict[str, int],
-        num_false_positives: Dict[str, int],
-        num_true_positives: Dict[str, int],
+            self,
+            observation: Observation,
+            learned_domain: Domain,
+            num_false_negatives: Dict[str, int],
+            num_false_positives: Dict[str, int],
+            num_true_positives: Dict[str, int],
     ) -> None:
         """Calculates the effects difference rate for each action.
 
@@ -163,6 +278,7 @@ class SemanticPerformanceCalculator:
         :param num_false_positives: the dictionary mapping between the action name and the number of false positive
         :param num_true_positives: the dictionary mapping between the action name and the number of true positive
         """
+
         self.logger.info("Calculating effects difference rate for the observation.")
         for observation_triplet in observation.components:
             model_previous_state = observation_triplet.previous_state
@@ -207,16 +323,19 @@ class SemanticPerformanceCalculator:
                     num_true_positives[executed_action.name] += 1
                     continue
 
-                num_true_positives[executed_action.name] += len(model_state_predicates.intersection(learned_state_predicates))
-                num_false_positives[executed_action.name] += len(learned_state_predicates.difference(model_state_predicates))
-                num_false_negatives[executed_action.name] += len(model_state_predicates.difference(learned_state_predicates))
+                num_true_positives[executed_action.name] += len(
+                    model_state_predicates.intersection(learned_state_predicates))
+                num_false_positives[executed_action.name] += len(
+                    learned_state_predicates.difference(model_state_predicates))
+                num_false_negatives[executed_action.name] += len(
+                    model_state_predicates.difference(learned_state_predicates))
 
             except ValueError:
                 self.logger.debug("The action is not applicable in the state.")
                 continue
 
     def calculate_preconditions_semantic_performance(
-        self, learned_domain: Domain, learned_domain_path: Path
+            self, learned_domain: Domain, learned_domain_path: Path
     ) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Calculates the precision recall values of the learned preconditions.
 
@@ -236,15 +355,17 @@ class SemanticPerformanceCalculator:
                     continue
 
                 true_positive, false_positive, false_negative = self._calculate_action_applicability_rate(
-                    action, learned_domain_path, component.previous_state, observation_objects,
-                )
+                    action, learned_domain_path, component.previous_state, observation_objects)
+
                 num_true_positives[action.name] += true_positive
                 num_false_positives[action.name] += false_positive
                 num_false_negatives[action.name] += false_negative
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
+        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives,
+                                           list(learned_domain.actions.keys()))
 
-    def calculate_effects_semantic_performance(self, learned_domain: Domain) -> Tuple[Dict[str, float], Dict[str, float]]:
+    def calculate_effects_semantic_performance(self, learned_domain: Domain) -> Tuple[
+        Dict[str, float], Dict[str, float]]:
         """Calculates the precision recall values of the learned effects.
 
         :param learned_domain: the action model that was learned using the action model learning algorithm
@@ -261,9 +382,22 @@ class SemanticPerformanceCalculator:
             )
 
         for observation in self.dataset_observations:
-            self._calculate_effects_difference_rate(observation, learned_domain, num_false_negatives, num_false_positives, num_true_positives)
+            self._calculate_effects_difference_rate(observation,
+                                                    learned_domain,
+                                                    num_false_negatives,
+                                                    num_false_positives,
+                                                    num_true_positives)
 
-        return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
+        if  self.learning_algorithm in [LearningAlgorithmType.esam_learning, LearningAlgorithmType.sam_learning]:
+            return _calculate_precision_recall(num_false_negatives,
+                                               num_false_positives,
+                                               num_true_positives,
+                                               list(self.model_domain.actions.keys()))
+
+        return _calculate_precision_recall(num_false_negatives,
+                                           num_false_positives,
+                                           num_true_positives,
+                                           list(learned_domain.actions.keys()))
 
     def calculate_performance(self, learned_domain_path: Path, num_used_observations: int, policy: NegativePreconditionPolicy) -> None:
         """Calculate the semantic precision and recall of the learned domain.
@@ -274,20 +408,22 @@ class SemanticPerformanceCalculator:
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
         self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
-        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
+        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(
+            learned_domain, learned_domain_path)
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         for action_name in self.model_domain.actions:
             action_stats = {
+                "action_name": action_name,
                 "learning_algorithm": self.learning_algorithm.name,
                 "policy": policy.name,
-                "action_name": action_name,
                 "num_trajectories": num_used_observations,
                 "precondition_precision": preconditions_precision.get(action_name, 1),
                 "precondition_recall": preconditions_recall.get(action_name, 0),
                 "effects_precision": effects_precision.get(action_name, 1),
                 "effects_recall": effects_recall.get(action_name, 1),
             }
+
             self.combined_stats.append(action_stats)
 
     def export_semantic_performance(self, fold_num: int, iteration_num: Optional[int] = None) -> None:
@@ -298,7 +434,7 @@ class SemanticPerformanceCalculator:
         """
         iterations_suffix = f"_{iteration_num}" if iteration_num is not None else ""
         statistics_path = (
-            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_semantic_performance_stats_fold_{fold_num}{iterations_suffix}.csv"
+                self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_semantic_performance_stats_fold_{fold_num}{iterations_suffix}.csv"
         )
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PRECISION_STATS)

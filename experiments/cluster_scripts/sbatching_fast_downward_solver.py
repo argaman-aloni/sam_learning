@@ -10,7 +10,7 @@ from experiments.cluster_scripts.common import submit_job, progress_bar, sigint_
 def execute_experiment_setup_batch(code_directory, configuration, environment_variables, experiment, experiment_index, total_run_time):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     fold_creation_sid = submit_job(
-        conda_env="online_nsam",
+        conda_env="macq_env",
         mem="6G",
         python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
@@ -33,7 +33,7 @@ def execute_experiment_setup_batch(code_directory, configuration, environment_va
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids):
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
     statistics_collection_job = submit_job(
-        conda_env="online_nsam",
+        conda_env="macq_env",
         mem="6G",
         python_file=f"{code_directory}/distributed_results_collector.py",
         dependency=f"afterok:{':'.join([str(e) for e in job_ids])}",
@@ -75,7 +75,7 @@ def main():
         ]
         print(f"Submitting job for problem {problem_file_path.stem}\n")
         sid = submit_job(
-            conda_env="online_nsam",
+            conda_env="macq_env",
             mem="16G",
             python_file=f"{code_directory}/fast_downward_solver.py",
             jobname=f"fast_downward_solver",

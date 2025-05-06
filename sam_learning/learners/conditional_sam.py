@@ -6,10 +6,10 @@ from typing import Dict, List, Optional, Set, Tuple
 from pddl_plus_parser.models import Domain, State, GroundedPredicate, ActionCall, Observation, \
     ObservedComponent, ConditionalEffect, PDDLObject, PDDLType, Precondition
 
-from sam_learning.core import DependencySet, LearnerDomain, extract_effects, LearnerAction, \
-    extract_predicate_data
-from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ
-from sam_learning.learners.sam_learning import SAMLearner
+from sam_learning.core import DependencySet, extract_effects, extract_predicate_data
+from sam_learning.core.learner_domain import (DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ, LearnerAction,
+                                              LearnerDomain)
+from .sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
 

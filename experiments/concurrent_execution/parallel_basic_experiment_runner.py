@@ -10,7 +10,6 @@ from typing import List, Optional, Dict, Tuple, Any, Union
 from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, ProblemParser
 from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 
-import sam_learning.learners
 from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_SPLIT, DEFAULT_NUMERIC_TOLERANCE, NUMERIC_ALGORITHMS
 from sam_learning.core import LearnerDomain
 from statistics.learning_statistics_manager import LearningStatisticsManager
@@ -78,7 +77,7 @@ class ParallelExperimentRunner:
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
+        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=3)
         self.domain_file_name = domain_file_name
         self._learning_algorithm = learning_algorithm
         self.semantic_performance_calc = None
@@ -108,7 +107,7 @@ class ParallelExperimentRunner:
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
     ) -> Tuple[LearnerDomain, Dict[str, Any]]:
-        return sam_learning.learners.SAMLearner(partial_domain).learn_action_model(allowed_observations)
+        raise NotImplementedError
 
     def _export_learned_domain(self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
@@ -288,18 +287,20 @@ class ParallelExperimentRunner:
             self.logger.debug("Skipping the validation of the learned domain due to request in the experiment.")
             return domain_file_path
 
-        self.domain_validator.validate_domain(
-            tested_domain_file_path=domain_file_path,
-            test_set_directory_path=test_set_dir_path,
-            used_observations=allowed_observations,
-            tolerance=DEFAULT_NUMERIC_TOLERANCE,
-            timeout=os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT),
-            learning_time=learning_time,
-            solvers_portfolio=portfolio,
-            preconditions_removal_policy=negative_preconditions_policy,
-        )
+        # self.domain_validator.validate_domain(
+        #     tested_domain_file_path=domain_file_path,
+        #     test_set_directory_path=test_set_dir_path,
+        #     used_observations=allowed_observations,
+        #     tolerance=DEFAULT_NUMERIC_TOLERANCE,
+        #     timeout=os.environ.get("PLANNER_EXECUTION_TIMEOUT", PLANNER_EXECUTION_TIMEOUT),
+        #     learning_time=learning_time,
+        #     solvers_portfolio=portfolio,
+        #     preconditions_removal_policy=negative_preconditions_policy,
+        # )
 
         return domain_file_path
+
+
 
     def run_action_triplets_experiment(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
         """Runs the experiment while iterating on the action triplets instead of on the trajectories.

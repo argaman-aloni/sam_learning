@@ -104,8 +104,7 @@ def main():
 
         print("Finished building the experiment folds!")
         execute_statistics_collection_job(
-            code_directory, configurations, environment_variables, experiment, experiment_sids, internal_iterations,
-        )
+            code_directory, configurations, environment_variables, experiment, experiment_sids, internal_iterations,)
 
 
 if __name__ == "__main__":

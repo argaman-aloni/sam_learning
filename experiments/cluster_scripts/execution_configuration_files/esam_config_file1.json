@@ -1,0 +1,116 @@
+{
+  "environment_variables_file_path": "/sise/home/omereliy/esam_experiments/environment.json",
+  "code_directory_path": "/sise/home/omereliy/esam_experiments/sam_learning/experiments/concurrent_execution",
+  "experiments_script_path": "parallel_discrete_experiment_runner.py",
+  "num_folds": 3,
+  "RAM": "64G",
+  "experiment_configurations": [
+	{
+      "parallelization_data": {
+        "min_index": 0,
+        "max_index": 11,
+        "hop": 1
+      },
+      "compared_versions": [
+        1,
+        2
+      ],
+      "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/barman/",
+      "domain_file_name": "domain.pddl",
+      "solver_type": 2,
+      "problems_prefix": "pfile"
+    },
+    {
+      "parallelization_data": {
+        "min_index": 0,
+        "max_index": 13,
+        "hop": 1
+      },
+      "compared_versions": [
+        1,
+        2
+      ],
+      "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/depots/",
+      "domain_file_name": "domain.pddl",
+      "solver_type": 2,
+      "problems_prefix": "pfile"
+    },
+    	{
+      "parallelization_data": {
+        "min_index": 0,
+        "max_index": 3,
+        "hop": 1
+      },
+      "compared_versions": [
+        1,
+        2
+      ],
+      "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/floortile/",
+      "domain_file_name": "domain.pddl",
+      "solver_type": 2,
+      "problems_prefix": "pfile"
+    },
+
+            	{
+      "parallelization_data": {
+        "min_index": 0,
+        "max_index": 10,
+        "hop": 1
+      },
+      "compared_versions": [
+        1,
+        2
+      ],
+      "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/rover/",
+      "domain_file_name": "domain.pddl",
+      "solver_type": 2,
+      "problems_prefix": "pfile"
+    },
+
+        	{
+      "parallelization_data": {
+        "min_index": 0,
+        "max_index": 10,
+        "hop": 1
+      },
+      "compared_versions": [
+        1,
+        2
+      ],
+      "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/satellite/",
+      "domain_file_name": "domain.pddl",
+      "solver_type": 2,
+      "problems_prefix": "pfile"
+    },
+            	{
+      "parallelization_data": {
+        "min_index": 0,
+        "max_index": 10,
+        "hop": 1
+      },
+      "compared_versions": [
+        1,
+        2
+      ],
+      "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/scanalyzer/",
+      "domain_file_name": "domain.pddl",
+      "solver_type": 2,
+      "problems_prefix": "pfile"
+    },
+            	{
+      "parallelization_data": {
+        "min_index": 0,
+        "max_index": 17,
+        "hop": 1
+      },
+      "compared_versions": [
+        1,
+        2
+      ],
+      "working_directory_path": "/sise/home/omereliy/esam_experiments/domains/storage/",
+      "domain_file_name": "domain.pddl",
+      "solver_type": 2,
+      "problems_prefix": "pfile"
+    }
+  ]
+}

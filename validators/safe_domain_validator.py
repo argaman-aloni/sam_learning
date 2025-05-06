@@ -4,9 +4,9 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union, Callable
 
-from pddl_plus_parser.models import Observation, MultiAgentObservation
+from pddl_plus_parser.models import Observation, MultiAgentObservation, ActionCall
 
 from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver, FFADLSolver
 from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes, NegativePreconditionPolicy, MappingElement, MacroActionParser
@@ -241,6 +241,26 @@ class DomainValidator:
         with open(solution_path, "w") as file:
             file.writelines(new_lines)
 
+    @staticmethod
+    def decode_solution(solution_path: Path, decode: Callable[[ActionCall], ActionCall]):
+        """
+        translates the solution file data to fit the original domain action signatures
+        @param solution_path: the original domain solution file path
+        @param decode: the decoding function that translates the learned domain grounded-action to the original domain
+        """
+        with open(solution_path, "r") as sol_file:
+            actions = sol_file.readlines()
+
+        decoded_actions_str = []
+        for action in actions:
+            cleaned_action = action[1:len(action)-2].split(" ")
+            original_action = ActionCall(cleaned_action[0], cleaned_action[1::])
+            decoded_actions_str.append(str(decode(original_action)))
+
+        with open(solution_path, "w") as file:
+            file.writelines(decoded_actions_str)
+
+
     def validate_domain(
         self,
         tested_domain_file_path: Path,
@@ -252,6 +272,7 @@ class DomainValidator:
         solvers_portfolio: List[SolverType] = None,
         preconditions_removal_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
         mapping: Dict[str, MappingElement] = None,
+        decode: Callable[[ActionCall], ActionCall] = None
     ) -> None:
         """Validates that using the input domain problems can be solved.
 
@@ -264,6 +285,8 @@ class DomainValidator:
         :param solvers_portfolio: the solvers to use for the validation, can be one or more and each will try to solve each planning problem at most once.
         :param preconditions_removal_policy: the policy used to remove the negative discrete preconditions.
         :param mapping: the learned model mapper from macro action to mapping element.
+        :param decode: function for decoding a grounded action(i.e Action call object) from the learned domain
+            to the original domain
         """
         num_triplets = self._extract_num_triplets(used_observations)
         solving_stats: Dict[str, Any] = {label: 0 for label in NUMERIC_STATISTICS_LABELS}
@@ -295,6 +318,8 @@ class DomainValidator:
 
                     if mapping:
                         self.adapt_solution_file(solution_path=solution_file_path, mapping=mapping)
+                    if decode:
+                        self.decode_solution(solution_file_path,decode)
 
                     self._validate_solution_content(
                         solution_file_path=solution_file_path, problem_file_path=problem_path, iteration_statistics=solving_stats

@@ -1,15 +1,17 @@
+from ..core import extract_effects, LearnerDomain, LearnerAction, extract_not_effects, NotSafeActionError, \
+    EquationSolutionType
+from ..learners import SAMLearner
 import logging
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Hashable, Set, Callable, Optional
 
 from nnf import And, Or, Var
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, PDDLType, GroundedPredicate
+from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, \
+    PDDLType, GroundedPredicate
 from scipy.cluster.hierarchy import DisjointSet
 
-from sam_learning.core import extract_effects, LearnerDomain, LearnerAction, extract_not_effects, NotSafeActionError, \
-    EquationSolutionType
-from sam_learning.learners.sam_learning import SAMLearner
+
 from utilities import NegativePreconditionPolicy
 
 
@@ -23,24 +25,30 @@ class ProxyActionData:
 class ExtendedSamLearner(SAMLearner):
     """An extension to SAM That can learn in cases of non-injective matching results."""
 
-    cnf_eff: Dict[str, And[Or[Var]]]
-    action_effects_cnfs: Dict[str, Set[Or[Var]]]
-    cannot_be_effects: Dict[str, Set[str]]
-    encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]]
-    decoders: Dict[str, Callable[[ActionCall], ActionCall]]
-
-    def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.hard):
+    def __init__(self, partial_domain: Domain,
+                 negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
         super().__init__(partial_domain=partial_domain, negative_preconditions_policy=negative_preconditions_policy)
         self.logger = logging.getLogger(__name__)
-        self.cnf_eff = {}
-        self.action_effects_cnfs = {action_name: set() for action_name in self.partial_domain.actions.keys()}
-        self.cannot_be_effects = {action_name: set() for action_name in self.partial_domain.actions.keys()}
+        self.cnf_eff: Dict[str, And[Or[Var]]] = {}
+        self.action_effects_cnfs: Dict[str, Set[Or[Var]]] = {action_name: set() for action_name in
+                                                             self.partial_domain.actions.keys()}
+        self.cannot_be_effects: Dict[str, Set[str]] = {action_name: set() for action_name in
+                                                       self.partial_domain.actions.keys()}
         self.popped_actions_archive: Dict[str, LearnerAction] = {}
-        self.encoders = {}
-        self.decoders = {}
+        self.action_name_2_proxy_names: Dict[str,List[str]] ={}
+        self.encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]] = {}
+        self.decoders: Dict[str, Callable[[ActionCall], ActionCall]] = {}
+
+    def get_encoder(self) -> Callable[[ActionCall], List[ActionCall | None]]:
+        return lambda call: self.encode(call)
+
+    def get_decoder(self):
+        return lambda call: self.decode(call)
 
     def encode(self, action_call: ActionCall) -> List[ActionCall]:
         """"""
+        if action_call.name not in self.encoders:
+            return []
         encoders: List[Callable] = self.encoders[action_call.name]
         possible_action_calls: List[ActionCall] = []
         for encoder in encoders:
@@ -51,13 +59,26 @@ class ExtendedSamLearner(SAMLearner):
                 logging.log(level=logging.INFO,
                             msg=f"skipped an unsafe encoding of {action_call.name} to {e.action_name}")
                 continue
+            except Exception:
+                continue
 
         return possible_action_calls
 
-    def decode(self, action_call: ActionCall) -> ActionCall:
-        return self.decoders[action_call.name](action_call)
+    def decode(self, action_call: ActionCall) -> ActionCall | None:
+        if action_call.name not in self.decoders:
+            return None
 
-    def _get_is_eff_clause_for_predicate(self, grounded_action: ActionCall, grounded_effect: GroundedPredicate) -> Or[Var]:
+        try:
+            call = self.decoders[action_call.name](action_call)
+            return call
+        except Exception as e:
+            logging.log(level=logging.INFO,
+                        msg=f"skipped an unsafe decoding of {action_call.name}")
+            logging.log(level=logging.INFO, msg=str(e))
+            return None
+
+    def _get_is_eff_clause_for_predicate(self, grounded_action: ActionCall,
+                                         grounded_effect: GroundedPredicate) -> Or[Var]:
         """
         Get the is effect clause for a given predicate by matching it to action literals.
 
@@ -149,7 +170,8 @@ class ExtendedSamLearner(SAMLearner):
         action_name = grounded_action.name
 
         self.triplet_snapshot.create_triplet_snapshot(
-            previous_state=previous_state, next_state=next_state, current_action=grounded_action, observation_objects=self.current_trajectory_objects
+            previous_state=previous_state, next_state=next_state, current_action=grounded_action,
+            observation_objects=self.current_trajectory_objects
         )
         if action_name in self.observed_actions:
             self.update_action(grounded_action, previous_state, next_state)
@@ -192,12 +214,12 @@ class ExtendedSamLearner(SAMLearner):
         return False
 
     def construct_proxy_action(
-        self,
-        action_name: str,
-        proxy_missing_precondition: Set[Predicate],
-        proxy_effects: Set[Predicate],
-        modified_parameter_mapping_dict: Dict[str, str],
-        proxy_number: Optional[int] = None,
+            self,
+            action_name: str,
+            proxy_missing_precondition: Set[Predicate],
+            proxy_effects: Set[Predicate],
+            modified_parameter_mapping_dict: Dict[str, str],
+            proxy_number: Optional[int] = None,
     ) -> LearnerAction:
         """
             constructs a proxy action based on information learned.
@@ -229,7 +251,8 @@ class ExtendedSamLearner(SAMLearner):
             new_repr: old_repr for old_repr, new_repr in modified_parameter_mapping_dict.items()
         }
 
-        new_signature = {parameter: signature[parameter] for parameter in reversed_proxy_signature_modified_param_dict.keys()}
+        new_signature = {parameter: signature[parameter] for parameter in
+                         reversed_proxy_signature_modified_param_dict.keys()}
         proxy_action = LearnerAction(proxy_action_name, signature=new_signature)
         proxy_action.discrete_effects = discrete_effects
         proxy_action.preconditions.root.operands = preconds
@@ -237,7 +260,7 @@ class ExtendedSamLearner(SAMLearner):
         return proxy_action
 
     def decoder_method(self, proxy_action_call: ActionCall, new_proxy: LearnerAction, proxy_data: ProxyActionData,
-                action_name: str) -> ActionCall:
+                       action_name: str) -> ActionCall:
         """
         method for translating grounded call of the learned domain to grounded call in the original domain
         Args:
@@ -267,7 +290,7 @@ class ExtendedSamLearner(SAMLearner):
         return ActionCall(action_name, new_obj_list)
 
     def encoder_method(self, original_action_call: ActionCall, proxy_data: ProxyActionData, new_proxy: LearnerAction,
-                action_name: str) -> ActionCall:
+                       action_name: str) -> ActionCall:
         """
         method for translating grounded call of the original domain to grounded call in the learned domain
         Args:
@@ -279,12 +302,10 @@ class ExtendedSamLearner(SAMLearner):
         Returns:
             ActionCall: equal proxy action call
         """
-        encoded_action_call = ActionCall("", [])
-        lifted_action = self.partial_domain.actions[action_name] if action_name in self.partial_domain.actions\
-            else self.popped_actions_archive[action_name]
+        lifted_action_signature = self._action_signatures[action_name]
 
         original_signature = {param_name: index for index, param_name in
-                              enumerate(list(lifted_action.signature.keys()))}
+                              enumerate(list(lifted_action_signature.keys()))}
 
         original_param_mapping = {param_name: original_action_call.parameters[index]
                                   for param_name, index in original_signature.items()}
@@ -297,10 +318,10 @@ class ExtendedSamLearner(SAMLearner):
                                                 "does not align with the action call",
                                          solution_type=EquationSolutionType.no_solution_found)
 
+        encoded_action_call = ActionCall("", [])
         encoded_action_call.parameters = [grounded_proxy_parameters[param] for param in new_proxy.signature.keys()]
         encoded_action_call.name = new_proxy.name
         return encoded_action_call
-
 
     def handle_lifted_action_instances(self, action_name: str, action_proxies_data: List[ProxyActionData]):
         """
@@ -310,6 +331,7 @@ class ExtendedSamLearner(SAMLearner):
             action_name: the name of the lifted action.
             action_proxies_data: list of Tuples where each tuple has preconditions, effect and dictionary.
         """
+
         # methods to binds variables to lambda in loop
         def create_encoder(proxy_data, new_proxy, action_name):
             """Creates an encoder function with bound values."""
@@ -331,6 +353,7 @@ class ExtendedSamLearner(SAMLearner):
 
         self.logger.debug(f"Creating proxy actions for action: {action_name}")
         proxy_number = 1
+        self.action_name_2_proxy_names[action_name] = []
         for proxy_data in action_proxies_data:
             # unpack tuple fields to get properties of proxy action into arguments of action constructor
             new_proxy = self.construct_proxy_action(
@@ -343,7 +366,7 @@ class ExtendedSamLearner(SAMLearner):
 
             # add proxy action to Learned domain action model
             self.partial_domain.actions[new_proxy.name] = new_proxy
-
+            self.action_name_2_proxy_names[action_name].append(new_proxy.name)
             # create decoder and encoder callable objects
             self.decoders[new_proxy.name] = create_decoder(proxy_data, new_proxy, action_name)
             self.encoders[action_name].append(create_encoder(proxy_data, new_proxy, action_name))
@@ -351,8 +374,7 @@ class ExtendedSamLearner(SAMLearner):
 
         #  pop original unsafe action from learned Domain action mode
         popped_action = self.partial_domain.actions.pop(action_name)
-        self.popped_actions_archive[popped_action.name]= popped_action
-        
+        self.popped_actions_archive[popped_action.name] = popped_action
 
     def construct_safe_actions(self) -> None:
         """
@@ -361,9 +383,12 @@ class ExtendedSamLearner(SAMLearner):
             if injective binding assumption does not hold for all observations of the action,
                 proxy actions are created and added to the domain.
         """
+        self.encoders = {}  # reinitialize\initialize encoders and decoders to remove old decoders and encoders methods
+        self.decoders = {}
         for action_name in self.observed_actions:
             action_proxies = []
-            self.logger.debug(f"Going over all the possible assignments that are true after for the action {action_name}.")
+            self.logger.debug(
+                f"Going over all the possible assignments that are true after for the action {action_name}.")
             for model in self.cnf_eff[action_name].models():
                 # represent the literals that were not selected as effects for the action -- will be added as preconditions
                 negative_assigned_predicates = set(pred for pred in model.keys() if not model[pred])
@@ -372,7 +397,8 @@ class ExtendedSamLearner(SAMLearner):
                 # check for contradiction before running
                 self.logger.debug(f"checking for contradiction action: {action_name} cnf assignment.")
                 if self.is_proxy_contradiction(negative_assigned_predicates, action_name):
-                    self.logger.debug(f"contradiction found in action: {action_name} cnf assignment, skipping assignment.")
+                    self.logger.debug(
+                        f"contradiction found in action: {action_name} cnf assignment, skipping assignment.")
                     continue
 
                 self.logger.debug(f"No contradiction found for action: {action_name} cnf assignment.")
@@ -389,10 +415,12 @@ class ExtendedSamLearner(SAMLearner):
                 # assemble proxy info
                 self.logger.debug(f"assigning new representatives for parameters list of action {action_name}")
                 proxy_signature_modified_param_dict = minimize_parameters_equality_dict(
-                    model_dict=model, act_signature=self._action_signatures[action_name], domain_types=self.partial_domain.types
+                    model_dict=model, act_signature=self._action_signatures[action_name],
+                    domain_types=self.partial_domain.types
                 )
 
-                action_proxies.append(ProxyActionData(additional_preconditions, effects, proxy_signature_modified_param_dict))
+                action_proxies.append(
+                    ProxyActionData(additional_preconditions, effects, proxy_signature_modified_param_dict))
 
             if len(action_proxies) == 1:
                 self.logger.debug(f"No proxy actions needed for action: {action_name}")
@@ -411,6 +439,32 @@ class ExtendedSamLearner(SAMLearner):
             else:
                 raise ValueError(f"No valid assignments found for action: {action_name}")
 
+    def _complete_possibly_missing_actions(self):
+        """Completes the actions that were not observed in the trajectory.
+
+        Note:
+            This allows SAM to be used multiple times on different trajectories.
+            In case some actions were deleted in previous iterations they will be added back.
+        """
+        for action_name in self.popped_actions_archive:
+            self.partial_domain.actions[action_name] = self.popped_actions_archive[action_name]
+
+        self.popped_actions_archive = {}
+        for action_name, action_signature in self._action_signatures.items():
+            if action_name not in self.partial_domain.actions:
+                self.partial_domain.actions[action_name] = LearnerAction(name=action_name, signature=action_signature)
+
+    def _remove_proxies(self):
+        # remove learned proxies so new can be generated
+        for _, proxies_list in self.action_name_2_proxy_names:
+            for proxy_name in proxies_list:
+                self.partial_domain.actions.pop(proxy_name)
+
+        #clean dict for new learning and proxy generation
+        self.action_name_2_proxy_names = {}
+
+
+
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
@@ -419,6 +473,7 @@ class ExtendedSamLearner(SAMLearner):
         """
         self.logger.info("Starting to learn the action model using the ESAM algorithm!")
         self._complete_possibly_missing_actions()
+        self._remove_proxies()
         for observation in observations:
             self.current_trajectory_objects = observation.grounded_objects
             for component in observation.components:
@@ -434,7 +489,7 @@ class ExtendedSamLearner(SAMLearner):
 
 
 def minimize_parameters_equality_dict(
-    model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types: Dict[str, PDDLType]
+        model_dict: Dict[Hashable, bool], act_signature: SignatureType, domain_types: Dict[str, PDDLType]
 ) -> Dict[str, str]:
     """
     The method computes the minimization of parameter list
@@ -446,7 +501,8 @@ def minimize_parameters_equality_dict(
         a dictionary mapping each original param act ind_ to the new actions minimized parameter list
     """
     # make a table that determines if an act ind 'i' is an effect in all occurrences of F, nad is bound to index 'other_param'
-    new_model_dict: Dict[Predicate, bool] = {parse_predicate_from_string(str(h), domain_types): v for h, v in model_dict.items()}
+    new_model_dict: Dict[Predicate, bool] = {parse_predicate_from_string(str(h), domain_types): v for h, v in
+                                             model_dict.items()}
 
     # start algorithm of parameters equality check
     if len(new_model_dict.keys()) == 0:
@@ -488,7 +544,8 @@ def modify_predicate_signature(predicates: Set[Predicate], param_dict: Dict[str,
     """
     new_set: Set[Predicate] = set()
     for predicate in predicates:
-        new_signature: Dict[str, PDDLType] = {param_dict[param]: predicate.signature[param] for param in predicate.signature.keys()}
+        new_signature: Dict[str, PDDLType] = {param_dict[param]: predicate.signature[param] for param in
+                                              predicate.signature.keys()}
         new_predicate = Predicate(name=predicate.name, signature=new_signature, is_positive=predicate.is_positive)
         new_set.add(new_predicate)
 

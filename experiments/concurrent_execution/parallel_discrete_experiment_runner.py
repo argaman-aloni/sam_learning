@@ -1,16 +1,15 @@
 """The POL main framework - Compile, Learn and Plan."""
 
 from pathlib import Path
-from typing import List, Dict, Tuple, Any, Callable
+from typing import List, Dict, Tuple, Any
 import argparse
 
-from pddl_plus_parser.models import Observation, Domain, ActionCall
+from pddl_plus_parser.models import Observation, Domain
 
 from experiments.concurrent_execution.parallel_basic_experiment_runner import (ParallelExperimentRunner,
                                                                                configure_iteration_logger)
 from sam_learning.core import LearnerDomain
 from sam_learning.learners import ExtendedSamLearner, SAMLearner
-from statistics.encoded_performance_calculator import EncodedPerformanceCalculator
 from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy
@@ -22,8 +21,6 @@ NUM_TRIPLETS_PER_TESTING = 10
 
 class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
     """Class that represents the POL framework."""
-    encoders: Dict[str, list[Callable[[ActionCall], ActionCall]]]
-    decoders: Dict[str, Callable[[ActionCall], ActionCall]]
 
     def __init__(
         self,
@@ -49,13 +46,15 @@ class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
             domain_path=self.working_directory_path / domain_file_name,
             learning_algorithm=learning_algorithm,
         )
+        self.learner = None
+
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
         self.semantic_performance_calc = init_semantic_performance_calculator(
-            self.working_directory_path,
-            self.domain_file_name,
-            self._learning_algorithm,
+            working_directory_path=self.working_directory_path,
+            domain_file_name=self.domain_file_name,
+            learning_algorithm=self._learning_algorithm,
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
             problem_prefix=self.problem_prefix,
             executing_agents=self.executing_agents,
@@ -64,21 +63,32 @@ class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
     ) -> Tuple[LearnerDomain, Dict[str, Any]]:
+
         if self._learning_algorithm == LearningAlgorithmType.esam_learning:
             esam_learner = ExtendedSamLearner(partial_domain)
-            leaner_domain , report = esam_learner.learn_action_model(allowed_observations)
+            learner_domain , report = esam_learner.learn_action_model(allowed_observations)
 
-            self.encoders, self.decoders = esam_learner.encoders, esam_learner.decoders
-            return leaner_domain, report
+            self.semantic_performance_calc.encode = esam_learner.get_encoder()
+            self.semantic_performance_calc.decode = esam_learner.get_decoder()
+
 
         elif self._learning_algorithm == LearningAlgorithmType.sam_learning:
             sam_learner = SAMLearner(partial_domain)
-            return sam_learner.learn_action_model(allowed_observations)
+            learner_domain , report = sam_learner.learn_action_model(allowed_observations)
+
+            self.semantic_performance_calc.encode = lambda call: [call] if call.name in learner_domain.actions else []
+            self.semantic_performance_calc.decode = lambda call: call
+
+        else:
+            learner_domain , report = LearnerDomain(partial_domain), {}
+
+
+        return learner_domain, report
+
 
     def _learn_model_offline(
             self, allowed_observations: List[Observation], partial_domain: Domain, test_set_dir_path: Path,
-            fold_num: int,
-    ) -> None:
+            fold_num: int) -> None:
         """Learns the model of the environment by learning from the input trajectories.
             used to solve.
         """
@@ -89,15 +99,11 @@ class ParallelDiscreteExperimentRunner(ParallelExperimentRunner):
             allowed_observations, learned_domain, test_set_dir_path, fold_num, float(learning_report["learning_time"]), policy
         )
 
-        if isinstance(self.semantic_performance_calc, EncodedPerformanceCalculator):
-            self.semantic_performance_calc.encoders = self.encoders
-            self.semantic_performance_calc.decoders = self.decoders
-
         self.semantic_performance_calc.calculate_performance(learned_domain_path, sum([len(observation) for observation in allowed_observations]))
         self.logger.info(f"Finished the learning phase for the fold - {fold_num} and {len(allowed_observations)} observations!")
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Runs the numeric action model learning algorithms evaluation experiments.")
+    parser = argparse.ArgumentParser(description="Runs action model learning algorithms evaluation experiments.")
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
@@ -107,7 +113,7 @@ def parse_arguments() -> argparse.Namespace:
         choices=[1,2],
         help="the type of action model learning algorithm to use.\n SAM- 1, Extended-SAM- 2.",
     )
-
+    parser.add_argument("--iteration_number", required=False, help="The current iteration to execute", type=int)
     parser.add_argument(
         "--solver_type",
         required=False,

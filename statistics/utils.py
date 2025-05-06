@@ -6,10 +6,9 @@ from typing import Optional
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 
-from statistics.encoded_performance_calculator import EncodedPerformanceCalculator
+from statistics.encoded_performance_calculator import EncodedPerformanceCalculator, SemanticPerformanceCalculator
 from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
-from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from utilities import LearningAlgorithmType
 
 DEFAULT_SIZE = 10
@@ -27,6 +26,10 @@ MULTI_AGENT_ALGORITHMS = [
     LearningAlgorithmType.ma_sam,
     LearningAlgorithmType.ma_sam_plus,
 ]
+
+DISCRETE_ALGORITHMS = [
+    LearningAlgorithmType.sam_learning,
+    LearningAlgorithmType.esam_learning]
 
 
 def init_semantic_performance_calculator(
@@ -80,11 +83,11 @@ def init_semantic_performance_calculator(
             learning_algorithm=learning_algorithm,
         )
 
-    elif learning_algorithm == LearningAlgorithmType.esam_learning:
+    elif learning_algorithm in DISCRETE_ALGORITHMS:
         return EncodedPerformanceCalculator(
             model_domain=model_domain,
-            model_domain_path=domain_path,
             observations=observations,
+            model_domain_path=domain_path,
             working_directory_path=working_directory_path,
             learning_algorithm=learning_algorithm,
         )

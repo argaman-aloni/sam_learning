@@ -39,9 +39,9 @@ class SolutionOutputTypes(Enum):
 
 
 class NegativePreconditionPolicy(Enum):
-    no_remove = (1,)  # keep all learned preconditions
+    no_remove = (1,) # keep all learned preconditions
     soft = (2,)
-    hard = (3,)  # no negative preconditions are allowed
+    hard = (3,) # no negative preconditions are allowed
     # allow only negative preconditions deducted form cnf solution
 
 
