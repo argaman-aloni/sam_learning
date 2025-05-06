@@ -1,6 +1,5 @@
 from .convex_hull_learner import ConvexHullLearner
-from .incremental_convex_hull_learner import IncrementalConvexHullLearner
-from .numeric_fluent_learner_algorithm import NumericFluentStateStorage
+from .numeric_fluent_learner_algorithm import NumericFluentStateStorage, IncrementalNumericFluentStateStorage
 from .numeric_utils import (
     construct_multiplication_strings,
     prettify_coefficients,

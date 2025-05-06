@@ -143,7 +143,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         # check if the new sample is already in the dataframe
         concat_data = pd.concat([self.data, new_sample], ignore_index=True).dropna(axis=1)
-        if concat_data.drop_duplicates().shape[0] == self.data.shape[0]:
+        if concat_data.duplicated().any():
             self.logger.debug("The new point is already in the storage, not adding it again.")
             return
 
@@ -287,3 +287,15 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             raise NotSafeActionError(
                 name=self.action_name, reason="Convex hull failed to create a convex hull", solution_type=EquationSolutionType.convex_hull_not_found
             )
+
+    def reset(self, new_relevant_features: List[str]) -> None:
+        """Resets changes the features used to create the convex hull and reset to start the learning from scratch.
+
+        :param new_relevant_features: the new relevant features to use.
+        """
+        self.logger.debug("Resetting the convex hull learner.")
+        self.relevant_fluents = new_relevant_features
+        self._convex_hull = None
+        self._gsp_base = None
+        self._complementary_base = None
+        self._spanning_standard_base = False

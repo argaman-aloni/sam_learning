@@ -10,7 +10,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import PDDLFunction, Domain
 
 from sam_learning.core import VocabularyCreator
-from sam_learning.core.numeric_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
+from sam_learning.core.online_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
 from sam_learning.core.numeric_learning.numeric_utils import display_convex_hull, create_monomials, create_polynomial_string
 from tests.consts import FARMLAND_EXAMPLES_PATH, FARMLAND_DOMAIN_PATH, FARMLAND_PAPER_EXAMPLES_PATH, FARMLAND_SPAN_EXAMPLES_PATH
 

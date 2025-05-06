@@ -14,8 +14,9 @@ from pddl_plus_parser.models import (
     CompoundPrecondition,
 )
 
-from sam_learning.core import InformationGainLearner, LearnerDomain, AbstractAgent, PriorityQueue, LearnerAction, EpisodeInfoRecord
+from sam_learning.core import InformationGainLearner, LearnerDomain, PriorityQueue, LearnerAction, EpisodeInfoRecord
 from sam_learning.core.online_learning.novelty_learner import NoveltyLearner, FAIL_RESULT, SUCCESS_RESULT
+from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
 from sam_learning.learners.incremental_numeric_sam import IncrementalNumericSAMLearner
 
 NON_INFORMATIVE_IG = 0
