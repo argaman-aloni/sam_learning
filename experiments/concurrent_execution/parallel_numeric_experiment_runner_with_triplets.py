@@ -82,27 +82,6 @@ class SingleIterationTripletsNSAMExperimentRunner(SingleIterationNSAMExperimentR
         self.semantic_performance_calc.calculate_performance(learned_domain_path, sum([len(observation) for observation in allowed_observations]))
         self.logger.info(f"Finished the learning phase for the fold - {fold_num} and {len(allowed_observations)} observations!")
 
-    def run_action_triplets_experiment(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
-        """Runs the experiment while iterating on the action triplets instead of on the trajectories.
-
-        :param fold_num: the index of the current folder that is currently running.
-        :param train_set_dir_path: This assumes that the folder contains all the train set.
-        :param test_set_dir_path: the directory containing the test set problems in which the learned model should be
-            used to solve.
-        """
-        self.logger.info(f"Executing the experiments on the action triplets instead of the trajectories for the fold - {fold_num}!")
-        self._init_semantic_performance_calculator(fold_num)
-        partial_domain = self.read_domain_file(train_set_dir_path)
-        complete_train_set = self.collect_observations(train_set_dir_path, partial_domain)
-        transitions_based_training_set = self.create_transitions_based_training_set(complete_train_set)
-        execution_scheme = [index + 1 for index in range(10)] + [index for index in range(20, min(len(transitions_based_training_set), 101), 10)]
-        for index in execution_scheme:
-            self._learn_model_offline([*transitions_based_training_set[0:index]], partial_domain, test_set_dir_path, fold_num)
-
-        self.semantic_performance_calc.export_semantic_performance(fold_num)
-        self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
-        self.domain_validator.write_statistics(fold_num)
-
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Runs the numeric action model learning algorithms evaluation experiments.")

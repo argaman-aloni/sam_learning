@@ -13,7 +13,7 @@ from experiments.cluster_scripts.common import (
 def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, internal_iterations):
     print(f"Creating the job that will collect the statistics from all the domain's experiments.")
     statistics_collection_job = submit_job(
-        conda_env="online_nsam",
+        conda_env="macq_env",
         mem="4G",
         python_file=f"{code_directory}/{configuration['results_collection_script_name']}",
         jobname=f"collect_statistics_{experiment['domain_file_name']}",

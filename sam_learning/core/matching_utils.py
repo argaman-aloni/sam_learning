@@ -103,7 +103,7 @@ def extract_not_effects(next_state_predicate: Set[GroundedPredicate]) -> Tuple[S
     :param next_state_predicate: all the grounded literals in the next state (negative and positive predicates).
     :return: A tuple representing the predicates that cannot be add-effects and those that cannot be delete-effects.
     """
-    not_effects = {predicate.copy(is_negated=predicate.is_positive) for predicate in next_state_predicate}
+    not_effects = {predicate.copy(is_negated=True) for predicate in next_state_predicate}
     not_add_effects = {predicate for predicate in not_effects if predicate.is_positive}
     not_delete_effects = {predicate for predicate in not_effects if not predicate.is_positive}
     return not_add_effects, not_delete_effects
