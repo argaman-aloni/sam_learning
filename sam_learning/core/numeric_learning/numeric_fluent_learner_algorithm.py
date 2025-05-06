@@ -21,15 +21,29 @@ class NumericFluentStateStorage:
     previous_state_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
     next_state_storage: Dict[str, List[float]]  # lifted function str -> numeric values.
 
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0, approximation_params = None):
+    def __init__(
+        self,
+        action_name: str,
+        domain_functions: Dict[str, PDDLFunction],
+        polynom_degree: int = 0,
+        epsilon: float = 0.0,
+        qhull_options: str = "",
+        incremental: bool = False,
+    ):
         self.action_name = action_name
         self.logger = logging.getLogger(__name__)
         self.previous_state_storage = defaultdict(list)
         self.next_state_storage = defaultdict(list)
         self.monomials = create_monomials(list(domain_functions.keys()), polynom_degree)
-        self.convex_hull_learner = ConvexHullLearner(action_name, domain_functions, polynom_degree=polynom_degree)
+        self.convex_hull_learner = (
+            ConvexHullLearner(action_name, domain_functions, polynom_degree=polynom_degree, epsilon=epsilon, qhull_options=qhull_options)
+            if not incremental
+            else IncrementalConvexHullLearner(
+                action_name, domain_functions, polynom_degree=polynom_degree, epsilon=epsilon, qhull_options=qhull_options
+            )
+        )
+
         self.linear_regression_learner = LinearRegressionLearner(action_name, domain_functions, polynom_degree=polynom_degree)
-        self.approximation_params = approximation_params
 
     def add_to_previous_state_storage(self, state_fluents: Dict[str, PDDLFunction]) -> None:
         """Adds the matched lifted state fluents to the previous state storage.
@@ -61,11 +75,6 @@ class NumericFluentStateStorage:
         :return: The precondition that contains the linear inequalities.
         """
         self.logger.info("Constructing the safe linear inequalities.")
-        if self.approximation_params is not None:
-            epsilon = self.approximation_params["epsilon"]
-            qhull_options = self.approximation_params["qhull_params"]
-            return self.convex_hull_learner.construct_safe_linear_inequalities(relevant_fluents, epsilon=epsilon, qhull_options=qhull_options)
-
         return self.convex_hull_learner.construct_safe_linear_inequalities(relevant_fluents)
 
     def construct_assignment_equations(
@@ -79,12 +88,3 @@ class NumericFluentStateStorage:
         """
         self.logger.info("Constructing the assignment equations.")
         return self.linear_regression_learner.construct_assignment_equations(allow_unsafe=allow_unsafe, relevant_fluents=relevant_fluents)
-
-
-class IncrementalNumericFluentStateStorage(NumericFluentStateStorage):
-    """Stores and learned the numeric state fluents of a single action."""
-
-    def __init__(self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0):
-        super().__init__(action_name, domain_functions, polynom_degree=polynom_degree)
-        self.logger = logging.getLogger(__name__)
-        self.convex_hull_learner = IncrementalConvexHullLearner(action_name, domain_functions, polynom_degree)

@@ -1,9 +1,37 @@
 """module tests for the SAM learning algorithm"""
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
+from pddl_plus_parser.models import ActionCall, Observation, ObservedComponent, Predicate, Domain, Problem
 
-from pddl_plus_parser.models import ActionCall, Observation, ObservedComponent, Predicate
-
+from pytest import fixture
 from sam_learning.learners import SAMLearner
-from tests.consts import sync_snapshot, extract_preconditions_predicates
+from tests.consts import (
+    sync_snapshot,
+    extract_preconditions_predicates,
+    BARMAN_CLASSICAL_DOMAIN_PATH,
+    BARMAN_CLASSICAL_PROBLEM_PATH,
+    BARMAN_CLASSICAL_TRAJECTORY_PATH,
+)
+from utilities import NegativePreconditionPolicy
+
+
+@fixture()
+def barman_domain() -> Domain:
+    return DomainParser(BARMAN_CLASSICAL_DOMAIN_PATH, partial_parsing=True).parse_domain()
+
+
+@fixture()
+def barman_problem(barman_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=BARMAN_CLASSICAL_PROBLEM_PATH, domain=barman_domain).parse_problem()
+
+
+@fixture()
+def barman_observation(barman_domain: Domain, barman_problem: Problem) -> Observation:
+    return TrajectoryParser(barman_domain, barman_problem).parse_trajectory(BARMAN_CLASSICAL_TRAJECTORY_PATH)
+
+
+@fixture()
+def barman_sam_learning(barman_domain: Domain) -> SAMLearner:
+    return SAMLearner(barman_domain, negative_preconditions_policy=NegativePreconditionPolicy.hard)
 
 
 def test_add_new_action_preconditions_adds_both_negative_and_positive_preconditions_to_the_action(
@@ -524,3 +552,10 @@ def test_learn_action_model_when_applying_multiple_times_with_different_trajecto
     model2_str = learned_model2.to_pddl()
     num_learned_actions_model2 = len(learned_model2.actions)
     assert len(model1_str) > len(model2_str) or num_learned_actions_model1 < num_learned_actions_model2
+
+
+def test_learn_action_model_when_learning_barman_domain_returns_correct_domain_and_no_missing_predicates_are_found_in_the_preconditions(
+    barman_sam_learning: SAMLearner, barman_observation: Observation
+):
+    learned_model1, learning_metadata = barman_sam_learning.learn_action_model([barman_observation])
+    assert "(holding ?h1 ?s)" in learned_model1.actions["shake"].to_pddl()

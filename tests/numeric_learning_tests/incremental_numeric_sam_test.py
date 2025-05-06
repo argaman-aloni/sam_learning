@@ -80,7 +80,6 @@ def minecraft_medium_observation(minecraft_medium_domain: Domain) -> Observation
 @fixture()
 def minecraft_medium_sam(minecraft_medium_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(minecraft_medium_domain)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
@@ -102,49 +101,42 @@ def minecraft_small_observation(minecraft_small_domain: Domain) -> Observation:
 @fixture()
 def minecraft_small_sam(minecraft_small_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(minecraft_small_domain)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
 @fixture()
 def depot_nsam(depot_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(depot_domain)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
 @fixture()
 def satellite_nsam(satellite_numeric_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(satellite_numeric_domain)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
 @fixture()
 def minecraft_nsam(minecraft_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(minecraft_domain)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
 @fixture()
 def counters_poly_nsam(counters_poly_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(counters_poly_domain, polynomial_degree=1)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
 @fixture()
 def farmland_nsam(farmland_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(farmland_domain, polynomial_degree=0)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
 @fixture()
 def sailing_nsam(sailing_domain: Domain) -> IncrementalNumericSAMLearner:
     nsam = IncrementalNumericSAMLearner(sailing_domain, polynomial_degree=0)
-    nsam._initialize_fluents_learners()
     return nsam
 
 
