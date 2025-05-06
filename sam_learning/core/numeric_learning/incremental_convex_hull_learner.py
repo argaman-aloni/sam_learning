@@ -136,6 +136,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         # assuming that if a feature is relevant to the preconditions it should always appear in the dataframe.
         if self.data.empty:
             self.data = new_sample  # This is to avoid observing warnings when adding the first sample.
+            # Notice, this is the place where the relevant fluents should be integrated.
             self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data)
             self.logger.debug("Added the first sample to the points dataframe.")
             return
