@@ -224,6 +224,17 @@ def test_create_polynomial_string_when_calling_with_three_functions_returns_the_
     assert polynomial_string == "(* (fuel-cost ) (* (load_limit ?z) (current_load ?z)))"
 
 
+def test_remove_complex_linear_dependencies_when_there_is_only_one_observed_entry_returns_equality_conditions_based_on_entry_only():
+    test_data = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
+    reduced_data, conditions = remove_complex_linear_dependencies(test_data)
+    assert len(conditions) == 3
+    assert conditions[0] == "(= a 1)"
+    assert conditions[1] == "(= b 2)"
+    assert conditions[2] == "(= c 3)"
+    assert len(reduced_data.columns) == 0
+    assert len(reduced_data) == 0
+
+
 def test_remove_complex_linear_dependencies_returns_correct_conditions_and_reduced_dataframe_when_one_feature_in_the_dataframe_is_constant_value():
     test_data = pd.DataFrame({"a": [1, 1, 1, 1], "b": [1, 3, 3, 4], "c": [1, 2, 3, 4]})
     reduced_data, conditions = remove_complex_linear_dependencies(test_data)

@@ -35,7 +35,7 @@ class PropositionalInformationGainLearner:
         self.preconditions_superset.intersection_update(predicates_in_state)
         self.cannot_be_preconditions.update(not_preconditions)
 
-        for not_precondition in not_preconditions:
+        for not_precondition in self.cannot_be_preconditions:
             self.logger.debug("Removing false positives from the must be preconditions set.")
             for must_be_preconditions_set in self.must_be_preconditions:
                 must_be_preconditions_set.discard(not_precondition)
@@ -48,6 +48,13 @@ class PropositionalInformationGainLearner:
         self.logger.info(f"Adding a new negative sample for the action {self.action_name}.")
         preconditions_not_in_state = self.preconditions_superset.difference(predicates_in_state)
         self.must_be_preconditions.append(preconditions_not_in_state)
+
+    def get_possible_preconditions_hitting_set(self) -> Set[Predicate]:
+        """Calculates the hitting that represents the action's preconditions.
+
+        :return: the hitting set of the action's preconditions.
+        """
+        self.logger.info(f"Calculating the hitting set for the action {self.action_name}.")
 
     def calculate_sample_information_gain(self, new_lifted_sample: Set[Predicate]) -> float:
         """Calculates the information gain of a new sample.

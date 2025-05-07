@@ -17,3 +17,4 @@ multipledispatch==1.0.0
 lark==1.1.7
 seaborn==0.11.2
 nnf~=0.4.1
+python-sat==1.8.dev16

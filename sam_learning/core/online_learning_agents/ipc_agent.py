@@ -2,10 +2,10 @@
 import logging
 from typing import Dict, Set, Tuple
 
-from pddl_plus_parser.models import State, Domain, ActionCall, Problem, Operator, evaluate_expression, PDDLFunction, \
-    NumericalExpressionTree
+from pddl_plus_parser.models import State, Domain, ActionCall, Problem, Operator, evaluate_expression, PDDLFunction, NumericalExpressionTree
 
-from sam_learning.core import AbstractAgent, VocabularyCreator
+from sam_learning.core import VocabularyCreator
+from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
 
 
 class IPCAgent(AbstractAgent):
@@ -22,8 +22,7 @@ class IPCAgent(AbstractAgent):
         self._problem = problem
         self._vocabulary_creator = VocabularyCreator()
 
-    def _assign_state_fluent_value(self, state_fluents: Dict[str, PDDLFunction],
-                                   goal_required_expressions: Set[NumericalExpressionTree]) -> None:
+    def _assign_state_fluent_value(self, state_fluents: Dict[str, PDDLFunction], goal_required_expressions: Set[NumericalExpressionTree]) -> None:
         """Assigns the values of the state fluents to later verify if the goal was achieved.
 
         :param state_fluents: the state fluents to be assigned to the goal expressions.
@@ -45,8 +44,7 @@ class IPCAgent(AbstractAgent):
         :param next_state: the next state.
         :return: the reward for advancing from the previous state to the next state.
         """
-        self.logger.debug(f"Checking if the previous state {previous_state} "
-                          f"is different from the next state {next_state}")
+        self.logger.debug(f"Checking if the previous state {previous_state} " f"is different from the next state {next_state}")
         if previous_state == next_state:
             self.logger.warning("The previous state is the same as the next state. ")
             return -1
@@ -66,7 +64,8 @@ class IPCAgent(AbstractAgent):
         """
         self.logger.info("Creating all the grounded actions for the domain given the current possible objects.")
         grounded_action_calls = self._vocabulary_creator.create_grounded_actions_vocabulary(
-            domain=self._domain, observed_objects=self._problem.objects)
+            domain=self._domain, observed_objects=self._problem.objects
+        )
         return grounded_action_calls
 
     def observe(self, state: State, action: ActionCall) -> Tuple[State, int]:
@@ -76,10 +75,13 @@ class IPCAgent(AbstractAgent):
         :param action: the action that was executed.
         :return: the state after the action was executed.
         """
-        self.logger.debug(
-            "Observing the action %s being executed on the state %s.", str(action), state.serialize())
-        operator = Operator(action=self._domain.actions[action.name], domain=self._domain,
-                            grounded_action_call=action.parameters, problem_objects=self._problem.objects)
+        self.logger.debug("Observing the action %s being executed on the state %s.", str(action), state.serialize())
+        operator = Operator(
+            action=self._domain.actions[action.name],
+            domain=self._domain,
+            grounded_action_call=action.parameters,
+            problem_objects=self._problem.objects,
+        )
         try:
             new_state = operator.apply(state)
 
@@ -106,8 +108,7 @@ class IPCAgent(AbstractAgent):
 
         self._assign_state_fluent_value(state.state_fluents, goal_fluents)
 
-        if (goal_predicates.issubset(state_predicates) and
-                all([evaluate_expression(fluent.root) for fluent in goal_fluents])):
+        if goal_predicates.issubset(state_predicates) and all([evaluate_expression(fluent.root) for fluent in goal_fluents]):
             self.logger.info("The IPC agent has reached the goal state.")
             return True
 

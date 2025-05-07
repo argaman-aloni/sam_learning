@@ -2,7 +2,6 @@ from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLea
 from sam_learning.core.numeric_learning.linear_regression_learner import LinearRegressionLearner
 from sam_learning.core.numeric_learning.numeric_fluent_learner_algorithm import NumericFluentStateStorage
 from sam_learning.core.numeric_learning.numeric_function_matcher import NumericFunctionMatcher
-from sam_learning.core.online_learning.abstract_agent import AbstractAgent
 from sam_learning.core.online_learning.consistent_model_validator import NumericConsistencyValidator
 from sam_learning.core.online_learning.numeric_information_gain_learner import InformationGainLearner
 from sam_learning.core.online_learning.priority_queue import PriorityQueue
@@ -36,6 +35,6 @@ from .numeric_learning import (
     construct_linear_equation_string,
     construct_non_circular_assignment,
 )
-from .online_learning import EpisodeInfoRecord, NoveltyLearner, BFSFeatureSelector, AbstractAgent, PriorityQueue
+from .online_learning import EpisodeInfoRecord, NoveltyLearner, BFSFeatureSelector, PriorityQueue
 from .predicates_matcher import PredicatesMatcher
 from .vocabulary_creator import VocabularyCreator
