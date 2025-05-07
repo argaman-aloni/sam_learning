@@ -36,7 +36,13 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
     additional_dependency_conditions: List[str]
 
     def __init__(
-        self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0, epsilon: float = 0.0, qhull_options: str = ""
+        self,
+        action_name: str,
+        domain_functions: Dict[str, PDDLFunction],
+        polynom_degree: int = 0,
+        epsilon: float = 0.0,
+        qhull_options: str = "",
+        relevant_fluents: Optional[List[str]] = None,
     ):
         super().__init__(action_name, {function.name: function for function in domain_functions.values()}, polynom_degree=polynom_degree)
         self._convex_hull = None
@@ -46,7 +52,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         functions = list([function.untyped_representation for function in domain_functions.values()])
         monomials = create_monomials(functions, polynom_degree)
         self.data = DataFrame(columns=[create_polynomial_string(monomial) for monomial in monomials])
-        self.relevant_fluents = None
+        self.relevant_fluents = relevant_fluents if relevant_fluents is not None else self.data.columns.tolist()
         self.affine_independent_data = None
         self.additional_dependency_conditions = []
         self._epsilon = epsilon
@@ -123,6 +129,39 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
         self._convex_hull = self._epsilon_approximate_hull(points=projected_points, incremental=True)
 
+    def _calculate_basis_and_hull(self, from_reset: bool = False) -> None:
+        """Calculates the basis and the convex hull of the points in the storage dataframe."""
+        prev_conditions = self.additional_dependency_conditions
+        self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data[self.relevant_fluents])
+        if self.affine_independent_data.empty:
+            self.logger.debug("There are no affine independent rows, no need for further processing.")
+            return
+
+        # If dependency conditions changed, retrain base and CH (if needed)
+        if prev_conditions != self.additional_dependency_conditions or from_reset or self._gsp_base is None:
+            self.logger.debug("Either new point affects the dependency conditions or no base learned. Learning base and possibly CH.")
+            self._learn_new_bases()
+            if self._gsp_base is not None and len(self._gsp_base) >= 2 and len(self.data) >= 3:
+                self._learn_new_convex_hull()
+
+            return
+
+        # Validate span and try to add to convex hull
+        if not self._is_spanned_in_base():
+            self.logger.debug("New point is not spanned by base. Relearning base and CH.")
+            self._learn_new_bases()
+            if len(self._gsp_base) <= 1:
+                self.logger.debug("New base is 1D or empty. Cannot form a convex hull.")
+                return
+
+            self._learn_new_convex_hull()
+            return
+
+        if self._convex_hull is not None:
+            # If reached here - the point is spanned by the base and the convex hull is not None
+            projected_point = np.dot(self._shift_new_point(), np.array(self._gsp_base).T)
+            self._convex_hull.add_points([projected_point])
+
     def add_new_point(self, point: Dict[str, float]) -> None:
         """Adds a new point to the convex hull learner.
 
@@ -132,15 +171,6 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :param point: the point to add to the convex hull learner.
         """
         new_sample = pd.DataFrame({k: [v] for k, v in point.items()})
-
-        # assuming that if a feature is relevant to the preconditions it should always appear in the dataframe.
-        if self.data.empty:
-            self.data = new_sample  # This is to avoid observing warnings when adding the first sample.
-            # Notice, this is the place where the relevant fluents should be integrated.
-            self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data)
-            self.logger.debug("Added the first sample to the points dataframe.")
-            return
-
         # check if the new sample is already in the dataframe
         concat_data = pd.concat([self.data, new_sample], ignore_index=True).dropna(axis=1)
         if concat_data.duplicated().any():
@@ -148,50 +178,11 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             return
 
         self.data = concat_data
-        prev_conditions = self.additional_dependency_conditions
-        self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data)
-
-        # If dependency conditions changed, retrain base and CH (if needed)
-        if prev_conditions != self.additional_dependency_conditions:
-            self.logger.debug("New point affects the dependency conditions. Relearning base and possibly CH.")
-            self._learn_new_bases()
-            if len(self._gsp_base) >= 2 and len(self.data) >= 3:
-                self._learn_new_convex_hull()
-
-            return
-
-        # If no base exists, train it and CH if possible
-        if self._gsp_base is None:
-            self.logger.debug("No base present. Learning base and CH.")
-            self._learn_new_bases()
-            if self._gsp_base is not None and len(self._gsp_base) >= 2 and len(self.data) >= 3:
-                self._learn_new_convex_hull()
-            return
-
-        # Validate span and try to add to convex hull
-        if not self._is_spanned_in_base():
-            self.logger.debug("New point is not spanned by base. Relearning base and CH.")
-            self._learn_new_bases()
-
-            if len(self._gsp_base) > 1:
-                self._learn_new_convex_hull()
-            else:
-                self.logger.debug("New base is 1D or empty. Cannot form a convex hull.")
-            return
-
-        if self._convex_hull is not None:
-            projected_point = np.dot(self._shift_new_point(), np.array(self._gsp_base).T)
-            try:
-                self._convex_hull.add_points([projected_point])
-
-            except QhullError:
-                self.logger.debug(f"Failed to add point to convex hull. Recomputing. Previous: {self._convex_hull.points}, New: {projected_point}")
-                self._learn_new_convex_hull()
+        self._calculate_basis_and_hull()
 
     def _create_ch_coefficients_data(self, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
         """Runs the convex hull algorithm on the given input points.
 
-        :param points: the points to run the convex hull algorithm on.
         :param display_mode: whether to display the convex hull.
         :return: the coefficients of the planes that represent the convex hull and the border point.
         """
@@ -250,11 +241,11 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
 
         :return: the inequality strings and the type of equations that were constructed (injunctive / disjunctive)
         """
-        if len(self.data) == 0:
-            self.logger.debug("No observations were given to learn any conditions.")
+        if len(self.data) == 0 or len(self.relevant_fluents) == 0:
+            self.logger.debug("No observations were given or the relevant fluents are empty - no conditions could be learned.")
             return Precondition("and")
 
-        if len(self.data.columns.tolist()) == 1:
+        if len(self.data.columns.tolist()) == 1 or len(self.relevant_fluents) == 1:
             self.logger.debug("Only one dimension is needed in the preconditions!")
             return self._construct_single_dimension_inequalities(self.data.loc[:, self.data.columns.tolist()[0]])
 
@@ -295,7 +286,6 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         """
         self.logger.debug("Resetting the convex hull learner.")
         self.relevant_fluents = new_relevant_features
+        self._convex_hull.close()
         self._convex_hull = None
-        self._gsp_base = None
-        self._complementary_base = None
-        self._spanning_standard_base = False
+        self._calculate_basis_and_hull(from_reset=True)

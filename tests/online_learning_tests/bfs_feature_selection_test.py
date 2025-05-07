@@ -51,6 +51,110 @@ def test_add_new_observation_when_adding_the_first_observation_correctly_sets_th
     assert bfs_feature_selector._observations.iloc[0].tolist() == [1, 2, 3, 4, True, False, True, False, True]
 
 
+def test_find_matching_successful_transition_row_when_dataset_dataframe_contains_a_row_with_subset_of_new_input_observation_and_the_state_was_successful_returns_true(
+    bfs_feature_selector: BFSFeatureSelector,
+) -> None:
+    reference_df = DataFrame.from_dict(
+        {
+            "(x)": [1, 2, 3, 4, 5],
+            "(y)": [2, 3, 4, 5, 6],
+            "(z)": [3, 4, 5, 6, 7],
+            "(w)": [4, 5, 6, 7, 8],
+            "(px)": [True, True, False, True, False],
+            "(py)": [False, False, True, False, True],
+            "(pz)": [True, True, False, True, False],
+            "(pw)": [False, False, True, False, True],
+            "is_successful": [True, True, False, True, False],
+        }
+    )
+    single_row_df = DataFrame.from_dict(
+        {"(x)": [1], "(y)": [2], "(z)": [3], "(w)": [4], "(px)": [True], "(py)": [True], "(pz)": [True], "(pw)": [False],}
+    )
+
+    match_found = bfs_feature_selector._find_matching_successful_transition_row(
+        reference_df=reference_df, single_row_df=single_row_df, columns=["(px)", "(py)", "(pz)", "(pw)"]
+    )
+    assert match_found
+
+
+def test_find_matching_successful_transition_row_when_dataset_dataframe_contains_a_row_with_data_same_as_observation_and_the_state_was_successful_returns_true(
+    bfs_feature_selector: BFSFeatureSelector,
+) -> None:
+    reference_df = DataFrame.from_dict(
+        {
+            "(x)": [1, 2, 3, 4, 5],
+            "(y)": [2, 3, 4, 5, 6],
+            "(z)": [3, 4, 5, 6, 7],
+            "(w)": [4, 5, 6, 7, 8],
+            "(px)": [True, True, False, True, False],
+            "(py)": [False, False, True, False, True],
+            "(pz)": [True, True, False, True, False],
+            "(pw)": [False, False, True, False, True],
+            "is_successful": [True, True, False, True, False],
+        }
+    )
+    single_row_df = DataFrame.from_dict(
+        {"(x)": [1], "(y)": [2], "(z)": [3], "(w)": [4], "(px)": [True], "(py)": [False], "(pz)": [True], "(pw)": [False],}
+    )
+
+    match_found = bfs_feature_selector._find_matching_successful_transition_row(
+        reference_df=reference_df, single_row_df=single_row_df, columns=["(px)", "(py)", "(pz)", "(pw)"]
+    )
+    assert match_found
+
+
+def test_find_matching_successful_transition_row_when_dataset_dataframe_contains_a_row_with_superset_of_state_data_and_the_state_was_successful_returns_false(
+    bfs_feature_selector: BFSFeatureSelector,
+) -> None:
+    reference_df = DataFrame.from_dict(
+        {
+            "(x)": [1, 2, 3, 4, 5],
+            "(y)": [2, 3, 4, 5, 6],
+            "(z)": [3, 4, 5, 6, 7],
+            "(w)": [4, 5, 6, 7, 8],
+            "(px)": [True, True, False, True, False],
+            "(py)": [False, False, True, False, True],
+            "(pz)": [True, True, False, True, False],
+            "(pw)": [False, False, True, False, True],
+            "is_successful": [True, True, False, True, False],
+        }
+    )
+    single_row_df = DataFrame.from_dict(
+        {"(x)": [1], "(y)": [2], "(z)": [3], "(w)": [4], "(px)": [False], "(py)": [False], "(pz)": [True], "(pw)": [False],}
+    )
+
+    match_found = bfs_feature_selector._find_matching_successful_transition_row(
+        reference_df=reference_df, single_row_df=single_row_df, columns=["(px)", "(py)", "(pz)", "(pw)"]
+    )
+    assert not match_found
+
+
+def test_find_matching_successful_transition_row_when_dataset_dataframe_contains_a_row_with_data_same_as_observation_and_the_state_was_unsuccessful_returns_false(
+    bfs_feature_selector: BFSFeatureSelector,
+) -> None:
+    reference_df = DataFrame.from_dict(
+        {
+            "(x)": [1, 2, 3, 4, 5],
+            "(y)": [2, 3, 4, 5, 6],
+            "(z)": [3, 4, 5, 6, 7],
+            "(w)": [4, 5, 6, 7, 8],
+            "(px)": [True, True, False, True, False],
+            "(py)": [False, False, True, False, True],
+            "(pz)": [True, True, False, True, False],
+            "(pw)": [False, False, True, False, True],
+            "is_successful": [False, False, False, False, True],
+        }
+    )
+    single_row_df = DataFrame.from_dict(
+        {"(x)": [1], "(y)": [2], "(z)": [3], "(w)": [4], "(px)": [True], "(py)": [False], "(pz)": [True], "(pw)": [False],}
+    )
+
+    match_found = bfs_feature_selector._find_matching_successful_transition_row(
+        reference_df=reference_df, single_row_df=single_row_df, columns=["(px)", "(py)", "(pz)", "(pw)"]
+    )
+    assert not match_found
+
+
 def test_add_new_observation_when_adding_the_first_observation_returns_empty_list_of_string_as_selected_features(
     bfs_feature_selector: BFSFeatureSelector,
 ) -> None:

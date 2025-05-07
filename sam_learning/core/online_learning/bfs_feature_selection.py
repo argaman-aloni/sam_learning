@@ -40,14 +40,16 @@ class BFSFeatureSelector:
         :return: True if a successful match is found, False otherwise.
         """
         self.logger.debug("Searching for a matching successful transition row based on the input transition.")
-        target_values = single_row_df.iloc[0][columns]
-        matches = reference_df[reference_df[columns].eq(target_values).all(axis=1)]
-        if matches.empty:
-            return False
-
-        for _, match in matches.iterrows():
-            if match["is_successful"]:
-                self.logger.debug("Found a successful match.")
+        # Since the state can have a superset of the features, we need to check if our dataset has a row with
+        # predicates set to true which is a subset of the new observation.
+        df_bool = single_row_df[columns] == True
+        per_column = df_bool.all(axis=0)
+        new_observation_true_columns = set(per_column.index[per_column].tolist())
+        for _, row in reference_df.iterrows():
+            mask = row[columns] == True
+            true_reference_columns = mask.index[mask].tolist()
+            if new_observation_true_columns.issuperset(true_reference_columns) and row["is_successful"]:
+                self.logger.debug("Found a matching transition row.")
                 return True
 
         self.logger.debug("No successful match found.")
