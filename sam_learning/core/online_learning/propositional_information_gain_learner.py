@@ -3,7 +3,6 @@ import logging
 from typing import Set, List
 
 from pddl_plus_parser.models import Predicate
-from pysat.examples.hitman import Hitman
 
 
 class PropositionalInformationGainLearner:
@@ -21,7 +20,6 @@ class PropositionalInformationGainLearner:
         self.preconditions_superset = {predicate.copy() for predicate in lifted_predicates}
         self.cannot_be_preconditions = set()
         self.must_be_preconditions = []
-        self._hitting_set_solver = Hitman(solver="m22", htype="lbx")
 
     def add_positive_sample(self, predicates_in_state: Set[Predicate]) -> None:
         """Adds a positive sample to the samples list used to create the action's precondition.
