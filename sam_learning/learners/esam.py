@@ -7,8 +7,7 @@ from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_str
 from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, PDDLType, GroundedPredicate
 from scipy.cluster.hierarchy import DisjointSet
 
-from sam_learning.core import extract_effects, LearnerDomain, LearnerAction, extract_not_effects, NotSafeActionError, \
-    EquationSolutionType
+from sam_learning.core import extract_discrete_effects, LearnerDomain, LearnerAction, extract_not_effects, NotSafeActionError, EquationSolutionType
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
@@ -46,8 +45,7 @@ class ExtendedSamLearner(SAMLearner):
                 encoded_action_call = encoder(action_call)
                 possible_action_calls.append(encoded_action_call)
             except NotSafeActionError as e:
-                logging.log(level=logging.INFO,
-                            msg=f"skipped an unsafe encoding of {action_call.name} to {e.action_name}")
+                logging.log(level=logging.INFO, msg=f"skipped an unsafe encoding of {action_call.name} to {e.action_name}")
                 continue
 
         return possible_action_calls
@@ -76,27 +74,17 @@ class ExtendedSamLearner(SAMLearner):
 
         return Or(clause_effects)
 
-    def _get_surely_not_eff(self, grounded_action: ActionCall) -> Set[Predicate]:
+    def handle_effects(self, grounded_action: ActionCall):
         """
-        Return the set of predicates representing the negative effects caused by the action between the previous state and the next state.
 
-        Parameters:
-            grounded_action (ActionCall): The grounded action that was executed.
-
-        Returns:
-            set[Predicate]: A set of predicates that cannot be an effect.
+        :param grounded_action:
+        :return:
         """
-        self.logger.info(f"Getting the predicates that are surely not effects for action {grounded_action.name}.")
-        not_add_effects, not_delete_effects = extract_not_effects(self.triplet_snapshot.next_state_predicates)
-        self.logger.debug("Updating the predicates that cannot be add effects and those that cannot be delete effects.")
-        not_lifted_add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(not_add_effects))
-        not_lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(not_delete_effects))
-        return set(not_lifted_add_effects).union(not_lifted_delete_effects)
-
-    def handle_effects(self, previous_state: State, next_state: State, grounded_action: ActionCall):
         # handle effects
         self.logger.debug(f"handling action {grounded_action.name} effects.")
-        add_grounded_effects, del_grounded_effects = extract_effects(previous_state, next_state)
+        add_grounded_effects, del_grounded_effects = extract_discrete_effects(
+            self.triplet_snapshot.previous_state_predicates, self.triplet_snapshot.next_state_predicates
+        )
 
         # add 'Or' clauses to set of 'Or' clauses
         self.logger.debug("Adding the effects to the action effects CNF as a new OR clause.")
@@ -104,7 +92,7 @@ class ExtendedSamLearner(SAMLearner):
             or_clause = self._get_is_eff_clause_for_predicate(grounded_action, grounded_effect)
             self.action_effects_cnfs[grounded_action.name].add(or_clause)
 
-        cannot_be_effects = self._get_surely_not_eff(grounded_action)
+        cannot_be_effects = extract_not_effects(self.triplet_snapshot.next_state_predicates)
 
         self.cannot_be_effects[grounded_action.name].update({eff.untyped_representation for eff in cannot_be_effects})
         self.logger.debug(f"finished handling action- {grounded_action.name} effects.")
@@ -133,7 +121,7 @@ class ExtendedSamLearner(SAMLearner):
         """
         self.logger.debug(f"updating action {str(grounded_action)}.")
         super()._update_action_preconditions(grounded_action)
-        self.handle_effects(previous_state, next_state, grounded_action)
+        self.handle_effects(grounded_action)
         self.logger.debug(f"finished updating action {str(grounded_action)}.")
 
     def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
@@ -292,18 +280,16 @@ class ExtendedSamLearner(SAMLearner):
                 if len(set(original_action_call.parameters)) != len(proxy_data.signature.keys()):
                     return res
 
-                original_signature = {param_name: index for index, param_name in
-                                      enumerate(self.partial_domain.actions[action_name].signature.keys())}
-                original_param_mapping = {param_name: original_action_call.parameters[index]
-                                          for param_name, index in original_signature.items()}
-                grounded_proxy_parameters = {proxy_data.signature[param_name]: obj
-                                             for param_name, obj in original_param_mapping.items()}
+                original_signature = {param_name: index for index, param_name in enumerate(self.partial_domain.actions[action_name].signature.keys())}
+                original_param_mapping = {param_name: original_action_call.parameters[index] for param_name, index in original_signature.items()}
+                grounded_proxy_parameters = {proxy_data.signature[param_name]: obj for param_name, obj in original_param_mapping.items()}
                 for param, obj_pddl_type in new_proxy.signature.items():
-                    if self.partial_domain.types[grounded_proxy_parameters[param]].is_sub_type(obj_pddl_type) :
-                        raise NotSafeActionError(name=f"{new_proxy.name}",
-                                                 reason="proxy action parameter mapping"
-                                                        "does not align with the action call",
-                                                 solution_type=EquationSolutionType.no_solution_found)
+                    if self.partial_domain.types[grounded_proxy_parameters[param]].is_sub_type(obj_pddl_type):
+                        raise NotSafeActionError(
+                            name=f"{new_proxy.name}",
+                            reason="proxy action parameter mapping" "does not align with the action call",
+                            solution_type=EquationSolutionType.no_solution_found,
+                        )
                 res.parameters = [grounded_proxy_parameters[param] for param in new_proxy.signature.keys()]
                 res.name = new_proxy.name
                 return res

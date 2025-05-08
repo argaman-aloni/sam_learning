@@ -6,8 +6,12 @@ import math
 from pddl_plus_parser.models import Predicate, Precondition, SignatureType, PDDLConstant
 
 from sam_learning.core.propositional_operations.discrete_utilities import extract_predicate_data
-from sam_learning.core.propositional_operations.logical_expression_operations import create_cnf_combination, minimize_cnf_clauses, \
-    _flip_single_predicate, check_complementary_literals
+from sam_learning.core.propositional_operations.logical_expression_operations import (
+    create_cnf_combination,
+    minimize_cnf_clauses,
+    _flip_single_predicate,
+    check_complementary_literals,
+)
 
 NOT_PREFIX = "(not"
 AFTER_NOT_PREFIX_INDEX = 5
@@ -16,14 +20,14 @@ RIGHT_BRACKET_INDEX = -1
 
 class DependencySet:
     """Class representing the dependency set of an action."""
+
     possible_antecedents: Dict[str, List[Set[str]]]
     max_antecedents: int
     action_signature: SignatureType
     domain_constants: Dict[str, PDDLConstant]
     logger: logging.Logger
 
-    def __init__(self, max_size_antecedents: int, action_signature: SignatureType,
-                 domain_constants: Dict[str, PDDLConstant]):
+    def __init__(self, max_size_antecedents: int, action_signature: SignatureType, domain_constants: Dict[str, PDDLConstant]):
         self.possible_antecedents = {}
         self.max_antecedents = max_size_antecedents
         self.action_signature = action_signature
@@ -46,8 +50,7 @@ class DependencySet:
 
         return superset_dependencies
 
-    def _extract_negated_minimized_antecedents(
-            self, unsafe_antecedents: List[Set[str]], preconditions: Set[str]) -> Union[List[Set[str]], bool]:
+    def _extract_negated_minimized_antecedents(self, unsafe_antecedents: List[Set[str]], preconditions: Set[str]) -> Union[List[Set[str]], bool]:
         """Tries to minimize the negated antecedents' size to a more compact representation.
 
         :param unsafe_antecedents: the unsafe antecedents to minimize.
@@ -90,8 +93,7 @@ class DependencySet:
 
         return precondition
 
-    def _create_negated_antecedent_preconditions(
-            self, negated_minimized_antecedents: Union[List[Set[str]], bool]) -> Union[Precondition, Predicate]:
+    def _create_negated_antecedent_preconditions(self, negated_minimized_antecedents: Union[List[Set[str]], bool]) -> Union[Precondition, Predicate]:
         """Creates the preconditions for the negated antecedents.
 
         :param negated_minimized_antecedents: the literals set representing the negated antecedents.
@@ -101,70 +103,79 @@ class DependencySet:
         if len(negated_minimized_antecedents) == 1:
             disjunction = next(iter(negated_minimized_antecedents))
             if len(disjunction) == 1:
-                return extract_predicate_data(action_signature=self.action_signature,
-                                              predicate_str=disjunction.pop(),
-                                              domain_constants=self.domain_constants)
+                return extract_predicate_data(
+                    action_signature=self.action_signature, predicate_str=disjunction.pop(), domain_constants=self.domain_constants
+                )
 
             or_condition = Precondition("or")
             for antecedent_literal in disjunction:
-                or_condition.add_condition(extract_predicate_data(action_signature=self.action_signature,
-                                                                  predicate_str=antecedent_literal,
-                                                                  domain_constants=self.domain_constants))
+                or_condition.add_condition(
+                    extract_predicate_data(
+                        action_signature=self.action_signature, predicate_str=antecedent_literal, domain_constants=self.domain_constants
+                    )
+                )
             return or_condition
 
         for disjunction in negated_minimized_antecedents:
             if len(disjunction) == 1:
                 negated_antecedents_preconditions.add_condition(
-                    extract_predicate_data(action_signature=self.action_signature,
-                                           predicate_str=disjunction.pop(),
-                                           domain_constants=self.domain_constants))
+                    extract_predicate_data(
+                        action_signature=self.action_signature, predicate_str=disjunction.pop(), domain_constants=self.domain_constants
+                    )
+                )
                 continue
 
             or_condition = Precondition("or")
             for antecedent_literal in disjunction:
-                or_condition.add_condition(extract_predicate_data(action_signature=self.action_signature,
-                                                                  predicate_str=antecedent_literal,
-                                                                  domain_constants=self.domain_constants))
+                or_condition.add_condition(
+                    extract_predicate_data(
+                        action_signature=self.action_signature, predicate_str=antecedent_literal, domain_constants=self.domain_constants
+                    )
+                )
 
             negated_antecedents_preconditions.add_condition(or_condition)
 
         return negated_antecedents_preconditions
 
     def _handle_contradicting_antecedents(
-            self, is_effect: bool, literal: str,
-            positive_minimized_antecedents: Set[str]) -> Union[Predicate, Precondition]:
-        self.logger.debug(f"The negation of the antecedents for {literal} contains contradiction, "
-                          f"so the rest of the DNF must be true")
+        self, is_effect: bool, literal: str, positive_minimized_antecedents: Set[str]
+    ) -> Union[Predicate, Precondition]:
+        self.logger.debug(f"The negation of the antecedents for {literal} contains contradiction, " f"so the rest of the DNF must be true")
         if not is_effect:
-            lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
-                                                             predicate_str=literal,
-                                                             domain_constants=self.domain_constants)
+            lifted_result_predicate = extract_predicate_data(
+                action_signature=self.action_signature, predicate_str=literal, domain_constants=self.domain_constants
+            )
             return lifted_result_predicate
         # the literal was observed as an effect of the action, so either the positive clauses are
         # true or the literal itself is true
         if check_complementary_literals(positive_minimized_antecedents):
-            lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
-                                                             predicate_str=literal,
-                                                             domain_constants=self.domain_constants)
+            lifted_result_predicate = extract_predicate_data(
+                action_signature=self.action_signature, predicate_str=literal, domain_constants=self.domain_constants
+            )
             return lifted_result_predicate
         positive_antecedents = Precondition("and")
         for antecedent_literal in positive_minimized_antecedents:
-            positive_antecedents.add_condition(extract_predicate_data(action_signature=self.action_signature,
-                                                                      predicate_str=antecedent_literal,
-                                                                      domain_constants=self.domain_constants))
+            positive_antecedents.add_condition(
+                extract_predicate_data(
+                    action_signature=self.action_signature, predicate_str=antecedent_literal, domain_constants=self.domain_constants
+                )
+            )
         resulting_preconditions = Precondition("or")
-        lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
-                                                         predicate_str=literal,
-                                                         domain_constants=self.domain_constants)
+        lifted_result_predicate = extract_predicate_data(
+            action_signature=self.action_signature, predicate_str=literal, domain_constants=self.domain_constants
+        )
         resulting_preconditions.add_condition(lifted_result_predicate)
         resulting_preconditions.add_condition(positive_antecedents)
         return resulting_preconditions
 
     def _handle_effect_literal(
-            self, lifted_result_predicate: Predicate,
-            negated_antecedents_preconditions: Union[Precondition, Predicate],
-            negated_result: str, positive_minimized_antecedents: Set[str],
-            preconditions: Set[str]) -> Optional[Precondition]:
+        self,
+        lifted_result_predicate: Predicate,
+        negated_antecedents_preconditions: Union[Precondition, Predicate],
+        negated_result: str,
+        positive_minimized_antecedents: Set[str],
+        preconditions: Set[str],
+    ) -> Optional[Precondition]:
         """Handles the creation of the conditional's effect preconditions.
 
         :param lifted_result_predicate: the lifted result predicate.
@@ -177,9 +188,11 @@ class DependencySet:
         restrictive_precondition = Precondition("or")
         positive_antecedents = Precondition("and")
         for antecedent_literal in positive_minimized_antecedents:
-            positive_antecedents.add_condition(extract_predicate_data(action_signature=self.action_signature,
-                                                                      predicate_str=antecedent_literal,
-                                                                      domain_constants=self.domain_constants))
+            positive_antecedents.add_condition(
+                extract_predicate_data(
+                    action_signature=self.action_signature, predicate_str=antecedent_literal, domain_constants=self.domain_constants
+                )
+            )
         restrictive_precondition.add_condition(positive_antecedents)
         restrictive_precondition.add_condition(negated_antecedents_preconditions)
         if negated_result not in preconditions:
@@ -191,20 +204,18 @@ class DependencySet:
 
         return restrictive_precondition
 
-    def initialize_dependencies(self, lifted_literals: Set[Predicate],
-                                antecedents: Optional[Set[Predicate]] = None) -> None:
+    def initialize_dependencies(self, lifted_literals: Set[Predicate], antecedents: Optional[Set[Predicate]] = None) -> None:
         """Initialize the dependencies with positive and negative literals.
 
         :param lifted_literals: the lifted bounded literals matching the action.
         :param antecedents: in case that the antecedents may contain different literals from the results
             (e.g. in the case of universal effects).
         """
+
         literals_str = {literal.untyped_representation for literal in lifted_literals}
         for literal in literals_str:
-            antecedents_literals = {antecedent.untyped_representation for antecedent in antecedents} \
-                if antecedents is not None else literals_str
-            self.possible_antecedents[literal] = create_cnf_combination(
-                antecedents_literals, self.max_antecedents)
+            antecedents_literals = {antecedent.untyped_representation for antecedent in antecedents} if antecedents is not None else literals_str
+            self.possible_antecedents[literal] = create_cnf_combination(antecedents_literals, self.max_antecedents)
 
     def remove_dependencies(self, literal: str, literals_to_remove: Set[str], include_supersets: bool = False) -> None:
         """Remove a dependency from the dependency set.
@@ -214,6 +225,10 @@ class DependencySet:
         :param include_supersets: whether to include supersets of the dependencies to remove.
         """
         self.logger.debug(f"Removing dependencies {literals_to_remove} for literal {literal}")
+        if literal not in self.possible_antecedents:
+            self.logger.warning(f"The literal {literal} is not in the dependency set!")
+            return
+
         conjunctions_to_remove = create_cnf_combination(literals_to_remove, self.max_antecedents)
         if include_supersets:
             conjunctions_to_remove = self._extract_superset_dependencies(literal, literals_to_remove)
@@ -251,8 +266,7 @@ class DependencySet:
         :param literal: the literal to check.
         :return: True if the dependency set is safe, False otherwise.
         """
-        self.logger.info(f"Determining whether the literal {literal} is a conditional effect "
-                         f"with safe number of antecedents")
+        self.logger.info(f"Determining whether the literal {literal} is a conditional effect " f"with safe number of antecedents")
         return len(self.possible_antecedents[literal]) == 1
 
     def is_possible_result(self, literal: str) -> bool:
@@ -280,8 +294,8 @@ class DependencySet:
         return safe_antecedents
 
     def construct_restrictive_preconditions(
-            self, preconditions: Set[str], literal: str,
-            is_effect: bool = False) -> Optional[Union[Precondition, Predicate]]:
+        self, preconditions: Set[str], literal: str, is_effect: bool = False
+    ) -> Optional[Union[Precondition, Predicate]]:
         """Extracts the safe conditional effects from the dependency set.
 
         :param preconditions: the preconditions of the action.
@@ -300,8 +314,7 @@ class DependencySet:
             positive_minimized_antecedents.update(disjunction)
 
         if isinstance(negated_minimized_antecedents, bool) and negated_minimized_antecedents:
-            self.logger.debug(f"The negation of the antecedents for {literal} is the same as the preconditions "
-                              f"so it can never be triggered!")
+            self.logger.debug(f"The negation of the antecedents for {literal} is the same as the preconditions " f"so it can never be triggered!")
             return None
 
         if isinstance(negated_minimized_antecedents, bool) and not negated_minimized_antecedents:
@@ -310,15 +323,15 @@ class DependencySet:
         # the negated antecedents are the minimized set of literals with no contradictions
         negated_antecedents_preconditions = self._create_negated_antecedent_preconditions(negated_minimized_antecedents)
 
-        negated_result = f"{NOT_PREFIX} {literal})" if not literal.startswith(NOT_PREFIX) else \
-            literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]
-        lifted_result_predicate = extract_predicate_data(action_signature=self.action_signature,
-                                                         predicate_str=literal,
-                                                         domain_constants=self.domain_constants)
+        negated_result = f"{NOT_PREFIX} {literal})" if not literal.startswith(NOT_PREFIX) else literal[AFTER_NOT_PREFIX_INDEX:RIGHT_BRACKET_INDEX]
+        lifted_result_predicate = extract_predicate_data(
+            action_signature=self.action_signature, predicate_str=literal, domain_constants=self.domain_constants
+        )
 
         if is_effect:
-            return self._handle_effect_literal(lifted_result_predicate, negated_antecedents_preconditions,
-                                               negated_result, positive_minimized_antecedents, preconditions)
+            return self._handle_effect_literal(
+                lifted_result_predicate, negated_antecedents_preconditions, negated_result, positive_minimized_antecedents, preconditions
+            )
 
         if negated_result in preconditions:
             return negated_antecedents_preconditions

@@ -8,12 +8,13 @@ from pddl_plus_parser.models import Domain, Problem, GroundedPredicate, Signatur
 from pddl_plus_parser.models.observation import Observation
 import pytest
 
-from sam_learning.core import extract_effects
+from sam_learning.core import extract_discrete_effects
 from sam_learning.learners.esam import ExtendedSamLearner, minimize_parameters_equality_dict
 from tests.consts import (
     ROVERS_COMBINED_ESAM_PROBLEM_PATH,
     ROVERS_COMBINED_ESAM_TRAJECTORY_PATH,
     ROVERS_ESAM_DOMAIN_PATH,
+    sync_snapshot,
 )
 
 
@@ -59,14 +60,12 @@ def assert_get_minimize_parameters_equality_dict(
 # Tests for _get_is_eff_clause_for_predicate
 # ---------------------------
 def test_is_eff_clause_multiple_binding(rovers_esam_learner: ExtendedSamLearner, rovers_esam_observation: Observation):
-    logging.getLogger().setLevel(logging.INFO)
-    rovers_esam_learner.logger.setLevel(logging.WARNING)
-
     comp = rovers_esam_observation.components[-1]
-    prev_state = comp.previous_state
-    next_state = comp.next_state
     grounded_action = comp.grounded_action_call
-    add_grounded_effects, _ = extract_effects(prev_state, next_state)
+    sync_snapshot(rovers_esam_learner, comp, rovers_esam_observation.grounded_objects)
+    add_grounded_effects, _ = extract_discrete_effects(
+        rovers_esam_learner.triplet_snapshot.previous_state_predicates, rovers_esam_learner.triplet_snapshot.next_state_predicates
+    )
 
     # Initialize with a default value then update when found
     grounded_predicate: GroundedPredicate = GroundedPredicate("communicated_soil_data", {}, {}, True)
@@ -86,10 +85,11 @@ def test_is_eff_clause_multiple_binding(rovers_esam_learner: ExtendedSamLearner,
 
 def test_is_eff_clause_injective_binding(rovers_esam_learner: ExtendedSamLearner, rovers_esam_observation: Observation):
     comp = rovers_esam_observation.components[0]
-    prev_state = comp.previous_state
-    next_state = comp.next_state
     grounded_action = comp.grounded_action_call
-    add_grounded_effects, _ = extract_effects(prev_state, next_state)
+    sync_snapshot(rovers_esam_learner, comp, rovers_esam_observation.grounded_objects)
+    add_grounded_effects, _ = extract_discrete_effects(
+        rovers_esam_learner.triplet_snapshot.previous_state_predicates, rovers_esam_learner.triplet_snapshot.next_state_predicates
+    )
 
     grounded_predicate = GroundedPredicate("", {}, {}, True)
     for effect in add_grounded_effects:

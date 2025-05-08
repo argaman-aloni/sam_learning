@@ -298,12 +298,11 @@ def test_handle_action_effects_returns_delete_effects_with_predicates_with_is_po
     elevators_sam_learning: SAMLearner, elevators_observation: Observation
 ):
     observation_component = elevators_observation.components[0]
-    previous_state = observation_component.previous_state
-    next_state = observation_component.next_state
     test_action_call = observation_component.grounded_action_call
     observed_objects = elevators_observation.grounded_objects
     elevators_sam_learning.current_trajectory_objects = observed_objects
-    add_effects, delete_effects = elevators_sam_learning._handle_action_effects(test_action_call, previous_state, next_state)
+    sync_snapshot(elevators_sam_learning, observation_component, elevators_observation.grounded_objects)
+    add_effects, delete_effects = elevators_sam_learning._handle_action_effects(test_action_call)
     assert len(add_effects) > 0
     assert len(delete_effects) > 0
     for add_effects_predicate in add_effects:
@@ -317,12 +316,11 @@ def test_handle_action_effects_returns_correct_add_and_delete_effects_predicates
     elevators_sam_learning: SAMLearner, elevators_observation: Observation
 ):
     observation_component = elevators_observation.components[0]
-    previous_state = observation_component.previous_state
-    next_state = observation_component.next_state
     test_action_call = observation_component.grounded_action_call
     observed_objects = elevators_observation.grounded_objects
     elevators_sam_learning.current_trajectory_objects = observed_objects
-    add_effects, delete_effects = elevators_sam_learning._handle_action_effects(test_action_call, previous_state, next_state)
+    sync_snapshot(elevators_sam_learning, observation_component, elevators_observation.grounded_objects)
+    add_effects, delete_effects = elevators_sam_learning._handle_action_effects(test_action_call)
     assert len(add_effects) == len(delete_effects) == 1
     assert add_effects[0].untyped_representation == "(lift-at ?lift ?f2)"
     assert delete_effects[0].untyped_representation == "(not (lift-at ?lift ?f1))"
@@ -335,7 +333,7 @@ def test_handle_action_effects_does_not_create_intersecting_sets_of_effects(elev
     test_action_call = observation_component.grounded_action_call
     observed_objects = elevators_observation.grounded_objects
     elevators_sam_learning.current_trajectory_objects = observed_objects
-    add_effects, delete_effects = elevators_sam_learning._handle_action_effects(test_action_call, previous_state, next_state)
+    add_effects, delete_effects = elevators_sam_learning._handle_action_effects(test_action_call)
     add_effects_str = set([p.untyped_representation for p in add_effects])
     delete_effects_str = set([p.untyped_representation for p in delete_effects])
     assert not add_effects_str.intersection(delete_effects_str)
