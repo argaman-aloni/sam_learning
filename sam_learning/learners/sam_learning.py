@@ -9,7 +9,7 @@ from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, D
 
 from sam_learning.core import (
     PredicatesMatcher,
-    extract_effects,
+    extract_discrete_effects,
     LearnerDomain,
     contains_duplicates,
     VocabularyCreator,
@@ -78,19 +78,16 @@ class SAMLearner:
         for predicate in self.cannot_be_effect[grounded_action.name]:
             self.partial_domain.actions[grounded_action.name].discrete_effects.discard(predicate)
 
-    def _handle_action_effects(
-        self, grounded_action: ActionCall, previous_state: State, next_state: State
-    ) -> Tuple[List[Predicate], List[Predicate]]:
+    def _handle_action_effects(self, grounded_action: ActionCall) -> Tuple[List[Predicate], List[Predicate]]:
         """Finds the effects generated from the previous and the next state on this current step.
 
         :param grounded_action: the grounded action that was executed according to the trajectory.
-        :param previous_state: the state that the action was executed on.
-        :param next_state: the state that was created after executing the action on the previous
-            state.
         :return: the effect containing the add and del list of predicates.
         """
         self.logger.debug(f"Starting to learn the effects of {str(grounded_action)}.")
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
+        grounded_add_effects, grounded_del_effects = extract_discrete_effects(
+            self.triplet_snapshot.previous_state_predicates, self.triplet_snapshot.next_state_predicates
+        )
         self.logger.debug("Updating the negative state predicates based on the action's execution.")
         lifted_add_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_add_effects))
         lifted_delete_effects = self.matcher.get_possible_literal_matches(grounded_action, list(grounded_del_effects))
@@ -155,7 +152,7 @@ class SAMLearner:
         # adding the preconditions each predicate is grounded in this stage.
         observed_action = self.partial_domain.actions[grounded_action.name]
         self._add_new_action_preconditions(grounded_action)
-        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(grounded_action, previous_state, next_state)
+        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(grounded_action)
 
         observed_action.discrete_effects.update(set(lifted_add_effects).union(lifted_delete_effects))
         self.observed_actions.append(observed_action.name)
@@ -172,7 +169,7 @@ class SAMLearner:
         action_name = grounded_action.name
         observed_action = self.partial_domain.actions[action_name]
         self._update_action_preconditions(grounded_action)
-        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(grounded_action, previous_state, next_state)
+        lifted_add_effects, lifted_delete_effects = self._handle_action_effects(grounded_action)
 
         observed_action.discrete_effects.update(set(lifted_add_effects).union(lifted_delete_effects))
         if len(self.partial_domain.constants) > 0:

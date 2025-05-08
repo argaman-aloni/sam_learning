@@ -13,7 +13,7 @@ from pddl_plus_parser.models import (
     JointActionCall,
 )
 
-from sam_learning.core import LearnerDomain, extract_effects, LiteralCNF, LearnerAction, extract_predicate_data
+from sam_learning.core import LearnerDomain, extract_discrete_effects, LiteralCNF, LearnerAction, extract_predicate_data
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
@@ -176,12 +176,10 @@ class MultiAgentSAM(SAMLearner):
 
         self.literals_cnf[grounded_effect.lifted_untyped_representation].add_possible_effect(concurrent_execution)
 
-    def update_single_agent_executed_action(self, executed_action: ActionCall, previous_state: State, next_state: State) -> None:
+    def update_single_agent_executed_action(self, executed_action: ActionCall) -> None:
         """Handles the situations where only one agent executed an action in a joint action.
 
         :param executed_action: the single operational action in the joint action.
-        :param previous_state: the state prior to the action's execution.
-        :param next_state: the state following the action's execution.
         """
         self.logger.info(f"Handling the execution of the single action - {str(executed_action)}.")
         observed_action = self.partial_domain.actions[executed_action.name]
@@ -192,7 +190,9 @@ class MultiAgentSAM(SAMLearner):
         else:
             super()._update_action_preconditions(executed_action)
 
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
+        grounded_add_effects, grounded_del_effects = extract_discrete_effects(
+            self.triplet_snapshot.previous_state_predicates, self.triplet_snapshot.next_state_predicates
+        )
         self.logger.debug("Updating the literals that must be effects of the action.")
         self.add_must_be_effect_to_cnf(executed_action, grounded_add_effects.union(grounded_del_effects))
         not_effects = self._extract_relevant_not_effects(executing_actions=[executed_action], relevant_action=executed_action,)
@@ -222,7 +222,9 @@ class MultiAgentSAM(SAMLearner):
             else:
                 super()._update_action_preconditions(executed_action)
 
-        grounded_add_effects, grounded_del_effects = extract_effects(previous_state, next_state)
+        grounded_add_effects, grounded_del_effects = extract_discrete_effects(
+            self.triplet_snapshot.previous_state_predicates, self.triplet_snapshot.next_state_predicates
+        )
         for executed_action in executing_actions:
             not_effects = self._extract_relevant_not_effects(executing_actions=[executed_action], relevant_action=executed_action,)
             self.add_not_effect_to_cnf(executed_action, not_effects)
@@ -251,7 +253,7 @@ class MultiAgentSAM(SAMLearner):
                 current_action=executing_action,
                 observation_objects=self.current_trajectory_objects,
             )
-            self.update_single_agent_executed_action(executing_action, previous_state, next_state)
+            self.update_single_agent_executed_action(executing_action)
             return
 
         self.logger.debug("More than one action is being executed in the current triplet.")
