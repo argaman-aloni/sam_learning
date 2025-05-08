@@ -140,7 +140,7 @@ def test_remove_non_existing_previous_state_dependencies_removes_correct_predica
 
     spider_conditional_sam._initialize_actions_dependencies(spider_first_action)
     spider_conditional_sam._update_observed_effects(spider_first_action, spider_first_state, spider_second_state)
-    spider_conditional_sam._remove_non_existing_previous_state_dependencies(spider_first_action, spider_first_state, spider_second_state)
+    spider_conditional_sam._remove_non_existing_previous_state_dependencies(spider_first_action)
     not_dependencies = {
         "(currently-updating-movable )",
         "(currently-updating-unmovable )",

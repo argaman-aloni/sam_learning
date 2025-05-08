@@ -49,7 +49,7 @@ def test_add_negative_sample_adds_correct_set_of_missing_preconditions_to_the_mu
     propositional_information_gain_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
 ):
     new_negative_sample = {p for p in lifted_vocabulary if p.untyped_representation in ["(not (available ?x))", "(not (treatment ?x ?oldtreatment))"]}
-    propositional_information_gain_learner.add_negative_sample(new_negative_sample)
+    propositional_information_gain_learner._add_negative_pre_state_observation(new_negative_sample)
     assert len(propositional_information_gain_learner.must_be_preconditions) == 1
     must_be_pre = propositional_information_gain_learner.must_be_preconditions[0]
     assert len(must_be_pre) == len(lifted_vocabulary) - 2
@@ -87,7 +87,7 @@ def test_add_negative_and_positive_sample_adds_correct_set_of_missing_preconditi
             "(grind-treatment-change ?m ?oldtreatment ?newtreatment)",
         ]
     }
-    propositional_information_gain_learner.add_negative_sample(new_negative_sample)
+    propositional_information_gain_learner._add_negative_pre_state_observation(new_negative_sample)
     assert len(propositional_information_gain_learner.must_be_preconditions) == 1
     must_be_pre = propositional_information_gain_learner.must_be_preconditions[0]
     assert len(must_be_pre) == 2
@@ -126,7 +126,7 @@ def test_add_negative_and_positive_sample_removes_redundant_preconditions_from_m
             "(grind-treatment-change ?m ?oldtreatment ?newtreatment)",
         ]
     }
-    propositional_information_gain_learner.add_negative_sample(new_negative_sample)
+    propositional_information_gain_learner._add_negative_pre_state_observation(new_negative_sample)
     assert len(propositional_information_gain_learner.must_be_preconditions) == 1
     must_be_pre = propositional_information_gain_learner.must_be_preconditions[0]
     assert len(must_be_pre) == 3
