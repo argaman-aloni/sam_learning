@@ -236,9 +236,7 @@ def test_update_single_agent_executed_action_updates_action_count(woodworking_ma
         action_call=test_action,
         trajectory_objects=multi_agent_observation.grounded_objects,
     )
-    woodworking_ma_sam.update_single_agent_executed_action(
-        executed_action=test_action, previous_state=first_trajectory_component.previous_state, next_state=first_trajectory_component.next_state
-    )
+    woodworking_ma_sam.update_single_agent_executed_action(executed_action=test_action)
     assert "do-grind" in woodworking_ma_sam.observed_actions
 
 
