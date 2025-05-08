@@ -159,15 +159,14 @@ class ConditionalSAM(SAMLearner):
         previous_state_literals = self._find_literals_existing_in_state(grounded_action, self.triplet_snapshot.previous_state_predicates)
         for literal in missing_next_state_literals:
             self.conditional_antecedents[grounded_action.name].remove_dependencies(literal=literal, literals_to_remove=previous_state_literals)
+
         self.logger.debug(f"Done removing existing previous state dependencies.")
 
-    def _remove_non_existing_previous_state_dependencies(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
+    def _remove_non_existing_previous_state_dependencies(self, grounded_action: ActionCall) -> None:
         """Removed literals that don't appear in the previous state from the dependency set of a literal that is
             guaranteed as an effect.
 
         :param grounded_action: the action that is being executed.
-        :param previous_state: the state prior to the action execution.
-        :param next_state: the state after the action execution.
         :return:
         """
         self.logger.debug("Removing non-existing previous state antecedents from literals observed in s'/ s.")
@@ -196,7 +195,7 @@ class ConditionalSAM(SAMLearner):
         :param next_state: the state following the action's execution.
         """
         self._remove_existing_previous_state_dependencies(grounded_action)
-        self._remove_non_existing_previous_state_dependencies(grounded_action, previous_state, next_state)
+        self._remove_non_existing_previous_state_dependencies(grounded_action)
 
     def _apply_inductive_rules(self, grounded_action: ActionCall, previous_state: State, next_state: State) -> None:
         """Updates the literals that cannot be effects as well as updates the dependency set.
