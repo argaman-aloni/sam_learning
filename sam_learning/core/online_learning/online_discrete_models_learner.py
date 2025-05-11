@@ -8,7 +8,8 @@ DUMMY_EFFECT = Predicate("dummy_effect", signature={}, is_positive=True)
 
 
 class OnlineDiscreteModelLearner:
-    """Information gain calculation of the numeric part of an action."""
+    """Online model learning algorithm that learns discrete action models.
+    Similar to the work of Sarath Sreedharan and Michael Katz (2023)."""
 
     logger: logging.Logger
     action_name: str
@@ -46,11 +47,10 @@ class OnlineDiscreteModelLearner:
                 must_be_preconditions_set.discard(not_precondition)
 
     def _add_positive_post_state_observation(self, pre_state_predicates: Set[Predicate], post_state_predicates: Set[Predicate]) -> None:
-        """
+        """Adds a positive pre and post-state observation and deduces the predicates to filter from the effects.
 
-        :param pre_state_predicates:
-        :param post_state_predicates:
-        :return:
+        :param pre_state_predicates: the predicates observed in the state in which the action was executed successfully.
+        :param post_state_predicates: the pridacates observed in the state following the action execution.
         """
         self.logger.info(f"Adding a new positive post-state observation for the action {self.action_name}.")
         if len(self.cannot_be_effects) == 0:
@@ -72,12 +72,11 @@ class OnlineDiscreteModelLearner:
     def add_transition_data(
         self, pre_state_predicates: Set[Predicate], post_state_predicates: Set[Predicate], is_transition_successful: bool
     ) -> None:
-        """
+        """Collects the data from the transition and updates the model.
 
-        :param pre_state_predicates:
-        :param post_state_predicates:
-        :param is_transition_successful:
-        :return:
+        :param pre_state_predicates: the predicates observed in the state in which the action was executed.
+        :param post_state_predicates: the predicates observed in the state following the action execution.
+        :param is_transition_successful: a boolean indicating if the action was successfully applied in the pre-state.
         """
         if is_transition_successful:
             self._add_positive_pre_state_observation(pre_state_predicates)
