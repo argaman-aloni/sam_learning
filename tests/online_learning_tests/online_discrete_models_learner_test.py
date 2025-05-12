@@ -22,6 +22,17 @@ def online_discrete_model_learner(lifted_vocabulary) -> OnlineDiscreteModelLearn
     return OnlineDiscreteModelLearner(TEST_ACTION_NAME, lifted_vocabulary)
 
 
+def test_initialization_of_learner_with_empty_predicates_set_works_correctly():
+    empty_predicates_set = set()
+    online_discrete_model_learner = OnlineDiscreteModelLearner(TEST_ACTION_NAME, empty_predicates_set)
+    assert online_discrete_model_learner.action_name == TEST_ACTION_NAME
+    assert len(online_discrete_model_learner.predicates_superset) == 0
+    assert len(online_discrete_model_learner.cannot_be_preconditions) == 0
+    assert len(online_discrete_model_learner.must_be_preconditions) == 0
+    assert len(online_discrete_model_learner.cannot_be_effects) == 0
+    assert len(online_discrete_model_learner.must_be_effects) == 0
+
+
 def test_add_positive_post_state_observation_when_no_preconditions_exists_adds_it_to_the_superset_creates_a_complementary_set_for_the_not_preconditions_and_returns_none(
     online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
 ):
@@ -203,6 +214,15 @@ def test_get_safe_model_returns_correct_safe_model_even_if_no_observation_was_gi
     assert len(safe_effects) == 0
 
 
+def test_get_safe_model_returns_empty_preconditions_and_effects_when_learner_initialized_with_no_predicates():
+    empty_predicates_set = set()
+    online_discrete_model_learner = OnlineDiscreteModelLearner(TEST_ACTION_NAME, empty_predicates_set)
+    safe_precondition, safe_effects = online_discrete_model_learner.get_safe_model()
+    assert safe_precondition is not None
+    assert len(safe_precondition.operands) == 0
+    assert len(safe_effects) == 0
+
+
 def test_get_safe_model_when_observed_a_single_positive_observation_returns_preconditions_and_effects_based_on_the_observation(
     online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
 ):
@@ -243,6 +263,15 @@ def test_get_optimistic_model_when_no_observation_was_given_returns_the_superset
     assert len(optimistic_precondition.operands) == 0
     assert len(optimistic_effects) == 1
     assert optimistic_effects.pop() == DUMMY_EFFECT
+
+
+def test_get_optimistic_model_returns_empty_preconditions_and_only_the_goal_predicate_as_effects_when_learner_initialized_with_no_predicates():
+    empty_predicates_set = set()
+    online_discrete_model_learner = OnlineDiscreteModelLearner(TEST_ACTION_NAME, empty_predicates_set)
+    safe_precondition, safe_effects = online_discrete_model_learner.get_optimistic_model()
+    assert safe_precondition is not None
+    assert len(safe_precondition.operands) == 0
+    assert len(safe_effects) == 1
 
 
 def test_get_optimistic_model_when_observed_a_single_positive_observation_returns_preconditions_and_effects_based_on_the_observation(
