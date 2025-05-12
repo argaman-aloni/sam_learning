@@ -586,3 +586,40 @@ def test_is_point_in_convex_hull_captures_that_more_than_one_point_is_in_1d_conv
 
     point_to_test = pd.Series({"(x )": random.uniform(0, 10), "(y )": 0, "(z )": 0})
     assert convex_hull_learner.is_point_in_convex_hull(point_to_test)
+
+
+def test_copy_returns_correct_convex_hull_when_data_is_empty(convex_hull_learner: IncrementalConvexHullLearner):
+    convex_hull_learner_copy = convex_hull_learner.copy()
+    assert convex_hull_learner_copy._convex_hull is None
+    assert convex_hull_learner_copy._gsp_base is None
+    assert convex_hull_learner_copy._complementary_base is None
+    assert not convex_hull_learner_copy._spanning_standard_base
+    assert convex_hull_learner_copy._convex_hull is None
+
+
+def test_copy_returns_correct_convex_hull_when_data_is_not_empty(convex_hull_learner: IncrementalConvexHullLearner):
+    valid_x_points = [0, 0, 1, 1]
+    valid_y_points = [0, 1, 0, 1]
+    for x, y in zip(valid_x_points, valid_y_points):
+        convex_hull_learner.add_new_point({"(x )": x, "(y )": y, "(z )": 0})
+
+    copy = convex_hull_learner.copy()
+    assert copy._convex_hull is not None
+    assert copy._gsp_base == convex_hull_learner._gsp_base
+    assert copy._complementary_base == convex_hull_learner._complementary_base
+    assert copy._spanning_standard_base == convex_hull_learner._spanning_standard_base
+    assert np.array_equal(copy._convex_hull.points, convex_hull_learner._convex_hull.points)
+
+
+def test_copy_returns_correct_convex_hull_when_data_is_not_empty_and_large_number_of_points_were_added_to_convex_hull(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
+    for i in range(100):
+        convex_hull_learner.add_new_point({"(x )": random.uniform(0, 100), "(y )": random.uniform(0, 100), "(z )": random.uniform(0, 100)})
+
+    copy = convex_hull_learner.copy()
+    assert copy._convex_hull is not None
+    assert copy._gsp_base == convex_hull_learner._gsp_base
+    assert copy._complementary_base == convex_hull_learner._complementary_base
+    assert copy._spanning_standard_base == convex_hull_learner._spanning_standard_base
+    assert np.array_equal(copy._convex_hull.points, convex_hull_learner._convex_hull.points)

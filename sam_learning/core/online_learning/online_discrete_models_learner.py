@@ -15,13 +15,14 @@ class OnlineDiscreteModelLearner:
     action_name: str
     cannot_be_preconditions: Set[Predicate]
     must_be_preconditions: List[Set[Predicate]]
+    predicates_superset: Set[Predicate]
     cannot_be_effects: Set[Predicate]
     must_be_effects: Set[Predicate]
 
     def __init__(self, action_name: str, lifted_predicates: Set[Predicate]):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
-        self._predicates_superset = {predicate.copy() for predicate in lifted_predicates}
+        self.predicates_superset = {predicate.copy() for predicate in lifted_predicates}
         self.cannot_be_preconditions = set()
         self.cannot_be_effects = set()
         self.must_be_preconditions = []
@@ -34,7 +35,7 @@ class OnlineDiscreteModelLearner:
         :param predicates_in_state: the predicates observed in the state in which the action was executed successfully.
         """
         self.logger.info(f"Adding a new positive pre-state observation for the action {self.action_name}.")
-        not_preconditions = self._predicates_superset.difference(predicates_in_state)
+        not_preconditions = self.predicates_superset.difference(predicates_in_state)
         if len(self.cannot_be_preconditions) == 0:
             self.logger.debug("Since this is the first positive observation we need to create the complement of the predicates.")
             self.cannot_be_preconditions = not_preconditions
@@ -55,7 +56,7 @@ class OnlineDiscreteModelLearner:
         self.logger.info(f"Adding a new positive post-state observation for the action {self.action_name}.")
         if len(self.cannot_be_effects) == 0:
             self.logger.debug("Since this is the first positive observation we need to create the complement of the predicates.")
-            self.cannot_be_effects = {predicate for predicate in self._predicates_superset}
+            self.cannot_be_effects = {predicate for predicate in self.predicates_superset}
             self.cannot_be_effects.difference_update(post_state_predicates)
 
         self.must_be_effects.update(set([predicate.copy() for predicate in post_state_predicates.difference(pre_state_predicates)]))
@@ -66,7 +67,7 @@ class OnlineDiscreteModelLearner:
         :param predicates_in_state: the predicates observed in the state in which the action could not be applied.
         """
         self.logger.info(f"Adding a new negative sample for the action {self.action_name}.")
-        preconditions_not_in_state = self._predicates_superset.difference(predicates_in_state)
+        preconditions_not_in_state = self.predicates_superset.difference(predicates_in_state)
         self.must_be_preconditions.append(preconditions_not_in_state.difference(self.cannot_be_preconditions))
 
     def add_transition_data(
@@ -93,7 +94,7 @@ class OnlineDiscreteModelLearner:
         """
         self.logger.info(f"Getting the safe model for the action {self.action_name}.")
         safe_precondition = Precondition("and")
-        for predicate in self._predicates_superset.difference(self.cannot_be_preconditions):
+        for predicate in self.predicates_superset.difference(self.cannot_be_preconditions):
             safe_precondition.add_condition(predicate.copy())
 
         return safe_precondition, self.must_be_effects
@@ -116,4 +117,25 @@ class OnlineDiscreteModelLearner:
         if len(self.cannot_be_preconditions) == 0:
             return optimistic_precondition, {DUMMY_EFFECT}
 
-        return optimistic_precondition, self._predicates_superset.difference(self.cannot_be_effects)
+        return optimistic_precondition, self.predicates_superset.difference(self.cannot_be_effects)
+
+    def is_state_in_safe_model(self, state: Set[Predicate]) -> bool:
+        """Checks if state predicates hold in the safe model.
+
+        :param state: The state predicates to check.
+        :return: True if the state is in the safe model, False otherwise.
+        """
+        safe_conditions = self.predicates_superset.difference(self.cannot_be_preconditions)
+        return state.issuperset(safe_conditions)
+
+    def is_state_not_applicable_in_safe_model(self, state: Set[Predicate]) -> bool:
+        """Checks if state predicates only include the predicates that are not preconditions for the action.
+
+        Note:
+            Since actions can have empty discrete preconditions, this also checks if a failure occurred due to
+            the discrete part of the action.
+
+        :param state: The state predicates to check.
+        :return: True if the state is not applicable in the safe model, False otherwise.
+        """
+        return len(self.must_be_preconditions) > 0 and state.issubset(self.cannot_be_preconditions)
