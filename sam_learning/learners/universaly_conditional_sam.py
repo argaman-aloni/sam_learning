@@ -175,15 +175,11 @@ class UniversallyConditionalSAM(ConditionalSAM):
 
         self.logger.debug(f"Done removing existing previous state quantified dependencies for every object.")
 
-    def _remove_non_existing_previous_state_quantified_dependencies(
-        self, grounded_action: ActionCall, previous_state: State, next_state: State
-    ) -> None:
+    def _remove_non_existing_previous_state_quantified_dependencies(self, grounded_action: ActionCall) -> None:
         """Removed literals that don't appear in the previous state from the dependency set of a literal that is
             guaranteed as an effect.
 
         :param grounded_action: the action that is being executed.
-        :param previous_state: the state prior to the action execution.
-        :param next_state: the state after the action execution.
         """
         self.logger.debug("Removing non-existing previous state quantified antecedents from quantified literals " "observed in s'/ s.")
         grounded_add_effects, grounded_del_effects = extract_discrete_effects(
@@ -221,7 +217,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         """
         super()._remove_not_antecedents(grounded_action, previous_state, next_state)
         self._remove_existing_previous_state_quantified_dependencies(grounded_action)
-        self._remove_non_existing_previous_state_quantified_dependencies(grounded_action, previous_state, next_state)
+        self._remove_non_existing_previous_state_quantified_dependencies(grounded_action)
 
     def _construct_restrictive_universal_effect(self, action: LearnerAction, quantified_type: str, quantified_literal: str) -> None:
         """Removes the universal effect from the action.

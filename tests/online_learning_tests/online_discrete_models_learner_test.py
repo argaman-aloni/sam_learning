@@ -109,7 +109,7 @@ def test_add_negative_pre_state_observation_and_add_positive_pre_state_observati
         ]
     }
     online_discrete_model_learner._add_positive_pre_state_observation(new_positive_sample)
-    assert len(online_discrete_model_learner._predicates_superset.difference(online_discrete_model_learner.cannot_be_preconditions)) == 7
+    assert len(online_discrete_model_learner.predicates_superset.difference(online_discrete_model_learner.cannot_be_preconditions)) == 7
     new_negative_sample = {
         p
         for p in lifted_vocabulary
@@ -158,7 +158,7 @@ def test_add_positive_post_state_observation_when_adding_sample_for_the_first_ti
         pre_state_predicates=pre_state_predicates, post_state_predicates=next_state_predicates
     )
     assert len(online_discrete_model_learner.must_be_effects) == 2
-    print(len(online_discrete_model_learner._predicates_superset))
+    print(len(online_discrete_model_learner.predicates_superset))
     assert len(online_discrete_model_learner.cannot_be_effects) == 2
 
 
@@ -278,3 +278,57 @@ def test_get_optimistic_model_when_observed_a_single_negative_observation_return
     assert isinstance(or_condition, Precondition)
     assert len(or_condition.operands) == 2
     assert len(optimistic_effects) == 1
+
+
+def test_is_state_in_safe_model_when_no_observation_was_given_returns_false_since_model_is_conservative(
+    online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
+):
+    state = {p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]}
+    assert not online_discrete_model_learner.is_state_in_safe_model(state)
+
+
+def test_is_state_in_safe_model_when_predicates_not_are_part_of_what_cannot_be_preconditions_returns_false(
+    online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
+):
+    pre_state_predicates = {
+        p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]
+    }
+    next_state_predicates = {
+        p for p in lifted_vocabulary if p.untyped_representation not in ["(available ?x)", "(not (surface-condition ?x ?oldsurface))",]
+    }
+    online_discrete_model_learner.add_transition_data(pre_state_predicates, next_state_predicates, is_transition_successful=True)
+    state = {p for p in lifted_vocabulary if p.untyped_representation in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]}
+    assert not online_discrete_model_learner.is_state_in_safe_model(state)
+
+
+def test_is_state_in_safe_model_when_predicates_are_exactly_of_what_cannot_be_preconditions_returns_true(
+    online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
+):
+    pre_state_predicates = {
+        p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]
+    }
+    next_state_predicates = {
+        p for p in lifted_vocabulary if p.untyped_representation not in ["(available ?x)", "(not (surface-condition ?x ?oldsurface))",]
+    }
+    online_discrete_model_learner.add_transition_data(pre_state_predicates, next_state_predicates, is_transition_successful=True)
+    state = {p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]}
+    assert online_discrete_model_learner.is_state_in_safe_model(state)
+
+
+def test_is_state_in_safe_model_when_predicates_are_subset_of_the_inverse_of_what_cannot_be_preconditions_returns_false(
+    online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
+):
+    pre_state_predicates = {
+        p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]
+    }
+    next_state_predicates = {
+        p for p in lifted_vocabulary if p.untyped_representation not in ["(available ?x)", "(not (surface-condition ?x ?oldsurface))",]
+    }
+    online_discrete_model_learner.add_transition_data(pre_state_predicates, next_state_predicates, is_transition_successful=True)
+    state = {
+        p
+        for p in lifted_vocabulary
+        if p.untyped_representation
+        not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)", "(available ?x)", "(not (surface-condition ?x ?oldsurface))"]
+    }
+    assert not online_discrete_model_learner.is_state_in_safe_model(state)

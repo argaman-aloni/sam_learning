@@ -8,7 +8,7 @@ from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpress
 from scipy.spatial import ConvexHull
 
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
-from sam_learning.core.numeric_learning.numeric_utils import remove_complex_linear_dependencies
+from sam_learning.core.numeric_learning.numeric_utils import remove_complex_linear_dependencies, construct_pddl_inequality_scheme
 
 TEST_ACTION_NAME = "test_action"
 
@@ -31,7 +31,7 @@ def test_construct_pddl_inequality_scheme_with_simple_2d_four_equations_returns_
     left_side_coefficients = np.random.randint(10, size=(4, 2))
     right_side_points = np.random.randint(10, size=4)
 
-    inequalities = convex_hull_learner._construct_pddl_inequality_scheme(left_side_coefficients, right_side_points, ["(x)", "(y)"])
+    inequalities = construct_pddl_inequality_scheme(left_side_coefficients, right_side_points, ["(x)", "(y)"])
     assert len(inequalities) == 4
     for ineq in inequalities:
         assert ineq.startswith("(<=")

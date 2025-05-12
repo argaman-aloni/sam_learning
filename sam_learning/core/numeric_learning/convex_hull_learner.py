@@ -13,8 +13,6 @@ from scipy.spatial import ConvexHull, QhullError
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import ConditionType, EquationSolutionType
 from sam_learning.core.numeric_learning.numeric_utils import (
-    construct_multiplication_strings,
-    construct_linear_equation_string,
     prettify_coefficients,
     construct_numeric_conditions,
     construct_projected_variable_strings,
@@ -24,6 +22,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_polynomial_string,
     divide_span_by_common_denominator,
     remove_complex_linear_dependencies,
+    construct_pddl_inequality_scheme,
 )
 
 np.set_printoptions(precision=2)
@@ -160,7 +159,7 @@ class ConvexHullLearner:
         diagonal_eye = [list(vector) for vector in np.eye(points.shape[1])]
         orthnormal_span = divide_span_by_common_denominator(extended_gram_schmidt(diagonal_eye, projection_basis))
         transformed_orthonormal_vars = construct_projected_variable_strings(points_df.columns.tolist(), shift_axis, diagonal_eye)
-        span_verification_conditions = self._construct_pddl_inequality_scheme(
+        span_verification_conditions = construct_pddl_inequality_scheme(
             np.array(orthnormal_span), np.zeros(len(orthnormal_span)), transformed_orthonormal_vars, sign_to_use="="
         )
         return coefficients, border_point, transformed_vars, span_verification_conditions
@@ -175,26 +174,6 @@ class ConvexHullLearner:
         coefficients = [[-1], [1]]
         border_point = prettify_coefficients([-projected_points.min(), projected_points.max()])
         return border_point, coefficients
-
-    @staticmethod
-    def _construct_pddl_inequality_scheme(
-        coefficient_matrix: np.ndarray, border_points: np.ndarray, headers: List[str], sign_to_use: str = "<="
-    ) -> List[str]:
-        """Construct the inequality strings in the appropriate PDDL format.
-
-        :param coefficient_matrix: the matrix containing the coefficient vectors for each inequality.
-        :param border_points: the convex hull point which ensures that Ax <= b.
-        :param headers: the headers of the columns in the coefficient matrix.
-        :param sign_to_use: the sign to use in the inequalities (for cases when we want to use equalities).
-        :return: the inequalities PDDL formatted strings.
-        """
-        inequalities = set()
-        for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
-            multiplication_functions = construct_multiplication_strings(inequality_coefficients, headers)
-            constructed_left_side = construct_linear_equation_string(multiplication_functions)
-            inequalities.add(f"({sign_to_use} {constructed_left_side} {border_point})")
-
-        return list(inequalities)
 
     def _create_disjunctive_preconditions(self, previous_state_matrix: DataFrame, equality_conditions: List[str] = []) -> Precondition:
         """Create the disjunctive representation of the preconditions.
@@ -270,7 +249,7 @@ class ConvexHullLearner:
             if filtered_dataframe.shape[1] == 1:
                 self.logger.debug("After filtering the linear dependencies remained with a single feature!")
                 b, A = self._construct_single_dimension_convex_hull(filtered_dataframe.to_numpy())
-                inequalities_strs = self._construct_pddl_inequality_scheme(A, b, filtered_dataframe.columns.tolist())
+                inequalities_strs = construct_pddl_inequality_scheme(A, b, filtered_dataframe.columns.tolist())
                 return construct_numeric_conditions(
                     [*inequalities_strs, *extra_conditions], condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions
                 )
@@ -278,7 +257,7 @@ class ConvexHullLearner:
             A, b, column_names, additional_projection_conditions = self._create_convex_hull_linear_inequalities(
                 filtered_dataframe, display_mode=False
             )
-            inequalities_strs = self._construct_pddl_inequality_scheme(A, b, column_names)
+            inequalities_strs = construct_pddl_inequality_scheme(A, b, column_names)
             if additional_projection_conditions is not None:
                 inequalities_strs.extend([*extra_conditions, *additional_projection_conditions])
 
