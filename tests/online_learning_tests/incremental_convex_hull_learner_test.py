@@ -545,3 +545,44 @@ def test_reset_followed_by_add_point_when_point_outside_range_adds_point_correct
     print(str(precondition))
     assert len(precondition.operands) == 2
     assert "(<= (x ) 200)" in str(precondition)
+
+
+def test_is_point_in_convex_hull_captures_that_a_point_is_in_a_convex_hull_in_a_2d_plane(convex_hull_learner: IncrementalConvexHullLearner,):
+    valid_x_points = [0, 0, 1, 1]
+    valid_y_points = [0, 1, 0, 1]
+    for x, y in zip(valid_x_points, valid_y_points):
+        convex_hull_learner.add_new_point({"(x )": x, "(y )": y, "(z )": 0})
+
+    point_to_test = pd.Series({"(x )": 0.5, "(y )": 0.5, "(z )": 0})
+    assert convex_hull_learner.is_point_in_convex_hull(point_to_test)
+
+
+def test_is_point_in_convex_hull_captures_that_a_point_is_not_in_a_convex_hull_in_a_2d_plane(convex_hull_learner: IncrementalConvexHullLearner):
+    valid_x_points = [0, 0, 1, 1]
+    valid_y_points = [0, 1, 0, 1]
+    for x, y in zip(valid_x_points, valid_y_points):
+        convex_hull_learner.add_new_point({"(x )": x, "(y )": y, "(z )": 0})
+
+    point_to_test = pd.Series({"(x )": 2, "(y )": 2, "(z )": 0})
+    assert not convex_hull_learner.is_point_in_convex_hull(point_to_test)
+
+
+def test_is_point_in_convex_hull_captures_that_all_given_points_are_in_the_convex_hull_when_running_with_multiple_inputs_conscutively(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
+    valid_x_points = [0, 0, 1, 1]
+    valid_y_points = [0, 1, 0, 1]
+    for x, y in zip(valid_x_points, valid_y_points):
+        convex_hull_learner.add_new_point({"(x )": x, "(y )": y, "(z )": 0})
+
+    for i in range(10):
+        point_to_test = pd.Series({"(x )": random.uniform(0, 1), "(y )": random.uniform(0, 1), "(z )": 0})
+        assert convex_hull_learner.is_point_in_convex_hull(point_to_test)
+
+
+def test_is_point_in_convex_hull_captures_that_more_than_one_point_is_in_1d_convex_hull(convex_hull_learner: IncrementalConvexHullLearner,):
+    for i in range(10):
+        convex_hull_learner.add_new_point({"(x )": i, "(y )": 0, "(z )": 0})
+
+    point_to_test = pd.Series({"(x )": random.uniform(0, 10), "(y )": 0, "(z )": 0})
+    assert convex_hull_learner.is_point_in_convex_hull(point_to_test)

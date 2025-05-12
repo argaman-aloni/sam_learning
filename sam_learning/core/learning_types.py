@@ -9,7 +9,9 @@ class ConditionType(Enum):
 
 class EquationSolutionType(Enum):
     """The solution types possible as output to the learning algorithm."""
+
     no_solution_found = 1
     not_enough_data = 2
     convex_hull_not_found = 3
     ok = 4
+    svm_failed_to_train = 5

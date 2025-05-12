@@ -258,12 +258,10 @@ def test_remove_non_existing_previous_state_quantified_dependencies_does_not_rai
     sync_snapshot(
         nurikabe_conditional_sam, nurikabe_observation.components[0], nurikabe_observation.grounded_objects, should_include_all_objects=True
     )
-    previous_state = nurikabe_observation.components[0].previous_state
     grounded_action = nurikabe_observation.components[0].grounded_action_call
-    next_state = nurikabe_observation.components[0].next_state
     nurikabe_conditional_sam._initialize_universal_dependencies(grounded_action)
     try:
-        nurikabe_conditional_sam._remove_non_existing_previous_state_quantified_dependencies(grounded_action, previous_state, next_state)
+        nurikabe_conditional_sam._remove_non_existing_previous_state_quantified_dependencies(grounded_action)
 
     except Exception as e:
         pytest.fail(f"Unexpected error: {e}")

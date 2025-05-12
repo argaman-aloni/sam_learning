@@ -384,6 +384,32 @@ def create_monomials(domain_functions: List[str], polynom_degree: int = 0) -> Li
     return monomials
 
 
+def create_grounded_monomials(monomials: List[List[str]], state_fluents: Dict[str, PDDLFunction]) -> Dict[str, float]:
+    """Creates a dictionary of grounded monomials based on given monomials and state fluents.
+
+    This function iterates over a list of monomials, where each monomial is a list of
+    strings representing components. It computes the product of the values
+    of the given `state_fluents` for each monomial and stores the result
+    in a dictionary with the polynomial string representation of the monomial as its key.
+
+    :param monomials: A list of monomials, where each monomial is a list of strings
+                      representing components.
+    :param state_fluents: A dictionary where keys are strings representing fluents,
+                          and values are instances of PDDLFunction, containing their
+                          respective values.
+    :return: A dictionary where keys are the string representations of monomials
+             and values are the computed product of the respective fluent values.
+    """
+    sample_dataset = {}
+    for monomial in monomials:
+        if any([component not in state_fluents for component in monomial]):
+            continue
+
+        sample_dataset[create_polynomial_string(monomial)] = np.prod([state_fluents[fluent].value for fluent in monomial])
+
+    return sample_dataset
+
+
 def _create_polynomial_string_recursive(fluents: List[str]) -> str:
     """Creates the polynomial string representing the equation recursively.
 
@@ -500,3 +526,29 @@ def remove_complex_linear_dependencies(data: DataFrame) -> Tuple[DataFrame, List
         conditions.append(f"(= {feature_to_check} {multiplication_functions})")
 
     return data.drop(columns=removed_columns), conditions
+
+
+def construct_pddl_inequality_scheme(
+    coefficient_matrix: np.ndarray, border_points: Union[np.ndarray, float], headers: List[str], sign_to_use: str = "<="
+) -> List[str]:
+    """Construct the inequality strings in the appropriate PDDL format.
+
+    :param coefficient_matrix: the matrix containing the coefficient vectors for each inequality.
+    :param border_points: the convex hull point which ensures that Ax <= b.
+    :param headers: the headers of the columns in the coefficient matrix.
+    :param sign_to_use: the sign to use in the inequalities (for cases when we want to use equalities).
+    :return: the inequalities PDDL formatted strings.
+    """
+    inequalities = set()
+    if isinstance(border_points, float):
+        # there is only one data point
+        multiplication_functions = construct_multiplication_strings(coefficient_matrix, headers)
+        constructed_left_side = construct_linear_equation_string(multiplication_functions)
+        return [f"({sign_to_use} {constructed_left_side} {border_points})"]
+
+    for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
+        multiplication_functions = construct_multiplication_strings(inequality_coefficients, headers)
+        constructed_left_side = construct_linear_equation_string(multiplication_functions)
+        inequalities.add(f"({sign_to_use} {constructed_left_side} {border_point})")
+
+    return list(inequalities)
