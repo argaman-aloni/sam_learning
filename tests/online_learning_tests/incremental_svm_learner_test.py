@@ -1,20 +1,36 @@
 # File: tests\test_incremental_svm_learner.py
+from typing import Dict
+
 import numpy as np
-import pandas as pd
 import pytest
 from pddl_plus_parser.models import PDDLFunction, Precondition
-from sam_learning.core.exceptions import NotSafeActionError
+
 from sam_learning.core.online_learning.incremental_svm_learner import IncrementalSVMLearner
+
+FUNC_NAMES = ["(x )", "(y )", "(z )", "(w )"]
 
 
 @pytest.fixture
-def svm_learner():
-    domain_functions = {
-        "x": PDDLFunction(name="x", signature={}),
-        "y": PDDLFunction(name="y", signature={}),
-        "z": PDDLFunction(name="z", signature={}),
-        "w": PDDLFunction(name="w", signature={}),
+def domain_functions():
+    return {
+        "(x )": PDDLFunction(name="x", signature={}),
+        "(y )": PDDLFunction(name="y", signature={}),
+        "(z )": PDDLFunction(name="z", signature={}),
+        "(w )": PDDLFunction(name="w", signature={}),
     }
+
+
+@pytest.fixture
+def two_dim_svm_learner():
+    return IncrementalSVMLearner(
+        action_name="test_action",
+        domain_functions={"(x )": PDDLFunction(name="x", signature={}), "(y )": PDDLFunction(name="y", signature={}),},
+        polynom_degree=0,
+    )
+
+
+@pytest.fixture
+def svm_learner(domain_functions: Dict[str, PDDLFunction]):
     return IncrementalSVMLearner(action_name="test_action", domain_functions=domain_functions, polynom_degree=0)
 
 
@@ -24,7 +40,12 @@ def test_initialization_of_learner_creates_correct_columns(svm_learner: Incremen
 
 
 def test_add_new_point_adds_single_sample_to_data(svm_learner: IncrementalSVMLearner):
-    sample_point = {"(x )": 1.0, "(y )": 0.5, "(z )": 0.0, "(w )": 0.0}
+    func_values = [1.0, 0.5, 0.0, 0.0]
+    sample_point = {}
+    for val, name in zip(func_values, FUNC_NAMES):
+        sample_point[name] = PDDLFunction(name=name, signature={})
+        sample_point[name].set_value(val)
+
     svm_learner.add_new_point(point=sample_point, is_successful=True)
 
     assert len(svm_learner.data) == 1
@@ -36,11 +57,16 @@ def test_add_new_point_adds_single_sample_to_data(svm_learner: IncrementalSVMLea
 
 
 def test_add_new_point_with_failure_label_successfully(svm_learner: IncrementalSVMLearner):
-    sample_point = {"(x )": 1.0, "(y )": 0.5, "(z )": 0.0, "(w )": 0.0}
+    func_values = [1.0, 0.5, 0.0, 0.0]
+    sample_point = {}
+    for val, name in zip(func_values, FUNC_NAMES):
+        sample_point[name] = PDDLFunction(name=name, signature={})
+        sample_point[name].set_value(val)
+
     svm_learner.add_new_point(point=sample_point, is_successful=False)
 
     assert len(svm_learner.data) == 1
-    assert svm_learner.data.iloc[0]["label"] == 0
+    assert svm_learner.data.iloc[0]["label"] == -1
 
 
 def test_create_svm_conditions_returns_empty_preconditions_when_no_data_was_added(svm_learner: IncrementalSVMLearner):
@@ -54,10 +80,75 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     x = [np.random.randint(0, 100) for _ in range(N)]
     y = [np.random.randint(0, 100) for _ in range(N)]
     z = [np.random.randint(0, 100) for _ in range(N)]
+    w = [0.0 for _ in range(N)]
     for i in range(N):
         label = x[i] >= 2 and y[i] >= 4 and z[i] >= 1
-        svm_learner.add_new_point(point={"(x )": x[i], "(y )": y[i], "(z )": z[i], "(w )": 0.0}, is_successful=label)
+        point = {name: PDDLFunction(name=name, signature={}) for name in FUNC_NAMES}
+        point["(x )"].set_value(x[i])
+        point["(y )"].set_value(y[i])
+        point["(z )"].set_value(z[i])
+        point["(w )"].set_value(w[i])
+        svm_learner.add_new_point(point=point, is_successful=label)
 
     result = svm_learner.construct_linear_inequalities()
+    assert isinstance(result, Precondition)
+    print(str(result))
+
+
+def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_accurate_conditions_when_conditions_are_circular(
+    domain_functions: Dict[str, PDDLFunction]
+):
+    learner = IncrementalSVMLearner(action_name="test_action", domain_functions=domain_functions, polynom_degree=2)
+    N = 200
+    x = [np.random.randint(-100, 100) for _ in range(N)]
+    y = [np.random.randint(-100, 100) for _ in range(N)]
+    z = [0.0 for _ in range(N)]
+    w = [0.0 for _ in range(N)]
+    for i in range(N):
+        label = (x[i] ^ 2) + (y[i] ^ 2) <= 9
+        point = {name: PDDLFunction(name=name, signature={}) for name in FUNC_NAMES}
+        point["(x )"].set_value(x[i])
+        point["(y )"].set_value(y[i])
+        point["(z )"].set_value(z[i])
+        point["(w )"].set_value(w[i])
+        learner.add_new_point(point=point, is_successful=label)
+
+    result = learner.construct_linear_inequalities()
+    assert isinstance(result, Precondition)
+    print(str(result))
+
+
+def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_accurate_conditions_when_conditions_are_box(
+    two_dim_svm_learner: IncrementalSVMLearner,
+):
+    N = 500
+    x = [np.random.random_integers(-10, 10) for _ in range(N // 2)] + [np.random.random_integers(-100, 100) for _ in range(N // 2)]
+    y = [np.random.random_integers(-10, 10) for _ in range(N // 2)] + [np.random.random_integers(-100, 100) for _ in range(N // 2)]
+    for i in range(N):
+        label = -10 <= x[i] <= 10 and -10 <= y[i] <= 10
+        point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
+        point["(x )"].set_value(x[i])
+        point["(y )"].set_value(y[i])
+        two_dim_svm_learner.add_new_point(point=point, is_successful=label)
+
+    result = two_dim_svm_learner.construct_linear_inequalities()
+    assert isinstance(result, Precondition)
+    print(str(result))
+
+
+def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_accurate_conditions_when_conditions_are_linear(
+    two_dim_svm_learner: IncrementalSVMLearner,
+):
+    N = 500
+    x = [np.random.random_integers(-100, 100) for _ in range(N)]
+    y = [np.random.random_integers(-100, 100) for _ in range(N)]
+    for i in range(N):
+        label = x[i] > 5 + y[i]
+        point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
+        point["(x )"].set_value(x[i])
+        point["(y )"].set_value(y[i])
+        two_dim_svm_learner.add_new_point(point=point, is_successful=label)
+
+    result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))

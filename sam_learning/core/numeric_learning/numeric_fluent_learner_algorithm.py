@@ -50,13 +50,8 @@ class NumericFluentStateStorage:
 
         :param state_fluents: the lifted state fluents that were matched for the action.
         """
-        sample_dataset = {}
-        for monomial in self.monomials:
-            if any([component not in state_fluents for component in monomial]):
-                continue
 
-            sample_dataset[create_polynomial_string(monomial)] = np.prod([state_fluents[fluent].value for fluent in monomial])
-
+        sample_dataset = create_grounded_monomials(self.monomials, state_fluents)
         self.convex_hull_learner.add_new_point(sample_dataset)
         self.linear_regression_learner.add_new_observation(sample_dataset, store_in_prev_state=True)
 

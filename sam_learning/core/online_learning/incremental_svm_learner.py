@@ -2,9 +2,10 @@
 import logging
 from typing import Dict, List, Tuple, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from sklearn.svm import LinearSVC
 
@@ -17,13 +18,60 @@ from sam_learning.core.numeric_learning.numeric_utils import (
     create_polynomial_string,
     EPSILON,
     construct_pddl_inequality_scheme,
-    prettify_floating_point_number,
     create_grounded_monomials,
 )
 
 LABEL_COLUMN = "label"
-MAX_ALLOWED_CONDITIONS = 10
+MAX_ALLOWED_CONDITIONS = 100
 MIN_ALLOWED_UNRESOLVED_POINTS = 5
+
+
+def plot_planes_2d(X: DataFrame, y: Series, planes, axis_names: List[str], grid: int = 200):
+    plt.figure(figsize=(6, 6))
+    plt.scatter(X[y == 1][axis_names[0]], X[y == 1][axis_names[1]], marker="o", label="Positive", edgecolor="black")
+    plt.scatter(X[y == -1][axis_names[0]], X[y == -1][axis_names[1]], marker="x", label="Negative", color="gray")
+
+    xmin, xmax = X[axis_names[0]].min(), X[axis_names[0]].max()
+    ymin, ymax = X[axis_names[1]].min(), X[axis_names[1]].max()
+    xgrid = np.linspace(xmin - 0.5, xmax + 0.5, grid)
+    ygrid = np.linspace(ymin - 0.5, ymax + 0.5, grid)
+    Xg, Yg = np.meshgrid(xgrid, ygrid)
+    colors = plt.cm.tab10(np.arange(len(planes)))
+
+    for idx, (w, b) in enumerate(planes):
+        # line endpoints
+        color = colors[idx]
+        Z = w[0] * Xg + w[1] * Yg
+        plt.contourf(Xg, Yg, Z >= b, levels=[0.5, 1], alpha=0.3, colors=[color], zorder=1)
+
+        # Plot boundary line
+        if abs(w[1]) > 1e-6:
+            x_vals = np.array([xmin - 0.5, xmax + 0.5])
+            y_vals = (b - w[0] * x_vals) / w[1]
+            plt.plot(x_vals, y_vals, "--", linewidth=2, color=color, label=f"Plane {idx + 1}", zorder=2)
+        else:
+            # vertical line
+            x0 = b / w[0]
+            plt.axvline(x0, color=color, linestyle="--", linewidth=2, label=f"Plane {idx + 1}", zorder=2)
+
+        # Random points on the line
+        pts_x = np.random.uniform(xmin - 0.5, xmax + 0.5, 10)
+        if abs(w[1]) > 1e-6:
+            pts_y = (b - w[0] * pts_x) / w[1]
+        else:
+            pts_y = np.random.uniform(ymin - 0.5, ymax + 0.5, 10)
+
+        plt.scatter(pts_x, pts_y, s=30, color=color, edgecolor="white", label=f"Points on P{idx + 1}", zorder=4)
+
+    plt.xlim(xmin - 0.5, xmax + 0.5)
+    plt.ylim(X[axis_names[1]].min() - 0.5, X[axis_names[1]].max() + 0.5)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.title("2D Polytope Planes")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 
 class IncrementalSVMLearner:
@@ -45,12 +93,12 @@ class IncrementalSVMLearner:
         self.action_name = action_name
         functions = list([function.untyped_representation for function in domain_functions.values()])
         self.monomials = create_monomials(functions, polynom_degree)
-        self.data = DataFrame(columns=[*[create_polynomial_string(monomial) for monomial in monomials], LABEL_COLUMN])
+        self.data = DataFrame(columns=[*[create_polynomial_string(monomial) for monomial in self.monomials], LABEL_COLUMN])
         self.relevant_fluents = relevant_fluents if relevant_fluents is not None else self.data.columns.tolist()
         self.domain_functions = {function.name: function for function in domain_functions.values()}
         self.logger = logging.getLogger(__name__)
 
-    def add_new_point(self, point: Dict[str, float], is_successful: bool = True) -> None:
+    def add_new_point(self, point: Dict[str, PDDLFunction], is_successful: bool = True) -> None:
         """Adds a new point to the labeled dataset.
 
         Note:
@@ -64,7 +112,7 @@ class IncrementalSVMLearner:
         self.data = pd.concat([self.data, new_sample], ignore_index=True)
         self.data.dropna(axis=1, inplace=True)
 
-    def _incremental_create_svm_linear_conditions(self) -> List[Tuple[List[float], float]]:
+    def _incremental_create_svm_linear_conditions(self, debug: bool = True) -> List[Tuple[List[float], float]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :return: the matrix representing the inequalities of the planes created by the convex hull as well as the
@@ -83,22 +131,40 @@ class IncrementalSVMLearner:
                 self.logger.debug("Remaining points have only one label cannot continue running SVM.")
                 break
 
-            classifier = LinearSVC(random_state=0, tol=EPSILON)
+            classifier = LinearSVC(random_state=0, tol=EPSILON, dual=False, max_iter=5000)
             classifier.fit(X_reminder, y_reminder.tolist())
             A = classifier.coef_[0].copy()
             b = -classifier.intercept_[0].copy()
-            coefficients, border_point = prettify_coefficients(A), prettify_floating_point_number(b)
-            planes.append((coefficients, border_point))
+            coefficients, border_point = prettify_coefficients(A), prettify_coefficients([b])[0]
 
             # Remove correctly classified points
-            predictions = classifier.predict(X_reminder)
-            mask = predictions != y_reminder
-            X_reminder, y_reminder = X_reminder[mask], y_reminder[mask]
-            self.logger.debug(f"Plane {i+1}: {A[0]:+.3f}·x + {A[1]:+.3f}·y {-b:+.3f} = 0 (removed {np.sum(~mask)} points)")
+            preds = classifier.predict(X_reminder)  # numpy array
+            is_neg = y_reminder.values == -1  # numpy bool array
+            pred_is_neg = preds == -1  # numpy bool array
 
-            if len(X_reminder) == 0:
+            # correctly classified negatives
+            correctly_classified_neg = is_neg & pred_is_neg
+
+            # keep mask: everything except those
+            keep_mask = ~correctly_classified_neg
+
+            # apply it
+            X_reminder = X_reminder[keep_mask]
+            y_reminder = y_reminder.iloc[keep_mask]
+
+            self.logger.debug(
+                f"Plane {' + '.join([f'{coefficients[j]} ' f'* {col}' for j, col in enumerate(no_label_columns.columns.tolist())])} >= {b} (removed {np.sum(~keep_mask)} points)"
+            )
+
+            if len(X_reminder) == 0 or np.sum(~keep_mask) == 0:
                 print("All points classified. Stopping.")
                 break
+
+            planes.append((coefficients, border_point))
+
+        if debug:
+            if len(no_label_columns.columns.tolist()) == 2:
+                plot_planes_2d(self.data, self.data[LABEL_COLUMN].to_numpy(), planes, no_label_columns.columns.tolist())
 
         return planes
 

@@ -15,7 +15,6 @@ from sam_learning.core.propositional_operations.discrete_utilities import (
     iterate_over_objects_of_same_type,
 )
 from sam_learning.core.propositional_operations.literals_cnf import LiteralCNF, group_params_from_clause, is_clause_consistent, PGType
-from sam_learning.core.unsafe_learning.svm_fluents_learning import SVMFluentsLearning
 from .environment_snapshot import EnvironmentSnapshot
 from .exceptions import NotSafeActionError
 from .learner_domain import LearnerAction, LearnerDomain
