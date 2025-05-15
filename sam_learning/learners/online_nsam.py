@@ -14,7 +14,7 @@ from pddl_plus_parser.models import (
     CompoundPrecondition,
 )
 
-from sam_learning.core import InformationGainLearner, LearnerDomain, PriorityQueue, LearnerAction, EpisodeInfoRecord
+from sam_learning.core import InformationStatesLearner, LearnerDomain, PriorityQueue, LearnerAction, EpisodeInfoRecord
 from sam_learning.core.online_learning.novelty_learner import NoveltyLearner, FAIL_RESULT, SUCCESS_RESULT
 from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
 from sam_learning.learners.incremental_numeric_sam import IncrementalNumericSAMLearner
@@ -26,7 +26,7 @@ MAX_STEPS_PER_EPISODE = 100
 class OnlineNSAMLearner(IncrementalNumericSAMLearner):
     """"An online version of the Numeric SAM learner."""
 
-    ig_learner: Dict[str, InformationGainLearner]
+    ig_learner: Dict[str, InformationStatesLearner]
     agent: AbstractAgent
     episode_statistics: Dict[str, int]
     _action_observation_rate: Dict[str, float]
@@ -56,7 +56,7 @@ class OnlineNSAMLearner(IncrementalNumericSAMLearner):
         self.safe_perfect_numeric_effects = {}
 
         for action_name, action_data in self.partial_domain.actions.items():
-            self.ig_learner[action_name] = InformationGainLearner(action_name=action_name)
+            self.ig_learner[action_name] = InformationStatesLearner(action_name=action_name)
 
     def _apply_feature_selection(self, action: ActionCall) -> List[str]:
         """Applies feature selection to the action's numeric features.

@@ -56,7 +56,7 @@ class InformationStatesLearner:
         self.combined_data = DataFrame(columns=[*monomial_strs, self.parameter_bound_predicates, LABEL_COLUMN])
         self.numeric_data = DataFrame(columns=[*monomial_strs, LABEL_COLUMN])
 
-    def _create_combined_sample_data(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> DataFrame:
+    def _create_combined_sample_data(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> DataFrame:
         """Creates a combined sample data from the numeric and propositional samples.
 
         :param new_numeric_sample: the numeric part of the sample.
@@ -72,7 +72,7 @@ class InformationStatesLearner:
         new_sample_data = DataFrame.from_dict({**grounded_monomials, **predicates_map})
         return new_sample_data
 
-    def _visited_previously_failed_execution(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate]) -> bool:
+    def _visited_previously_failed_execution(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: set[Predicate]) -> bool:
         """Validates whether the new sample is a previously visited failed state.
 
         :param new_numeric_sample: the numeric part of the sample.
@@ -113,7 +113,7 @@ class InformationStatesLearner:
         return False
 
     def add_new_sample(
-        self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: List[Predicate], is_successful: bool = True
+        self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate], is_successful: bool = True
     ) -> None:
         """Adds a new sample to the combined observation data. The function integrates a numeric
         sample and a propositional sample into a combined data structure. The resulting data

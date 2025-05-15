@@ -1,6 +1,6 @@
 """Module tests for the numeric information gaining process."""
 import random
-from typing import List, Set
+from typing import List, Set, Dict
 
 import pandas as pd
 import pytest
@@ -16,65 +16,66 @@ TEST_PREDICATE_NAMES = ["p", "q", "r", "s"]
 
 
 @pytest.fixture
-def lifted_vocabulary(woodworking_domain: Domain) -> Set[Predicate]:
-    return VocabularyCreator().create_lifted_vocabulary(
-        domain=woodworking_domain, possible_parameters=woodworking_domain.actions["do-grind"].signature
-    )
+def lifted_depot_vocabulary(depot_domain: Domain) -> Set[Predicate]:
+    return VocabularyCreator().create_lifted_vocabulary(domain=depot_domain, possible_parameters=depot_domain.actions["drive"].signature)
 
 
 @pytest.fixture
-def online_discrete_model_learner(lifted_vocabulary) -> OnlineDiscreteModelLearner:
-    return OnlineDiscreteModelLearner(TEST_ACTION_NAME, lifted_vocabulary)
+def online_discrete_model_learner(lifted_depot_vocabulary: Set[Predicate]) -> OnlineDiscreteModelLearner:
+    return OnlineDiscreteModelLearner(TEST_ACTION_NAME, lifted_depot_vocabulary)
 
 
 @pytest.fixture
-def convex_hull_learner() -> IncrementalConvexHullLearner:
-    domain_functions = {
-        "x": PDDLFunction(name="x", signature={}),
-        "y": PDDLFunction(name="y", signature={}),
-        "z": PDDLFunction(name="z", signature={}),
-    }
-    return IncrementalConvexHullLearner(TEST_ACTION_NAME, domain_functions)
+def parameter_bound_function_vocabulary(depot_domain: Domain) -> Dict[str, PDDLFunction]:
+    return VocabularyCreator().create_lifted_functions_vocabulary(domain=depot_domain, possible_parameters=depot_domain.actions["drive"].signature)
 
 
 @pytest.fixture
-def test_predicates() -> List[Predicate]:
-    predicates = []
-    for p in TEST_PREDICATE_NAMES:
-        predicates.append(Predicate(name=p, signature={}, is_positive=True))
-        predicates.append(Predicate(name=p, signature={}, is_positive=False))
-
-    return predicates
+def incremental_convex_hull_learner(parameter_bound_function_vocabulary: Dict[str, PDDLFunction]) -> IncrementalConvexHullLearner:
+    return IncrementalConvexHullLearner(TEST_ACTION_NAME, parameter_bound_function_vocabulary)
 
 
 @pytest.fixture
-def informative_states_learner_no_predicates() -> InformationStatesLearner:
+def informative_states_learner_no_predicates(incremental_convex_hull_learner: IncrementalConvexHullLearner) -> InformationStatesLearner:
     information_gain = InformationStatesLearner(
         action_name=TEST_ACTION_NAME,
         discrete_model_learner=OnlineDiscreteModelLearner(action_name=TEST_ACTION_NAME, lifted_predicates=set()),
-        convex_hull_learner=IncrementalConvexHullLearner(action_name=TEST_ACTION_NAME, domain_functions={}),
-    )
-    information_gain.init_dataframes(valid_lifted_functions=TEST_FUNCTION_NAMES, lifted_predicates=[])
-    return information_gain
-
-
-@pytest.fixture
-def information_gain_learner_with_predicates(test_predicates: List[Predicate]) -> InformationStatesLearner:
-    information_gain = InformationStatesLearner(action_name=TEST_ACTION_NAME)
-    information_gain.init_dataframes(
-        valid_lifted_functions=TEST_FUNCTION_NAMES, lifted_predicates=[p.untyped_representation for p in test_predicates]
+        convex_hull_learner=incremental_convex_hull_learner,
     )
     return information_gain
 
 
 @pytest.fixture
-def depot_numeric_information_gain_learner(depot_domain: Domain) -> InformationStatesLearner:
-    information_gain = InformationStatesLearner(action_name="drive")
-    information_gain.init_dataframes(
-        valid_lifted_functions=list(depot_domain.functions.keys()),
-        lifted_predicates=[p.untyped_representation for p in depot_domain.predicates.values()],
+def informative_states_learner_only_discrete(online_discrete_model_learner: OnlineDiscreteModelLearner) -> InformationStatesLearner:
+    information_gain = InformationStatesLearner(
+        action_name=TEST_ACTION_NAME,
+        discrete_model_learner=online_discrete_model_learner,
+        convex_hull_learner=IncrementalConvexHullLearner(TEST_ACTION_NAME, {}),
     )
     return information_gain
+
+
+@pytest.fixture
+def depot_informative_states_learner(
+    online_discrete_model_learner: OnlineDiscreteModelLearner, incremental_convex_hull_learner: IncrementalConvexHullLearner
+) -> InformationStatesLearner:
+    information_gain = InformationStatesLearner(
+        action_name="drive", discrete_model_learner=online_discrete_model_learner, convex_hull_learner=incremental_convex_hull_learner,
+    )
+    return information_gain
+
+
+def test_create_combined_sample_when_domain_does_not_have_predicates_and_only_functions_data_creates_a_dataframe_with_the_correct_columns(
+    informative_states_learner_no_predicates: InformationStatesLearner, parameter_bound_function_vocabulary: Dict[str, PDDLFunction]
+):
+    new_numeric_sample = {}
+    for index, func in enumerate(parameter_bound_function_vocabulary.values()):
+        new_func = PDDLFunction(name=func.name, signature=func.signature)
+        new_func.set_value(4 + index)
+        new_numeric_sample[func.name] = new_func
+
+    combined_df = informative_states_learner_no_predicates._create_combined_sample_data(new_numeric_sample, set())
+    assert len(combined_df) == 1
 
 
 def test_locate_sample_in_df_locates_that_samples_exists_in_the_dataframe_and_returns_its_index(
