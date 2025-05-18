@@ -539,7 +539,7 @@ def construct_pddl_inequality_scheme(
     :param sign_to_use: the sign to use in the inequalities (for cases when we want to use equalities).
     :return: the inequalities PDDL formatted strings.
     """
-    inequalities = set()
+    inequalities = []
     if isinstance(border_points, float):
         # there is only one data point
         multiplication_functions = construct_multiplication_strings(coefficient_matrix, headers)
@@ -549,6 +549,6 @@ def construct_pddl_inequality_scheme(
     for inequality_coefficients, border_point in zip(coefficient_matrix, border_points):
         multiplication_functions = construct_multiplication_strings(inequality_coefficients, headers)
         constructed_left_side = construct_linear_equation_string(multiplication_functions)
-        inequalities.add(f"({sign_to_use} {constructed_left_side} {border_point})")
+        inequalities.append(f"({sign_to_use} {constructed_left_side} {border_point})")
 
-    return list(inequalities)
+    return inequalities
