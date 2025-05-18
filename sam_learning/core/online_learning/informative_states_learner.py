@@ -73,7 +73,7 @@ class InformationStatesLearner:
         new_sample_data = DataFrame(combined_sample_data)
         return new_sample_data
 
-    def _visited_previously_failed_execution(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: set[Predicate]) -> bool:
+    def _visited_previously_failed_execution(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
         """Validates whether the new sample is a previously visited failed state.
 
         :param new_numeric_sample: the numeric part of the sample.
