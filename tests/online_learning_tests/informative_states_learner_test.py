@@ -395,7 +395,7 @@ def test_is_sample_informative_when_no_observation_were_observed_yet_returns_tru
     )
 
 
-def test_is_informative_when_new_observation_already_observed_returns_false(
+def test_is_sample_informative_when_new_observation_already_observed_returns_false(
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
@@ -424,7 +424,7 @@ def test_is_informative_when_new_observation_already_observed_returns_false(
     )
 
 
-def test_is_informative_when_propositional_part_of_state_is_superset_of_the_observed_data_and_point_inside_the_convex_hull_returns_false(
+def test_is_sample_informative_when_propositional_part_of_state_is_superset_of_the_observed_data_and_point_inside_the_convex_hull_returns_false(
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
@@ -456,7 +456,7 @@ def test_is_informative_when_propositional_part_of_state_is_superset_of_the_obse
     )
 
 
-def test_is_informative_when_propositional_part_contains_only_what_cannot_be_preconditions_and_numeric_model_is_safe_returns_false(
+def test_is_sample_informative_when_propositional_part_contains_only_what_cannot_be_preconditions_and_numeric_model_is_safe_returns_false(
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
@@ -500,7 +500,7 @@ def test_is_informative_when_propositional_part_contains_only_what_cannot_be_pre
     )
 
 
-def test_is_informative_when_propositional_part_does_not_contain_unit_clause_must_be_preconditions_and_numeric_model_is_safe_returns_false(
+def test_is_sample_informative_when_propositional_part_does_not_contain_unit_clause_must_be_preconditions_and_numeric_model_is_safe_returns_false(
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
