@@ -181,7 +181,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             self.logger.debug("The new point is already in the storage, not adding it again.")
             return
 
-        self.data = concat_data
+        self.data = concat_data.dropna(axis=1)
         self._calculate_basis_and_hull()
 
     def _create_ch_coefficients_data(self, display_mode: bool = True) -> Tuple[List[List[float]], List[float]]:
@@ -289,6 +289,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :param point: the point to check.
         :return: whether the point is in the convex hull.
         """
+        if pd.concat([self.data, point], ignore_index=True).duplicated().any():
+            self.logger.debug("The new point is already in the storage, it is thus is the convex hull.")
+            return True
+
         if self._gsp_base is None:
             self.logger.debug("The convex hull is not yet learned since didn't receive enough points.")
             return False
@@ -355,3 +359,9 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         if self._convex_hull is not None:
             new_learner._learn_new_convex_hull(incremental=not one_shot)
         return new_learner
+
+    def close_convex_hull(self) -> None:
+        """Closes the convex hull."""
+        if self._convex_hull is not None:
+            self._convex_hull.close()
+            self._convex_hull = None
