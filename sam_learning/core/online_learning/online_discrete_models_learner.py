@@ -138,4 +138,6 @@ class OnlineDiscreteModelLearner:
         :param state: The state predicates to check.
         :return: True if the state is not applicable in the safe model, False otherwise.
         """
-        return len(self.must_be_preconditions) > 0 and state.issubset(self.cannot_be_preconditions)
+        # a state is not applicable if the state does not include any of the predicates that are possibly "must be preconditions"
+        state_does_not_contain_unit_clause = any([len(state.intersection(cnf)) == 0 for cnf in self.must_be_preconditions])
+        return len(self.must_be_preconditions) > 0 and state_does_not_contain_unit_clause

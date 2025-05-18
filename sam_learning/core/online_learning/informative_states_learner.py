@@ -69,7 +69,8 @@ class InformationStatesLearner:
             **{p.untyped_representation: True for p in new_propositional_sample},
             **{p.untyped_representation: False for p in self.discrete_model_learner.predicates_superset.difference(new_propositional_sample)},
         }
-        new_sample_data = DataFrame.from_dict({**grounded_monomials, **predicates_map})
+        combined_sample_data = {**{k: [v] for k, v in grounded_monomials.items()}, **{k: [v] for k, v in predicates_map.items()}}
+        new_sample_data = DataFrame(combined_sample_data)
         return new_sample_data
 
     def _visited_previously_failed_execution(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: set[Predicate]) -> bool:
@@ -82,7 +83,7 @@ class InformationStatesLearner:
         # Create combined sample data
         new_sample_data = self._create_combined_sample_data(new_numeric_sample, new_propositional_sample)
         new_sample_data[LABEL_COLUMN] = False
-        return len(pd.concat([self.combined_data, new_sample_data])) == len(self.combined_data)
+        return len(pd.concat([self.combined_data, new_sample_data], ignore_index=True).drop_duplicates()) == len(self.combined_data)
 
     def _is_state_not_applicable_in_numeric_model(self, new_numeric_sample: Dict[str, PDDLFunction]) -> bool:
         """Determines if a given numeric sample results in a state that is not applicable
@@ -100,20 +101,23 @@ class InformationStatesLearner:
         :return: Returns True if a negative sample is located within the constructed convex hull,
             indicating the state is not applicable. Otherwise, returns False.
         """
-        grounded_monomials = create_grounded_monomials(self.monomials, new_numeric_sample)
-        new_numeric_df = DataFrame.from_dict(grounded_monomials)
-        new_numeric_df[LABEL_COLUMN] = True
-        validation_convex_hull = self.convex_hull_learner.copy(one_shot=True)
+        validation_convex_hull = self.convex_hull_learner.copy(one_shot=False)
+        validation_convex_hull.add_new_point(create_grounded_monomials(self.monomials, new_numeric_sample))
         negative_samples = self.numeric_data[self.numeric_data[LABEL_COLUMN] == False]
         for _, negative_sample in negative_samples.iterrows():
-            negative_sample_in_hull = validation_convex_hull.is_point_in_convex_hull(negative_sample)
+            data_columns = [col for col in self.numeric_data.columns.tolist() if col != LABEL_COLUMN]
+            negative_sample_in_hull = validation_convex_hull.is_point_in_convex_hull(negative_sample[data_columns])
             if negative_sample_in_hull:
+                self.logger.debug("Found a negative sample inside the convex hull.")
+                validation_convex_hull.close_convex_hull()
                 return True
 
+        self.logger.debug(f"Sample {new_numeric_sample} does not create a convex hull with inapplicable points.")
+        validation_convex_hull.close_convex_hull()
         return False
 
     def add_new_sample(
-        self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate], is_successful: bool = True
+        self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate] = frozenset(), is_successful: bool = True
     ) -> None:
         """Adds a new sample to the combined observation data. The function integrates a numeric
         sample and a propositional sample into a combined data structure. The resulting data
@@ -129,11 +133,14 @@ class InformationStatesLearner:
         """
         new_observation_entry = self._create_combined_sample_data(new_numeric_sample, new_propositional_sample)
         new_observation_entry[LABEL_COLUMN] = is_successful
-        self.combined_data = pd.concat([self.combined_data, new_observation_entry])
-        grounded_monomials = create_grounded_monomials(self.monomials, new_numeric_sample)
-        new_numeric_df = DataFrame.from_dict(grounded_monomials)
-        new_numeric_df[LABEL_COLUMN] = is_successful
-        self.numeric_data = pd.concat([self.numeric_data, new_numeric_df])
+        new_numeric_df = new_observation_entry[self.numeric_data.columns.tolist()]
+        if self.combined_data.empty:
+            self.combined_data = new_observation_entry
+            self.numeric_data = new_numeric_df
+
+        else:
+            self.combined_data = pd.concat([self.combined_data, new_observation_entry], ignore_index=True)
+            self.numeric_data = pd.concat([self.numeric_data, new_numeric_df], ignore_index=True)
 
     def is_sample_informative(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
         """Checks whether the sample is informative.
@@ -145,14 +152,14 @@ class InformationStatesLearner:
         # First, check if the sample is definitely applicable and non-informative
         is_applicable_and_non_informative = self.discrete_model_learner.is_state_in_safe_model(
             new_propositional_sample
-        ) and self.convex_hull_learner.is_point_in_convex_hull(DataFrame.from_dict(new_numeric_sample))
+        ) and self.convex_hull_learner.is_point_in_convex_hull(DataFrame({func_name: [func.value] for func_name, func in new_numeric_sample.items()}))
         if is_applicable_and_non_informative:
             return False
 
-        # Otherwise, check if it's definitely not applicable
+        # Otherwise, check if it's definitely not applicable - if either is not applicable, return False
         is_definitely_not_applicable = self.discrete_model_learner.is_state_not_applicable_in_safe_model(
             new_propositional_sample
-        ) and self._is_state_not_applicable_in_numeric_model(new_numeric_sample)
+        ) or self._is_state_not_applicable_in_numeric_model(new_numeric_sample)
 
         # Return whether it's informative and whether it's applicable
         return not is_definitely_not_applicable
