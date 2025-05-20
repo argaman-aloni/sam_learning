@@ -257,7 +257,7 @@ def test_is_state_not_applicable_in_numeric_model_when_no_negative_samples_exist
     online_numeric_model_learner.add_transition_data(
         pre_state_functions=new_numeric_sample, post_state_functions=not_observed_numeric_sample, is_transition_successful=True
     )
-    assert not informative_states_learner_no_predicates._is_state_not_applicable_in_numeric_model(not_observed_numeric_sample)
+    assert not informative_states_learner_no_predicates._is_state_not_applicable_in_safe_numeric_model(not_observed_numeric_sample)
 
 
 def test_is_state_not_applicable_in_numeric_model_when_single_negative_sample_exists_and_new_sample_does_not_match_observed_one_returns_false(
@@ -276,7 +276,7 @@ def test_is_state_not_applicable_in_numeric_model_when_single_negative_sample_ex
         not_observed_numeric_sample[func.untyped_representation] = new_func
 
     informative_states_learner_no_predicates.add_new_sample(new_numeric_sample=new_numeric_sample, is_successful=False)
-    assert not informative_states_learner_no_predicates._is_state_not_applicable_in_numeric_model(not_observed_numeric_sample)
+    assert not informative_states_learner_no_predicates._is_state_not_applicable_in_safe_numeric_model(not_observed_numeric_sample)
 
 
 def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and_new_observation_with_existing_convex_hull_includes_negative_sample_returns_true(
@@ -328,7 +328,7 @@ def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and
     new_func.set_value(0.0)
     new_invalid_sample[new_func.untyped_representation] = new_func
 
-    assert informative_states_learner_no_predicates._is_state_not_applicable_in_numeric_model(new_numeric_sample=new_invalid_sample)
+    assert informative_states_learner_no_predicates._is_state_not_applicable_in_safe_numeric_model(new_numeric_sample=new_invalid_sample)
 
 
 def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and_new_observation_with_existing_convex_hull_does_not_include_negative_sample_returns_false(
@@ -380,7 +380,7 @@ def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and
     new_func.set_value(0.0)
     new_invalid_sample[new_func.untyped_representation] = new_func
 
-    assert not informative_states_learner_no_predicates._is_state_not_applicable_in_numeric_model(new_numeric_sample=new_invalid_sample)
+    assert not informative_states_learner_no_predicates._is_state_not_applicable_in_safe_numeric_model(new_numeric_sample=new_invalid_sample)
 
 
 def test_is_sample_informative_when_no_observation_were_observed_yet_returns_true(

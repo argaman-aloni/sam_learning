@@ -284,8 +284,7 @@ class DomainValidator:
                     problem_file_path=problem_path,
                     tolerance=tolerance,
                     solving_timeout=timeout,
-                    solving_stats=problem_solving_report,
-                )
+                ).name
                 end_time = time.time()
                 if problem_solving_report[problem_file_name] == SolutionOutputTypes.ok.name:
                     problem_solving_times.append(end_time - start_time)  # time in seconds

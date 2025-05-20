@@ -115,25 +115,6 @@ class LearnerAction:
         formatted_string = "\n".join([line for line in action_string.split("\n") if line.strip()])
         return f"{formatted_string}\n"
 
-    def to_pddl_legacy(self, should_simplify: bool = True, decimal_digits: int = DEFAULT_DIGITS):
-        """Returns the PDDL string representation of the action.
-
-        Note:
-            This is for legacy support and should be removed in the future.
-
-        :param should_simplify: whether to simplify the preconditions or not.
-        :param decimal_digits: the number of decimal digits to use to display the preconditions.
-        :return: the PDDL string representing the action.
-        """
-        action_string = (
-            f"(:action {self.name}\n"
-            f"\t:parameters {self._signature_to_pddl()}\n"
-            f"\t:precondition {self.preconditions.print(should_simplify=should_simplify, decimal_digits=decimal_digits)}\n"
-            f"\t:effect {self._effects_to_pddl()})"
-        )
-        formatted_string = "\n".join([line for line in action_string.split("\n") if line.strip()])
-        return f"{formatted_string}\n"
-
 
 class LearnerDomain:
     """Class representing the domain that is to be learned by the action model learning algorithm."""
@@ -222,17 +203,16 @@ class LearnerDomain:
         """
         return "\n\t".join([str(f) for f in self.functions.values()])
 
-    def to_pddl(self, should_simplify: bool = True, decimal_digits: int = DEFAULT_DIGITS) -> str:
+    def to_pddl(self, decimal_digits: int = DEFAULT_DIGITS) -> str:
         """Converts the domain into a PDDL string format.
 
         :return: the PDDL string representing the domain.
         """
-        # TODO: remove the support for legacy PDDL format in the future.
         self._complete_missing_requirements()
         predicates = "\n\t".join([str(p) for p in self.predicates.values()])
         predicates_str = f"(:predicates {predicates}\n)\n\n" if len(self.predicates) > 0 else ""
         types_str = f"(:types {self._types_to_pddl()}\n)\n\n" if len(self.types) > 0 else ""
-        actions = "\n".join(action.to_pddl_legacy(should_simplify=should_simplify, decimal_digits=decimal_digits) for action in self.actions.values())
+        actions = "\n".join(action.to_pddl(decimal_digits=decimal_digits) for action in self.actions.values())
         constants = f"(:constants {self._constants_to_pddl()}\n)\n\n" if len(self.constants) > 0 else ""
         functions = f"(:functions {self._functions_to_pddl()}\n)\n\n" if len(self.functions) > 0 else ""
         return (

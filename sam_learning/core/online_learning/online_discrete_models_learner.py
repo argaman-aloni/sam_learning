@@ -114,8 +114,9 @@ class OnlineDiscreteModelLearner:
 
             optimistic_precondition.add_condition(or_condition)
 
-        if len(self.cannot_be_preconditions) == 0:
-            return optimistic_precondition, {DUMMY_EFFECT}
+        if len(self.cannot_be_effects) == 0:
+            # Assuming that the action's effects are all the positive predicates
+            return optimistic_precondition, {predicate for predicate in self.predicates_superset if predicate.is_positive}
 
         return optimistic_precondition, self.predicates_superset.difference(self.cannot_be_effects)
 
@@ -128,7 +129,7 @@ class OnlineDiscreteModelLearner:
         safe_conditions = self.predicates_superset.difference(self.cannot_be_preconditions)
         return state.issuperset(safe_conditions)
 
-    def is_state_not_applicable_in_safe_model(self, state: Set[Predicate]) -> bool:
+    def is_state_not_applicable_in_safe_discrete_model(self, state: Set[Predicate]) -> bool:
         """Checks if state predicates only include the predicates that are not preconditions for the action.
 
         Note:

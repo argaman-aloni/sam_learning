@@ -1,6 +1,8 @@
 """Abstract class for all solvers."""
 from abc import ABC, abstractmethod
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 
 class SolutionOutputTypes(Enum):
@@ -19,7 +21,9 @@ class AbstractSolver(ABC):
         pass
 
     @abstractmethod
-    def solve_problem(self, *args, **kwargs) -> SolutionOutputTypes:
+    def solve_problem(
+        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_timeout: int, **kwargs: Any
+    ) -> SolutionOutputTypes:
         """Solve the problem."""
         pass
 

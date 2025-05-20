@@ -12,7 +12,7 @@ from sam_learning.core.online_learning_agents.minecraft_agent import MinecraftAg
 from sam_learning.core import LearnerDomain, EpisodeInfoRecord
 from sam_learning.learners import OnlineNSAMLearner
 from solvers import MetricFFSolver
-from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
+from utilities import LearningAlgorithmType, SolverType
 from validators import OnlineLearningDomainValidator
 
 DEFAULT_SPLIT = 10
