@@ -367,7 +367,7 @@ def test_is_state_not_applicable_in_safe_model_when_no_observation_was_given_ret
     online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
 ):
     state = {p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]}
-    assert not online_discrete_model_learner.is_state_not_applicable_in_safe_model(state)
+    assert not online_discrete_model_learner.is_state_not_applicable_in_safe_discrete_model(state)
 
 
 def test_is_state_not_applicable_in_safe_model_when_no_nust_be_preconditions_existing_returns_false(
@@ -381,7 +381,7 @@ def test_is_state_not_applicable_in_safe_model_when_no_nust_be_preconditions_exi
     }
     online_discrete_model_learner.add_transition_data(pre_state_predicates, next_state_predicates, is_transition_successful=True)
     state = {p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]}
-    assert not online_discrete_model_learner.is_state_not_applicable_in_safe_model(state)
+    assert not online_discrete_model_learner.is_state_not_applicable_in_safe_discrete_model(state)
 
 
 def test_is_state_not_applicable_in_safe_model_when_state_predicates_are_subset_of_not_preconditions_and_there_are_must_be_preconditions(
@@ -399,7 +399,7 @@ def test_is_state_not_applicable_in_safe_model_when_state_predicates_are_subset_
     }
     online_discrete_model_learner._add_negative_pre_state_observation(negative_pre_state_predicates)
     state = {p for p in lifted_vocabulary if p.untyped_representation in ["(available ?x)", "(not (surface-condition ?x ?oldsurface))",]}
-    assert online_discrete_model_learner.is_state_not_applicable_in_safe_model(state)
+    assert online_discrete_model_learner.is_state_not_applicable_in_safe_discrete_model(state)
 
 
 def test_is_state_not_applicable_in_safe_model_when_state_predicates_do_not_contain_any_unit_clause_of_must_be_preconditions(
@@ -417,4 +417,4 @@ def test_is_state_not_applicable_in_safe_model_when_state_predicates_do_not_cont
     }
     online_discrete_model_learner._add_negative_pre_state_observation(negative_pre_state_predicates)
     state = {p for p in lifted_vocabulary if p.untyped_representation in ["(surface-condition ?x ?oldsurface)",]}
-    assert online_discrete_model_learner.is_state_not_applicable_in_safe_model(state)
+    assert online_discrete_model_learner.is_state_not_applicable_in_safe_discrete_model(state)

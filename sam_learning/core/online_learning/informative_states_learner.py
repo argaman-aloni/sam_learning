@@ -86,7 +86,7 @@ class InformationStatesLearner:
         new_sample_data[LABEL_COLUMN] = False
         return len(pd.concat([self.combined_data, new_sample_data], ignore_index=True).drop_duplicates()) == len(self.combined_data)
 
-    def _is_state_not_applicable_in_numeric_model(self, new_numeric_sample: Dict[str, PDDLFunction]) -> bool:
+    def _is_state_not_applicable_in_safe_numeric_model(self, new_numeric_sample: Dict[str, PDDLFunction]) -> bool:
         """Determines if a given numeric sample results in a state that is not applicable
         in the context of the numeric model. This is assessed by checking if any negative
         samples from the numeric data are inside the convex hull created using the provided
@@ -158,9 +158,9 @@ class InformationStatesLearner:
             return False
 
         # Otherwise, check if it's definitely not applicable - if either is not applicable, return False
-        is_definitely_not_applicable = self.discrete_model_learner.is_state_not_applicable_in_safe_model(
+        is_definitely_not_applicable = self.discrete_model_learner.is_state_not_applicable_in_safe_discrete_model(
             new_propositional_sample
-        ) or self._is_state_not_applicable_in_numeric_model(new_numeric_sample)
+        ) or self._is_state_not_applicable_in_safe_numeric_model(new_numeric_sample)
 
         # Return whether it's informative and whether it's applicable
         return not is_definitely_not_applicable
