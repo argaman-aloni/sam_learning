@@ -26,7 +26,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
 
 
 class IncrementalConvexHullLearner(ConvexHullLearner):
-    """Class that learns the convex hull of the preconditions of an action."""
+    """Class that learns the convex hull for the preconditions of an action - incrementally."""
 
     _convex_hull: Optional[ConvexHull]
     _gsp_base: Optional[List[List[float]]]
@@ -358,6 +358,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         new_learner._spanning_standard_base = self._spanning_standard_base
         if self._convex_hull is not None:
             new_learner._learn_new_convex_hull(incremental=not one_shot)
+
         return new_learner
 
     def close_convex_hull(self) -> None:
@@ -365,3 +366,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         if self._convex_hull is not None:
             self._convex_hull.close()
             self._convex_hull = None
+
+    def is_spanning_standard_base(self) -> bool:
+        """Checks if the convex hull is spanning the standard base.
+
+        :return: whether the convex hull is spanning the standard base.
+        """
+        return self._spanning_standard_base

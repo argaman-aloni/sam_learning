@@ -10,6 +10,7 @@ from pddl_plus_parser.models import PDDLFunction, Predicate, Domain, Observation
 from sam_learning.core import VocabularyCreator
 from sam_learning.core.online_learning import IncrementalConvexHullLearner, InformationStatesLearner, OnlineDiscreteModelLearner
 from sam_learning.core.online_learning.informative_states_learner import LABEL_COLUMN
+from sam_learning.core.online_learning.online_numeric_models_learner import OnlineNumericModelLearner
 
 TEST_ACTION_NAME = "drive"
 TEST_FUNCTION_NAMES = ["(x)", "(y)", "(z)", "(w)"]
@@ -32,16 +33,16 @@ def parameter_bound_function_vocabulary(depot_domain: Domain) -> Dict[str, PDDLF
 
 
 @pytest.fixture
-def incremental_convex_hull_learner(parameter_bound_function_vocabulary: Dict[str, PDDLFunction]) -> IncrementalConvexHullLearner:
-    return IncrementalConvexHullLearner(TEST_ACTION_NAME, domain_functions=parameter_bound_function_vocabulary, polynom_degree=0)
+def online_numeric_model_learner(parameter_bound_function_vocabulary: Dict[str, PDDLFunction],) -> OnlineNumericModelLearner:
+    return OnlineNumericModelLearner(action_name=TEST_ACTION_NAME, pb_functions=parameter_bound_function_vocabulary,)
 
 
 @pytest.fixture
-def informative_states_learner_no_predicates(incremental_convex_hull_learner: IncrementalConvexHullLearner) -> InformationStatesLearner:
+def informative_states_learner_no_predicates(online_numeric_model_learner: OnlineNumericModelLearner) -> InformationStatesLearner:
     information_gain = InformationStatesLearner(
         action_name=TEST_ACTION_NAME,
-        discrete_model_learner=OnlineDiscreteModelLearner(action_name=TEST_ACTION_NAME, lifted_predicates=set()),
-        convex_hull_learner=incremental_convex_hull_learner,
+        discrete_model_learner=OnlineDiscreteModelLearner(action_name=TEST_ACTION_NAME, pb_predicates=set()),
+        numeric_model_learner=online_numeric_model_learner,
     )
     return information_gain
 
@@ -51,17 +52,17 @@ def informative_states_learner_only_discrete(online_discrete_model_learner: Onli
     information_gain = InformationStatesLearner(
         action_name=TEST_ACTION_NAME,
         discrete_model_learner=online_discrete_model_learner,
-        convex_hull_learner=IncrementalConvexHullLearner(TEST_ACTION_NAME, {}),
+        numeric_model_learner=OnlineNumericModelLearner(action_name=TEST_ACTION_NAME, pb_functions={}),
     )
     return information_gain
 
 
 @pytest.fixture
 def depot_informative_states_learner(
-    online_discrete_model_learner: OnlineDiscreteModelLearner, incremental_convex_hull_learner: IncrementalConvexHullLearner
+    online_discrete_model_learner: OnlineDiscreteModelLearner, online_numeric_model_learner: OnlineNumericModelLearner
 ) -> InformationStatesLearner:
     information_gain = InformationStatesLearner(
-        action_name="drive", discrete_model_learner=online_discrete_model_learner, convex_hull_learner=incremental_convex_hull_learner,
+        action_name="drive", discrete_model_learner=online_discrete_model_learner, numeric_model_learner=online_numeric_model_learner,
     )
     return information_gain
 
@@ -238,7 +239,7 @@ def test_visited_previously_failed_execution_when_both_predicates_and_numeric_fu
 def test_is_state_not_applicable_in_numeric_model_when_no_negative_samples_exist_in_dataset_returns_false(
     informative_states_learner_no_predicates: InformationStatesLearner,
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
-    incremental_convex_hull_learner: IncrementalConvexHullLearner,
+    online_numeric_model_learner: OnlineNumericModelLearner,
 ):
     new_numeric_sample = {}
     for index, func in enumerate(parameter_bound_function_vocabulary.values()):
@@ -253,7 +254,9 @@ def test_is_state_not_applicable_in_numeric_model_when_no_negative_samples_exist
         new_numeric_sample[function_name] = new_func
 
     informative_states_learner_no_predicates.add_new_sample(new_numeric_sample=new_numeric_sample, is_successful=True)
-    incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in new_numeric_sample.values()})
+    online_numeric_model_learner.add_transition_data(
+        pre_state_functions=new_numeric_sample, post_state_functions=not_observed_numeric_sample, is_transition_successful=True
+    )
     assert not informative_states_learner_no_predicates._is_state_not_applicable_in_numeric_model(not_observed_numeric_sample)
 
 
@@ -279,7 +282,7 @@ def test_is_state_not_applicable_in_numeric_model_when_single_negative_sample_ex
 def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and_new_observation_with_existing_convex_hull_includes_negative_sample_returns_true(
     informative_states_learner_no_predicates: InformationStatesLearner,
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
-    incremental_convex_hull_learner: IncrementalConvexHullLearner,
+    online_numeric_model_learner: OnlineNumericModelLearner,
 ):
     function_to_positive_values_map = {
         "(load_limit ?x)": [0, 0, 1, 1],
@@ -301,7 +304,9 @@ def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and
             new_func.set_value(function_to_positive_values_map[func_name][index])
             state_dict[func_name] = new_func
 
-        incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in state_dict.values()})
+        online_numeric_model_learner.add_transition_data(
+            pre_state_functions=state_dict, post_state_functions=state_dict, is_transition_successful=True
+        )
         informative_states_learner_no_predicates.add_new_sample(new_numeric_sample=state_dict, is_successful=True)
 
     negative_state_dict = {}
@@ -329,7 +334,7 @@ def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and
 def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and_new_observation_with_existing_convex_hull_does_not_include_negative_sample_returns_false(
     informative_states_learner_no_predicates: InformationStatesLearner,
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
-    incremental_convex_hull_learner: IncrementalConvexHullLearner,
+    online_numeric_model_learner: OnlineNumericModelLearner,
 ):
     function_to_positive_values_map = {
         "(load_limit ?x)": [0, 0, 1, 1],
@@ -351,7 +356,9 @@ def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and
             new_func.set_value(function_to_positive_values_map[func_name][index])
             state_dict[func_name] = new_func
 
-        incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in state_dict.values()})
+        online_numeric_model_learner.add_transition_data(
+            pre_state_functions=state_dict, post_state_functions=state_dict, is_transition_successful=True
+        )
         informative_states_learner_no_predicates.add_new_sample(new_numeric_sample=state_dict, is_successful=True)
 
     negative_state_dict = {}
@@ -399,7 +406,7 @@ def test_is_sample_informative_when_new_observation_already_observed_returns_fal
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
-    incremental_convex_hull_learner: IncrementalConvexHullLearner,
+    online_numeric_model_learner: OnlineNumericModelLearner,
     online_discrete_model_learner: OnlineDiscreteModelLearner,
 ):
     new_numeric_sample = {}
@@ -414,7 +421,9 @@ def test_is_sample_informative_when_new_observation_already_observed_returns_fal
     online_discrete_model_learner.add_transition_data(
         pre_state_predicates=pre_state_predicates, post_state_predicates=post_state_predicates, is_transition_successful=True
     )
-    incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in new_numeric_sample.values()})
+    online_numeric_model_learner.add_transition_data(
+        pre_state_functions=new_numeric_sample, post_state_functions=new_numeric_sample, is_transition_successful=True
+    )
     depot_informative_states_learner.add_new_sample(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=pre_state_predicates, is_successful=True
     )
@@ -428,7 +437,7 @@ def test_is_sample_informative_when_propositional_part_of_state_is_superset_of_t
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
-    incremental_convex_hull_learner: IncrementalConvexHullLearner,
+    online_numeric_model_learner: OnlineNumericModelLearner,
     online_discrete_model_learner: OnlineDiscreteModelLearner,
 ):
     new_numeric_sample = {}
@@ -444,7 +453,9 @@ def test_is_sample_informative_when_propositional_part_of_state_is_superset_of_t
         pre_state_predicates=pre_state_predicates, post_state_predicates=post_state_predicates, is_transition_successful=True
     )
 
-    incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in new_numeric_sample.values()})
+    online_numeric_model_learner.add_transition_data(
+        pre_state_functions=new_numeric_sample, post_state_functions=new_numeric_sample, is_transition_successful=True
+    )
     depot_informative_states_learner.add_new_sample(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=pre_state_predicates, is_successful=True
     )
@@ -460,7 +471,7 @@ def test_is_sample_informative_when_propositional_part_contains_only_what_cannot
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
-    incremental_convex_hull_learner: IncrementalConvexHullLearner,
+    online_numeric_model_learner: OnlineNumericModelLearner,
     online_discrete_model_learner: OnlineDiscreteModelLearner,
 ):
     new_numeric_sample = {}
@@ -476,7 +487,9 @@ def test_is_sample_informative_when_propositional_part_contains_only_what_cannot
     online_discrete_model_learner.add_transition_data(
         pre_state_predicates=pre_state_predicates, post_state_predicates=post_state_predicates, is_transition_successful=True
     )
-    incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in new_numeric_sample.values()})
+    online_numeric_model_learner.add_transition_data(
+        pre_state_functions=new_numeric_sample, post_state_functions=new_numeric_sample, is_transition_successful=True
+    )
     depot_informative_states_learner.add_new_sample(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=pre_state_predicates, is_successful=True
     )
@@ -489,7 +502,9 @@ def test_is_sample_informative_when_propositional_part_contains_only_what_cannot
     online_discrete_model_learner.add_transition_data(
         pre_state_predicates=negative_pre_state_predicates, post_state_predicates=negative_pre_state_predicates, is_transition_successful=False
     )
-    incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in new_numeric_sample.values()})
+    online_numeric_model_learner.add_transition_data(
+        pre_state_functions=new_numeric_sample, post_state_functions=new_numeric_sample, is_transition_successful=False
+    )
     depot_informative_states_learner.add_new_sample(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=negative_pre_state_predicates, is_successful=False
     )
@@ -504,7 +519,7 @@ def test_is_sample_informative_when_propositional_part_does_not_contain_unit_cla
     depot_informative_states_learner: InformationStatesLearner,
     lifted_depot_vocabulary: Set[Predicate],
     parameter_bound_function_vocabulary: Dict[str, PDDLFunction],
-    incremental_convex_hull_learner: IncrementalConvexHullLearner,
+    online_numeric_model_learner: OnlineNumericModelLearner,
     online_discrete_model_learner: OnlineDiscreteModelLearner,
 ):
     new_numeric_sample = {}
@@ -520,7 +535,9 @@ def test_is_sample_informative_when_propositional_part_does_not_contain_unit_cla
     online_discrete_model_learner.add_transition_data(
         pre_state_predicates=pre_state_predicates, post_state_predicates=post_state_predicates, is_transition_successful=True
     )
-    incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in new_numeric_sample.values()})
+    online_numeric_model_learner.add_transition_data(
+        pre_state_functions=new_numeric_sample, post_state_functions=new_numeric_sample, is_transition_successful=True
+    )
     depot_informative_states_learner.add_new_sample(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=pre_state_predicates, is_successful=True
     )
@@ -533,7 +550,9 @@ def test_is_sample_informative_when_propositional_part_does_not_contain_unit_cla
     online_discrete_model_learner.add_transition_data(
         pre_state_predicates=negative_pre_state_predicates, post_state_predicates=negative_pre_state_predicates, is_transition_successful=False
     )
-    incremental_convex_hull_learner.add_new_point(point={func.untyped_representation: func.value for func in new_numeric_sample.values()})
+    online_numeric_model_learner.add_transition_data(
+        pre_state_functions=new_numeric_sample, post_state_functions=new_numeric_sample, is_transition_successful=False
+    )
     depot_informative_states_learner.add_new_sample(
         new_numeric_sample=new_numeric_sample, new_propositional_sample=negative_pre_state_predicates, is_successful=False
     )

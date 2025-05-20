@@ -9,6 +9,7 @@ from pddl_plus_parser.models import PDDLFunction, Predicate
 from sam_learning.core.numeric_learning.numeric_utils import create_grounded_monomials
 from sam_learning.core.online_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
 from sam_learning.core.online_learning.online_discrete_models_learner import OnlineDiscreteModelLearner
+from sam_learning.core.online_learning.online_numeric_models_learner import OnlineNumericModelLearner
 
 LABEL_COLUMN = "label"
 
@@ -44,14 +45,14 @@ class InformationStatesLearner:
     monomials: List[List[str]]
 
     def __init__(
-        self, action_name: str, discrete_model_learner: OnlineDiscreteModelLearner, convex_hull_learner: IncrementalConvexHullLearner,
+        self, action_name: str, discrete_model_learner: OnlineDiscreteModelLearner, numeric_model_learner: OnlineNumericModelLearner,
     ):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
         self.discrete_model_learner = discrete_model_learner
-        self.convex_hull_learner = convex_hull_learner
-        self.monomials = self.convex_hull_learner.monomials
-        monomial_strs = self.convex_hull_learner.data.columns.tolist()
+        self.numeric_model_learner = numeric_model_learner
+        self.monomials = self.numeric_model_learner._monomials
+        monomial_strs = self.numeric_model_learner.data_columns
         self.parameter_bound_predicates = [p.untyped_representation for p in self.discrete_model_learner.predicates_superset]
         self.combined_data = DataFrame(columns=[*monomial_strs, self.parameter_bound_predicates, LABEL_COLUMN])
         self.numeric_data = DataFrame(columns=[*monomial_strs, LABEL_COLUMN])
@@ -101,7 +102,7 @@ class InformationStatesLearner:
         :return: Returns True if a negative sample is located within the constructed convex hull,
             indicating the state is not applicable. Otherwise, returns False.
         """
-        validation_convex_hull = self.convex_hull_learner.copy(one_shot=False)
+        validation_convex_hull = self.numeric_model_learner.copy_convex_hull_learner(one_shot=False)
         validation_convex_hull.add_new_point(create_grounded_monomials(self.monomials, new_numeric_sample))
         negative_samples = self.numeric_data[self.numeric_data[LABEL_COLUMN] == False]
         for _, negative_sample in negative_samples.iterrows():
@@ -152,7 +153,7 @@ class InformationStatesLearner:
         # First, check if the sample is definitely applicable and non-informative
         is_applicable_and_non_informative = self.discrete_model_learner.is_state_in_safe_model(
             new_propositional_sample
-        ) and self.convex_hull_learner.is_point_in_convex_hull(DataFrame({func_name: [func.value] for func_name, func in new_numeric_sample.items()}))
+        ) and self.numeric_model_learner.is_state_in_safe_model(new_numeric_sample)
         if is_applicable_and_non_informative:
             return False
 

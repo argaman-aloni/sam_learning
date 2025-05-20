@@ -19,10 +19,10 @@ class OnlineDiscreteModelLearner:
     cannot_be_effects: Set[Predicate]
     must_be_effects: Set[Predicate]
 
-    def __init__(self, action_name: str, lifted_predicates: Set[Predicate]):
+    def __init__(self, action_name: str, pb_predicates: Set[Predicate]):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
-        self.predicates_superset = {predicate.copy() for predicate in lifted_predicates}
+        self.predicates_superset = {predicate.copy() for predicate in pb_predicates}
         self.cannot_be_preconditions = set()
         self.cannot_be_effects = set()
         self.must_be_preconditions = []

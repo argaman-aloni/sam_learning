@@ -7,11 +7,13 @@ import uuid
 from pathlib import Path
 from typing import Dict
 
+from solvers.abstract_solver import AbstractSolver, SolutionOutputTypes
+
 FAST_DOWNWARD_DIR_PATH = os.environ["FAST_DOWNWARD_DIR_PATH"]
 MAX_RUNNING_TIME = 60  # seconds
 
 
-class FastDownwardSolver:
+class FastDownwardSolver(AbstractSolver):
     """Class designated to use to activate the metric-FF solver on the cluster and parse its result."""
 
     logger: logging.Logger
@@ -48,7 +50,7 @@ class FastDownwardSolver:
         solving_stats: Dict[str, str],
         solving_timeout: int,
         tolerance: float = 0.1,
-    ) -> bool:
+    ) -> SolutionOutputTypes:
         """Solves a single problem using the Fast Downward solver.
 
         :param domain_file_path: the path to the domain file.
@@ -56,6 +58,7 @@ class FastDownwardSolver:
         :param problems_directory_path: the path to the directory containing the problems.
         :param solving_stats: the statistics of the solving process.
         :param solving_timeout: the timeout for the solving process.
+        :param tolerance: unused parameter (added to create a uniform API).
         :return Whether the execution terminated successfully.
         """
         os.chdir(FAST_DOWNWARD_DIR_PATH)
@@ -85,21 +88,22 @@ class FastDownwardSolver:
             solving_stats[problem_file_path.stem] = "ok"
             self._remove_cost_from_file(solution_path)
             self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / sas_file_path)
-            return True
+            return SolutionOutputTypes.ok
 
         except subprocess.CalledProcessError as e:
             if e.returncode in [21, 23, 247]:
                 self.logger.warning(f"Fast Downward returned status code {e.returncode} - timeout on problem {problem_file_path.stem}.")
                 solving_stats[problem_file_path.stem] = "timeout"
-                return True
+                return SolutionOutputTypes.timeout
+
             elif e.returncode in [11, 12]:
                 self.logger.warning(f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}.")
                 solving_stats[problem_file_path.stem] = "no_solution"
-                return True
-            else:
-                self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")
-                solving_stats[problem_file_path.stem] = "solver_error"
-                return False
+                return SolutionOutputTypes.no_solution
+
+            self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")
+            solving_stats[problem_file_path.stem] = "solver_error"
+            return SolutionOutputTypes.solver_error
 
     def execute_solver(
         self,
@@ -115,6 +119,7 @@ class FastDownwardSolver:
         :param domain_file_path: the path to the domain file.
         :param problems_prefix: the prefix of the problems files.
         :param tolerance: the tolerance of the solver (added to create a uniform API).
+        :param solving_timeout: the timeout for the solving process.
         :return: a dictionary containing the solving status of each problem.
         """
         solving_stats = {}
@@ -122,12 +127,10 @@ class FastDownwardSolver:
         self.logger.info("Starting to solve the input problems using Fast-Downward solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.logger.info(f"Fast Downward is starting to solve problem - {problem_file_path.stem}")
-            terminated_successfully = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
+            termination_status = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
             num_retries = 0
-            while not terminated_successfully and num_retries < 3:
-                terminated_successfully = self.solve_problem(
-                    domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout
-                )
+            while termination_status == SolutionOutputTypes.solver_error and num_retries < 3:
+                termination_status = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_stats, solving_timeout)
                 num_retries += 1
 
         return solving_stats

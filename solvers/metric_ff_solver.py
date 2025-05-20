@@ -8,12 +8,14 @@ from typing import Dict
 
 from pddl_plus_parser.exporters import MetricFFParser
 
+from solvers.abstract_solver import AbstractSolver, SolutionOutputTypes
+
 METRIC_FF_DIRECTORY = os.environ["METRIC_FF_DIRECTORY"]
 
 MAX_RUNNING_TIME = 5  # seconds
 
 
-class MetricFFSolver:
+class MetricFFSolver(AbstractSolver):
     """Class designated to use to activate the metric-FF solver on the cluster and parse its result."""
 
     logger: logging.Logger
@@ -35,30 +37,31 @@ class MetricFFSolver:
 
     def _run_metric_ff_process(
         self, run_command: str, solution_path: Path, problem_file_path: Path, solving_stats: Dict[str, str], solving_timeout: int = MAX_RUNNING_TIME,
-    ) -> None:
+    ) -> SolutionOutputTypes:
         """Runs the metric-ff process."""
         self.logger.info(f"Metric-FF solver is working on - {problem_file_path.stem}")
         process = subprocess.Popen(run_command, shell=True)
         try:
             process.wait(timeout=solving_timeout)
+
         except subprocess.TimeoutExpired:
             self.logger.warning(f"Metric-FF solver took more than {solving_timeout} seconds to finish.")
             os.kill(process.pid, signal.SIGTERM)
             os.system("pkill -f ./ff")
             solution_path.unlink(missing_ok=True)
             solving_stats[problem_file_path.stem] = "timeout"
-            return
+            return SolutionOutputTypes.timeout
 
         if process.returncode is None:
             solving_stats[problem_file_path.stem] = "timeout"
             solution_path.unlink(missing_ok=True)
-            return
+            return SolutionOutputTypes.timeout
 
         if process.returncode != 0:
             self.logger.warning(f"Metric FF Solver returned status code {process.returncode}.")
             if not solution_path.exists():
                 solving_stats[problem_file_path.stem] = "solver_error"
-                return
+                return SolutionOutputTypes.solver_error
 
             solving_status = self.parser.get_solving_status(solution_path)[0]
             if solving_status != "ok" and solving_status != "no-solution":
@@ -67,7 +70,7 @@ class MetricFFSolver:
                 self.logger.warning(f"Metric FF Solver encountered an error - {problem_file_path.stem}")
                 self.logger.warning(error)
                 solution_path.unlink(missing_ok=True)
-                return
+                return SolutionOutputTypes.solver_error
 
         self.logger.info("Metric FF Solver finished its execution!")
         solving_status = self.parser.get_solving_status(solution_path)[0]
@@ -75,11 +78,12 @@ class MetricFFSolver:
             self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = solving_status
             self.parser.parse_plan(solution_path, solution_path)
+            return SolutionOutputTypes.ok
 
-        elif solving_status == "no-solution":
-            self.logger.warning(f"Metric FF Solver could not solve problem - {problem_file_path.stem}")
-            solving_stats[problem_file_path.stem] = "no_solution"
-            solution_path.unlink(missing_ok=True)
+        self.logger.warning(f"Metric FF Solver could not solve problem - {problem_file_path.stem}")
+        solving_stats[problem_file_path.stem] = "no_solution"
+        solution_path.unlink(missing_ok=True)
+        return SolutionOutputTypes.no_solution
 
     def solve_problem(
         self,
@@ -89,7 +93,7 @@ class MetricFFSolver:
         solving_stats: Dict[str, str],
         solving_timeout: int,
         tolerance: float,
-    ) -> None:
+    ) -> SolutionOutputTypes:
         """Solves a single problem using the Metric FF algorithm.
 
         :param domain_file_path: the path to the domain file.
@@ -103,7 +107,7 @@ class MetricFFSolver:
         self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
         solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
         run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 0 -t {tolerance} > {solution_path}"
-        self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_stats, solving_timeout)
+        return self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_stats, solving_timeout)
 
     def execute_solver(
         self,
