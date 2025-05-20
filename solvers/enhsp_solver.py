@@ -5,9 +5,11 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 
 from jdk4py import JAVA
+
+from solvers.abstract_solver import AbstractSolver, SolutionOutputTypes
 
 ENHSP_FILE_PATH = os.environ["ENHSP_FILE_PATH"]
 MAX_RUNNING_TIME = 5  # seconds
@@ -20,7 +22,7 @@ GOAL_NOT_REACHABLE = b"Goal is not reachable"
 ERROR_TYPE_NO_SOLUTION = b'"this.plan" is null'
 
 
-class ENHSPSolver:
+class ENHSPSolver(AbstractSolver):
     """Class designated to use to activate the metric-FF solver on the cluster and parse its result."""
 
     logger: logging.Logger
@@ -30,7 +32,7 @@ class ENHSPSolver:
 
     def _run_enhsp_process(
         self, run_command: str, problem_file_path: Path, solving_stats: Dict[str, str], solving_timeout: int = MAX_RUNNING_TIME
-    ) -> bool:
+    ) -> Tuple[bool, SolutionOutputTypes]:
         """Runs the ENHSP process and monitors its execution time.
 
         :param run_command: the command to run the ENHSP process.
@@ -48,12 +50,12 @@ class ENHSPSolver:
             solving_stats[problem_file_path.stem] = "timeout"
             os.kill(process.pid, signal.SIGTERM)
             os.system(f"pkill -f {ENHSP_FILE_PATH}")
-            return True
+            return True, SolutionOutputTypes.timeout
 
         if process.returncode is None:
             solving_stats[problem_file_path.stem] = "timeout"
             self.logger.warning(f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
-            return True
+            return True, SolutionOutputTypes.timeout
 
         self.logger.info("ENHSP finished its execution!")
         stdout = process.stdout.read()
@@ -62,23 +64,23 @@ class ENHSPSolver:
         if PROBLEM_SOLVED in stdout:
             self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "ok"
-            return True
+            return True, SolutionOutputTypes.ok
 
         elif NO_SOLUTION_FOR_PROBLEM in stdout or OTHER_NO_SOLUTION_TYPE in stdout or ERROR_TYPE_NO_SOLUTION in stderr:
             self.logger.warning(f"Solver could not solve problem - {problem_file_path.stem}")
             solving_stats[problem_file_path.stem] = "no_solution"
-            return True
+            return True, SolutionOutputTypes.no_solution
 
         elif GOAL_NOT_REACHABLE in stderr:
             self.logger.warning("Solver declared goal unreachable!")
             solving_stats[problem_file_path.stem] = "no_solution"
-            return True
+            return True, SolutionOutputTypes.no_solution
 
         else:
             self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDOUT - {stdout}")
             self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDERR - {stderr}")
             solving_stats[problem_file_path.stem] = "solver_error"
-            return False
+            return False, SolutionOutputTypes.solver_error
 
     def solve_problem(
         self,
@@ -88,7 +90,7 @@ class ENHSPSolver:
         solving_stats: Dict[str, str],
         solving_timeout: int,
         tolerance: float,
-    ) -> None:
+    ) -> SolutionOutputTypes:
         """Solves a single problem using the ENHSP algorithm.
 
         :param domain_file_path: the path to the domain file.
@@ -97,6 +99,7 @@ class ENHSPSolver:
         :param solving_stats: the statistics of the solving process.
         :param solving_timeout: the timeout for the solver.
         :param tolerance: the numeric tolerance to use.
+        :return: the status of the solution.
         """
         num_retries = 0
         self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
@@ -116,10 +119,12 @@ class ENHSPSolver:
             str(solution_path.absolute()),
         ]
         run_command = f"{str(JAVA)} -jar {ENHSP_FILE_PATH} {' '.join(running_options)}"
-        solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
+        solver_output_ok, solution_status = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
         while not solver_output_ok and num_retries < 3:
-            solver_output_ok = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
+            solver_output_ok, solution_status = self._run_enhsp_process(run_command, problem_file_path, solving_stats, solving_timeout)
             num_retries += 1
+
+        return solution_status
 
     def execute_solver(
         self,

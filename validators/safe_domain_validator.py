@@ -8,8 +8,8 @@ from typing import Dict, List, Any, Optional, Union
 
 from pddl_plus_parser.models import Observation, MultiAgentObservation
 
-from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver, FFADLSolver
-from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes, NegativePreconditionPolicy, MappingElement, MacroActionParser
+from solvers import FastDownwardSolver, MetricFFSolver, ENHSPSolver, SolutionOutputTypes
+from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy, MappingElement, MacroActionParser
 from validators.common import AGGREGATED_SOLVING_FIELDS
 from validators.validator_script_data import VALID_PLAN, INAPPLICABLE_PLAN, GOAL_NOT_REACHED, run_validate_script
 
@@ -17,7 +17,6 @@ SOLVER_TYPES = {
     SolverType.fast_downward: FastDownwardSolver,
     SolverType.metric_ff: MetricFFSolver,
     SolverType.enhsp: ENHSPSolver,
-    SolverType.fast_forward: FFADLSolver,
 }
 
 SOLVING_STATISTICS = [
@@ -279,7 +278,7 @@ class DomainValidator:
             for solver_type in solvers_portfolio:
                 start_time = time.time()
                 solver = SOLVER_TYPES[solver_type]()
-                solver.solve_problem(
+                problem_solving_report[problem_file_name] = solver.solve_problem(
                     problems_directory_path=test_set_directory_path,
                     domain_file_path=tested_domain_file_path,
                     problem_file_path=problem_path,
