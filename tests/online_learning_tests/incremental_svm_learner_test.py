@@ -2,10 +2,12 @@
 from typing import Dict
 
 import numpy as np
+import csv
 import pytest
 from pddl_plus_parser.models import PDDLFunction, Precondition
 
 from sam_learning.core.online_learning.incremental_svm_learner import IncrementalSVMLearner
+from tests.consts import TWO_SIDES_OF_BOX_PATH, CLOSE_TO_BOX_PATH
 
 FUNC_NAMES = ["(x )", "(y )", "(z )", "(w )"]
 
@@ -122,8 +124,8 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     two_dim_svm_learner: IncrementalSVMLearner,
 ):
     N = 500
-    x = [np.random.random_integers(-10, 10) for _ in range(N // 2)] + [np.random.random_integers(-100, 100) for _ in range(N // 2)]
-    y = [np.random.random_integers(-10, 10) for _ in range(N // 2)] + [np.random.random_integers(-100, 100) for _ in range(N // 2)]
+    x = [np.random.randint(-10, 10 + 1) for _ in range(N // 2)] + [np.random.randint(-100, 100 + 1) for _ in range(N // 2)]
+    y = [np.random.randint(-10, 10 + 1) for _ in range(N // 2)] + [np.random.randint(-100, 100 + 1) for _ in range(N // 2)]
     for i in range(N):
         label = -10 <= x[i] <= 10 and -10 <= y[i] <= 10
         point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
@@ -134,14 +136,59 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
+    assert len(result.operands) >=  2 + 1 # at least number of dimensions + 1
 
+def test_create_svm_conditions_when_negative_points_are_close_to_the_condition_box(
+    two_dim_svm_learner: IncrementalSVMLearner,
+):
+    with open(CLOSE_TO_BOX_PATH, "r") as csvfile:
+
+        reader = csv.reader(csvfile)
+        
+        next(reader) # Skip the header   
+        for row in reader: # For each row in the CSV file
+            point = {
+                name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]
+            }
+            point["(x )"].set_value(float(row[0]))
+            point["(y )"].set_value(float(row[1]))
+            label = row[2] == 'True'
+            two_dim_svm_learner.add_new_point(point=point, is_successful=label)
+
+    result = two_dim_svm_learner.construct_linear_inequalities()
+    assert isinstance(result, Precondition)
+    print(str(result))
+    assert len(result.operands) >=  2 + 1 # at least number of dimensions + 1
+
+
+def test_create_svm_conditions_when_given_negative_points_from_two_sides_of_the_condition_box(
+    two_dim_svm_learner: IncrementalSVMLearner,
+):
+    with open(TWO_SIDES_OF_BOX_PATH, "r") as csvfile:
+
+        reader = csv.reader(csvfile)
+        
+        next(reader) # Skip the header   
+        for row in reader: # For each row in the CSV file
+            point = {
+                name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]
+            }
+            point["(x )"].set_value(float(row[0]))
+            point["(y )"].set_value(float(row[1]))
+            label = row[2] == 'True'
+            two_dim_svm_learner.add_new_point(point=point, is_successful=label)
+
+    result = two_dim_svm_learner.construct_linear_inequalities()
+    assert isinstance(result, Precondition)
+    print(str(result))
+    assert len(result.operands) ==  2 # two sides of the box
 
 def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_accurate_conditions_when_conditions_are_linear(
     two_dim_svm_learner: IncrementalSVMLearner,
 ):
     N = 500
-    x = [np.random.random_integers(-100, 100) for _ in range(N)]
-    y = [np.random.random_integers(-100, 100) for _ in range(N)]
+    x = [np.random.randint(-100, 100 + 1) for _ in range(N)]
+    y = [np.random.randint(-100, 100 + 1) for _ in range(N)]
     for i in range(N):
         label = x[i] > 5 + y[i]
         point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
