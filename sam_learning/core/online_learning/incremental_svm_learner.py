@@ -169,17 +169,23 @@ class IncrementalSVMLearner:
             # keep mask: everything except those
             keep_mask = ~correctly_classified_neg
 
-            # apply it
+            # The classifier is not able to classify any more points
+            # Specifically the last negative point can't be classified
+            if np.sum(~keep_mask) == 0:
+                # remove the last negative point from the data
+                final_mask = np.ones(len(y_reminder), dtype=bool)
+                final_mask[closest_neg_global_idx] = False
+                X_reminder = X_reminder[final_mask]
+                y_reminder = y_reminder[final_mask]
+                continue
+
+            # apply the mask
             X_reminder = X_reminder[keep_mask]
             y_reminder = y_reminder.iloc[keep_mask]
 
             self.logger.debug(
                 f"Plane {' + '.join([f'{coefficients[j]} ' f'* {col}' for j, col in enumerate(no_label_columns.columns.tolist())])} >= {b} (removed {np.sum(~keep_mask)} points)"
             )
-
-            if len(X_reminder) == 0 or np.sum(~keep_mask) == 0:
-                print("All points classified. Stopping.")
-                break
 
             planes.append((coefficients, border_point))
 
