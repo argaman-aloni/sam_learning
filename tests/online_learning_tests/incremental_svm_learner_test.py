@@ -138,6 +138,28 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     print(str(result))
     assert len(result.operands) >=  2 + 1 # at least number of dimensions + 1
 
+def test_create_svm_conditions_when_given_hundredth_positive_samples_as_box(
+    two_dim_svm_learner: IncrementalSVMLearner,
+):
+    positive_propotion = 0.01
+    N = 1000
+    positive_count = int(N * positive_propotion)
+    negative_count = N - positive_count
+
+    x = [np.random.randint(-10, 10 + 1) for _ in range(positive_count)] + [np.random.randint(-100, 100 + 1) for _ in range(negative_count)]
+    y = [np.random.randint(-10, 10 + 1) for _ in range(positive_count)] + [np.random.randint(-100, 100 + 1) for _ in range(negative_count)]
+    for i in range(N):
+        label = -10 <= x[i] <= 10 and -10 <= y[i] <= 10
+        point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
+        point["(x )"].set_value(x[i])
+        point["(y )"].set_value(y[i])
+        two_dim_svm_learner.add_new_point(point=point, is_successful=label)
+
+    result = two_dim_svm_learner.construct_linear_inequalities()
+    assert isinstance(result, Precondition)
+    print(str(result))
+    assert len(result.operands) >=  2 + 1 # at least number of dimensions + 1
+
 def test_create_svm_conditions_when_negative_points_are_close_to_the_condition_box(
     two_dim_svm_learner: IncrementalSVMLearner,
 ):
