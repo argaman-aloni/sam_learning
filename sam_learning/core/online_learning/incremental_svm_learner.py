@@ -55,15 +55,6 @@ def plot_planes_2d(X: DataFrame, y: Series, planes, axis_names: List[str], grid:
             x0 = b / w[0]
             plt.axvline(x0, color=color, linestyle="--", linewidth=2, label=f"Plane {idx + 1}", zorder=2)
 
-        # Random points on the line
-        pts_x = np.random.uniform(xmin - 0.5, xmax + 0.5, 10)
-        if abs(w[1]) > 1e-6:
-            pts_y = (b - w[0] * pts_x) / w[1]
-        else:
-            pts_y = np.random.uniform(ymin - 0.5, ymax + 0.5, 10)
-
-        plt.scatter(pts_x, pts_y, s=30, color=color, edgecolor="white", label=f"Points on P{idx + 1}", zorder=4)
-
     plt.xlim(xmin - 0.5, xmax + 0.5)
     plt.ylim(X[axis_names[1]].min() - 0.5, X[axis_names[1]].max() + 0.5)
     plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
@@ -151,7 +142,7 @@ class IncrementalSVMLearner:
             y_filtered = y_reminder[final_mask]
 
             classifier = LinearSVC(
-                random_state=0, tol=EPSILON, dual=False, max_iter=5000, class_weight={-1: 10, 1: 1},
+               random_state=0, tol=EPSILON, dual=False, max_iter=5000, C=1e10
             )
             classifier.fit(X_filtered, y_filtered.tolist())
             A = classifier.coef_[0].copy()
