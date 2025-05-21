@@ -255,23 +255,23 @@ def test_get_safe_model_when_observed_a_single_negative_observation_returns_prec
     assert len(safe_effects) == 0
 
 
-def test_get_optimistic_model_when_no_observation_was_given_returns_the_superset_of_the_predicates(
+def test_get_optimistic_model_when_no_observation_was_given_returns_effects_that_are_only_positive_predicates(
     online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
 ):
     optimistic_precondition, optimistic_effects = online_discrete_model_learner.get_optimistic_model()
     assert optimistic_precondition is not None
     assert len(optimistic_precondition.operands) == 0
-    assert len(optimistic_effects) == 1
-    assert optimistic_effects.pop() == DUMMY_EFFECT
+    assert len(optimistic_effects) > 0
+    assert all([eff.is_positive for eff in optimistic_effects])
 
 
-def test_get_optimistic_model_returns_empty_preconditions_and_only_the_goal_predicate_as_effects_when_learner_initialized_with_no_predicates():
+def test_get_optimistic_model_returns_empty_preconditions_and_and_no_predicates_as_effects_when_learner_initialized_with_no_predicates():
     empty_predicates_set = set()
     online_discrete_model_learner = OnlineDiscreteModelLearner(TEST_ACTION_NAME, empty_predicates_set)
     safe_precondition, safe_effects = online_discrete_model_learner.get_optimistic_model()
     assert safe_precondition is not None
     assert len(safe_precondition.operands) == 0
-    assert len(safe_effects) == 1
+    assert len(safe_effects) == 0
 
 
 def test_get_optimistic_model_when_observed_a_single_positive_observation_returns_preconditions_and_effects_based_on_the_observation(
@@ -305,8 +305,10 @@ def test_get_optimistic_model_when_observed_a_single_negative_observation_return
     assert len(optimistic_precondition.operands) == 1
     or_condition = optimistic_precondition.operands.pop()
     assert isinstance(or_condition, Precondition)
+    assert or_condition.binary_operator == "or"
     assert len(or_condition.operands) == 2
-    assert len(optimistic_effects) == 1
+    assert len(optimistic_effects) > 0
+    assert all([eff.is_positive for eff in optimistic_effects])
 
 
 def test_is_state_in_safe_model_when_no_observation_was_given_returns_false_since_model_is_conservative(
