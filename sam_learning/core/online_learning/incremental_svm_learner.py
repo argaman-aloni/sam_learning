@@ -187,7 +187,28 @@ class IncrementalSVMLearner:
                 f"Plane {' + '.join([f'{coefficients[j]} ' f'* {col}' for j, col in enumerate(no_label_columns.columns.tolist())])} >= {b} (removed {np.sum(~keep_mask)} points)"
             )
 
-            planes.append((coefficients, border_point))
+            # Add predictions of negative points for later comparison
+            preds = classifier.predict(no_label_columns.to_numpy())
+            pred_is_neg = preds == -1
+
+            planes.append((coefficients, border_point, pred_is_neg.astype(int)))
+
+        # Remove planes that are subsets of others
+        filtered_planes = []
+        for i in range(len(planes)):
+            coeff_i, bp_i, pred_i = planes[i]
+            is_subset = False
+
+            for j in range(i+1, len(planes)):
+                # Check if the plane i is a subset of another
+                result = planes[j][2] - pred_i
+                if -1 not in result: # plain j is superset of plane i
+                    is_subset = True
+                    break
+
+            if not is_subset:
+                filtered_planes.append((coeff_i, bp_i))     
+        planes = filtered_planes
 
         if debug:
             if len(no_label_columns.columns.tolist()) == 2:

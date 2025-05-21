@@ -199,3 +199,4 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
+    assert len(result.operands) >=  1 # at least one condition
