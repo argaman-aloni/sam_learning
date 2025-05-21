@@ -481,7 +481,7 @@ def test_construct_convex_hull_inequalities_when_given_too_few_examples_returns_
     assert learner._gsp_base is not None
     assert learner._complementary_base is not None
     precondition = learner.construct_safe_linear_inequalities()
-    print(precondition.print(should_simplify=False, decimal_digits=2))
+    print(precondition.print(decimal_digits=2))
 
 
 def test_construct_convex_hull_inequalities_when_convex_hull_initialized_with_empty_relevant_fluents_returns_empty_conditions(

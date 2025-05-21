@@ -141,7 +141,11 @@ class InformationStatesLearner:
 
         else:
             self.combined_data = pd.concat([self.combined_data, new_observation_entry], ignore_index=True)
+            self.combined_data.dropna(axis="columns", inplace=True)
+            self.combined_data = self.combined_data.drop_duplicates()
             self.numeric_data = pd.concat([self.numeric_data, new_numeric_df], ignore_index=True)
+            self.numeric_data.dropna(axis="columns", inplace=True)
+            self.numeric_data = self.numeric_data.drop_duplicates()
 
     def is_sample_informative(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
         """Checks whether the sample is informative.

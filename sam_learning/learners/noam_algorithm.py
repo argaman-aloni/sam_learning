@@ -1,8 +1,10 @@
 """An online version of the Numeric SAM learner."""
 import logging
+import random
+from collections import defaultdict
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Set, List, Any, Tuple
+from typing import Dict, Set, List, Tuple
 
 from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call
 from pddl_plus_parser.lisp_parsers import ProblemParser
@@ -18,8 +20,6 @@ from pddl_plus_parser.models import (
 
 from sam_learning.core import (
     InformationStatesLearner,
-    PriorityQueue,
-    EpisodeInfoRecord,
     OnlineDiscreteModelLearner,
     PredicatesMatcher,
     NumericFunctionMatcher,
@@ -43,15 +43,41 @@ class ExplorationAlgorithmType(Enum):
     combined = "combined"
 
 
+def create_plan_actions(plan_path: Path) -> List[ActionCall]:
+    """
+
+    :param plan_path:
+    :return:
+    """
+    with open(plan_path, "rt") as plan_file:
+        plan_lines = plan_file.readlines()
+
+    plan_actions = []
+    for line in plan_lines:
+        plan_actions.append(parse_action_call(line))
+
+    return plan_actions
+
+
 class NumericOnlineActionModelLearner:
-    """"An online version of the Numeric SAM learner."""
+    """
+    Provides functionality for online learning of numeric action models.
+
+    This class is designed to create and manage safe and optimistic action models
+    based on transition data extracted during exploration. It also allows for
+    construction, optimization, and export of these models. The learner can handle
+    state transitions caused by actions, analyze informative states, and update
+    learned domain models. Furthermore, it leverages discrete and numeric models
+    learners to refine action model accuracy.
+    """
 
     DUMMY_ACTION_CALL = ActionCall(name="dummy_action", grounded_parameters=[])
 
     _informative_states_learner: Dict[str, InformationStatesLearner]
+    _discrete_models_learners: Dict[str, OnlineDiscreteModelLearner]
+    _numeric_models_learners: Dict[str, OnlineNumericModelLearner]
     agent: AbstractAgent
     episode_statistics: Dict[str, int]
-    _episode_recorder: EpisodeInfoRecord
     safe_perfect_numeric_effects = Dict[str, Set[NumericalExpressionTree]]
 
     def __init__(
@@ -137,31 +163,19 @@ class NumericOnlineActionModelLearner:
 
         return domain_path
 
-    def _create_plan_actions(self, plan_path: Path) -> List[ActionCall]:
-        """
-
-        :param plan_path:
-        :return:
-        """
-        self.logger.debug(f"Reading the plan in the path {plan_path}")
-        with open(plan_path, "rt") as plan_file:
-            plan_lines = plan_file.readlines()
-
-        plan_actions = []
-        for line in plan_lines:
-            plan_actions.append(parse_action_call(line))
-
-        return plan_actions
-
     def _calculate_state_action_informative_state(
         self, current_state: State, action_to_test: ActionCall, problem_objects: Dict[str, PDDLObject]
     ) -> bool:
-        """
+        """Determines if a given state-action pair is informative based on provided problem objects,
+        grounded predicates, and numeric functions. This facilitates evaluating whether the
+        state-action pair contributes meaningful information to the learning process.
 
-        :param current_state:
-        :param action_to_test:
-        :param problem_objects:
-        :return:
+        :param current_state: The current state of the system, representing the conditions
+                              and configurations at the point of evaluation.
+        :param action_to_test: The action being evaluated to test its impact on the current state.
+        :param problem_objects: A dictionary of problem objects used in the domain, mapping
+                                object names to their respective PDDLObject instances.
+        :return: A boolean indicating whether the specific state-action pair is informative.
         """
         previous_state_grounded_predicates = self.triplet_snapshot.create_propositional_state_snapshot(current_state, action_to_test, problem_objects)
         previous_state_grounded_functions = self.triplet_snapshot.create_numeric_state_snapshot(current_state, action_to_test, problem_objects)
@@ -175,8 +189,7 @@ class NumericOnlineActionModelLearner:
         return state_informative
 
     def _add_transition_data(self, action_to_update: ActionCall, is_transition_successful: bool = True) -> None:
-        """
-        Adds transition data to the relevant models and updates the model learners with
+        """Adds transition data to the relevant models and updates the model learners with
         information about the state changes caused by an action. This method logs the
         process of adding positive transition data to the model for further analysis
         or learning.
@@ -215,7 +228,7 @@ class NumericOnlineActionModelLearner:
         )
 
     def _select_action_and_execute(
-        self, current_state: State, frontier: PriorityQueue, problem_objects: Dict[str, PDDLObject]
+        self, current_state: State, frontier: Dict[str, List[ActionCall]], problem_objects: Dict[str, PDDLObject]
     ) -> Tuple[ActionCall, bool, State]:
         """
 
@@ -224,13 +237,23 @@ class NumericOnlineActionModelLearner:
         :param problem_objects:
         :return:
         """
-        action = frontier.get_item()
-        next_state, is_transition_successful, _ = self.agent.observe(state=current_state, action=action)
+        num_grounded_actions = sum(len(actions) for actions in frontier.values())
+        selection_probabilities = [len(actions) / num_grounded_actions for actions in frontier.values()]
+        selected_action_name = random.choices(list(problem_objects.keys()), weights=selection_probabilities, k=1)[0]
+        selected_ground_action = random.choice(frontier[selected_action_name])
+        self.logger.debug(f"Selected action {selected_ground_action.name} with parameters {selected_ground_action.grounded_parameters}.")
+        if len(frontier[selected_action_name]) == 1:
+            del frontier[selected_action_name]
+
+        else:
+            frontier[selected_action_name].remove(selected_ground_action)
+
+        next_state, is_transition_successful, _ = self.agent.observe(state=current_state, action=selected_ground_action)
         self.triplet_snapshot.create_triplet_snapshot(
-            previous_state=current_state, next_state=next_state, current_action=action, observation_objects=problem_objects
+            previous_state=current_state, next_state=next_state, current_action=selected_ground_action, observation_objects=problem_objects
         )
-        self._add_transition_data(action, is_transition_successful=is_transition_successful)
-        return action, is_transition_successful, next_state
+        self._add_transition_data(selected_ground_action, is_transition_successful=is_transition_successful)
+        return selected_ground_action, is_transition_successful, next_state
 
     def initialize_learning_algorithms(self) -> None:
         """
@@ -256,20 +279,21 @@ class NumericOnlineActionModelLearner:
 
     def calculate_valid_neighbors(
         self, grounded_actions: Set[ActionCall], current_state: State, problem_objects: Dict[str, PDDLObject]
-    ) -> PriorityQueue:
+    ) -> Dict[str, List[ActionCall]]:
         """Calculates the valid action neighbors for the current state that the learner is in.
 
         :param grounded_actions: all possible grounded actions.
         :param current_state: the current state that the learner is in.
+        :param problem_objects: the objects in the observation.
         :return: a priority queue of the valid neighbors for the current state, the priority of the action is based
             on their IG.
         """
         self.logger.info("Calculating the valid neighbors for the current state.")
-        valid_frontier = PriorityQueue()
+        valid_frontier = defaultdict(list)
         if self._exploration_policy == ExplorationAlgorithmType.goal_oriented:
             self.logger.debug("The exploration policy is goal oriented, adding all the actions to the priority queue.")
             for action in grounded_actions:
-                valid_frontier.insert(item=action, priority=1.0, selection_probability=1.0)
+                valid_frontier[action.name].append(action)
 
             return valid_frontier
 
@@ -277,13 +301,13 @@ class NumericOnlineActionModelLearner:
             state_informative = self._calculate_state_action_informative_state(current_state, action, problem_objects)
             if state_informative:
                 self.logger.debug(f"The action {action.name} is informative, adding it to the priority queue.")
-                valid_frontier.insert(item=action, priority=1.0, selection_probability=1.0)
+                valid_frontier[action.name].append(action)
 
         return valid_frontier
 
     def update_failed_action_neighbors(
-        self, neighbors: PriorityQueue, current_state: State, action: ActionCall, problem_objects: Dict[str, PDDLObject]
-    ) -> PriorityQueue:
+        self, frontier: Dict[str, List[ActionCall]], current_state: State, action: ActionCall, problem_objects: Dict[str, PDDLObject]
+    ) -> None:
         """Calculates the new neighbor queue based on the new information of the failed action.
 
         :param neighbors: the previously calculated neighbors queue.
@@ -293,31 +317,35 @@ class NumericOnlineActionModelLearner:
         :return: the new neighbors queue with the failed lifted action updated.
         """
         self.logger.debug("Updating the failed action's frontier with the new data.")
-        new_neighbors = PriorityQueue()
-        while len(neighbors) > 0:
-            neighbor, information_gain, probability = neighbors.get_queue_item_data()
-            if neighbor.name != action.name:
-                new_neighbors.insert(item=neighbor, priority=information_gain, selection_probability=probability)
-                continue
+        if action.name not in frontier:
+            self.logger.debug(f"The action {action.name} is not in the frontier, returning the original frontier.")
+            return
 
-            state_informative = self._calculate_state_action_informative_state(current_state, neighbor, problem_objects)
+        neighbors = []
+        for grounded_neighbor in frontier[action.name]:
+            state_informative = self._calculate_state_action_informative_state(current_state, grounded_neighbor, problem_objects)
             if state_informative:
-                self.logger.info(f"The action {neighbor.name} is informative, adding it to the priority queue.")
-                new_neighbors.insert(item=neighbor, priority=0.5, selection_probability=probability)
+                neighbors.append(grounded_neighbor)
 
-        return new_neighbors
+        if len(neighbors) == 0:
+            self.logger.debug(f"The lifted action {action.name} is not informative in this state, removing it from the frontier.")
+            del frontier[action.name]
+            return
 
-    def search_to_learn_action_model(
+        frontier[action.name] = neighbors
+
+    def explore_to_refine_models(
         self, init_state: State, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE, problem_objects: Dict[str, PDDLObject] = None
     ) -> int:
-        """Searches for informative actions to learn an action model that solves the problem.
+        """
 
-        :param init_state: the current state of the environment.
-        :return: the learned domain with the number of steps done in the episode and whether the goal was achieved.
+        :param init_state:
+        :param num_steps_till_episode_end:
+        :param problem_objects:
+        :return:
         """
         self.logger.info("Searching for informative actions given the current state.")
         grounded_actions = self.agent.get_environment_actions(init_state)
-        self._episode_recorder.add_num_grounded_actions(len(grounded_actions))
         step_number = 0
         frontier = self.calculate_valid_neighbors(grounded_actions, init_state, problem_objects)
         current_state = init_state.copy()
@@ -327,7 +355,7 @@ class NumericOnlineActionModelLearner:
 
             while not is_transition_successful and step_number < MAX_STEPS_PER_EPISODE:
                 self.logger.debug("The action was not successful, trying again.")
-                frontier = self.update_failed_action_neighbors(frontier, current_state, action)
+                self.update_failed_action_neighbors(frontier, current_state, action, problem_objects)
                 action, is_transition_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
                 step_number += 1
 
@@ -367,7 +395,7 @@ class NumericOnlineActionModelLearner:
         initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
         if self._exploration_policy == ExplorationAlgorithmType.informative_explorer:
             self.logger.info("Applying the informative explorer exploration policy - starting to explore the environment.")
-            return self.search_to_learn_action_model(init_state=initial_state, num_steps_till_episode_end=MAX_STEPS_PER_EPISODE)
+            return self.explore_to_refine_models(init_state=initial_state, num_steps_till_episode_end=MAX_STEPS_PER_EPISODE)
 
         self.logger.debug("Applying goal oriented exploration approach.")
         solution_file_path = self.workdir / f"{problem_path.stem}.solution"
@@ -387,7 +415,7 @@ class NumericOnlineActionModelLearner:
 
         if solution_status == SolutionOutputTypes.ok:
             self.logger.info("The problem was solved using the safe action model.")
-            plan_actions = self._create_plan_actions(solution_file_path)
+            plan_actions = create_plan_actions(solution_file_path)
             trace, goal_reached = self.agent.execute_plan(plan_actions)
             self.train_models_using_trace(trace)
             if goal_reached:
@@ -396,7 +424,7 @@ class NumericOnlineActionModelLearner:
         self.logger.info(f"The plan created using the optimistic model could not reach the goal.")
         return (
             len(trace)
-            + self.search_to_learn_action_model(
+            + self.explore_to_refine_models(
                 trace.components[-1].next_state,
                 num_steps_till_episode_end=MAX_STEPS_PER_EPISODE - len(trace),
                 problem_objects=trace.grounded_objects,
@@ -426,7 +454,7 @@ class NumericOnlineActionModelLearner:
         )
         if solution_status == SolutionOutputTypes.ok:
             self.logger.info("The problem was solved using the safe action model.")
-            plan_actions = self._create_plan_actions(solution_file_path)
+            plan_actions = create_plan_actions(solution_file_path)
             return len(plan_actions)
 
         return self.apply_exploration_policy(problem_path)

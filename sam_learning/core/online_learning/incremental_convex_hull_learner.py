@@ -136,7 +136,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
     def _calculate_basis_and_hull(self, from_reset: bool = False) -> None:
         """Calculates the basis and the convex hull of the points in the storage dataframe."""
         prev_conditions = self.additional_dependency_conditions
-        self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data[self.relevant_fluents])
+        # Avoid cases when some of the data points are NaN and thus removed.
+        self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(
+            self.data[[col for col in self.data.columns if col in self.relevant_fluents]]
+        )
         if self.affine_independent_data.empty:
             self.logger.debug("There are no affine independent rows, no need for further processing.")
             return
@@ -289,7 +292,12 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :param point: the point to check.
         :return: whether the point is in the convex hull.
         """
-        if pd.concat([self.data, point], ignore_index=True).duplicated().any():
+        concat_data = (
+            pd.concat([self.data, point], ignore_index=True)
+            if isinstance(point, DataFrame)
+            else pd.concat([self.data, point.to_frame().T], ignore_index=True)
+        )
+        if concat_data.duplicated().any():
             self.logger.debug("The new point is already in the storage, it is thus is the convex hull.")
             return True
 
