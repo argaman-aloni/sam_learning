@@ -89,7 +89,7 @@ class PIL:
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
             agent = MinecraftAgent(domain=complete_domain, problem=problem)
             online_learner.update_agent(agent)
-            learned_model, num_steps_in_episode, goal_achieved = online_learner.search_to_learn_action_model(init_state)
+            learned_model, num_steps_in_episode, goal_achieved = online_learner.explore_to_refine_models(init_state)
             self.logger.info(
                 f"Finished episode number {problem_index + 1}! " f"The current goal was {'achieved' if goal_achieved else 'not achieved'}."
             )

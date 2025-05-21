@@ -2,7 +2,7 @@
 import shutil
 from pathlib import Path
 
-from pddl_plus_parser.lisp_parsers import DomainParser
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import Domain, Problem, State
 from pytest import fixture
 
@@ -10,7 +10,7 @@ from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners import NumericOnlineActionModelLearner
 from sam_learning.learners.noam_algorithm import ExplorationAlgorithmType
 from solvers import ENHSPSolver
-from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, create_plan_actions, DEPOT_ONLINE_LEARNING_PLAN
+from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, create_plan_actions, DEPOT_ONLINE_LEARNING_PLAN, DEPOT_ONLINE_LEARNING_PROBLEM
 
 
 @fixture()
@@ -27,6 +27,12 @@ def working_directory():
 def depot_numeric_domain() -> Domain:
     domain_parser = DomainParser(DEPOTS_NUMERIC_DOMAIN_PATH, partial_parsing=False)
     return domain_parser.parse_domain()
+
+
+@fixture()
+def depot_problem(depot_numeric_domain: Domain) -> Problem:
+    problem_parser = ProblemParser(DEPOT_ONLINE_LEARNING_PROBLEM, depot_numeric_domain)
+    return problem_parser.parse_problem()
 
 
 @fixture
@@ -77,7 +83,7 @@ def test_train_models_using_trace_when_given_a_single_action_adds_the_action_dat
     assert len(depot_noam_informative_explorer._numeric_models_learners[first_action.name]._convex_hull_learner.data) > 0
 
 
-def test_train_models_using_trace_when_given_a_makes_the_action_to_be_not_informative_after_it_was_already_observed(
+def test_train_models_using_trace_when_given_an_already_observed_state_and_action_makes_the_action_to_be_not_informative(
     depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem, depot_numeric_agent: IPCAgent
 ):
     initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
@@ -93,6 +99,22 @@ def test_train_models_using_trace_when_given_a_makes_the_action_to_be_not_inform
         current_state=initial_state, action_to_test=first_action, problem_objects=depot_problem.objects
     )
     assert not is_informative
+
+
+def test_train_models_using_trace_when_given_multiple_successful_transitions_does_not_fail_and_optimistic_model_and_safe_model_can_be_constructed(
+    depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem, depot_numeric_agent: IPCAgent
+):
+    try:
+        plan = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))
+        trace, _ = depot_numeric_agent.execute_plan(plan=plan)
+        depot_noam_informative_explorer.initialize_learning_algorithms()
+        depot_noam_informative_explorer.train_models_using_trace(trace=trace)
+        safe_model = depot_noam_informative_explorer._construct_safe_action_model()
+        optimistic_model = depot_noam_informative_explorer._construct_optimistic_action_model()
+        print("Safe model:\n", safe_model.to_pddl())
+        print("Optimistic model:\n", optimistic_model.to_pddl())
+    except Exception as e:
+        assert False, e
 
 
 def test_construct_safe_action_model_when_no_observation_given_does_not_fail(depot_noam_informative_explorer: NumericOnlineActionModelLearner):

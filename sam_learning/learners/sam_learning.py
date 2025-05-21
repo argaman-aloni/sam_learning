@@ -26,7 +26,7 @@ class SAMLearner:
     """
 
     logger: logging.Logger
-    partial_domain: LearnerDomain
+    partial_domain: Domain
     matcher: PredicatesMatcher
     observed_actions: List[str]
     safe_actions: List[str]
@@ -41,7 +41,7 @@ class SAMLearner:
     def __init__(self, partial_domain: Domain, negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove):
 
         self.logger = logging.getLogger(__name__)
-        self.partial_domain = LearnerDomain(domain=partial_domain)
+        self.partial_domain = partial_domain
         self.matcher = PredicatesMatcher(partial_domain)
         self.vocabulary_creator = VocabularyCreator()
         self.triplet_snapshot = EnvironmentSnapshot(partial_domain=partial_domain)
