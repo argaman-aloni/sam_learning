@@ -1,14 +1,18 @@
 """Module test for the IPC active learning agent."""
 from pathlib import Path
 
-from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import Domain, Problem, State, ActionCall, GroundedPredicate, NumericalExpressionTree, construct_expression_tree
+from pddl_plus_parser.models import Domain, Problem, State, ActionCall
 from pytest import fixture
-from typing import List
 
 from sam_learning.core.online_learning_agents import IPCAgent
-from tests.consts import DEPOTS_NUMERIC_DOMAIN_PATH, MINECRAFT_LARGE_DOMAIN_PATH, DEPOT_ONLINE_LEARNING_PROBLEM, DEPOT_ONLINE_LEARNING_PLAN
+from tests.consts import (
+    DEPOTS_NUMERIC_DOMAIN_PATH,
+    MINECRAFT_LARGE_DOMAIN_PATH,
+    DEPOT_ONLINE_LEARNING_PROBLEM,
+    DEPOT_ONLINE_LEARNING_PLAN,
+    create_plan_actions,
+)
 
 
 @fixture()
@@ -42,22 +46,6 @@ def depot_numeric_agent(depot_numeric_domain: Domain, depot_problem: Problem) ->
     agent = IPCAgent(depot_numeric_domain)
     agent.initialize_problem(depot_problem)
     return agent
-
-
-def create_plan_actions(plan_path: Path) -> List[ActionCall]:
-    """Creates a list of action calls from a plan file.
-
-    :param plan_path:
-    :return:
-    """
-    with open(plan_path, "rt") as plan_file:
-        plan_lines = plan_file.readlines()
-
-    plan_actions = []
-    for line in plan_lines:
-        plan_actions.append(parse_action_call(line))
-
-    return plan_actions
 
 
 def test_observe_on_state_with_applicable_action_returns_correct_next_state_and_that_the_action_was_applied_successfully(
@@ -200,3 +188,16 @@ def test_execute_plan_when_plan_contains_invalid_action_returns_trace_with_lengt
     assert not goal_reached
     assert all([component.is_successful for component in trace.components[:-1]])
     assert trace.components[-1].is_successful is False
+
+
+def test_execute_plan_adds_problem_objects_to_trace_when_trace_created(depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain):
+    # Arrange
+    problem = ProblemParser(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, domain=depot_numeric_domain).parse_problem()
+    depot_numeric_agent.initialize_problem(problem)
+    plan = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))
+
+    # Act
+    trace, goal_reached = depot_numeric_agent.execute_plan(plan)
+
+    # Assert
+    assert len(trace.grounded_objects) > 0

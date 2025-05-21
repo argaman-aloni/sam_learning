@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Dict, List
 
+from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call
 from pddl_plus_parser.models import (
     PDDLType,
     Predicate,
@@ -203,3 +204,19 @@ def extract_preconditions_predicates(compound_preconditions: CompoundPreconditio
             predicates.append(precond)
 
     return predicates
+
+
+def create_plan_actions(plan_path: Path) -> List[ActionCall]:
+    """Creates a list of action calls from a plan file.
+
+    :param plan_path:
+    :return:
+    """
+    with open(plan_path, "rt") as plan_file:
+        plan_lines = plan_file.readlines()
+
+    plan_actions = []
+    for line in plan_lines:
+        plan_actions.append(parse_action_call(line))
+
+    return plan_actions

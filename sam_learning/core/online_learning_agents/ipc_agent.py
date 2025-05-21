@@ -130,6 +130,7 @@ class IPCAgent(AbstractAgent):
         """
         self.logger.info("Executing the plan %s.", str(plan))
         trace = Observation()
+        trace.add_problem_objects(self._problem.objects)
         current_state = State(predicates=self._problem.initial_state_predicates, fluents=self._problem.initial_state_fluents)
         for index, action in enumerate(plan):
             next_state, is_successful, reward = self.observe(current_state, action)
