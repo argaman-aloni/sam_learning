@@ -111,7 +111,8 @@ class NumericOnlineActionModelLearner:
         :return: the safe action model.
         """
         self.logger.info("Constructing the safe action model.")
-        for action_name, action in self.partial_domain.actions.items():
+        safe_domain = self.partial_domain.shallow_copy()
+        for action_name, action in safe_domain.actions.items():
             preconditions = Precondition("and")
             safe_discrete_preconditions, safe_discrete_effects = self._discrete_models_learners[action_name].get_safe_model()
             for precondition in safe_discrete_preconditions.operands:
@@ -125,7 +126,7 @@ class NumericOnlineActionModelLearner:
             action.numeric_effects = safe_numeric_effects
             action.preconditions.root = preconditions
 
-        return self.partial_domain
+        return safe_domain
 
     def _construct_optimistic_action_model(self) -> Domain:
         """Constructs the optimistic action model for the domain.
@@ -133,7 +134,8 @@ class NumericOnlineActionModelLearner:
         :return: the safe action model.
         """
         self.logger.info("Constructing the safe action model.")
-        for action_name, action in self.partial_domain.actions.items():
+        optimistic_domain = self.partial_domain.shallow_copy()
+        for action_name, action in optimistic_domain.actions.items():
             preconditions = Precondition("and")
             optimistic_discrete_preconditions, optimistic_discrete_effects = self._discrete_models_learners[action_name].get_optimistic_model()
             for precondition in optimistic_discrete_preconditions.operands:
@@ -147,7 +149,7 @@ class NumericOnlineActionModelLearner:
             action.numeric_effects = optimistic_numeric_effects
             action.preconditions.root = preconditions
 
-        return self.partial_domain
+        return optimistic_domain
 
     def _export_learned_domain(self, learned_domain: Domain, is_safe_model: bool = True) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
@@ -310,7 +312,7 @@ class NumericOnlineActionModelLearner:
     ) -> None:
         """Calculates the new neighbor queue based on the new information of the failed action.
 
-        :param neighbors: the previously calculated neighbors queue.
+        :param frontier: the previously calculated neighbors.
         :param current_state: the state in which the action had failed.
         :param action: the failed grounded action.
         :param problem_objects: the objects in the observation.
@@ -384,7 +386,9 @@ class NumericOnlineActionModelLearner:
                 current_action=observed_transition.grounded_action_call,
                 observation_objects=trace.grounded_objects,
             )
-            self._add_transition_data(action_to_update=observed_transition.grounded_action_call, is_transition_successful=True)
+            self._add_transition_data(
+                action_to_update=observed_transition.grounded_action_call, is_transition_successful=observed_transition.is_successful
+            )
 
     def apply_exploration_policy(self, problem_path: Path) -> int:
         """Applies the exploration policy to the current state.

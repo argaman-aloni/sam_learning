@@ -8,20 +8,19 @@ from stree.Splitter import Snode
 from sam_learning.core import LearnerDomain
 from sam_learning.core.learning_types import ConditionType
 from sam_learning.core.numeric_learning.numeric_utils import prettify_coefficients, prettify_floating_point_number
-from sam_learning.core.unsafe_learning.unsafe_numeric_fluents_learning_base import UnsafeFluentsLearning, CLASS_COLUMN
 
 TOLERANCE = 0.01
 
 
-class ObliqueTreeFluentsLearning(UnsafeFluentsLearning):
+class ObliqueTreeFluentsLearning:
     """Learns models creating an oblique tree and iterating over its calculated nodes."""
 
-    def __init__(self, action_name: str, polynomial_degree: int = 0,
-                 partial_domain: Union[Domain, LearnerDomain] = None):
+    def __init__(self, action_name: str, polynomial_degree: int = 0, partial_domain: Union[Domain, LearnerDomain] = None):
         super().__init__(action_name, polynomial_degree, partial_domain)
 
-    def _iterate_over_tree(self, node: Snode, features_names: List[str],
-                           coefficients_path: List[List[float]], intercepts_path: List[float]) -> List[str]:
+    def _iterate_over_tree(
+        self, node: Snode, features_names: List[str], coefficients_path: List[List[float]], intercepts_path: List[float]
+    ) -> List[str]:
         """Iterates over the tree and creates the preconditions from the SVC nodes.
 
         Notice:
@@ -34,10 +33,8 @@ class ObliqueTreeFluentsLearning(UnsafeFluentsLearning):
         """
         if node.is_leaf():
             if node._class == 1:
-                self.logger.debug("A route has been completed. "
-                                  "All nodes on the route are connected with an AND condition.")
-                constraint_strings = self._create_inequality_constraint_strings(
-                    features_names, coefficients_path, intercepts_path)
+                self.logger.debug("A route has been completed. " "All nodes on the route are connected with an AND condition.")
+                constraint_strings = self._create_inequality_constraint_strings(features_names, coefficients_path, intercepts_path)
                 return constraint_strings
 
             return []
@@ -49,18 +46,17 @@ class ObliqueTreeFluentsLearning(UnsafeFluentsLearning):
         right_child_node = node.get_down()
         # Node->down == the left child for some unknown reason
         left_child_node = node.get_up()
-        left_constraint_strings = self._iterate_over_tree(
-            left_child_node, features_names, coefficients_path, intercepts_path)
-        right_constraint_strings = self._iterate_over_tree(
-            right_child_node, features_names, coefficients_path, intercepts_path)
+        left_constraint_strings = self._iterate_over_tree(left_child_node, features_names, coefficients_path, intercepts_path)
+        right_constraint_strings = self._iterate_over_tree(right_child_node, features_names, coefficients_path, intercepts_path)
 
         coefficients_path.pop()
         intercepts_path.pop()
 
         return left_constraint_strings + right_constraint_strings
 
-    def learn_preconditions(self, positive_observations: List[Observation],
-                            negative_observations: List[Observation]) -> Tuple[List[str], ConditionType]:
+    def learn_preconditions(
+        self, positive_observations: List[Observation], negative_observations: List[Observation]
+    ) -> Tuple[List[str], ConditionType]:
         """Learning the preconditions of an action using oblique tree technique.
 
         Notice:
@@ -72,10 +68,8 @@ class ObliqueTreeFluentsLearning(UnsafeFluentsLearning):
         """
         self.logger.info("Learning the preconditions of the action using oblique tree.")
         dataframe = super()._create_pre_state_classification_dataset(positive_observations, negative_observations)
-        stree = Stree(random_state=42, max_depth=5, splitter="cfs").fit(
-            dataframe.loc[:, dataframe.columns != CLASS_COLUMN], dataframe[CLASS_COLUMN])
+        stree = Stree(random_state=42, max_depth=5, splitter="cfs").fit(dataframe.loc[:, dataframe.columns != CLASS_COLUMN], dataframe[CLASS_COLUMN])
         self.logger.debug("The tree has been built.")
         intercepts_path = []
         coefficients_path = []
-        return self._iterate_over_tree(stree.tree_, dataframe.columns.values.tolist(),
-                                       coefficients_path, intercepts_path), ConditionType.disjunctive
+        return self._iterate_over_tree(stree.tree_, dataframe.columns.values.tolist(), coefficients_path, intercepts_path), ConditionType.disjunctive
