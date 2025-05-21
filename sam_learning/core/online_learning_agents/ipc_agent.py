@@ -1,8 +1,18 @@
 """An agent for the active learning of IPC models"""
 import logging
-from typing import Dict, Set, Tuple
+from typing import Dict, Set, Tuple, List
 
-from pddl_plus_parser.models import State, Domain, ActionCall, Problem, Operator, evaluate_expression, PDDLFunction, NumericalExpressionTree
+from pddl_plus_parser.models import (
+    State,
+    Domain,
+    ActionCall,
+    Problem,
+    Operator,
+    evaluate_expression,
+    PDDLFunction,
+    NumericalExpressionTree,
+    Observation,
+)
 
 from sam_learning.core import VocabularyCreator
 from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
@@ -14,12 +24,12 @@ class IPCAgent(AbstractAgent):
     _vocabulary_creator: VocabularyCreator
     logger: logging.Logger
 
-    def __init__(self, domain: Domain, problem: Problem):
+    def __init__(self, domain: Domain):
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self._reward = 0
         self._domain = domain
-        self._problem = problem
+        self._problem = None
         self._vocabulary_creator = VocabularyCreator()
 
     def _assign_state_fluent_value(self, state_fluents: Dict[str, PDDLFunction], goal_required_expressions: Set[NumericalExpressionTree]) -> None:
@@ -36,20 +46,6 @@ class IPCAgent(AbstractAgent):
                 for expression_function in expression_functions:
                     if state_fluent.untyped_representation == expression_function.untyped_representation:
                         expression_function.set_value(state_fluent.value)
-
-    def _get_reward(self, previous_state: State, next_state: State) -> int:
-        """Evaluates the reward for advancing from the previous state to the next state.
-
-        :param previous_state: the previous state.
-        :param next_state: the next state.
-        :return: the reward for advancing from the previous state to the next state.
-        """
-        self.logger.debug(f"Checking if the previous state {previous_state} " f"is different from the next state {next_state}")
-        if previous_state == next_state:
-            self.logger.warning("The previous state is the same as the next state. ")
-            return -1
-
-        return 1
 
     def get_environment_actions(self, state: State) -> Set[ActionCall]:
         """Returns the set of the actions that are legal in the environment in the current state.
@@ -68,13 +64,14 @@ class IPCAgent(AbstractAgent):
         )
         return grounded_action_calls
 
-    def observe(self, state: State, action: ActionCall) -> Tuple[State, int]:
+    def observe(self, state: State, action: ActionCall) -> Tuple[State, bool, int]:
         """Observes an action being executed on the state and the resulting new state of the environment.
 
         :param state: the state before the action was executed.
         :param action: the action that was executed.
         :return: the state after the action was executed.
         """
+        is_successful = True
         self.logger.debug("Observing the action %s being executed on the state %s.", str(action), state.serialize())
         operator = Operator(
             action=self._domain.actions[action.name],
@@ -88,9 +85,18 @@ class IPCAgent(AbstractAgent):
         except ValueError:
             self.logger.debug(f"Could not apply the action {str(operator)} to the state.")
             new_state = state.copy()
+            is_successful = False
 
-        reward = self._get_reward(state, new_state)
-        return new_state, reward
+        # TODO: Later on try to think of a better way to handle the reward
+        return new_state, is_successful, 0
+
+    def initialize_problem(self, problem: Problem) -> None:
+        """Initializes the problem for the IPC agent.
+
+        :param problem: the PDDL problem to be initialized.
+        """
+        self.logger.info("Initializing the IPC agent with the PDDL problem.")
+        self._problem = problem
 
     def goal_reached(self, state: State) -> bool:
         """Evaluates whether the goal of the PDDL problem has been reached.
@@ -114,3 +120,24 @@ class IPCAgent(AbstractAgent):
 
         self.logger.debug("Goal has not been reached according to the IPC agent.")
         return False
+
+    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool]:
+        """Executes a plan in the environment and returns the trace created from the plan, and whether using the plan's
+        actions the goal was reached.
+
+        :param plan: the plan to be executed.
+        :return: The trace created from the plan and whether the goal was reached.
+        """
+        self.logger.info("Executing the plan %s.", str(plan))
+        trace = Observation()
+        current_state = State(predicates=self._problem.initial_state_predicates, fluents=self._problem.initial_state_fluents)
+        for index, action in enumerate(plan):
+            next_state, is_successful, reward = self.observe(current_state, action)
+            trace.add_component(previous_state=current_state, next_state=next_state, call=action, is_successful_transition=is_successful)
+            current_state = next_state
+            if not is_successful:
+                self.logger.debug(f"Could not apply the action {str(action)} to the state, the plan was inapplicable in step {index + 1}.")
+                break
+
+        is_goal_reached = self.goal_reached(current_state)
+        return trace, is_goal_reached

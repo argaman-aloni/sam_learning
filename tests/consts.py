@@ -126,6 +126,10 @@ FARMLAND_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data.csv"
 FARMLAND_PAPER_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data_for_paper.csv"
 FARMLAND_SPAN_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "span_convex_state_data.csv"
 
+
+DEPOT_ONLINE_LEARNING_PROBLEM = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.pddl"
+DEPOT_ONLINE_LEARNING_PLAN = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.solution"
+
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
 CITY_TYPE = PDDLType(name="city", parent=OBJECT_TYPE)

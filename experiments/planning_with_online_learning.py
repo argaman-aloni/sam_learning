@@ -10,7 +10,7 @@ from pddl_plus_parser.models import State
 
 from sam_learning.core.online_learning_agents.minecraft_agent import MinecraftAgent
 from sam_learning.core import LearnerDomain, EpisodeInfoRecord
-from sam_learning.learners import OnlineNSAMLearner
+from sam_learning.learners import NumericOnlineActionModelLearner
 from solvers import MetricFFSolver
 from utilities import LearningAlgorithmType, SolverType
 from validators import OnlineLearningDomainValidator
@@ -79,7 +79,7 @@ class PIL:
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         episode_info_recorder = EpisodeInfoRecord(action_names=[action for action in complete_domain.actions])
-        online_learner = OnlineNSAMLearner(
+        online_learner = NumericOnlineActionModelLearner(
             partial_domain=partial_domain, polynomial_degree=self._polynomial_degree, episode_recorder=episode_info_recorder
         )
         num_training_goal_achieved = 0
