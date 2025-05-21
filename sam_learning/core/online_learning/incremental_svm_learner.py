@@ -8,6 +8,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from pddl_plus_parser.models import Precondition, PDDLFunction
 from sklearn.svm import LinearSVC
+from scipy.spatial.distance import cdist
 
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import ConditionType, EquationSolutionType
@@ -131,8 +132,28 @@ class IncrementalSVMLearner:
                 self.logger.debug("Remaining points have only one label cannot continue running SVM.")
                 break
 
-            classifier = LinearSVC(random_state=0, tol=EPSILON, dual=False, max_iter=5000)
-            classifier.fit(X_reminder, y_reminder.tolist())
+            # Find the closest negative point to any positive
+            neg_mask = y_reminder == -1
+            pos_mask = y_reminder == 1
+            X_neg = X_reminder[neg_mask]
+            X_pos = X_reminder[pos_mask]
+            distances = cdist(X_pos.tolist(), X_neg.tolist(), metric="euclidean")
+            min_dist_index = distances.argmin()
+            _, col = divmod(min_dist_index, distances.shape[1])
+            closest_neg_idx_in_X_neg = col
+            closest_neg_global_idx = np.where(neg_mask)[0][closest_neg_idx_in_X_neg]
+
+            # Filter the data to keep only the closest negative point and all positive points
+            final_mask = np.zeros(len(y_reminder), dtype=bool)
+            final_mask[pos_mask] = True
+            final_mask[closest_neg_global_idx] = True
+            X_filtered = X_reminder[final_mask]
+            y_filtered = y_reminder[final_mask]
+
+            classifier = LinearSVC(
+                random_state=0, tol=EPSILON, dual=False, max_iter=5000, class_weight={-1: 10, 1: 1},
+            )
+            classifier.fit(X_filtered, y_filtered.tolist())
             A = classifier.coef_[0].copy()
             b = -classifier.intercept_[0].copy()
             coefficients, border_point = prettify_coefficients(A), prettify_coefficients([b])[0]
