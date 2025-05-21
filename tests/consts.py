@@ -156,6 +156,8 @@ DRIVERLOG_COMBINED_PROBLEM_PATH = EXAMPLES_DIR_PATH / "driverlog_conflicting_pro
 DRIVERLOG_COMBINED_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "driverlog_ma_sam_pfile2.trajectory"
 ROVERS_COMBINED_WITH_MACRO_DOMAIN_PATH = EXAMPLES_DIR_PATH / "rovers_ma_plus_domain.pddl"
 
+TWO_SIDES_OF_BOX_PATH = EXAMPLES_DIR_PATH / "negative_from_two_sides.csv"
+CLOSE_TO_BOX_PATH = EXAMPLES_DIR_PATH / "negative_close_to_box.csv"
 
 def sync_snapshot(
     sam_learning: SAMLearner, component: ObservedComponent, trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False
