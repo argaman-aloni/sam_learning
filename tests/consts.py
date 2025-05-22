@@ -158,6 +158,7 @@ ROVERS_COMBINED_WITH_MACRO_DOMAIN_PATH = EXAMPLES_DIR_PATH / "rovers_ma_plus_dom
 
 TWO_SIDES_OF_BOX_PATH = EXAMPLES_DIR_PATH / "negative_from_two_sides.csv"
 CLOSE_TO_BOX_PATH = EXAMPLES_DIR_PATH / "negative_close_to_box.csv"
+CLOSE_TO_LINEAR_CONDITION_PATH = EXAMPLES_DIR_PATH / "negative_close_to_linear_condition.csv"
 
 def sync_snapshot(
     sam_learning: SAMLearner, component: ObservedComponent, trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False
