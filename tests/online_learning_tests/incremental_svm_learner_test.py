@@ -7,7 +7,7 @@ import pytest
 from pddl_plus_parser.models import PDDLFunction, Precondition
 
 from sam_learning.core.online_learning.incremental_svm_learner import IncrementalSVMLearner
-from tests.consts import TWO_SIDES_OF_BOX_PATH, CLOSE_TO_BOX_PATH
+from tests.consts import TWO_SIDES_OF_BOX_PATH, CLOSE_TO_BOX_PATH, CLOSE_TO_LINEAR_CONDITION_PATH
 
 FUNC_NAMES = ["(x )", "(y )", "(z )", "(w )"]
 
@@ -222,3 +222,25 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     assert isinstance(result, Precondition)
     print(str(result))
     assert len(result.operands) >=  1 # at least one condition
+
+def test_create_svm_conditions_when_negative_points_are_close_to_the_linear_condition(
+    two_dim_svm_learner: IncrementalSVMLearner,
+):
+    with open(CLOSE_TO_LINEAR_CONDITION_PATH, "r") as csvfile:
+
+        reader = csv.reader(csvfile)
+        
+        next(reader) # Skip the header   
+        for row in reader: # For each row in the CSV file
+            point = {
+                name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]
+            }
+            point["(x )"].set_value(float(row[0]))
+            point["(y )"].set_value(float(row[1]))
+            label = row[2] == 'True'
+            two_dim_svm_learner.add_new_point(point=point, is_successful=label)
+
+    result = two_dim_svm_learner.construct_linear_inequalities()
+    assert isinstance(result, Precondition)
+    print(str(result))
+    assert 1 <= len(result.operands) <=  2 # Have 4 planes when 2 of them are subset of the other 2
