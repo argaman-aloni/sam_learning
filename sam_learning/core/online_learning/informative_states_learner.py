@@ -51,7 +51,7 @@ class InformationStatesLearner:
         self.action_name = action_name
         self.discrete_model_learner = discrete_model_learner
         self.numeric_model_learner = numeric_model_learner
-        self.monomials = self.numeric_model_learner._monomials
+        self.monomials = self.numeric_model_learner.monomials
         monomial_strs = self.numeric_model_learner.data_columns
         self.parameter_bound_predicates = [p.untyped_representation for p in self.discrete_model_learner.predicates_superset]
         self.combined_data = DataFrame(columns=[*monomial_strs, self.parameter_bound_predicates, LABEL_COLUMN])

@@ -17,9 +17,21 @@ def lifted_vocabulary(woodworking_domain: Domain) -> Set[Predicate]:
     )
 
 
+
+@pytest.fixture
+def depot_lifted_vocabulary(depot_domain: Domain) -> Set[Predicate]:
+    return VocabularyCreator().create_lifted_vocabulary(
+        domain=depot_domain, possible_parameters=depot_domain.actions["lift"].signature
+    )
+
 @pytest.fixture
 def online_discrete_model_learner(lifted_vocabulary) -> OnlineDiscreteModelLearner:
     return OnlineDiscreteModelLearner(TEST_ACTION_NAME, lifted_vocabulary)
+
+
+@pytest.fixture
+def depot_online_discrete_model_learner(depot_lifted_vocabulary) -> OnlineDiscreteModelLearner:
+    return OnlineDiscreteModelLearner("lift", depot_lifted_vocabulary)
 
 
 def test_initialization_of_learner_with_empty_predicates_set_works_correctly():
@@ -160,10 +172,10 @@ def test_add_positive_post_state_observation_when_adding_sample_for_the_first_ti
     online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
 ):
     pre_state_predicates = {
-        p for p in lifted_vocabulary if p.untyped_representation not in ["(not (available ?x))", "(surface-condition ?x ?oldsurface)",]
+        p for p in lifted_vocabulary if p.untyped_representation not in ["(available ?x)", "(not (surface-condition ?x ?oldsurface))",]
     }
     next_state_predicates = {
-        p for p in lifted_vocabulary if p.untyped_representation not in ["(available ?x)", "(not (surface-condition ?x ?oldsurface))",]
+        p for p in lifted_vocabulary if p.untyped_representation in ["(available ?x)", "(not (surface-condition ?x ?oldsurface))",]
     }
     online_discrete_model_learner._add_positive_post_state_observation(
         pre_state_predicates=pre_state_predicates, post_state_predicates=next_state_predicates
@@ -171,6 +183,32 @@ def test_add_positive_post_state_observation_when_adding_sample_for_the_first_ti
     assert len(online_discrete_model_learner.must_be_effects) == 2
     print(len(online_discrete_model_learner.predicates_superset))
     assert len(online_discrete_model_learner.cannot_be_effects) == 2
+
+
+def test_add_positive_post_state_observation_when_adding_sample_for_the_second_time_adds_additional_predicates_to_the_cannot_be_effects_set(
+    depot_online_discrete_model_learner: OnlineDiscreteModelLearner, depot_lifted_vocabulary: Set[Predicate]
+):
+    pre_state_predicates = {
+        p for p in depot_lifted_vocabulary if p.untyped_representation not in ["(not (at ?x ?p))", "(not (available ?x))", "(not (at ?y ?p))", "(not (clear ?y))", "(not (at ?z ?p))"]
+    }
+    next_state_predicates = {
+        p for p in depot_lifted_vocabulary if p.untyped_representation not in ["(at ?y ?p)", "(clear ?y)", "(not (lifting ?x ?y))", "(available ?x)", "(not (clear ?z))", "(not (at ?z ?p))"]
+    }
+    depot_online_discrete_model_learner._add_positive_post_state_observation(
+        pre_state_predicates=pre_state_predicates, post_state_predicates=next_state_predicates
+    )
+    assert "(at ?z ?p)" not in [eff.untyped_representation for eff in depot_online_discrete_model_learner.cannot_be_effects]
+
+    pre_state_predicates = {
+        p for p in depot_lifted_vocabulary if p.untyped_representation not in ["(not (at ?x ?p))", "(not (available ?x))", "(not (at ?y ?p))", "(not (clear ?y))", "(at ?z ?p)"]
+    }
+    next_state_predicates = {
+        p for p in depot_lifted_vocabulary if p.untyped_representation not in ["(at ?y ?p)", "(clear ?y)", "(not (lifting ?x ?y))", "(available ?x)", "(not (clear ?z))", "(at ?z ?p)"]
+    }
+    depot_online_discrete_model_learner._add_positive_post_state_observation(
+        pre_state_predicates=pre_state_predicates, post_state_predicates=next_state_predicates
+    )
+    assert "(at ?z ?p)" in [eff.untyped_representation for eff in depot_online_discrete_model_learner.cannot_be_effects]
 
 
 def test_add_transition_data_when_transition_is_successful_adds_positive_pre_and_post_state_observations(
@@ -184,7 +222,7 @@ def test_add_transition_data_when_transition_is_successful_adds_positive_pre_and
     }
     online_discrete_model_learner.add_transition_data(pre_state_predicates, next_state_predicates, is_transition_successful=True)
     assert len(online_discrete_model_learner.must_be_effects) == 2
-    assert len(online_discrete_model_learner.cannot_be_effects) == 2
+    assert len(online_discrete_model_learner.cannot_be_effects) == len(lifted_vocabulary) - 2
     assert len(online_discrete_model_learner.must_be_preconditions) == 0
     assert len(online_discrete_model_learner.cannot_be_preconditions) == 2
 
@@ -287,7 +325,7 @@ def test_get_optimistic_model_when_observed_a_single_positive_observation_return
     optimistic_precondition, optimistic_effects = online_discrete_model_learner.get_optimistic_model()
     assert optimistic_precondition is not None
     assert len(optimistic_precondition.operands) == 0
-    assert len(optimistic_effects) == len(lifted_vocabulary) - 2
+    assert len(optimistic_effects) == len(lifted_vocabulary) - len(next_state_predicates)
 
 
 def test_get_optimistic_model_when_observed_a_single_negative_observation_returns_precondition_with_or_on_the_must_be_preconditions_cnf_data(
@@ -309,6 +347,18 @@ def test_get_optimistic_model_when_observed_a_single_negative_observation_return
     assert len(or_condition.operands) == 2
     assert len(optimistic_effects) > 0
     assert all([eff.is_positive for eff in optimistic_effects])
+
+
+def test_get_optimistic_model_when_cnfs_are_multiple_unit_clauses_combines_them_in_and_condition(
+    online_discrete_model_learner: OnlineDiscreteModelLearner, lifted_vocabulary: Set[Predicate]
+):
+    for predicate in lifted_vocabulary:
+        online_discrete_model_learner.must_be_preconditions.append({predicate})
+
+    optimistic_precondition, _ = online_discrete_model_learner.get_optimistic_model()
+    assert optimistic_precondition is not None
+    assert len(optimistic_precondition.operands) > 1
+    assert all([isinstance(op, Predicate) for op in optimistic_precondition.operands])
 
 
 def test_is_state_in_safe_model_when_no_observation_was_given_returns_false_since_model_is_conservative(
