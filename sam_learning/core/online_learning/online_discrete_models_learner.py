@@ -36,12 +36,7 @@ class OnlineDiscreteModelLearner:
         """
         self.logger.info(f"Adding a new positive pre-state observation for the action {self.action_name}.")
         not_preconditions = self.predicates_superset.difference(predicates_in_state)
-        if len(self.cannot_be_preconditions) == 0:
-            self.logger.debug("Since this is the first positive observation we need to create the complement of the predicates.")
-            self.cannot_be_preconditions = not_preconditions
-            return
-
-        self.cannot_be_preconditions.update(not_preconditions)
+        self.cannot_be_preconditions = not_preconditions if len(self.cannot_be_preconditions) == 0 else self.cannot_be_preconditions.union(not_preconditions)
         for not_precondition in self.cannot_be_preconditions:
             self.logger.debug("Removing false positives from the must be preconditions set.")
             for must_be_preconditions_set in self.must_be_preconditions:
@@ -54,11 +49,7 @@ class OnlineDiscreteModelLearner:
         :param post_state_predicates: the pridacates observed in the state following the action execution.
         """
         self.logger.info(f"Adding a new positive post-state observation for the action {self.action_name}.")
-        if len(self.cannot_be_effects) == 0:
-            self.logger.debug("Since this is the first positive observation we need to create the complement of the predicates.")
-            self.cannot_be_effects = {predicate for predicate in self.predicates_superset}
-            self.cannot_be_effects.difference_update(post_state_predicates)
-
+        self.cannot_be_effects.update([predicate.copy(is_negated=True) for predicate in post_state_predicates])
         self.must_be_effects.update(set([predicate.copy() for predicate in post_state_predicates.difference(pre_state_predicates)]))
 
     def _add_negative_pre_state_observation(self, predicates_in_state: Set[Predicate]) -> None:
@@ -71,7 +62,7 @@ class OnlineDiscreteModelLearner:
         self.must_be_preconditions.append(preconditions_not_in_state.difference(self.cannot_be_preconditions))
 
     def add_transition_data(
-        self, pre_state_predicates: Set[Predicate], post_state_predicates: Set[Predicate], is_transition_successful: bool
+        self, pre_state_predicates: Set[Predicate], post_state_predicates: Set[Predicate] = None, is_transition_successful: bool = True
     ) -> None:
         """Collects the data from the transition and updates the model.
 
@@ -108,6 +99,15 @@ class OnlineDiscreteModelLearner:
         # if action was not observed yet, return the superset of the predicates
         optimistic_precondition = Precondition("and")
         for cnf in self.must_be_preconditions:
+            if len(cnf) == 0:
+                continue
+
+            if len(cnf) == 1:
+                predicate = cnf.pop()
+                optimistic_precondition.add_condition(predicate.copy())
+                cnf.add(predicate)
+                continue
+
             or_condition = Precondition("or")
             for predicate in cnf:
                 or_condition.add_condition(predicate.copy())

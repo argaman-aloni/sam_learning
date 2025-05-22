@@ -49,6 +49,15 @@ class OnlineNumericModelLearner:
         self._data_columns = [create_polynomial_string(monomial) for monomial in self._monomials]
 
     @property
+    def monomials(self) -> List[List[str]]:
+        """
+        Returns the list of monomials used for feature construction in the learning process.
+
+        :return: A list of lists, where each inner list represents a monomial as a list of strings.
+        """
+        return self._monomials
+
+    @property
     def data_columns(self) -> List[str]:
         """Returns the data columns of the convex hull learner.
 
@@ -94,7 +103,7 @@ class OnlineNumericModelLearner:
         self._svm_learner.add_new_point(state_fluents, is_successful=False)
 
     def add_transition_data(
-        self, pre_state_functions: Dict[str, PDDLFunction], post_state_functions: Dict[str, PDDLFunction], is_transition_successful: bool
+        self, pre_state_functions: Dict[str, PDDLFunction], post_state_functions: Dict[str, PDDLFunction] = None, is_transition_successful: bool = True
     ) -> None:
         """Adds transition data, including pre-state and post-state functions, to the system. If the transition is
         successful, it updates positive pre- and post-state observations. Otherwise, it updates negative

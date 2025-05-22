@@ -108,8 +108,8 @@ SAILING_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" / "sa
 
 
 COUNTERS_POLYNOMIAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "counters_poly.pddl"
-COUNTERS_POLYNOMIAL_PROBLEMS_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.pddl")]
-COUNTERS_POLYNOMIAL_TRAJECTORIES_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.trajectory")]
+COUNTERS_POLYNOMIAL_PROBLEMS_PATH = [path for path in EXAMPLES_DIR_PATH.glob("pfile_counters_poly*.pddl")]
+COUNTERS_POLYNOMIAL_TRAJECTORIES_PATH = [path for path in EXAMPLES_DIR_PATH.glob("pfile_counters_poly*.trajectory")]
 
 BLOCKS_PROPOSITIONAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "blocksworld_propositional_domain.pddl"
 BLOCKS_PROPOSITIONAL_PROBLEM_PATH = EXAMPLES_DIR_PATH / "blocks_propositional_prob00.pddl"
