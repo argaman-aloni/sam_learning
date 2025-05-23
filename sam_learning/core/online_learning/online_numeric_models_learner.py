@@ -1,5 +1,5 @@
 """An online numeric model learning algorithm."""
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from sam_learning.core.numeric_learning.linear_regression_learner import LinearRegressionLearner
 from sam_learning.core.numeric_learning.numeric_utils import create_grounded_monomials, create_monomials, create_polynomial_string
@@ -154,7 +154,7 @@ class OnlineNumericModelLearner:
         :return: True if the state is in the safe model, False otherwise.
         """
         sample_dataset = create_grounded_monomials(self._monomials, state)
-        return self._convex_hull_learner.is_point_in_convex_hull(DataFrame({func_name: [val] for func_name, val in sample_dataset.items()}))
+        return self._convex_hull_learner.is_point_in_convex_hull(Series({func_name: val for func_name, val in sample_dataset.items()}))
 
     def copy_convex_hull_learner(self, one_shot: bool) -> IncrementalConvexHullLearner:
         """Returns a copy of the convex hull learner.

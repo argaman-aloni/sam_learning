@@ -1,6 +1,9 @@
 """Module test for the online_nsam module."""
+import logging
 import shutil
+import time
 from pathlib import Path
+from queue import PriorityQueue
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Predicate
@@ -68,14 +71,15 @@ def test_calculate_state_action_informative_state_when_state_observed_for_the_fi
                           fluents=depot_problem.initial_state_fluents)
     first_action = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))[0]
     depot_noam_informative_explorer.initialize_learning_algorithms()
-    is_informative = depot_noam_informative_explorer._calculate_state_action_informative(
+    is_informative, action_applicable = depot_noam_informative_explorer._calculate_state_action_informative(
         current_state=initial_state, action_to_test=first_action, problem_objects=depot_problem.objects
     )
     assert is_informative
 
 
 def test_add_transition_data_when_failure_caused_by_discrete_condition_not_holding_adds_failure_to_discrete_model_and_not_to_numeric_and_undecided(
-        depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem, depot_numeric_agent: IPCAgent):
+        depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem,
+        depot_numeric_agent: IPCAgent):
     first_action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor2", "depot3"])
     trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
@@ -148,6 +152,52 @@ def test_add_transition_data_when_transition_is_successful_adds_data_to_all_mode
     assert len(depot_noam_informative_explorer.undecided_failure_observations[first_action.name]) == 0
 
 
+def test_select_action_and_execute_when_when_there_is_a_single_applicable_action_in_the_frontier_executes_the_action_and_returns_successive_state(
+        depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem,
+        depot_numeric_agent: IPCAgent):
+    depot_numeric_agent.initialize_problem(depot_problem)
+    depot_noam_informative_explorer.initialize_learning_algorithms()
+    frontier = [ActionCall(name="drive", grounded_parameters=["truck0", "distributor2", "depot3"])]
+    initial_state = State(predicates=depot_problem.initial_state_predicates,
+                          fluents=depot_problem.initial_state_fluents)
+    selected_action, is_successful, next_state = depot_noam_informative_explorer._select_action_and_execute(
+        current_state=initial_state, frontier=frontier, problem_objects=depot_problem.objects)
+    assert selected_action.name == "drive"
+    assert is_successful
+    assert next_state is not None
+    assert next_state != initial_state
+
+
+def test_select_action_and_execute_when_when_there_is_a_single_inapplicable_action_in_the_frontier_executes_the_action_and_returns_same_state(
+        depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem,
+        depot_numeric_agent: IPCAgent):
+    depot_numeric_agent.initialize_problem(depot_problem)
+    depot_noam_informative_explorer.initialize_learning_algorithms()
+    frontier = [ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])]
+    initial_state = State(predicates=depot_problem.initial_state_predicates,
+                          fluents=depot_problem.initial_state_fluents)
+    selected_action, is_successful, next_state = depot_noam_informative_explorer._select_action_and_execute(
+        current_state=initial_state, frontier=frontier, problem_objects=depot_problem.objects)
+    assert selected_action.name == "drive"
+    assert not is_successful
+    assert next_state is not None
+    assert next_state == initial_state
+
+def test_select_action_and_execute_when_when_there_is_a_single_inapplicable_action_in_the_frontier_executes_the_action_and_reduces_frontier_size(
+        depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem,
+        depot_numeric_agent: IPCAgent):
+    depot_numeric_agent.initialize_problem(depot_problem)
+    depot_noam_informative_explorer.initialize_learning_algorithms()
+    frontier = [ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])]
+    initial_state = State(predicates=depot_problem.initial_state_predicates,
+                          fluents=depot_problem.initial_state_fluents)
+    selected_action, is_successful, next_state = depot_noam_informative_explorer._select_action_and_execute(
+        current_state=initial_state, frontier=frontier, problem_objects=depot_problem.objects)
+    assert selected_action.name == "drive"
+    assert not is_successful
+    assert len(frontier) == 0
+
+
 def test_train_models_using_trace_when_given_a_single_action_adds_the_action_data_to_all_model_learners(
         depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem,
         depot_numeric_agent: IPCAgent
@@ -172,12 +222,12 @@ def test_train_models_using_trace_when_given_an_already_observed_state_and_actio
     first_action = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))[0]
     trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
-    is_informative = depot_noam_informative_explorer._calculate_state_action_informative(
+    is_informative, action_applicable = depot_noam_informative_explorer._calculate_state_action_informative(
         current_state=initial_state, action_to_test=first_action, problem_objects=depot_problem.objects
     )
     assert is_informative
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
-    is_informative = depot_noam_informative_explorer._calculate_state_action_informative(
+    is_informative, action_applicable = depot_noam_informative_explorer._calculate_state_action_informative(
         current_state=initial_state, action_to_test=first_action, problem_objects=depot_problem.objects
     )
     assert not is_informative
@@ -192,7 +242,7 @@ def test_train_models_using_trace_when_given_an_inapplicable_action_in_a_state_w
     failed_first_action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])
     trace, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
-    is_informative = depot_noam_informative_explorer._calculate_state_action_informative(
+    is_informative, action_applicable = depot_noam_informative_explorer._calculate_state_action_informative(
         current_state=initial_state, action_to_test=failed_first_action, problem_objects=depot_problem.objects
     )
     assert is_informative
@@ -283,3 +333,40 @@ def test_construct_optimistic_action_model_when_no_observation_given_does_not_fa
         depot_noam_informative_explorer._construct_optimistic_action_model()
     except Exception as e:
         assert False, e
+
+def test_explore_to_refine_models_changes_the_models_after_short_episode_is_done_and_does_not_take_extremely_long_to_finish(
+        depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem, depot_domain: Domain,
+        depot_numeric_agent: IPCAgent):
+    depot_numeric_agent.initialize_problem(depot_problem)
+    initial_state = State(predicates=depot_problem.initial_state_predicates,
+                          fluents=depot_problem.initial_state_fluents)
+
+    depot_noam_informative_explorer.initialize_learning_algorithms()
+    start_time = time.time()
+    num_steps_done = depot_noam_informative_explorer.explore_to_refine_models(
+        init_state=initial_state,
+        num_steps_till_episode_end=10,
+        problem_objects=depot_problem.objects,
+    )
+    end_time = time.time()
+    assert num_steps_done <= 100
+    assert end_time - start_time < 60, "Exploration took too long to finish"
+    print("Safe model:\n", depot_noam_informative_explorer._construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_informative_explorer._construct_optimistic_action_model().to_pddl())
+
+def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_updates_models_and_safe_and_optimistic_domains_are_available(
+        depot_noam_informative_explorer: NumericOnlineActionModelLearner, depot_problem: Problem, depot_domain: Domain,
+        depot_numeric_agent: IPCAgent):
+    depot_numeric_agent.initialize_problem(depot_problem)
+    initial_state = State(predicates=depot_problem.initial_state_predicates,
+                          fluents=depot_problem.initial_state_fluents)
+
+    depot_noam_informative_explorer.initialize_learning_algorithms()
+    num_steps_done = depot_noam_informative_explorer.explore_to_refine_models(
+        init_state=initial_state,
+        num_steps_till_episode_end=10000,
+        problem_objects=depot_problem.objects,
+    )
+    assert num_steps_done <= 10000
+    print("Safe model:\n", depot_noam_informative_explorer._construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_informative_explorer._construct_optimistic_action_model().to_pddl())
