@@ -84,7 +84,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         shifted_points = points - shift_axis
         return extended_gram_schmidt(shifted_points)
 
-    def _shift_new_point(self, point: Series) -> np.ndarray:
+    def _shift_new_point(self, point: Union[Series, DataFrame]) -> np.ndarray:
         """Shifts the points based on the first sample in the dataframe.
 
         Note: if the points are spanning the original space, we do not need to shift the points.
@@ -92,6 +92,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :return: the shifted point based on the first sample in the dataframe.
         """
         numpy_sample = point.to_numpy()
+        if (isinstance(point, DataFrame) and point.shape[1]) == 1 or (isinstance(point, Series) and point.shape[0] == 1):
+            self.logger.debug("The point is a single dimensional.")
+            return numpy_sample - self.affine_independent_data.iloc[0][0]
+
         shifted_sample = numpy_sample - self.affine_independent_data.iloc[0] if not self._spanning_standard_base else numpy_sample
         return shifted_sample
 
@@ -319,7 +323,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             self.logger.debug("The new points are not in the span of the input points.")
             return False
 
-        if projected_entry.shape[0] > 1:
+        if projected_entry.ndim > 1:
             self.logger.debug("Validating whether the new point conforms with the CH inequalities.")
             A = self._convex_hull.equations[:, :-1]
             b = self._convex_hull.equations[:, -1]

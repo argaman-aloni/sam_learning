@@ -39,13 +39,14 @@ class InformationStatesLearner:
     logger: logging.Logger
     action_name: str
     combined_data: DataFrame
-    numeric_data: DataFrame
+    numeric_failure_data: DataFrame
     discrete_model_learner: OnlineDiscreteModelLearner
     convex_hull_learner: IncrementalConvexHullLearner
     monomials: List[List[str]]
 
     def __init__(
-        self, action_name: str, discrete_model_learner: OnlineDiscreteModelLearner, numeric_model_learner: OnlineNumericModelLearner,
+            self, action_name: str, discrete_model_learner: OnlineDiscreteModelLearner,
+            numeric_model_learner: OnlineNumericModelLearner,
     ):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
@@ -53,11 +54,13 @@ class InformationStatesLearner:
         self.numeric_model_learner = numeric_model_learner
         self.monomials = self.numeric_model_learner.monomials
         monomial_strs = self.numeric_model_learner.data_columns
-        self.parameter_bound_predicates = [p.untyped_representation for p in self.discrete_model_learner.predicates_superset]
+        self.parameter_bound_predicates = [p.untyped_representation for p in
+                                           self.discrete_model_learner.predicates_superset]
         self.combined_data = DataFrame(columns=[*monomial_strs, self.parameter_bound_predicates, LABEL_COLUMN])
-        self.numeric_data = DataFrame(columns=[*monomial_strs, LABEL_COLUMN])
+        self.numeric_failure_data = DataFrame(columns=[*monomial_strs])
 
-    def _create_combined_sample_data(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> DataFrame:
+    def _create_combined_sample_data(self, new_numeric_sample: Dict[str, PDDLFunction],
+                                     new_propositional_sample: Set[Predicate]) -> DataFrame:
         """Creates a combined sample data from the numeric and propositional samples.
 
         :param new_numeric_sample: the numeric part of the sample.
@@ -68,13 +71,16 @@ class InformationStatesLearner:
         grounded_monomials = create_grounded_monomials(self.monomials, new_numeric_sample)
         predicates_map = {
             **{p.untyped_representation: True for p in new_propositional_sample},
-            **{p.untyped_representation: False for p in self.discrete_model_learner.predicates_superset.difference(new_propositional_sample)},
+            **{p.untyped_representation: False for p in
+               self.discrete_model_learner.predicates_superset.difference(new_propositional_sample)},
         }
-        combined_sample_data = {**{k: [v] for k, v in grounded_monomials.items()}, **{k: [v] for k, v in predicates_map.items()}}
+        combined_sample_data = {**{k: [v] for k, v in grounded_monomials.items()},
+                                **{k: [v] for k, v in predicates_map.items()}}
         new_sample_data = DataFrame(combined_sample_data)
         return new_sample_data
 
-    def _visited_previously_failed_execution(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
+    def _visited_previously_failed_execution(self, new_numeric_sample: Dict[str, PDDLFunction],
+                                             new_propositional_sample: Set[Predicate]) -> bool:
         """Validates whether the new sample is a previously visited failed state.
 
         :param new_numeric_sample: the numeric part of the sample.
@@ -84,7 +90,8 @@ class InformationStatesLearner:
         # Create combined sample data
         new_sample_data = self._create_combined_sample_data(new_numeric_sample, new_propositional_sample)
         new_sample_data[LABEL_COLUMN] = False
-        return len(pd.concat([self.combined_data, new_sample_data], ignore_index=True).drop_duplicates()) == len(self.combined_data)
+        return len(pd.concat([self.combined_data, new_sample_data], ignore_index=True).drop_duplicates()) == len(
+            self.combined_data)
 
     def _is_state_not_applicable_in_safe_numeric_model(self, new_numeric_sample: Dict[str, PDDLFunction]) -> bool:
         """Determines if a given numeric sample results in a state that is not applicable
@@ -104,21 +111,40 @@ class InformationStatesLearner:
         """
         validation_convex_hull = self.numeric_model_learner.copy_convex_hull_learner(one_shot=False)
         validation_convex_hull.add_new_point(create_grounded_monomials(self.monomials, new_numeric_sample))
-        negative_samples = self.numeric_data[self.numeric_data[LABEL_COLUMN] == False]
-        for _, negative_sample in negative_samples.iterrows():
-            data_columns = [col for col in self.numeric_data.columns.tolist() if col != LABEL_COLUMN]
+        for _, negative_sample in self.numeric_failure_data.iterrows():
+            data_columns = [col for col in self.numeric_failure_data.columns.tolist() if col != LABEL_COLUMN]
             negative_sample_in_hull = validation_convex_hull.is_point_in_convex_hull(negative_sample[data_columns])
             if negative_sample_in_hull:
                 self.logger.debug("Found a negative sample inside the convex hull.")
                 validation_convex_hull.close_convex_hull()
                 return True
 
-        self.logger.debug(f"Sample {new_numeric_sample} does not create a convex hull with inapplicable points.")
+        self.logger.debug(f"The given sample does not create a convex hull with inapplicable points.")
         validation_convex_hull.close_convex_hull()
         return False
 
+    def add_new_numeric_failure(self, new_numeric_sample: Dict[str, PDDLFunction]) -> None:
+        """
+
+        Args:
+            new_numeric_sample:
+
+        Returns:
+
+        """
+        grounded_monomials = create_grounded_monomials(self.monomials, new_numeric_sample)
+        new_numeric_df = DataFrame({k: [v] for k, v in grounded_monomials.items()})
+        if self.numeric_failure_data.empty:
+            self.numeric_failure_data = new_numeric_df
+            return
+
+        self.numeric_failure_data = pd.concat([self.numeric_failure_data, new_numeric_df], ignore_index=True)
+        self.numeric_failure_data.dropna(axis="columns", inplace=True)
+        self.numeric_failure_data = self.numeric_failure_data.drop_duplicates()
+
     def add_new_sample(
-        self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate] = frozenset(), is_successful: bool = True
+            self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate] = frozenset(),
+            is_successful: bool = True
     ) -> None:
         """Adds a new sample to the combined observation data. The function integrates a numeric
         sample and a propositional sample into a combined data structure. The resulting data
@@ -134,20 +160,27 @@ class InformationStatesLearner:
         """
         new_observation_entry = self._create_combined_sample_data(new_numeric_sample, new_propositional_sample)
         new_observation_entry[LABEL_COLUMN] = is_successful
-        new_numeric_df = new_observation_entry[self.numeric_data.columns.tolist()]
         if self.combined_data.empty:
             self.combined_data = new_observation_entry
-            self.numeric_data = new_numeric_df
 
         else:
             self.combined_data = pd.concat([self.combined_data, new_observation_entry], ignore_index=True)
             self.combined_data.dropna(axis="columns", inplace=True)
             self.combined_data = self.combined_data.drop_duplicates()
-            self.numeric_data = pd.concat([self.numeric_data, new_numeric_df], ignore_index=True)
-            self.numeric_data.dropna(axis="columns", inplace=True)
-            self.numeric_data = self.numeric_data.drop_duplicates()
 
-    def is_sample_informative(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
+    def is_applicable(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
+        """Checks whether the action is applicable in the state.
+
+        :param new_numeric_sample: The numeric sample to check.
+        :param new_propositional_sample: The propositional predicates representing the new sample.
+        :return: whether the action is applicable in the state.
+        """
+        return self.discrete_model_learner.is_state_in_safe_model(
+            new_propositional_sample
+        ) and self.numeric_model_learner.is_state_in_safe_model(new_numeric_sample)
+
+    def is_sample_informative(self, new_numeric_sample: Dict[str, PDDLFunction],
+                              new_propositional_sample: Set[Predicate]) -> bool:
         """Checks whether the sample is informative.
 
         :param new_numeric_sample: The new sample to calculate whether it is informative.
