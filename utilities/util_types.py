@@ -10,6 +10,7 @@ class LearningAlgorithmType(Enum):
     conditional_sam = 9
     universal_sam = 10
     online_nsam = 13
+    noam_learning = 14
     incremental_nsam = 19
 
     # learning algorithms relating to fault repair not to be used for POL

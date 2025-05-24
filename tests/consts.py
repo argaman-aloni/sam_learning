@@ -1,4 +1,5 @@
 """Constants for the tests."""
+
 from pathlib import Path
 from typing import Dict, List
 
@@ -165,8 +166,15 @@ TWO_SIDES_OF_BOX_PATH = EXAMPLES_DIR_PATH / "negative_from_two_sides.csv"
 CLOSE_TO_BOX_PATH = EXAMPLES_DIR_PATH / "negative_close_to_box.csv"
 CLOSE_TO_LINEAR_CONDITION_PATH = EXAMPLES_DIR_PATH / "negative_close_to_linear_condition.csv"
 
+COUNTERS_ONLINE_LEARNING_DOMAIN_PATH = EXAMPLES_DIR_PATH / "counters_domain_online_learning.pddl"
+COUNTERS_ONLINE_LEARNING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile10_0_counters_online.pddl"
+
+
 def sync_snapshot(
-    sam_learning: SAMLearner, component: ObservedComponent, trajectory_objects: Dict[str, PDDLObject], should_include_all_objects: bool = False
+    sam_learning: SAMLearner,
+    component: ObservedComponent,
+    trajectory_objects: Dict[str, PDDLObject],
+    should_include_all_objects: bool = False,
 ) -> None:
     previous_state = component.previous_state
     next_state = component.next_state
@@ -187,13 +195,19 @@ def sync_snapshot(
 
 
 def sync_ma_snapshot(
-    ma_sam: MultiAgentSAM, component: MultiAgentComponent, action_call: ActionCall, trajectory_objects: Dict[str, PDDLObject]
+    ma_sam: MultiAgentSAM,
+    component: MultiAgentComponent,
+    action_call: ActionCall,
+    trajectory_objects: Dict[str, PDDLObject],
 ) -> None:
     previous_state = component.previous_state
     next_state = component.next_state
     ma_sam.current_trajectory_objects = trajectory_objects
     ma_sam.triplet_snapshot.create_triplet_snapshot(
-        previous_state=previous_state, next_state=next_state, current_action=action_call, observation_objects=trajectory_objects
+        previous_state=previous_state,
+        next_state=next_state,
+        current_action=action_call,
+        observation_objects=trajectory_objects,
     )
 
 
