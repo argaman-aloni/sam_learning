@@ -46,20 +46,44 @@ class OnlineDiscreteModelLearner:
         """Adds a positive pre and post-state observation and deduces the predicates to filter from the effects.
 
         :param pre_state_predicates: the predicates observed in the state in which the action was executed successfully.
-        :param post_state_predicates: the pridacates observed in the state following the action execution.
+        :param post_state_predicates: the predicates observed in the state following the action execution.
         """
         self.logger.info(f"Adding a new positive post-state observation for the action {self.action_name}.")
         self.cannot_be_effects.update([predicate.copy(is_negated=True) for predicate in post_state_predicates])
         self.must_be_effects.update(set([predicate.copy() for predicate in post_state_predicates.difference(pre_state_predicates)]))
+
+    def _apply_unit_propagation(self) -> None:
+        """Applies unit propagation to the must be preconditions CNFs."""
+        self.logger.debug("Applying unit propagation to the must be preconditions CNFs.")
+        unit_clauses = [cnf for cnf in self.must_be_preconditions if len(cnf) == 1]
+        new_must_be_preconditions = unit_clauses
+        for cnf in self.must_be_preconditions:
+            if len(cnf) == 1:
+                # We verify externally that no duplication clauses are added.
+                continue
+
+            # If an atom from the unit clause is already in the CNF, the clause becomes true.
+            if len(cnf.intersection({element for clause in unit_clauses for element in clause})) > 0:
+                self.logger.debug("The CNF is already satisfied by the unit clause. No need to apply unit propagation.")
+                continue
+
+            new_must_be_preconditions.append(cnf)
+
+        self.must_be_preconditions = new_must_be_preconditions
 
     def _add_negative_pre_state_observation(self, predicates_in_state: Set[Predicate]) -> None:
         """Adds a negative sample to the samples list used to create the action's precondition.
 
         :param predicates_in_state: the predicates observed in the state in which the action could not be applied.
         """
-        self.logger.info(f"Adding a new negative sample for the action {self.action_name}.")
+        self.logger.debug(f"Adding a new negative sample for the action {self.action_name}.")
         preconditions_not_in_state = self.predicates_superset.difference(predicates_in_state)
+        if any([cnf.issubset(predicates_in_state) and predicates_in_state.issubset(cnf) for cnf in self.must_be_preconditions]):
+            self.logger.debug("The state is already in the must be preconditions. No need to add it again.")
+            return
+
         self.must_be_preconditions.append(preconditions_not_in_state.difference(self.cannot_be_preconditions))
+        self._apply_unit_propagation()
 
     def add_transition_data(
         self, pre_state_predicates: Set[Predicate], post_state_predicates: Set[Predicate] = None, is_transition_successful: bool = True
@@ -70,6 +94,7 @@ class OnlineDiscreteModelLearner:
         :param post_state_predicates: the predicates observed in the state following the action execution.
         :param is_transition_successful: a boolean indicating if the action was successfully applied in the pre-state.
         """
+        self.logger.debug(f"Adding {'positive' if is_transition_successful else 'negative'} transition data for the action {self.action_name}.")
         if is_transition_successful:
             self._add_positive_pre_state_observation(pre_state_predicates)
             self._add_positive_post_state_observation(pre_state_predicates, post_state_predicates)

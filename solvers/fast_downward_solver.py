@@ -1,4 +1,4 @@
-"""Module responsible for running the Expressive Numeric Heuristic Planner (ENHSP)."""
+"""Module responsible for running the Fast Downward discrete planner."""
 import logging
 import os
 import subprocess
@@ -9,7 +9,7 @@ from typing import Dict
 
 from solvers.abstract_solver import AbstractSolver, SolutionOutputTypes
 
-FAST_DOWNWARD_DIR_PATH = os.environ["FAST_DOWNWARD_DIR_PATH"]
+FAST_DOWNWARD_DIR_PATH = os.environ.get("FAST_DOWNWARD_DIR_PATH", "./fast-downward")
 MAX_RUNNING_TIME = 60  # seconds
 
 

@@ -128,7 +128,7 @@ class IPCAgent(AbstractAgent):
         :param plan: the plan to be executed.
         :return: The trace created from the plan and whether the goal was reached.
         """
-        self.logger.info("Executing the plan %s.", str(plan))
+        self.logger.info("Executing the plan %s.", ", ".join([str(action) for action in plan]))
         trace = Observation()
         trace.add_problem_objects(self._problem.objects)
         current_state = State(predicates=self._problem.initial_state_predicates, fluents=self._problem.initial_state_fluents)
