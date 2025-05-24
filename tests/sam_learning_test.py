@@ -34,6 +34,21 @@ def barman_sam_learning(barman_domain: Domain) -> SAMLearner:
     return SAMLearner(barman_domain, negative_preconditions_policy=NegativePreconditionPolicy.hard)
 
 
+@fixture()
+def elevators_sam_learning(elevators_domain: Domain) -> SAMLearner:
+    return SAMLearner(elevators_domain)
+
+
+@fixture()
+def elevators_sam_learning_soft_policy(elevators_domain: Domain) -> SAMLearner:
+    return SAMLearner(elevators_domain, negative_preconditions_policy=NegativePreconditionPolicy.soft)
+
+
+@fixture()
+def elevators_sam_learning_hard_policy(elevators_domain: Domain) -> SAMLearner:
+    return SAMLearner(elevators_domain, negative_preconditions_policy=NegativePreconditionPolicy.hard)
+
+
 def test_add_new_action_preconditions_adds_both_negative_and_positive_preconditions_to_the_action(
     elevators_sam_learning: SAMLearner, elevators_observation: Observation
 ):

@@ -6,6 +6,7 @@ import numpy
 import numpy as np
 import pandas as pd
 import pytest
+from pandas import Series, DataFrame
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import PDDLFunction, Domain
 
@@ -49,6 +50,27 @@ def test_creating_the_convex_hull_learner_creates_the_dataframe_with_the_correct
 ):
     assert convex_hull_learner.data.shape == (0, 3)
     assert convex_hull_learner.data.columns.tolist() == ["(x )", "(y )", "(z )"]
+
+def test_shift_new_point_when_point_is_single_dimension_series_shifts_point_correctly_and_does_not_fail(convex_hull_learner):
+    point = Series([1])
+    convex_hull_learner.affine_independent_data = DataFrame({"(x )": [1]})
+    try:
+        result = convex_hull_learner._shift_new_point(point)
+        assert result is not None
+        assert result == numpy.array([[0.0]])
+    except Exception as e:
+        pytest.fail(f"Exception was raised: {e}")
+
+
+def test_shift_new_point_when_point_is_single_dimension_dataframe_shifts_point_correctly_and_does_not_fail(convex_hull_learner):
+    point = DataFrame({"(x )": [1]})
+    convex_hull_learner.affine_independent_data = DataFrame({"(x )": [1]})
+    try:
+        result = convex_hull_learner._shift_new_point(point)
+        assert result is not None
+        assert result == numpy.array([[0.0]])
+    except Exception as e:
+        pytest.fail(f"Exception was raised: {e}")
 
 
 def test_add_new_point_when_adding_a_point_for_the_first_time_only_adds_it_to_the_class_data(convex_hull_learner):
@@ -481,7 +503,7 @@ def test_construct_convex_hull_inequalities_when_given_too_few_examples_returns_
     assert learner._gsp_base is not None
     assert learner._complementary_base is not None
     precondition = learner.construct_safe_linear_inequalities()
-    print(precondition.print(should_simplify=False, decimal_digits=2))
+    print(precondition.print(decimal_digits=2))
 
 
 def test_construct_convex_hull_inequalities_when_convex_hull_initialized_with_empty_relevant_fluents_returns_empty_conditions(

@@ -104,7 +104,7 @@ class IncrementalSVMLearner:
         self.data = pd.concat([self.data, new_sample], ignore_index=True)
         self.data.dropna(axis=1, inplace=True)
 
-    def _incremental_create_svm_linear_conditions(self, debug: bool = True) -> List[Tuple[List[float], float]]:
+    def _incremental_create_svm_linear_conditions(self, debug: bool = False) -> List[Tuple[List[float], float]]:
         """Create the convex hull and returns the matrix representing the inequalities.
 
         :return: the matrix representing the inequalities of the planes created by the convex hull as well as the

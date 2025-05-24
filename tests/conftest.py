@@ -5,7 +5,6 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, Trajector
 from pddl_plus_parser.models import Domain, Problem, Observation, PDDLObject, MultiAgentObservation
 from pytest import fixture
 
-from sam_learning.learners import SAMLearner, MASAMPlus
 from tests.consts import (
     ELEVATORS_DOMAIN_PATH,
     ELEVATORS_PROBLEM_PATH,
@@ -49,7 +48,6 @@ from tests.consts import (
     WOODWORKING_DOMAIN_PATH,
 )
 from tests.multi_agent_learning_tests.multi_agent_sam_test import WOODWORKING_AGENT_NAMES, ROVERS_AGENT_NAMES
-from utilities import NegativePreconditionPolicy
 
 os.environ["CONVEX_HULL_ERROR_PATH"] = "tests\\convex_hull_error.txt"
 DRIVERLOG_AGENT_NAMES = [f"driver{i}" for i in range(1, 9)]
@@ -69,21 +67,6 @@ def elevators_problem(elevators_domain: Domain) -> Problem:
 @fixture()
 def elevators_observation(elevators_domain: Domain, elevators_problem: Problem) -> Observation:
     return TrajectoryParser(elevators_domain, elevators_problem).parse_trajectory(ELEVATORS_TRAJECTORY_PATH)
-
-
-@fixture()
-def elevators_sam_learning(elevators_domain: Domain) -> SAMLearner:
-    return SAMLearner(elevators_domain)
-
-
-@fixture()
-def elevators_sam_learning_soft_policy(elevators_domain: Domain) -> SAMLearner:
-    return SAMLearner(elevators_domain, negative_preconditions_policy=NegativePreconditionPolicy.soft)
-
-
-@fixture()
-def elevators_sam_learning_hard_policy(elevators_domain: Domain) -> SAMLearner:
-    return SAMLearner(elevators_domain, negative_preconditions_policy=NegativePreconditionPolicy.hard)
 
 
 @fixture()
@@ -125,11 +108,13 @@ def woodworking_ma_combined_domain() -> Domain:
 
 @fixture()
 def woodworking_ma_combined_problem(woodworking_ma_combined_domain: Domain) -> Problem:
-    return ProblemParser(problem_path=WOODWORKING_COMBINED_PROBLEM_PATH, domain=woodworking_ma_combined_domain).parse_problem()
+    return ProblemParser(problem_path=WOODWORKING_COMBINED_PROBLEM_PATH,
+                         domain=woodworking_ma_combined_domain).parse_problem()
 
 
 @fixture()
-def multi_agent_observation(woodworking_ma_combined_domain: Domain, woodworking_ma_combined_problem) -> MultiAgentObservation:
+def multi_agent_observation(woodworking_ma_combined_domain: Domain,
+                            woodworking_ma_combined_problem) -> MultiAgentObservation:
     return TrajectoryParser(woodworking_ma_combined_domain, woodworking_ma_combined_problem).parse_trajectory(
         WOODWORKING_COMBINED_TRAJECTORY_PATH, executing_agents=WOODWORKING_AGENT_NAMES
     )
@@ -259,7 +244,8 @@ def satellite_numeric_problem(satellite_numeric_domain: Domain) -> Problem:
 
 @fixture()
 def satellite_numeric_observation(satellite_numeric_domain: Domain, satellite_numeric_problem: Problem) -> Observation:
-    return TrajectoryParser(satellite_numeric_domain, satellite_numeric_problem).parse_trajectory(SATELLITE_NUMERIC_TRAJECTORY_PATH)
+    return TrajectoryParser(satellite_numeric_domain, satellite_numeric_problem).parse_trajectory(
+        SATELLITE_NUMERIC_TRAJECTORY_PATH)
 
 
 @fixture()
@@ -275,7 +261,8 @@ def minecraft_large_problem(minecraft_large_domain: Domain) -> Problem:
 
 @fixture()
 def minecraft_large_trajectory(minecraft_large_domain: Domain, minecraft_large_problem: Problem) -> Observation:
-    return TrajectoryParser(minecraft_large_domain, minecraft_large_problem).parse_trajectory(MINECRAFT_LARGE_TRAJECTORY_PATH)
+    return TrajectoryParser(minecraft_large_domain, minecraft_large_problem).parse_trajectory(
+        MINECRAFT_LARGE_TRAJECTORY_PATH)
 
 
 @fixture()
@@ -298,8 +285,3 @@ def ma_driverlog_observation(ma_driverlog_domain: Domain, ma_driverlog_problem: 
     return TrajectoryParser(ma_driverlog_domain, ma_driverlog_problem).parse_trajectory(
         DRIVERLOG_COMBINED_TRAJECTORY_PATH, executing_agents=DRIVERLOG_AGENT_NAMES
     )
-
-
-@fixture()
-def rovers_ma_sam_plus(ma_rovers_domain) -> MASAMPlus:
-    return MASAMPlus(ma_rovers_domain)

@@ -46,7 +46,7 @@ class NumericFunctionMatcher:
         :param grounded_function: the observed numeric function.
         :return: the lifted function definition with the value set according to the observation.
         """
-        self.logger.info("Starting to lift the matched parameters!")
+        self.logger.debug("Starting to lift the matched parameters!")
         object_to_parameter_mapping = [
             {grounded_obj: lifted_param}
             for grounded_obj, lifted_param in zip(grounded_call_parameters, executed_action.parameter_names)
@@ -82,7 +82,7 @@ class NumericFunctionMatcher:
         :param grounded_state_fluents: the numeric state fluents.
         :return: a dictionary containing the lifted numeric state function with their assigned values.
         """
-        self.logger.info(f"Starting to search for matches for the grounded action - {str(action_call)}")
+        self.logger.debug(f"Starting to search for matches for the grounded action - {str(action_call)}")
         possible_matches = {}
         for domain_function in self.matcher_domain.functions.values():
             if len(domain_function.signature) > len(action_call.parameters) and len(self.matcher_domain.constants) == 0:
@@ -103,7 +103,7 @@ class NumericFunctionMatcher:
             possible_function_signatures = self.create_possible_function_signatures(call_parameters, domain_function)
             for unsigned_representation in possible_function_signatures:
                 if unsigned_representation in grounded_state_fluents:
-                    self.logger.info(
+                    self.logger.debug(
                         f"found a possible match to the action " f"{action_call.name} - {unsigned_representation}"
                     )
 

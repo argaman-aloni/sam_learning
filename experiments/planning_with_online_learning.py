@@ -10,9 +10,9 @@ from pddl_plus_parser.models import State
 
 from sam_learning.core.online_learning_agents.minecraft_agent import MinecraftAgent
 from sam_learning.core import LearnerDomain, EpisodeInfoRecord
-from sam_learning.learners import OnlineNSAMLearner
+from sam_learning.learners import NumericOnlineActionModelLearner
 from solvers import MetricFFSolver
-from utilities import LearningAlgorithmType, SolverType, SolutionOutputTypes
+from utilities import LearningAlgorithmType, SolverType
 from validators import OnlineLearningDomainValidator
 
 DEFAULT_SPLIT = 10
@@ -79,7 +79,7 @@ class PIL:
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         episode_info_recorder = EpisodeInfoRecord(action_names=[action for action in complete_domain.actions])
-        online_learner = OnlineNSAMLearner(
+        online_learner = NumericOnlineActionModelLearner(
             partial_domain=partial_domain, polynomial_degree=self._polynomial_degree, episode_recorder=episode_info_recorder
         )
         num_training_goal_achieved = 0
@@ -89,7 +89,7 @@ class PIL:
             init_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
             agent = MinecraftAgent(domain=complete_domain, problem=problem)
             online_learner.update_agent(agent)
-            learned_model, num_steps_in_episode, goal_achieved = online_learner.search_to_learn_action_model(init_state)
+            learned_model, num_steps_in_episode, goal_achieved = online_learner.explore_to_refine_models(init_state)
             self.logger.info(
                 f"Finished episode number {problem_index + 1}! " f"The current goal was {'achieved' if goal_achieved else 'not achieved'}."
             )

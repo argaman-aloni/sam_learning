@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Dict, List
 
+from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call
 from pddl_plus_parser.models import (
     PDDLType,
     Predicate,
@@ -107,8 +108,8 @@ SAILING_TRAJECTORIES_DIRECTORY = EXAMPLES_DIR_PATH / "large_data_examples" / "sa
 
 
 COUNTERS_POLYNOMIAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "counters_poly.pddl"
-COUNTERS_POLYNOMIAL_PROBLEMS_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.pddl")]
-COUNTERS_POLYNOMIAL_TRAJECTORIES_PATH = [path for path in (EXAMPLES_DIR_PATH).glob("pfile_counters_poly*.trajectory")]
+COUNTERS_POLYNOMIAL_PROBLEMS_PATH = [path for path in EXAMPLES_DIR_PATH.glob("pfile_counters_poly*.pddl")]
+COUNTERS_POLYNOMIAL_TRAJECTORIES_PATH = [path for path in EXAMPLES_DIR_PATH.glob("pfile_counters_poly*.trajectory")]
 
 BLOCKS_PROPOSITIONAL_DOMAIN_PATH = EXAMPLES_DIR_PATH / "blocksworld_propositional_domain.pddl"
 BLOCKS_PROPOSITIONAL_PROBLEM_PATH = EXAMPLES_DIR_PATH / "blocks_propositional_prob00.pddl"
@@ -125,6 +126,10 @@ BARMAN_CLASSICAL_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "barman_pfile3.trajectory
 FARMLAND_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data.csv"
 FARMLAND_PAPER_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "convex_state_data_for_paper.csv"
 FARMLAND_SPAN_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "span_convex_state_data.csv"
+
+
+DEPOT_ONLINE_LEARNING_PROBLEM = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.pddl"
+DEPOT_ONLINE_LEARNING_PLAN = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.solution"
 
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
@@ -199,3 +204,19 @@ def extract_preconditions_predicates(compound_preconditions: CompoundPreconditio
             predicates.append(precond)
 
     return predicates
+
+
+def create_plan_actions(plan_path: Path) -> List[ActionCall]:
+    """Creates a list of action calls from a plan file.
+
+    :param plan_path:
+    :return:
+    """
+    with open(plan_path, "rt") as plan_file:
+        plan_lines = plan_file.readlines()
+
+    plan_actions = []
+    for line in plan_lines:
+        plan_actions.append(parse_action_call(line))
+
+    return plan_actions

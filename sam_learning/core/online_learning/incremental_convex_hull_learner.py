@@ -26,7 +26,7 @@ from sam_learning.core.numeric_learning.numeric_utils import (
 
 
 class IncrementalConvexHullLearner(ConvexHullLearner):
-    """Class that learns the convex hull of the preconditions of an action."""
+    """Class that learns the convex hull for the preconditions of an action - incrementally."""
 
     _convex_hull: Optional[ConvexHull]
     _gsp_base: Optional[List[List[float]]]
@@ -84,7 +84,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         shifted_points = points - shift_axis
         return extended_gram_schmidt(shifted_points)
 
-    def _shift_new_point(self, point: Series) -> np.ndarray:
+    def _shift_new_point(self, point: Union[Series, DataFrame]) -> np.ndarray:
         """Shifts the points based on the first sample in the dataframe.
 
         Note: if the points are spanning the original space, we do not need to shift the points.
@@ -92,6 +92,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :return: the shifted point based on the first sample in the dataframe.
         """
         numpy_sample = point.to_numpy()
+        if (isinstance(point, DataFrame) and point.shape[1]) == 1 or (isinstance(point, Series) and point.shape[0] == 1):
+            self.logger.debug("The point is a single dimensional.")
+            return numpy_sample - self.affine_independent_data.iloc[0][0]
+
         shifted_sample = numpy_sample - self.affine_independent_data.iloc[0] if not self._spanning_standard_base else numpy_sample
         return shifted_sample
 
@@ -136,7 +140,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
     def _calculate_basis_and_hull(self, from_reset: bool = False) -> None:
         """Calculates the basis and the convex hull of the points in the storage dataframe."""
         prev_conditions = self.additional_dependency_conditions
-        self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(self.data[self.relevant_fluents])
+        # Avoid cases when some of the data points are NaN and thus removed.
+        self.affine_independent_data, self.additional_dependency_conditions = remove_complex_linear_dependencies(
+            self.data[[col for col in self.data.columns if col in self.relevant_fluents]]
+        )
         if self.affine_independent_data.empty:
             self.logger.debug("There are no affine independent rows, no need for further processing.")
             return
@@ -289,7 +296,12 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :param point: the point to check.
         :return: whether the point is in the convex hull.
         """
-        if pd.concat([self.data, point], ignore_index=True).duplicated().any():
+        concat_data = (
+            pd.concat([self.data, point], ignore_index=True)
+            if isinstance(point, DataFrame)
+            else pd.concat([self.data, point.to_frame().T], ignore_index=True)
+        )
+        if concat_data.duplicated().any():
             self.logger.debug("The new point is already in the storage, it is thus is the convex hull.")
             return True
 
@@ -358,6 +370,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         new_learner._spanning_standard_base = self._spanning_standard_base
         if self._convex_hull is not None:
             new_learner._learn_new_convex_hull(incremental=not one_shot)
+
         return new_learner
 
     def close_convex_hull(self) -> None:
@@ -365,3 +378,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         if self._convex_hull is not None:
             self._convex_hull.close()
             self._convex_hull = None
+
+    def is_spanning_standard_base(self) -> bool:
+        """Checks if the convex hull is spanning the standard base.
+
+        :return: whether the convex hull is spanning the standard base.
+        """
+        return self._spanning_standard_base

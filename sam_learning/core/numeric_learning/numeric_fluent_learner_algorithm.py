@@ -6,10 +6,10 @@ from typing import Dict, List, Tuple, Optional, Set
 import numpy as np
 from pddl_plus_parser.models import PDDLFunction, Precondition, NumericalExpressionTree
 
-from sam_learning.core.online_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
 from sam_learning.core.numeric_learning.convex_hull_learner import ConvexHullLearner
 from sam_learning.core.numeric_learning.linear_regression_learner import LinearRegressionLearner
-from sam_learning.core.numeric_learning.numeric_utils import create_monomials, create_polynomial_string
+from sam_learning.core.numeric_learning.numeric_utils import create_monomials, create_grounded_monomials
+from sam_learning.core.online_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
 
 np.seterr(divide="ignore", invalid="ignore")
 
