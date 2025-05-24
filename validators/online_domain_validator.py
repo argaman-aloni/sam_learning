@@ -3,7 +3,7 @@ import csv
 from pathlib import Path
 from typing import Optional
 
-from utilities import SolutionOutputTypes
+
 from validators.safe_domain_validator import DomainValidator, DEBUG_STATISTICS
 
 ACTION_LINE_REGEX = r"(\[\d+, \d+\]): \(.*\)"

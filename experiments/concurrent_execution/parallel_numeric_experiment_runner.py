@@ -120,7 +120,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
 
         with open(plan_miner_output_domain_path, "wt") as domain_file:
             # This should keep the domain name in the correct format and maintain the correct domain name in the PDDL file.
-            domain_file.write(learned_domain.to_pddl(should_simplify=False))
+            domain_file.write(learned_domain.to_pddl())
             return learned_domain
 
     def _run_plan_miner_process(self, plan_miner_trajectory_file_path: Path) -> Optional[Path]:
