@@ -4,7 +4,7 @@ import random
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Set, List, Tuple
+from typing import Dict, Set, List, Tuple, Union
 
 from bokeh.util.sampledata import DataFrame
 from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call
@@ -15,7 +15,7 @@ from pddl_plus_parser.models import (
     ActionCall,
     Precondition,
     Observation,
-    PDDLObject, PDDLFunction, Predicate, )
+    PDDLObject, PDDLFunction, Predicate, GroundedPredicate, )
 
 from sam_learning.core import (
     InformationStatesLearner,
@@ -30,7 +30,7 @@ from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgen
 from solvers import AbstractSolver, SolutionOutputTypes
 
 NON_INFORMATIVE_IG = 0
-MAX_STEPS_PER_EPISODE = 100
+MAX_STEPS_PER_EPISODE = 5000
 PROBLEM_SOLVING_TIMEOUT = 60 * 5  # 5 minutes
 
 random.seed(42) # Set seed for reproducibility
@@ -70,8 +70,6 @@ class NumericOnlineActionModelLearner:
     learned domain models. Furthermore, it leverages discrete and numeric models
     learners to refine action model accuracy.
     """
-
-    DUMMY_ACTION_CALL = ActionCall(name="dummy_action", grounded_parameters=[])
 
     _informative_states_learner: Dict[str, InformationStatesLearner]
     _discrete_models_learners: Dict[str, OnlineDiscreteModelLearner]
@@ -186,18 +184,15 @@ class NumericOnlineActionModelLearner:
                                 object names to their respective PDDLObject instances.
         :return: A boolean indicating whether the specific state-action pair is informative and whether the action is applicable.
         """
-        previous_state_grounded_predicates = self.triplet_snapshot.create_propositional_state_snapshot(current_state,
-                                                                                                       action_to_test,
-                                                                                                       problem_objects)
-        previous_state_grounded_functions = self.triplet_snapshot.create_numeric_state_snapshot(current_state,
-                                                                                                action_to_test,
-                                                                                                problem_objects)
+        previous_state_grounded_predicates = self.triplet_snapshot.create_propositional_state_snapshot(
+            current_state, action_to_test, problem_objects)
+        previous_state_grounded_functions = self.triplet_snapshot.create_numeric_state_snapshot(
+            current_state, action_to_test, problem_objects)
         previous_state_pb_predicates = set(
-            self._discrete_predicate_matcher.get_possible_literal_matches(action_to_test,
-                                                                          list(previous_state_grounded_predicates))
+            self._discrete_predicate_matcher.get_possible_literal_matches(action_to_test, list(previous_state_grounded_predicates))
         )
-        previous_state_pb_functions = self._numeric_function_matcher.match_state_functions(action_to_test,
-                                                                                           previous_state_grounded_functions)
+        previous_state_pb_functions = self._numeric_function_matcher.match_state_functions(
+            action_to_test, previous_state_grounded_functions)
         state_informative = self._informative_states_learner[action_to_test.name].is_sample_informative(
             new_propositional_sample=previous_state_pb_predicates, new_numeric_sample=previous_state_pb_functions
         )
@@ -208,7 +203,7 @@ class NumericOnlineActionModelLearner:
 
     def _handle_execution_failure(
             self,
-            action_to_update: ActionCall,
+            action_to_update: Union[ActionCall, str],
             previous_state_pb_functions: Dict[str, PDDLFunction],
             previous_state_pb_predicates: Set[Predicate]):
         """Handles the case when an action execution fails by attempting to classify the root cause
@@ -220,29 +215,22 @@ class NumericOnlineActionModelLearner:
         :param previous_state_pb_functions: The numeric functions in the previous state.
         :param previous_state_pb_predicates: The predicates in the previous state.
         """
+        action_name = action_to_update.name if isinstance(action_to_update, ActionCall) else action_to_update
         self.logger.debug("The action was not successful, trying to classify the root cause for the failure.")
-        if self._discrete_models_learners[action_to_update.name].is_state_in_safe_model(
-                state=previous_state_pb_predicates):
-            self.logger.debug(
-                "The action was not successful, but the discrete model claimed that the state upheld the action's preconditions.")
-            self._numeric_models_learners[action_to_update.name].add_transition_data(previous_state_pb_functions,
-                                                                                     is_transition_successful=False)
-            self._informative_states_learner[action_to_update.name].add_new_numeric_failure(
-                new_numeric_sample=previous_state_pb_functions)
+        if self._discrete_models_learners[action_name].is_state_in_safe_model(state=previous_state_pb_predicates):
+            self.logger.debug("The action was not successful, but the discrete model claimed that the state upheld the action's preconditions.")
+            self._numeric_models_learners[action_name].add_transition_data(previous_state_pb_functions,is_transition_successful=False)
+            self._informative_states_learner[action_name].add_new_numeric_failure(new_numeric_sample=previous_state_pb_functions)
             return
 
-        if self._numeric_models_learners[action_to_update.name].is_state_in_safe_model(
-                state=previous_state_pb_functions):
-            self.logger.debug(
-                "The action was not successful, but the numeric model claimed that the state upheld the action's preconditions.")
-            self._discrete_models_learners[action_to_update.name].add_transition_data(previous_state_pb_predicates,
-                                                                                      is_transition_successful=False)
+        if self._numeric_models_learners[action_name].is_state_in_safe_model(state=previous_state_pb_functions):
+            self.logger.debug("The action was not successful, but the numeric model claimed that the state upheld the action's preconditions.")
+            self._discrete_models_learners[action_name].add_transition_data(previous_state_pb_predicates, is_transition_successful=False)
             return
 
         self.logger.debug(
             "Cannot decide if the action was not successful due to the discrete or numeric model. Adding to the undecided observations.")
-        self.undecided_failure_observations[action_to_update.name].append(
-            (previous_state_pb_predicates, previous_state_pb_functions))
+        self.undecided_failure_observations[action_name].append((previous_state_pb_predicates, previous_state_pb_functions))
 
     def _eliminate_undecided_observations(self, action_name: str) -> None:
         """Eliminates undecided failure observations for a given action by re-evaluating them
@@ -254,30 +242,29 @@ class NumericOnlineActionModelLearner:
         :returns: None
         """
         self.logger.debug("Eliminating undecided observations.")
-        new_undecided_observations = []
-        while len(self.undecided_failure_observations[action_name]) > 0:
-            (previous_state_pb_predicates, previous_state_pb_functions) = self.undecided_failure_observations[action_name].pop()
+        backup_undecided_observations = self.undecided_failure_observations[action_name]
+        self.undecided_failure_observations[action_name] = []
+        while len(backup_undecided_observations) > 0:
+            (previous_state_pb_predicates, previous_state_pb_functions) = backup_undecided_observations.pop()
+            self._handle_execution_failure(action_to_update=action_name,
+                                           previous_state_pb_functions=previous_state_pb_functions,
+                                           previous_state_pb_predicates=previous_state_pb_predicates)
 
-            if self._discrete_models_learners[action_name].is_state_in_safe_model(state=previous_state_pb_predicates):
-                self.logger.debug(
-                    "The action was not successful, but the discrete model claimed that the state upheld the action's preconditions.")
-                self._numeric_models_learners[action_name].add_transition_data(previous_state_pb_functions,
-                                                                               is_transition_successful=False)
-                self._informative_states_learner[action_name].add_new_numeric_failure(
-                    new_numeric_sample=previous_state_pb_functions)
-                continue
 
-            if self._numeric_models_learners[action_name].is_state_in_safe_model(state=previous_state_pb_functions):
-                self.logger.debug(
-                    "The action was not successful, but the numeric model claimed that the state upheld the action's preconditions.")
-                self._discrete_models_learners[action_name].add_transition_data(previous_state_pb_predicates,
-                                                                                is_transition_successful=False)
-                continue
+    def _extract_parameter_bound_state_data(
+            self, action: ActionCall,
+            state_predicates: Set[GroundedPredicate],
+            state_functions: Dict[str, PDDLFunction]) -> Tuple[Set[Predicate], Dict[str, PDDLFunction]]:
+        """Extracts the parameter bound state data for a given action and state.
 
-            new_undecided_observations.append((previous_state_pb_predicates, previous_state_pb_functions))
-
-        self.undecided_failure_observations[action_name] = new_undecided_observations
-
+        :param action: The action for which the state data is being extracted.
+        :param state_predicates: The grounded predicates in the current state.
+        :param state_functions: The numeric functions in the current state.
+        :return: A tuple containing the propositional predicates and numeric functions relevant to the action.
+        """
+        pb_predicates = set(self._discrete_predicate_matcher.get_possible_literal_matches(action, list(state_predicates)))
+        pb_functions = self._numeric_function_matcher.match_state_functions(action, state_functions)
+        return pb_predicates, pb_functions
 
     def _add_transition_data(self, action_to_update: ActionCall, is_transition_successful: bool = True) -> None:
         """Adds transition data to the relevant models and updates the model learners with
@@ -295,19 +282,16 @@ class NumericOnlineActionModelLearner:
         :param is_transition_successful: A boolean indicating whether the transition
             caused by the action was successful. Defaults to True.
         """
-        previous_state_pb_predicates = set(
-            self._discrete_predicate_matcher.get_possible_literal_matches(action_to_update, list(
-                self.triplet_snapshot.previous_state_predicates))
+        previous_state_pb_predicates, previous_state_pb_functions = self._extract_parameter_bound_state_data(
+            action=action_to_update,
+            state_predicates=self.triplet_snapshot.previous_state_predicates,
+            state_functions=self.triplet_snapshot.previous_state_functions,
         )
-        next_state_pb_predicates = set(
-            self._discrete_predicate_matcher.get_possible_literal_matches(action_to_update, list(
-                self.triplet_snapshot.next_state_predicates))
+        next_state_pb_predicates, next_state_pb_functions = self._extract_parameter_bound_state_data(
+            action=action_to_update,
+            state_predicates=self.triplet_snapshot.next_state_predicates,
+            state_functions=self.triplet_snapshot.next_state_functions,
         )
-        previous_state_pb_functions = self._numeric_function_matcher.match_state_functions(
-            action_to_update, self.triplet_snapshot.previous_state_functions
-        )
-        next_state_pb_functions = self._numeric_function_matcher.match_state_functions(action_to_update,
-                                                                                       self.triplet_snapshot.next_state_functions)
         self._informative_states_learner[action_to_update.name].add_new_sample(
             new_propositional_sample=previous_state_pb_predicates,
             new_numeric_sample=previous_state_pb_functions,
@@ -345,17 +329,17 @@ class NumericOnlineActionModelLearner:
         self.logger.debug("Selecting an action from the grounded actions set.")
         random_action = random.choice(frontier)
         if self._exploration_policy == ExplorationAlgorithmType.goal_oriented:
-            selected_ground_action = frontier.pop()
+            selected_ground_action = frontier.pop(0)
 
         else:
-            selected_ground_action = frontier.pop()
+            selected_ground_action = frontier.pop(0)
             action_informative, action_applicable = self._calculate_state_action_informative(
                 current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects)
             while len(frontier) > 0 and not action_informative:
                 if action_applicable:
                     self._applicable_actions.add(selected_ground_action)
 
-                selected_ground_action = frontier.pop()
+                selected_ground_action = frontier.pop(0)
                 action_informative, action_applicable = self._calculate_state_action_informative(
                     current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects)
 
@@ -390,7 +374,7 @@ class NumericOnlineActionModelLearner:
             self._discrete_models_learners[action_name] = OnlineDiscreteModelLearner(action_name=action_name,
                                                                                      pb_predicates=pb_predicates)
             self._numeric_models_learners[action_name] = OnlineNumericModelLearner(
-                action_name=action_name, pb_functions=pb_functions, polynom_degree=self._polynomial_degree, qhull_options="QJ Qx Q11"
+                action_name=action_name, pb_functions=pb_functions, polynom_degree=self._polynomial_degree, qhull_options="QJ Qx Q11 Q12"
             )
             self._informative_states_learner[action_name] = InformationStatesLearner(
                 action_name=action_name,
@@ -404,8 +388,12 @@ class NumericOnlineActionModelLearner:
         :param grounded_actions: The set of grounded actions available for exploration.
         :return: A set of actions to explore.
         """
-        weights = []
-        actions = []
+        if self._exploration_policy == ExplorationAlgorithmType.goal_oriented:
+            shuffled_actions = list(grounded_actions)
+            random.shuffle(shuffled_actions)
+            return shuffled_actions
+
+        weights, actions = [], []
         for action in grounded_actions:
             actions.append(action)
             weights.append(1.0 / (1 + self._successful_execution_count.get(action.name, 0)))
@@ -419,11 +407,12 @@ class NumericOnlineActionModelLearner:
             problem_objects: Dict[str, PDDLObject] = None
     ) -> int:
         """
+        Explore the environment to refine the action models by executing actions and observing outcomes.
 
-        :param init_state:
-        :param num_steps_till_episode_end:
-        :param problem_objects:
-        :return:
+        :param init_state: The initial state from which exploration starts.
+        :param num_steps_till_episode_end: The maximum number of steps to perform in the episode.
+        :param problem_objects: Optional dictionary of problem objects used in the domain.
+        :return: The number of steps taken during exploration or until the goal is reached.
         """
         self.logger.info("Searching for informative actions given the current state.")
         step_number = 0
@@ -486,10 +475,9 @@ class NumericOnlineActionModelLearner:
         initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents,
                               is_init=True)
         if self._exploration_policy == ExplorationAlgorithmType.informative_explorer:
-            self.logger.info(
-                "Applying the informative explorer exploration policy - starting to explore the environment.")
-            return self.explore_to_refine_models(init_state=initial_state,
-                                                 num_steps_till_episode_end=MAX_STEPS_PER_EPISODE)
+            self.logger.info("Applying the informative explorer exploration policy - starting to explore the environment.")
+            return self.explore_to_refine_models(
+                init_state=initial_state, num_steps_till_episode_end=MAX_STEPS_PER_EPISODE, problem_objects=problem.objects)
 
         self.logger.debug("Applying goal oriented exploration approach.")
         solution_file_path = self.workdir / f"{problem_path.stem}.solution"
@@ -497,35 +485,33 @@ class NumericOnlineActionModelLearner:
             f"Could not solve the problem {problem_path.stem} using the safe action model, transitioning to the optimistic model.")
         optimistic_model = self._construct_optimistic_action_model()
         domain_path = self._export_learned_domain(optimistic_model, is_safe_model=False)
-        solution_status = self._solver.solve_problem(
-            domain_file_path=domain_path,
-            problem_file_path=problem_path,
-            problems_directory_path=self.workdir,
-            solving_timeout=PROBLEM_SOLVING_TIMEOUT,
-        )
-
-        trace = Observation()
-        trace.add_problem_objects(problem.objects)
-        trace.add_component(previous_state=initial_state, call=self.DUMMY_ACTION_CALL, next_state=initial_state)
+        solution_status = self._solver.solve_problem(domain_file_path=domain_path, problem_file_path=problem_path,
+            problems_directory_path=self.workdir, solving_timeout=PROBLEM_SOLVING_TIMEOUT)
 
         if solution_status == SolutionOutputTypes.ok:
-            self.logger.info("The problem was solved using the safe action model.")
+            self.logger.info("The problem was solved using the optimistic action model.")
             plan_actions = create_plan_actions(solution_file_path)
             trace, goal_reached = self.agent.execute_plan(plan_actions)
             self.train_models_using_trace(trace)
             if goal_reached:
                 return len(plan_actions)
 
-        self.logger.info(f"The plan created using the optimistic model could not reach the goal.")
-        return (
-                len(trace)
-                + self.explore_to_refine_models(
-            trace.components[-1].next_state,
-            num_steps_till_episode_end=MAX_STEPS_PER_EPISODE - len(trace),
-            problem_objects=trace.grounded_objects,
-        )
-                - 1
-        )
+            else:
+                self.logger.info(f"The plan created using the optimistic model could not reach the goal. Valid Plan length: {len(trace)}")
+                return (
+                    len(trace)
+                    + self.explore_to_refine_models(
+                        trace.components[-1].next_state,
+                        num_steps_till_episode_end=MAX_STEPS_PER_EPISODE - len(trace),
+                        problem_objects=trace.grounded_objects,
+                    )
+                )
+
+        self.logger.info(f"The problem {problem_path.stem} could not be solved using the optimistic model.")
+        return self.explore_to_refine_models(
+            init_state=initial_state,
+            num_steps_till_episode_end=MAX_STEPS_PER_EPISODE,
+            problem_objects=problem.objects)
 
     def try_to_solve_problem(self, problem_path: Path) -> int:
         """Tries to solve the problem using the current domain.

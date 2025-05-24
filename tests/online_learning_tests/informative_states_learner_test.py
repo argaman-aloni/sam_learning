@@ -118,8 +118,8 @@ def test_add_new_sample_adds_new_sample_to_the_existing_dataframe_when_no_predic
 
     informative_states_learner_no_predicates.add_new_sample(new_numeric_sample, is_successful=True)
     assert len(informative_states_learner_no_predicates.combined_data) == 1
-    assert len(informative_states_learner_no_predicates.numeric_failure_data) == 1
-    assert len(informative_states_learner_no_predicates.numeric_failure_data.columns) == 4
+    assert len(informative_states_learner_no_predicates.numeric_failure_data) == 0
+    assert len(informative_states_learner_no_predicates.numeric_failure_data.columns) == 3
 
 
 def test_add_new_sample_when_sample_is_successful_does_not_add_to_negative_sample(
@@ -133,7 +133,6 @@ def test_add_new_sample_when_sample_is_successful_does_not_add_to_negative_sampl
 
     informative_states_learner_no_predicates.add_new_sample(new_numeric_sample, is_successful=True)
     assert (informative_states_learner_no_predicates.combined_data[LABEL_COLUMN] == True).all()
-    assert (informative_states_learner_no_predicates.numeric_failure_data[LABEL_COLUMN] == True).all()
 
 
 def test_add_new_sample_when_domain_contains_numeric_and_discrete_parts_adds_discrete_data_to_combined_data(
@@ -308,6 +307,7 @@ def test_is_state_not_applicable_in_numeric_model_when_negative_sample_exist_and
             pre_state_functions=state_dict, post_state_functions=state_dict, is_transition_successful=True
         )
         informative_states_learner_no_predicates.add_new_sample(new_numeric_sample=state_dict, is_successful=True)
+        informative_states_learner_no_predicates.add_new_numeric_failure(new_numeric_sample=state_dict)
 
     negative_state_dict = {}
     for func_name, value in function_to_negative_values_map.items():

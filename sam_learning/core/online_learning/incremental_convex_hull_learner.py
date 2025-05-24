@@ -323,7 +323,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             self.logger.debug("The new points are not in the span of the input points.")
             return False
 
-        if projected_entry.ndim > 1:
+        if projected_entry.shape[0] > 1:
             self.logger.debug("Validating whether the new point conforms with the CH inequalities.")
             A = self._convex_hull.equations[:, :-1]
             b = self._convex_hull.equations[:, -1]

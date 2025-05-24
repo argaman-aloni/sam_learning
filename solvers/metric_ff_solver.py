@@ -10,7 +10,7 @@ from pddl_plus_parser.exporters import MetricFFParser
 
 from solvers.abstract_solver import AbstractSolver, SolutionOutputTypes
 
-METRIC_FF_DIRECTORY = os.environ["METRIC_FF_DIRECTORY"]
+METRIC_FF_DIRECTORY = os.environ.get("METRIC_FF_DIRECTORY", "./metric-ff")
 
 MAX_RUNNING_TIME = 5  # seconds
 

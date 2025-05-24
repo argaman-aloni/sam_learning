@@ -11,7 +11,7 @@ from jdk4py import JAVA
 
 from solvers.abstract_solver import AbstractSolver, SolutionOutputTypes
 
-ENHSP_FILE_PATH = os.environ["ENHSP_FILE_PATH"]
+ENHSP_FILE_PATH = os.environ.get("ENHSP_FILE_PATH", "./enhsp/enhsp.jar")
 MAX_RUNNING_TIME = 5  # seconds
 
 TIMEOUT_ERROR_CODE = b"Timeout has been reached"
@@ -76,7 +76,7 @@ class ENHSPSolver(AbstractSolver):
             return False, SolutionOutputTypes.solver_error
 
     def solve_problem(
-        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_timeout: int, tolerance: float,
+        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_timeout: int, tolerance: float = 0.1,
     ) -> SolutionOutputTypes:
         """Solves a single problem using the ENHSP algorithm.
 
