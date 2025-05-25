@@ -1,4 +1,5 @@
 """Module test for the IPC active learning agent."""
+
 from pathlib import Path
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
@@ -12,6 +13,7 @@ from tests.consts import (
     DEPOT_ONLINE_LEARNING_PROBLEM,
     DEPOT_ONLINE_LEARNING_PLAN,
     create_plan_actions,
+    DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL,
 )
 
 
@@ -125,7 +127,9 @@ def test_observe_on_state_with_inapplicable_action_returns_the_same_state_as_bef
     assert not is_applicable
 
 
-def test_get_environment_actions_gets_the_correct_number_of_grounded_actions(minecraft_agent: IPCAgent, minecraft_large_problem: Problem):
+def test_get_environment_actions_gets_the_correct_number_of_grounded_actions(
+    minecraft_agent: IPCAgent, minecraft_large_problem: Problem
+):
     # Arrange
     state_predicates = minecraft_large_problem.initial_state_predicates
     state_fluents = minecraft_large_problem.initial_state_fluents
@@ -190,7 +194,9 @@ def test_execute_plan_when_plan_contains_invalid_action_returns_trace_with_lengt
     assert trace.components[-1].is_successful is False
 
 
-def test_execute_plan_adds_problem_objects_to_trace_when_trace_created(depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain):
+def test_execute_plan_adds_problem_objects_to_trace_when_trace_created(
+    depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain
+):
     # Arrange
     problem = ProblemParser(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, domain=depot_numeric_domain).parse_problem()
     depot_numeric_agent.initialize_problem(problem)
@@ -201,3 +207,35 @@ def test_execute_plan_adds_problem_objects_to_trace_when_trace_created(depot_num
 
     # Assert
     assert len(trace.grounded_objects) > 0
+
+
+def test_goal_reached_when_goal_is_only_numeric_correctly_evaluates_that_goal_was_reached_in_the_observed_state(
+    depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain
+):
+    # Arrange
+    problem = ProblemParser(
+        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL, domain=depot_numeric_domain
+    ).parse_problem()
+    depot_numeric_agent.initialize_problem(problem)
+    state_predicates = problem.initial_state_predicates
+    state_fluents = problem.initial_state_fluents
+    state_fluents["(current_load truck0)"].set_value(200.0)
+    state_fluents["(current_load truck1)"].set_value(100.0)
+    state_containing_goal_fluents = State(predicates=state_predicates, fluents=state_fluents)
+    assert depot_numeric_agent.goal_reached(state_containing_goal_fluents)
+
+
+def test_goal_reached_when_goal_is_only_numeric_and_goal_fluents_not_matching_goal_requirements_returns_goal_not_reached(
+    depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain
+):
+    # Arrange
+    problem = ProblemParser(
+        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL, domain=depot_numeric_domain
+    ).parse_problem()
+    depot_numeric_agent.initialize_problem(problem)
+    state_predicates = problem.initial_state_predicates
+    state_fluents = problem.initial_state_fluents
+    state_fluents["(current_load truck0)"].set_value(99.0)
+    state_fluents["(current_load truck1)"].set_value(15.0)
+    state_containing_goal_fluents = State(predicates=state_predicates, fluents=state_fluents)
+    assert not depot_numeric_agent.goal_reached(state_containing_goal_fluents)

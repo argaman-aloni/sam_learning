@@ -1,7 +1,18 @@
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import Domain, Observation
 from pytest import fixture
 
 from sam_learning.core import EnvironmentSnapshot
+from tests.consts import (
+    BARMAN_ERROR_IN_PRODUCTION_PROBLEM_PATH,
+    BARMAN_ERROR_IN_PRODUCTION_TRAJECTORY_PATH,
+    BARMAN_ERROR_IN_PRODUCTION_DOMAIN_PATH,
+)
+
+
+@fixture()
+def barman_domain() -> Domain:
+    return DomainParser(BARMAN_ERROR_IN_PRODUCTION_DOMAIN_PATH, partial_parsing=True).parse_domain()
 
 
 @fixture()
@@ -12,6 +23,19 @@ def elevators_environment_snapshot(elevators_domain: Domain):
 @fixture()
 def minecraft_environment_snapshot(minecraft_domain: Domain):
     return EnvironmentSnapshot(partial_domain=minecraft_domain)
+
+
+@fixture()
+def barman_environment_snapshot(barman_domain: Domain):
+    return EnvironmentSnapshot(partial_domain=barman_domain)
+
+
+@fixture()
+def barman_observation(barman_domain: Domain) -> Observation:
+    barman_problem = ProblemParser(
+        problem_path=BARMAN_ERROR_IN_PRODUCTION_PROBLEM_PATH, domain=barman_domain
+    ).parse_problem()
+    return TrajectoryParser(barman_domain, barman_problem).parse_trajectory(BARMAN_ERROR_IN_PRODUCTION_TRAJECTORY_PATH)
 
 
 def test_create_state_discrete_snapshot_creates_a_snapshot_with_negative_predicates_set_that_is_not_empty(
@@ -25,6 +49,19 @@ def test_create_state_discrete_snapshot_creates_a_snapshot_with_negative_predica
     )
     negative_predicates = [p for p in predicates if not p.is_positive]
     assert len(negative_predicates) > 0
+
+
+def test_create_state_discrete_snapshot_creates_a_snapshot_with_correct_object_types_for_objects_with_type_hierarchy_in_barman_domain(
+    barman_environment_snapshot: EnvironmentSnapshot, barman_observation: Observation
+):
+    observation_component = barman_observation.components[0]
+    pre_state = observation_component.next_state
+    observed_objects = barman_observation.grounded_objects
+    predicates = barman_environment_snapshot._create_state_discrete_snapshot(
+        state=pre_state, relevant_objects=observed_objects
+    )
+    assert "(contains shot1 - shot ingredient1 - ingredient)" in [str(p) for p in predicates]
+    assert "(contains shot1 - container ingredient1 - beverage)" not in [str(p) for p in predicates]
 
 
 def test_create_state_discrete_snapshot_creates_a_snapshot_with_negative_and_positive_predicates(
