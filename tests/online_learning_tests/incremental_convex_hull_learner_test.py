@@ -1,4 +1,6 @@
 """Module tests the incremental convex hull learner."""
+
+import csv
 import random
 import time
 
@@ -11,9 +13,19 @@ from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import PDDLFunction, Domain
 
 from sam_learning.core import VocabularyCreator
-from sam_learning.core.numeric_learning.numeric_utils import display_convex_hull, create_monomials, create_polynomial_string
+from sam_learning.core.numeric_learning.numeric_utils import (
+    display_convex_hull,
+    create_monomials,
+    create_polynomial_string,
+)
 from sam_learning.core.online_learning.incremental_convex_hull_learner import IncrementalConvexHullLearner
-from tests.consts import FARMLAND_EXAMPLES_PATH, FARMLAND_DOMAIN_PATH, FARMLAND_PAPER_EXAMPLES_PATH, FARMLAND_SPAN_EXAMPLES_PATH
+from tests.consts import (
+    FARMLAND_EXAMPLES_PATH,
+    FARMLAND_DOMAIN_PATH,
+    FARMLAND_PAPER_EXAMPLES_PATH,
+    FARMLAND_SPAN_EXAMPLES_PATH,
+    DEPOT_ERROR_IN_INCREMENTAL_HULL_CSV,
+)
 
 TEST_ACTION_NAME = "test_action"
 
@@ -51,7 +63,10 @@ def test_creating_the_convex_hull_learner_creates_the_dataframe_with_the_correct
     assert convex_hull_learner.data.shape == (0, 3)
     assert convex_hull_learner.data.columns.tolist() == ["(x )", "(y )", "(z )"]
 
-def test_shift_new_point_when_point_is_single_dimension_series_shifts_point_correctly_and_does_not_fail(convex_hull_learner):
+
+def test_shift_new_point_when_point_is_single_dimension_series_shifts_point_correctly_and_does_not_fail(
+    convex_hull_learner,
+):
     point = Series([1])
     convex_hull_learner.affine_independent_data = DataFrame({"(x )": [1]})
     try:
@@ -62,7 +77,9 @@ def test_shift_new_point_when_point_is_single_dimension_series_shifts_point_corr
         pytest.fail(f"Exception was raised: {e}")
 
 
-def test_shift_new_point_when_point_is_single_dimension_dataframe_shifts_point_correctly_and_does_not_fail(convex_hull_learner):
+def test_shift_new_point_when_point_is_single_dimension_dataframe_shifts_point_correctly_and_does_not_fail(
+    convex_hull_learner,
+):
     point = DataFrame({"(x )": [1]})
     convex_hull_learner.affine_independent_data = DataFrame({"(x )": [1]})
     try:
@@ -176,7 +193,9 @@ def test_add_new_point_when_adding_one_point_at_a_time_returns_correct_values_fo
         domain=farmland_domain, possible_parameters=farmland_domain.actions[test_action_name].signature
     )
 
-    learner = IncrementalConvexHullLearner(test_action_name, domain_functions=domain_functions, relevant_fluents=["(x ?f1)", "(x ?f2)"])
+    learner = IncrementalConvexHullLearner(
+        test_action_name, domain_functions=domain_functions, relevant_fluents=["(x ?f1)", "(x ?f2)"]
+    )
     for index, (_, row) in enumerate(dataframe.iterrows()):
         if learner._spanning_standard_base:
             assert (learner._convex_hull.points == (dataframe[:index].to_numpy(dtype=numpy.float32))).all()
@@ -209,7 +228,9 @@ def test_add_new_point_when_adding_multiple_points_with_single_dimension_does_no
         pytest.fail(f"Exception was raised: {e}")
 
 
-def test_add_new_point_when_adding_four_points_that_span_the_entire_space_returns_standard_basis(convex_hull_learner: IncrementalConvexHullLearner):
+def test_add_new_point_when_adding_four_points_that_span_the_entire_space_returns_standard_basis(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
     first_sample = {"(x )": 0, "(y )": 1, "(z )": 0}
     convex_hull_learner.add_new_point(first_sample)
     second_sample = {"(x )": 1, "(y )": 0, "(z )": 0}
@@ -274,12 +295,16 @@ def test_add_new_point_when_relevant_features_with_less_features_than_original_a
     assert len(convex_hull_learner.additional_dependency_conditions) == 0
 
 
-def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_conditions(convex_hull_learner: IncrementalConvexHullLearner,):
+def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_conditions(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
     first_sample = {"(x )": 0, "(y )": 1, "(z )": 0}
     convex_hull_learner.add_new_point(first_sample)
     second_sample = {"(x )": 1, "(y )": 0, "(z )": 0}
     convex_hull_learner.add_new_point(second_sample)
-    (coefficients, border_point, transformed_vars, _) = convex_hull_learner._incremental_create_ch_inequalities(display_mode=True)
+    (coefficients, border_point, transformed_vars, _) = convex_hull_learner._incremental_create_ch_inequalities(
+        display_mode=True
+    )
     assert coefficients == [[-1], [1]]
     assert border_point == [0.0, 1.0]
     assert transformed_vars == ["(* (- (y ) 1) -1)"]
@@ -297,9 +322,12 @@ def test_incremental_create_ch_inequalities_with_one_dimension_returns_min_max_c
     convex_hull_learner.add_new_point(third_sample)
     fourth_sample = {"(x )": 4, "(y )": 1, "(z )": 0}
     convex_hull_learner.add_new_point(fourth_sample)
-    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._incremental_create_ch_inequalities(
-        display_mode=True
-    )
+    (
+        coefficients,
+        border_point,
+        transformed_vars,
+        span_verification_conditions,
+    ) = convex_hull_learner._incremental_create_ch_inequalities(display_mode=True)
     assert coefficients == [[-1], [1]]
     assert border_point == [0, 4]
     assert set(convex_hull_learner.additional_dependency_conditions) == {"(= (y ) 1)", "(= (z ) 0)"}
@@ -318,9 +346,12 @@ def test_incremental_create_ch_inequalities_with_point_spanning_standard_base_re
     convex_hull_learner.add_new_point(third_sample)
     fourth_sample = {"(x )": 0, "(y )": 0, "(z )": 1}
     convex_hull_learner.add_new_point(fourth_sample)
-    (coefficients, border_point, transformed_vars, span_verification_conditions,) = convex_hull_learner._incremental_create_ch_inequalities(
-        display_mode=True
-    )
+    (
+        coefficients,
+        border_point,
+        transformed_vars,
+        span_verification_conditions,
+    ) = convex_hull_learner._incremental_create_ch_inequalities(display_mode=True)
     assert len(coefficients) == 4
     assert len(border_point) == 4
     assert span_verification_conditions is None
@@ -345,7 +376,9 @@ def test_construct_safe_linear_inequalities_when_creating_convex_hull_with_large
     convex_hull_learner: IncrementalConvexHullLearner,
 ):
     for _ in range(100):
-        convex_hull_learner.add_new_point({"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)})
+        convex_hull_learner.add_new_point(
+            {"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)}
+        )
 
     inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities()
     assert inequality_precondition.binary_operator == "and"
@@ -360,7 +393,9 @@ def test_construct_safe_linear_inequalities_when_adding_extra_large_number_of_sa
 ):
     start_time = time.time()
     for _ in range(1000):
-        convex_hull_learner.add_new_point({"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)})
+        convex_hull_learner.add_new_point(
+            {"(x )": random.uniform(-100, 100), "(y )": random.uniform(-100, 100), "(z )": random.uniform(-100, 100)}
+        )
 
     inequality_precondition = convex_hull_learner.construct_safe_linear_inequalities()
     end_time = time.time()
@@ -385,7 +420,10 @@ def test_incremental_create_ch_inequalities_creates_convex_hull_with_all_variabl
     monomials = create_monomials(list(state_matrix.keys()), polynom_degree=1)
     for i in range(k):
         polynomial_convex_hull_learner.add_new_point(
-            {create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            {
+                create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial])
+                for monomial in monomials
+            },
         )
 
     A, _, _, _ = polynomial_convex_hull_learner._incremental_create_ch_inequalities()
@@ -405,7 +443,10 @@ def test_construct_convex_hull_inequalities_when_given_polynomial_inequalities_r
     monomials = create_monomials(list(state_matrix.keys()), polynom_degree=1)
     for i in range(k):
         polynomial_convex_hull_learner.add_new_point(
-            {create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            {
+                create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial])
+                for monomial in monomials
+            },
         )
 
     precondition = polynomial_convex_hull_learner.construct_safe_linear_inequalities()
@@ -430,13 +471,17 @@ def test_construct_convex_hull_inequalities_when_adding_multiple_points_with_sin
         pytest.fail(f"Exception was raised: {e}")
 
 
-def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns_correct_number_of_equations(farmland_domain: Domain):
+def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns_correct_number_of_equations(
+    farmland_domain: Domain,
+):
     dataframe = pd.read_csv(FARMLAND_SPAN_EXAMPLES_PATH)
     vocabulary_creator = VocabularyCreator()
     possible_bounded_functions = vocabulary_creator.create_lifted_functions_vocabulary(
         domain=farmland_domain, possible_parameters=farmland_domain.actions["move-slow"].signature
     )
-    learner = IncrementalConvexHullLearner("move-slow", domain_functions=possible_bounded_functions, relevant_fluents=["(x ?f1)", "(x ?f2)"])
+    learner = IncrementalConvexHullLearner(
+        "move-slow", domain_functions=possible_bounded_functions, relevant_fluents=["(x ?f1)", "(x ?f2)"]
+    )
     for index, (_, row) in enumerate(dataframe.iterrows()):
 
         if learner._spanning_standard_base:
@@ -449,7 +494,9 @@ def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns
     assert len(precondition.operands) == 4
 
 
-def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns_with_one_constant_variable(farmland_domain: Domain):
+def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns_with_one_constant_variable(
+    farmland_domain: Domain,
+):
     dataframe = pd.read_csv(FARMLAND_EXAMPLES_PATH)
     vocabulary_creator = VocabularyCreator()
     possible_bounded_functions = vocabulary_creator.create_lifted_functions_vocabulary(
@@ -468,7 +515,9 @@ def test_construct_convex_hull_inequalities_when_spanning_standard_basis_returns
     assert len(learner._convex_hull.points) == 6
 
 
-def test_construct_convex_hull_inequalities_when_not_spanning_standard_basis_returns_with_two_constant_variables(farmland_domain: Domain):
+def test_construct_convex_hull_inequalities_when_not_spanning_standard_basis_returns_with_two_constant_variables(
+    farmland_domain: Domain,
+):
     dataframe = pd.read_csv(FARMLAND_EXAMPLES_PATH)[:4]
     vocabulary_creator = VocabularyCreator()
     possible_bounded_functions = vocabulary_creator.create_lifted_functions_vocabulary(
@@ -538,7 +587,10 @@ def test_reset_when_creating_one_feature_relevant_creates_conditions_with_only_o
     monomials = create_monomials(list(state_matrix.keys()), polynom_degree=1)
     for i in range(k):
         polynomial_convex_hull_learner.add_new_point(
-            {create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial]) for monomial in monomials},
+            {
+                create_polynomial_string(monomial): np.prod([state_matrix[name][i] for name in monomial])
+                for monomial in monomials
+            },
         )
 
     precondition = polynomial_convex_hull_learner.construct_safe_linear_inequalities()
@@ -559,7 +611,9 @@ def test_reset_followed_by_add_point_when_point_outside_range_adds_point_correct
     convex_hull_learner: IncrementalConvexHullLearner,
 ):
     for i in range(10):
-        convex_hull_learner.add_new_point({"(x )": random.uniform(0, 100), "(y )": random.uniform(0, 100), "(z )": random.uniform(0, 100)})
+        convex_hull_learner.add_new_point(
+            {"(x )": random.uniform(0, 100), "(y )": random.uniform(0, 100), "(z )": random.uniform(0, 100)}
+        )
 
     convex_hull_learner.reset(["(x )"])
     convex_hull_learner.add_new_point({"(x )": 200, "(y )": 500, "(z )": 120})
@@ -569,7 +623,9 @@ def test_reset_followed_by_add_point_when_point_outside_range_adds_point_correct
     assert "(<= (x ) 200)" in str(precondition)
 
 
-def test_is_point_in_convex_hull_captures_that_a_point_is_in_a_convex_hull_in_a_2d_plane(convex_hull_learner: IncrementalConvexHullLearner,):
+def test_is_point_in_convex_hull_captures_that_a_point_is_in_a_convex_hull_in_a_2d_plane(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
     valid_x_points = [0, 0, 1, 1]
     valid_y_points = [0, 1, 0, 1]
     for x, y in zip(valid_x_points, valid_y_points):
@@ -579,7 +635,9 @@ def test_is_point_in_convex_hull_captures_that_a_point_is_in_a_convex_hull_in_a_
     assert convex_hull_learner.is_point_in_convex_hull(point_to_test)
 
 
-def test_is_point_in_convex_hull_captures_that_a_point_is_not_in_a_convex_hull_in_a_2d_plane(convex_hull_learner: IncrementalConvexHullLearner):
+def test_is_point_in_convex_hull_captures_that_a_point_is_not_in_a_convex_hull_in_a_2d_plane(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
     valid_x_points = [0, 0, 1, 1]
     valid_y_points = [0, 1, 0, 1]
     for x, y in zip(valid_x_points, valid_y_points):
@@ -602,7 +660,9 @@ def test_is_point_in_convex_hull_captures_that_all_given_points_are_in_the_conve
         assert convex_hull_learner.is_point_in_convex_hull(point_to_test)
 
 
-def test_is_point_in_convex_hull_captures_that_more_than_one_point_is_in_1d_convex_hull(convex_hull_learner: IncrementalConvexHullLearner,):
+def test_is_point_in_convex_hull_captures_that_more_than_one_point_is_in_1d_convex_hull(
+    convex_hull_learner: IncrementalConvexHullLearner,
+):
     for i in range(10):
         convex_hull_learner.add_new_point({"(x )": i, "(y )": 0, "(z )": 0})
 
@@ -637,7 +697,9 @@ def test_copy_returns_correct_convex_hull_when_data_is_not_empty_and_large_numbe
     convex_hull_learner: IncrementalConvexHullLearner,
 ):
     for i in range(100):
-        convex_hull_learner.add_new_point({"(x )": random.uniform(0, 100), "(y )": random.uniform(0, 100), "(z )": random.uniform(0, 100)})
+        convex_hull_learner.add_new_point(
+            {"(x )": random.uniform(0, 100), "(y )": random.uniform(0, 100), "(z )": random.uniform(0, 100)}
+        )
 
     copy = convex_hull_learner.copy()
     assert copy._convex_hull is not None
@@ -645,3 +707,43 @@ def test_copy_returns_correct_convex_hull_when_data_is_not_empty_and_large_numbe
     assert copy._complementary_base == convex_hull_learner._complementary_base
     assert copy._spanning_standard_base == convex_hull_learner._spanning_standard_base
     assert np.array_equal(copy._convex_hull.points, convex_hull_learner._convex_hull.points)
+
+
+def test_depot_production_error_data_should_not_cause_exception(depot_domain: Domain):
+    # This test is to ensure that the data from the depot production error does not cause an exception
+    # when added to the convex hull learner.
+    function_vocabulary_creator = VocabularyCreator()
+    test_action = "unload"
+    pb_functions = function_vocabulary_creator.create_lifted_functions_vocabulary(
+        domain=depot_domain, possible_parameters=depot_domain.actions[test_action].signature
+    )
+    learner = IncrementalConvexHullLearner(test_action, pb_functions, qhull_options="QJ Q11 Q12")
+
+    with open(DEPOT_ERROR_IN_INCREMENTAL_HULL_CSV, "rt") as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        for row in csv_reader:
+            test_data = {key: float(value) for key, value in row.items() if key != "time"}
+            try:
+                learner.add_new_point(test_data)
+            except Exception as e:
+                pytest.fail(f"Exception was raised while adding data: {e}")
+
+
+def test_depot_production_error_data_should_not_cause_exception_without_qhull_options(depot_domain: Domain):
+    # This test is to ensure that the data from the depot production error does not cause an exception
+    # when added to the convex hull learner.
+    function_vocabulary_creator = VocabularyCreator()
+    test_action = "unload"
+    pb_functions = function_vocabulary_creator.create_lifted_functions_vocabulary(
+        domain=depot_domain, possible_parameters=depot_domain.actions[test_action].signature
+    )
+    learner = IncrementalConvexHullLearner(test_action, pb_functions)
+
+    with open(DEPOT_ERROR_IN_INCREMENTAL_HULL_CSV, "rt") as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        for row in csv_reader:
+            test_data = {key: float(value) for key, value in row.items() if key != "time"}
+            try:
+                learner.add_new_point(test_data)
+            except Exception as e:
+                pytest.fail(f"Exception was raised while adding data: {e}")

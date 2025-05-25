@@ -130,6 +130,9 @@ FARMLAND_SPAN_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "span_convex_state_data.csv"
 
 
 DEPOT_ONLINE_LEARNING_PROBLEM = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.pddl"
+DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL = (
+    EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning_with_numeric_goals.pddl"
+)
 DEPOT_ONLINE_LEARNING_PLAN = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.solution"
 
 OBJECT_TYPE = PDDLType(name="object")
@@ -168,6 +171,12 @@ CLOSE_TO_LINEAR_CONDITION_PATH = EXAMPLES_DIR_PATH / "negative_close_to_linear_c
 
 COUNTERS_ONLINE_LEARNING_DOMAIN_PATH = EXAMPLES_DIR_PATH / "counters_domain_online_learning.pddl"
 COUNTERS_ONLINE_LEARNING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile10_0_counters_online.pddl"
+
+DEPOT_ERROR_IN_INCREMENTAL_HULL_CSV = EXAMPLES_DIR_PATH / "depot_numeric_unload_action_error_case.csv"
+
+BARMAN_ERROR_IN_PRODUCTION_DOMAIN_PATH = EXAMPLES_DIR_PATH / "barman_bug_in_prod.pddl"
+BARMAN_ERROR_IN_PRODUCTION_PROBLEM_PATH = EXAMPLES_DIR_PATH / "0_barman_prob.pddl"
+BARMAN_ERROR_IN_PRODUCTION_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "0_barman_traj.trajectory"
 
 
 def sync_snapshot(

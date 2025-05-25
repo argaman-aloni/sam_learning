@@ -36,7 +36,11 @@ class MetricFFSolver(AbstractSolver):
             return solution_content.decode("utf-8", errors="ignore")
 
     def _run_metric_ff_process(
-        self, run_command: str, solution_path: Path, problem_file_path: Path, solving_timeout: int = MAX_RUNNING_TIME,
+        self,
+        run_command: str,
+        solution_path: Path,
+        problem_file_path: Path,
+        solving_timeout: int = MAX_RUNNING_TIME,
     ) -> SolutionOutputTypes:
         """Runs the metric-ff process."""
         self.logger.info(f"Metric-FF solver is working on - {problem_file_path.stem}")
@@ -80,7 +84,12 @@ class MetricFFSolver(AbstractSolver):
         return SolutionOutputTypes.no_solution
 
     def solve_problem(
-        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_timeout: int, tolerance: float,
+        self,
+        domain_file_path: Path,
+        problem_file_path: Path,
+        problems_directory_path: Path,
+        solving_timeout: int,
+        tolerance: float = 0.1,
     ) -> SolutionOutputTypes:
         """Solves a single problem using the Metric FF algorithm.
 
@@ -115,7 +124,9 @@ class MetricFFSolver(AbstractSolver):
         solving_stats = {}
         self.logger.info("Starting to solve the input problems using Metic-FF solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
-            termination_status = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_timeout, tolerance)
+            termination_status = self.solve_problem(
+                domain_file_path, problem_file_path, problems_directory_path, solving_timeout, tolerance
+            )
             solving_stats[problem_file_path.stem] = termination_status.name
 
         return solving_stats
@@ -123,8 +134,13 @@ class MetricFFSolver(AbstractSolver):
 
 if __name__ == "__main__":
     args = sys.argv
-    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO
+    )
     solver = MetricFFSolver()
     solver.execute_solver(
-        problems_directory_path=Path(args[1]), domain_file_path=Path(args[2]), problems_prefix=args[3], solving_timeout=int(args[4])
+        problems_directory_path=Path(args[1]),
+        domain_file_path=Path(args[2]),
+        problems_prefix=args[3],
+        solving_timeout=int(args[4]),
     )

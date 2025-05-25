@@ -1,10 +1,17 @@
 """class to record the information about each episode of the online learning process."""
+
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Dict
 
 from pandas import DataFrame
 
-RECORD_COLUMNS = ["#grounded_actions", "avg_informative_actions", "sum_failed_actions", "sum_successful_actions"]
+RECORD_COLUMNS = [
+    "num_grounded_actions",
+    "sum_failed_actions",
+    "sum_successful_actions",
+    "goal_reached",
+    "num_steps_in_episode",
+]
 
 
 class EpisodeInfoRecord:
@@ -13,54 +20,61 @@ class EpisodeInfoRecord:
     def __init__(self, action_names: List[str]):
         self._episode_number = 0
         self._num_informative_actions_in_step = []
+        self._action_names = action_names
         self._episode_info = {
             **{record_name: 0 for record_name in RECORD_COLUMNS},
-            **{f"#{action_name}_success": 0 for action_name in action_names},
-            **{f"#{action_name}_fail": 0 for action_name in action_names}
+            **{f"num_{action_name}_success": 0 for action_name in action_names},
+            **{f"num_{action_name}_fail": 0 for action_name in action_names},
         }
-        self.summarized_info = DataFrame(columns=[
-            "episode_number", *RECORD_COLUMNS, *{f"#{action_name}_success" for action_name in action_names},
-            *{f"#{action_name}_fail" for action_name in action_names}])
+        self.summarized_info = DataFrame(
+            columns=[
+                "episode_number",
+                *RECORD_COLUMNS,
+                *{f"num_{action_name}_success" for action_name in action_names},
+                *{f"num_{action_name}_fail" for action_name in action_names},
+                *{f"num_unknown_failed_transitions_{action_name}" for action_name in action_names},
+            ]
+        )
 
     def add_num_grounded_actions(self, num_grounded_actions: int) -> None:
         """Adds the number of grounded actions in the episode.
 
         :param num_grounded_actions: the number of grounded actions in the episode.
         """
-        self._episode_info["#grounded_actions"] = num_grounded_actions
+        self._episode_info["num_grounded_actions"] = num_grounded_actions
 
-    def add_num_informative_actions_in_step(self, num_informative_actions: int) -> None:
-        """Adds the number of informative actions in the episode.
-
-        :param num_informative_actions: the number of informative actions in the episode.
-        """
-        self._num_informative_actions_in_step.append(num_informative_actions)
-
-    def add_step_data(self, action_name: str, step_result: int) -> None:
+    def record_single_step(self, action_name: str, action_applicable: bool) -> None:
         """
 
         :param action_name:
         :param step_result:
         :return:
         """
-        if step_result == 1:
-            self._episode_info[f"#{action_name}_success"] += 1
+        if action_applicable:
+            self._episode_info[f"num_{action_name}_success"] += 1
             self._episode_info["sum_successful_actions"] += 1
+
             return
 
-        self._episode_info[f"#{action_name}_fail"] += 1
+        self._episode_info[f"num_{action_name}_fail"] += 1
         self._episode_info["sum_failed_actions"] += 1
 
-    def end_episode(self) -> None:
+    def end_episode(
+        self, undecided_states: Dict[str, List[Tuple]], goal_reached: bool, num_steps_in_episode: int
+    ) -> None:
         """Ends the episode."""
-        self._episode_info["avg_informative_actions"] = sum(self._num_informative_actions_in_step) / \
-                                                        len(self._num_informative_actions_in_step)
         self.summarized_info.loc[len(self.summarized_info)] = {
             **{"episode_number": self._episode_number},
-            **self._episode_info}
+            **self._episode_info,
+            **{
+                f"num_unknown_failed_transitions_{action_name}": len(undecided_states[action_name])
+                for action_name in self._action_names
+            },
+            **{"goal_reached": goal_reached},
+            "num_steps_in_episode": num_steps_in_episode,
+        }
 
         self._episode_info = {record_name: 0 for record_name in self._episode_info}
-        self._num_informative_actions_in_step = []
         self._episode_number += 1
 
     def export_statistics(self, path: Path) -> None:
