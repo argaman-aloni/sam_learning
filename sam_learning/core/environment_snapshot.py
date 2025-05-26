@@ -43,7 +43,8 @@ class EnvironmentSnapshot:
                 # updates all the grounded predicates where there of a lifted predicate that does not appear in the state.
                 for grounded_predicate in vocabulary_predicates:
                     grounded_signature = {
-                        param_name: relevant_objects[object_name].type for param_name, object_name in grounded_predicate.object_mapping.items()
+                        param_name: relevant_objects[object_name].type
+                        for param_name, object_name in grounded_predicate.object_mapping.items()
                     }
                     negative_state_predicates.add(
                         GroundedPredicate(
@@ -106,7 +107,9 @@ class EnvironmentSnapshot:
         self.logger.debug("Creating a snapshot of the environment.")
         parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
         relevant_objects = {
-            object_name: object_data for object_name, object_data in observation_objects.items() if object_name in parameters_including_consts
+            object_name: object_data
+            for object_name, object_data in observation_objects.items()
+            if object_name in parameters_including_consts
         }
         return self._create_state_discrete_snapshot(state, relevant_objects)
 
@@ -122,7 +125,9 @@ class EnvironmentSnapshot:
         self.logger.debug("Creating a snapshot of the environment.")
         parameters_including_consts = current_action.parameters + list(self.partial_domain.constants.keys())
         relevant_objects = {
-            object_name: object_data for object_name, object_data in observation_objects.items() if object_name in parameters_including_consts
+            object_name: object_data
+            for object_name, object_data in observation_objects.items()
+            if object_name in parameters_including_consts
         }
         return self._create_state_numeric_snapshot(state, relevant_objects)
 
