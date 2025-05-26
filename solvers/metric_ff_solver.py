@@ -23,6 +23,7 @@ class MetricFFSolver(AbstractSolver):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.parser = MetricFFParser()
+        self.name = "Metric-FF"
 
     @staticmethod
     def _extract_solver_error(solution_path: Path) -> str:

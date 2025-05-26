@@ -1,4 +1,5 @@
 """Create a train and test set split for the input directory for the action model learning algorithms to use."""
+
 import logging
 import random
 import shutil
@@ -27,6 +28,7 @@ class DistributedKFoldSplit:
         only_train_test: bool = False,
         learning_algorithms: List[int] = None,
         internal_iterations: List[int] = None,
+        triplets_experiment: bool = False,
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
@@ -37,6 +39,7 @@ class DistributedKFoldSplit:
         self.only_train_test = only_train_test
         self._learning_algorithms = learning_algorithms
         self._internal_iterations = internal_iterations
+        self.triplets_experiment = triplets_experiment
 
     def _copy_domain(self, directory_path: Path) -> None:
         """Copies the domain to the train set directory so that it'd be used in the learning process."""
@@ -94,6 +97,24 @@ class DistributedKFoldSplit:
             test_set_problems = [self.working_directory_path / f"{trajectory_paths[i].stem}.pddl" for i in test_set_indices]
             train_set_trajectories = [trajectory_paths[i] for i in range(len(trajectory_paths)) if i not in test_set_indices]
             training_data = {"internal_iterations": {}}
+            if self._internal_iterations is None:
+                self.logger.debug("No internal iterations given, using the full training set.")
+                for learning_algorithm in self._learning_algorithms:
+                    self.create_directories_content(
+                        test_set_problems=test_set_problems,
+                        selected_training_trajectories=train_set_trajectories,
+                        fold_index=fold_index,
+                        learning_algorithm=learning_algorithm,
+                    )
+                    training_data = [str(p.absolute()) for p in train_set_trajectories]
+
+                folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
+                    "train": training_data,
+                    "test": [str(p.absolute()) for p in test_set_problems],
+                }
+                self.logger.debug("Finished creating fold!")
+                continue
+
             for num_used_trajectories in self._internal_iterations:
                 self.logger.debug(f"Creating fold {fold_index} with {num_used_trajectories} trajectories.")
                 selected_trajectories = train_set_trajectories[:num_used_trajectories]
@@ -126,13 +147,20 @@ class DistributedKFoldSplit:
 
         save_fold_settings(self.working_directory_path, folds_data)
 
-    def create_k_fold(self, trajectory_suffix: str = "*.trajectory", max_items: int = 0, load_configuration: bool = True):
+    def create_k_fold(
+        self,
+        trajectory_suffix: str = "*.trajectory",
+        max_items: int = 0,
+        load_configuration: bool = True,
+        should_ignore_internal_iterations: bool = False,
+    ) -> None:
         """Creates a generator that will be used for the next algorithm to know where the train and test set
             directories reside.
 
         :param trajectory_suffix: the suffix of the trajectory files to be used.
         :param max_items: the maximum number of items to be used in the train and test set together.
         :param load_configuration: whether to load folds settings from the configuration file.
+        :param should_ignore_internal_iterations: whether to ignore the internal iterations in the folds settings.
         :return: a generator for the train and test set directories.
         """
         self.logger.info("Starting to create the folds for the cross validation process.")
@@ -153,11 +181,14 @@ class DistributedKFoldSplit:
                                 selected_training_trajectories=selected_trajectories_paths,
                                 fold_index=index,
                                 learning_algorithm=learning_algorithm,
-                                internal_iteration=int(iteration_num),
+                                internal_iteration=int(iteration_num) if not should_ignore_internal_iterations else None,
                             )
                         )
 
                 self.logger.debug("Finished creating fold!")
+                if not self.triplets_experiment:
+                    continue
+
                 # creating the folder to be used for the triplets based experiments
                 largest_iteration = max([int(i) for i in fold_content["train"]["internal_iterations"].keys()])
                 relevant_paths = [Path(p) for p in fold_content["train"]["internal_iterations"][str(largest_iteration)]]

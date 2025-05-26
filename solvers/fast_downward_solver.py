@@ -1,4 +1,5 @@
 """Module responsible for running the Fast Downward discrete planner."""
+
 import logging
 import os
 import subprocess
@@ -20,6 +21,7 @@ class FastDownwardSolver(AbstractSolver):
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.name = "Fast Downward"
 
     @staticmethod
     def _remove_cost_from_file(solution_path: Path) -> None:
@@ -43,7 +45,12 @@ class FastDownwardSolver(AbstractSolver):
             sas_file_path.unlink(missing_ok=True)
 
     def solve_problem(
-        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_timeout: int, tolerance: float = 0.1,
+        self,
+        domain_file_path: Path,
+        problem_file_path: Path,
+        problems_directory_path: Path,
+        solving_timeout: int,
+        tolerance: float = 0.1,
     ) -> SolutionOutputTypes:
         """Solves a single problem using the Fast Downward solver.
 
@@ -84,11 +91,15 @@ class FastDownwardSolver(AbstractSolver):
 
         except subprocess.CalledProcessError as e:
             if e.returncode in [21, 23, 247]:
-                self.logger.warning(f"Fast Downward returned status code {e.returncode} - timeout on problem {problem_file_path.stem}.")
+                self.logger.warning(
+                    f"Fast Downward returned status code {e.returncode} - timeout on problem {problem_file_path.stem}."
+                )
                 return SolutionOutputTypes.timeout
 
             elif e.returncode in [11, 12]:
-                self.logger.warning(f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}.")
+                self.logger.warning(
+                    f"Fast Downward returned status code {e.returncode} - plan unsolvable for problem {problem_file_path.stem}."
+                )
                 return SolutionOutputTypes.no_solution
 
             self.logger.critical(f"Fast Downward returned status code {e.returncode} - unknown error.")
@@ -116,10 +127,14 @@ class FastDownwardSolver(AbstractSolver):
         self.logger.info("Starting to solve the input problems using Fast-Downward solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
             self.logger.info(f"Fast Downward is starting to solve problem - {problem_file_path.stem}")
-            termination_status = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_timeout)
+            termination_status = self.solve_problem(
+                domain_file_path, problem_file_path, problems_directory_path, solving_timeout
+            )
             num_retries = 0
             while termination_status == SolutionOutputTypes.solver_error and num_retries < 3:
-                termination_status = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_timeout)
+                termination_status = self.solve_problem(
+                    domain_file_path, problem_file_path, problems_directory_path, solving_timeout
+                )
                 num_retries += 1
 
             solving_stats[problem_file_path.stem] = termination_status.name
@@ -129,8 +144,13 @@ class FastDownwardSolver(AbstractSolver):
 
 if __name__ == "__main__":
     args = sys.argv
-    logging.basicConfig(format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG
+    )
     solver = FastDownwardSolver()
     solver.solve_problem(
-        domain_file_path=Path(args[1]), problem_file_path=Path(args[2]), problems_directory_path=Path(args[3]), solving_timeout=int(args[4]),
+        domain_file_path=Path(args[1]),
+        problem_file_path=Path(args[2]),
+        problems_directory_path=Path(args[3]),
+        solving_timeout=int(args[4]),
     )

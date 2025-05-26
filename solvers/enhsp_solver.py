@@ -1,4 +1,5 @@
 """Module responsible for running the Expressive Numeric Heuristic Planner (ENHSP)."""
+
 import logging
 import os
 import signal
@@ -29,6 +30,7 @@ class ENHSPSolver(AbstractSolver):
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.name = "ENHSP"
 
     def _run_enhsp_process(
         self, run_command: str, problem_file_path: Path, solving_timeout: int = MAX_RUNNING_TIME
@@ -45,13 +47,17 @@ class ENHSPSolver(AbstractSolver):
             process.wait(timeout=solving_timeout)
 
         except subprocess.TimeoutExpired:
-            self.logger.warning(f"ENHSP did not finish after {solving_timeout} secs while trying to solve - {problem_file_path.stem}")
+            self.logger.warning(
+                f"ENHSP did not finish after {solving_timeout} secs while trying to solve - {problem_file_path.stem}"
+            )
             os.kill(process.pid, signal.SIGTERM)
             os.system(f"pkill -f {ENHSP_FILE_PATH}")
             return True, SolutionOutputTypes.timeout
 
         if process.returncode is None:
-            self.logger.warning(f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}")
+            self.logger.warning(
+                f"ENHSP did not finish in time so was killed while trying to solve - {problem_file_path.stem}"
+            )
             return True, SolutionOutputTypes.timeout
 
         self.logger.info("ENHSP finished its execution!")
@@ -71,12 +77,21 @@ class ENHSPSolver(AbstractSolver):
             return True, SolutionOutputTypes.no_solution
 
         else:
-            self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDOUT - {stdout}")
-            self.logger.critical(f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDERR - {stderr}")
+            self.logger.critical(
+                f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDOUT - {stdout}"
+            )
+            self.logger.critical(
+                f"While solving problem {problem_file_path.stem} encountered unknown error! " f"STDERR - {stderr}"
+            )
             return False, SolutionOutputTypes.solver_error
 
     def solve_problem(
-        self, domain_file_path: Path, problem_file_path: Path, problems_directory_path: Path, solving_timeout: int, tolerance: float = 0.1,
+        self,
+        domain_file_path: Path,
+        problem_file_path: Path,
+        problems_directory_path: Path,
+        solving_timeout: int,
+        tolerance: float = 0.1,
     ) -> SolutionOutputTypes:
         """Solves a single problem using the ENHSP algorithm.
 
@@ -131,7 +146,9 @@ class ENHSPSolver(AbstractSolver):
         solving_stats = {}
         self.logger.info("Starting to solve the input problems using ENHSP solver.")
         for problem_file_path in problems_directory_path.glob(f"{problems_prefix}*.pddl"):
-            termination_status = self.solve_problem(domain_file_path, problem_file_path, problems_directory_path, solving_timeout, tolerance)
+            termination_status = self.solve_problem(
+                domain_file_path, problem_file_path, problems_directory_path, solving_timeout, tolerance
+            )
             solving_stats[problem_file_path.stem] = termination_status.name
 
         return solving_stats
@@ -139,7 +156,9 @@ class ENHSPSolver(AbstractSolver):
 
 if __name__ == "__main__":
     args = sys.argv
-    logging.basicConfig(format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG
+    )
     solver = ENHSPSolver()
     solver.solve_problem(
         domain_file_path=Path(args[1]),

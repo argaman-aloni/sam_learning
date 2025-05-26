@@ -139,9 +139,7 @@ def test_calculate_state_action_informative_state_when_state_observed_for_the_fi
     depot_noam_informative_explorer: NumericOnlineActionModelLearner,
     depot_problem: Problem,
 ):
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     first_action = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))[0]
     depot_noam_informative_explorer.initialize_learning_algorithms()
     is_informative, action_applicable = depot_noam_informative_explorer._calculate_state_action_informative(
@@ -196,16 +194,9 @@ def test_add_transition_data_when_transition_is_not_successful_adds_data_to_all_
         current_action=component.grounded_action_call,
         observation_objects=trace.grounded_objects,
     )
-    depot_noam_informative_explorer._add_transition_data(
-        action_to_update=failed_first_action, is_transition_successful=False
-    )
-    assert (
-        len(depot_noam_informative_explorer._discrete_models_learners[failed_first_action.name].cannot_be_preconditions)
-        == 0
-    )
-    assert (
-        len(depot_noam_informative_explorer._numeric_models_learners[failed_first_action.name]._svm_learner.data) == 0
-    )
+    depot_noam_informative_explorer._add_transition_data(action_to_update=failed_first_action, is_transition_successful=False)
+    assert len(depot_noam_informative_explorer._discrete_models_learners[failed_first_action.name].cannot_be_preconditions) == 0
+    assert len(depot_noam_informative_explorer._numeric_models_learners[failed_first_action.name]._svm_learner.data) == 0
     assert len(depot_noam_informative_explorer._informative_states_learner[failed_first_action.name].combined_data) == 1
     assert len(depot_noam_informative_explorer.undecided_failure_observations[failed_first_action.name]) == 1
 
@@ -241,9 +232,7 @@ def test_select_action_and_execute_when_when_there_is_a_single_applicable_action
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_informative_explorer.initialize_learning_algorithms()
     frontier = [ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "distributor2"])]
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     selected_action, is_successful, next_state = depot_noam_informative_explorer._select_action_and_execute(
         current_state=initial_state, frontier=frontier, problem_objects=depot_problem.objects
     )
@@ -261,9 +250,7 @@ def test_select_action_and_execute_when_when_there_is_a_single_inapplicable_acti
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_informative_explorer.initialize_learning_algorithms()
     frontier = [ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])]
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     selected_action, is_successful, next_state = depot_noam_informative_explorer._select_action_and_execute(
         current_state=initial_state, frontier=frontier, problem_objects=depot_problem.objects
     )
@@ -281,9 +268,7 @@ def test_select_action_and_execute_when_when_there_is_a_single_inapplicable_acti
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_informative_explorer.initialize_learning_algorithms()
     frontier = [ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])]
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     selected_action, is_successful, next_state = depot_noam_informative_explorer._select_action_and_execute(
         current_state=initial_state, frontier=frontier, problem_objects=depot_problem.objects
     )
@@ -323,9 +308,7 @@ def test_select_action_and_execute_when_exploration_policy_is_goal_oriented_sele
         ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "distributor2"]),
         ActionCall(name="lift", grounded_parameters=["hoist5", "crate2", "crate0", "distributor1"]),
     ]
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     selected_action, _, _ = depot_noam_goal_oriented._select_action_and_execute(
         current_state=initial_state, frontier=frontier, problem_objects=depot_problem.objects
     )
@@ -348,9 +331,7 @@ def test_train_models_using_trace_when_given_a_single_action_adds_the_action_dat
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
     assert len(depot_noam_informative_explorer._discrete_models_learners[first_action.name].cannot_be_effects) > 0
     assert len(depot_noam_informative_explorer._discrete_models_learners[first_action.name].cannot_be_preconditions) > 0
-    assert (
-        len(depot_noam_informative_explorer._numeric_models_learners[first_action.name]._convex_hull_learner.data) > 0
-    )
+    assert len(depot_noam_informative_explorer._numeric_models_learners[first_action.name]._convex_hull_learner.data) > 0
 
 
 def test_train_models_using_trace_when_given_an_already_observed_state_and_action_makes_the_action_to_be_not_informative(
@@ -358,9 +339,7 @@ def test_train_models_using_trace_when_given_an_already_observed_state_and_actio
     depot_problem: Problem,
     depot_numeric_agent: IPCAgent,
 ):
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     first_action = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))[0]
     trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
@@ -380,9 +359,7 @@ def test_train_models_using_trace_when_given_an_inapplicable_action_in_a_state_w
     depot_problem: Problem,
     depot_numeric_agent: IPCAgent,
 ):
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     failed_first_action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])
     trace, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
@@ -423,7 +400,7 @@ def test_train_models_using_trace_when_given_an_inapplicable_action_and_then_the
     fixed_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "depot0"])
     trace, _ = depot_numeric_agent.execute_plan(plan=[fixed_action])
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
-    optimistic_model = depot_noam_informative_explorer._construct_optimistic_action_model()
+    optimistic_model = depot_noam_informative_explorer.construct_optimistic_action_model()
     optimistic_conditions = optimistic_model.actions[failed_first_action.name].preconditions.root.operands.pop()
     assert isinstance(optimistic_conditions, Precondition)
     assert optimistic_conditions.binary_operator == "or"
@@ -440,8 +417,8 @@ def test_train_models_using_trace_when_given_multiple_successful_transitions_doe
         trace, _ = depot_numeric_agent.execute_plan(plan=plan)
         depot_noam_informative_explorer.initialize_learning_algorithms()
         depot_noam_informative_explorer.train_models_using_trace(trace=trace)
-        safe_model = depot_noam_informative_explorer._construct_safe_action_model()
-        optimistic_model = depot_noam_informative_explorer._construct_optimistic_action_model()
+        safe_model = depot_noam_informative_explorer.construct_safe_action_model()
+        optimistic_model = depot_noam_informative_explorer.construct_optimistic_action_model()
         print("Safe model:\n", safe_model.to_pddl())
         print("Optimistic model:\n", optimistic_model.to_pddl())
     except Exception as e:
@@ -458,8 +435,8 @@ def test_train_models_using_trace_when_given_multiple_successful_transitions_ret
         trace, _ = depot_numeric_agent.execute_plan(plan=plan)
         depot_noam_informative_explorer.initialize_learning_algorithms()
         depot_noam_informative_explorer.train_models_using_trace(trace=trace)
-        safe_model = depot_noam_informative_explorer._construct_safe_action_model()
-        optimistic_model = depot_noam_informative_explorer._construct_optimistic_action_model()
+        safe_model = depot_noam_informative_explorer.construct_safe_action_model()
+        optimistic_model = depot_noam_informative_explorer.construct_optimistic_action_model()
         print("Safe model:\n", safe_model.to_pddl())
         print("Optimistic model:\n", optimistic_model.to_pddl())
     except Exception as e:
@@ -471,7 +448,7 @@ def test_construct_safe_action_model_when_no_observation_given_does_not_fail(
 ):
     try:
         depot_noam_informative_explorer.initialize_learning_algorithms()
-        depot_noam_informative_explorer._construct_safe_action_model()
+        depot_noam_informative_explorer.construct_safe_action_model()
     except Exception as e:
         assert False, e
 
@@ -481,7 +458,7 @@ def test_construct_optimistic_action_model_when_no_observation_given_does_not_fa
 ):
     try:
         depot_noam_informative_explorer.initialize_learning_algorithms()
-        depot_noam_informative_explorer._construct_optimistic_action_model()
+        depot_noam_informative_explorer.construct_optimistic_action_model()
     except Exception as e:
         assert False, e
 
@@ -493,9 +470,7 @@ def test_explore_to_refine_models_changes_the_models_after_short_episode_is_done
     depot_numeric_agent: IPCAgent,
 ):
     depot_numeric_agent.initialize_problem(depot_problem)
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
 
     depot_noam_informative_explorer.initialize_learning_algorithms()
     start_time = time.time()
@@ -508,8 +483,8 @@ def test_explore_to_refine_models_changes_the_models_after_short_episode_is_done
     assert not goal_reached, "Goal should not be reached in such a short episode"
     assert num_steps_done <= 100
     assert end_time - start_time < 60, "Exploration took too long to finish"
-    print("Safe model:\n", depot_noam_informative_explorer._construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_informative_explorer._construct_optimistic_action_model().to_pddl())
+    print("Safe model:\n", depot_noam_informative_explorer.construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
 
 
 def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_updates_models_and_safe_and_optimistic_domains_are_available(
@@ -519,9 +494,7 @@ def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_
     depot_numeric_agent: IPCAgent,
 ):
     depot_numeric_agent.initialize_problem(depot_problem)
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
 
     depot_noam_informative_explorer.initialize_learning_algorithms()
     goal_reached, num_steps_done = depot_noam_informative_explorer.explore_to_refine_models(
@@ -530,8 +503,8 @@ def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_
         problem_objects=depot_problem.objects,
     )
     assert num_steps_done <= 10000
-    print("Safe model:\n", depot_noam_informative_explorer._construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_informative_explorer._construct_optimistic_action_model().to_pddl())
+    print("Safe model:\n", depot_noam_informative_explorer.construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
 
 
 def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_empty_domain_that_reaches_goal_or_max_steps(
@@ -540,9 +513,7 @@ def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_
     counters_numeric_domain: Domain,
     counters_numeric_agent: IPCAgent,
 ):
-    initial_state = State(
-        predicates=counters_problem.initial_state_predicates, fluents=counters_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=counters_problem.initial_state_predicates, fluents=counters_problem.initial_state_fluents)
 
     counters_noam_informative_explorer.initialize_learning_algorithms()
     goal_reached, num_steps_done = counters_noam_informative_explorer.explore_to_refine_models(
@@ -551,8 +522,8 @@ def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_
         problem_objects=counters_problem.objects,
     )
     assert goal_reached or num_steps_done == 20000, "Goal should be reached or max steps should be done"
-    print("Safe model:\n", counters_noam_informative_explorer._construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", counters_noam_informative_explorer._construct_optimistic_action_model().to_pddl())
+    print("Safe model:\n", counters_noam_informative_explorer.construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", counters_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
 
 
 def test_explore_to_refine_models_when_using_goal_oriented_exploration_does_not_fail(
@@ -562,9 +533,7 @@ def test_explore_to_refine_models_when_using_goal_oriented_exploration_does_not_
     depot_numeric_agent: IPCAgent,
 ):
     depot_numeric_agent.initialize_problem(depot_problem)
-    initial_state = State(
-        predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents
-    )
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
 
     depot_noam_goal_oriented.initialize_learning_algorithms()
     goal_reached, num_steps_done = depot_noam_goal_oriented.explore_to_refine_models(
@@ -573,8 +542,8 @@ def test_explore_to_refine_models_when_using_goal_oriented_exploration_does_not_
         problem_objects=depot_problem.objects,
     )
     assert num_steps_done <= 10000
-    print("Safe model:\n", depot_noam_goal_oriented._construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_goal_oriented._construct_optimistic_action_model().to_pddl())
+    print("Safe model:\n", depot_noam_goal_oriented.construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_goal_oriented.construct_optimistic_action_model().to_pddl())
 
 
 def test_apply_exploration_policy_when_exploration_policy_is_informative_explorer_applies_policy_and_returns_less_than_max_number_of_steps_for_episode(
@@ -584,12 +553,10 @@ def test_apply_exploration_policy_when_exploration_policy_is_informative_explore
 ):
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_informative_explorer.initialize_learning_algorithms()
-    goal_reached, num_steps = depot_noam_informative_explorer.apply_exploration_policy(
-        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM
-    )
+    goal_reached, _, num_steps = depot_noam_informative_explorer.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
     assert num_steps <= 5000
-    print("Safe model:\n", depot_noam_informative_explorer._construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_informative_explorer._construct_optimistic_action_model().to_pddl())
+    print("Safe model:\n", depot_noam_informative_explorer.construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
 
 
 def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_planner_is_none_fails_as_it_tries_to_call_planner_with_optimistic_domain(
@@ -597,7 +564,7 @@ def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_p
 ):
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_goal_oriented.initialize_learning_algorithms()
-    depot_noam_goal_oriented._solver = None  # Set solver to None to simulate the failure case
+    depot_noam_goal_oriented._solvers = None  # Set solver to None to simulate the failure case
     with pytest.raises(AttributeError):
         depot_noam_goal_oriented.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
 
@@ -608,12 +575,10 @@ def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_p
     # NOTE: This test assumes that the planner is set and that the environment variable `ENHSP_FILE_PATH` is configured correctly.
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_goal_oriented.initialize_learning_algorithms()
-    goal_reached, num_steps = depot_noam_goal_oriented.apply_exploration_policy(
-        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM
-    )
+    goal_reached, _, num_steps = depot_noam_goal_oriented.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
     assert num_steps <= 5000
-    print("Safe model:\n", depot_noam_goal_oriented._construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_goal_oriented._construct_optimistic_action_model().to_pddl())
+    print("Safe model:\n", depot_noam_goal_oriented.construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_goal_oriented.construct_optimistic_action_model().to_pddl())
 
 
 def test_apply_exploration_policy_when_exploration_policy_combined_and_planner_is_set_applies_policy_and_returns_less_than_max_number_of_steps_for_episode(
@@ -624,9 +589,7 @@ def test_apply_exploration_policy_when_exploration_policy_combined_and_planner_i
     # NOTE: This test assumes that the planner is set and that the environment variable `ENHSP_FILE_PATH` is configured correctly.
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_goal_combined_explorer.initialize_learning_algorithms()
-    goal_reached, num_steps = depot_noam_goal_combined_explorer.apply_exploration_policy(
-        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM
-    )
+    goal_reached, _, num_steps = depot_noam_goal_combined_explorer.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
     assert num_steps <= 5000
-    print("Safe model:\n", depot_noam_goal_combined_explorer._construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_goal_combined_explorer._construct_optimistic_action_model().to_pddl())
+    print("Safe model:\n", depot_noam_goal_combined_explorer.construct_safe_action_model().to_pddl())
+    print("Optimistic model:\n", depot_noam_goal_combined_explorer.construct_optimistic_action_model().to_pddl())
