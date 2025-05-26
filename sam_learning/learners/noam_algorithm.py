@@ -28,13 +28,14 @@ from sam_learning.core import (
     NumericFunctionMatcher,
     VocabularyCreator,
     EnvironmentSnapshot,
+    EpisodeInfoRecord,
 )
 from sam_learning.core.online_learning.online_numeric_models_learner import OnlineNumericModelLearner
 from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
 from solvers import AbstractSolver, SolutionOutputTypes
 
 NON_INFORMATIVE_IG = 0
-MAX_STEPS_PER_EPISODE = 1500
+MAX_STEPS_PER_EPISODE = 3000
 PROBLEM_SOLVING_TIMEOUT = 60 * 10  # 1 minutes
 
 random.seed(42)  # Set seed for reproducibility
@@ -49,10 +50,10 @@ class ExplorationAlgorithmType(Enum):
 
 
 def create_plan_actions(plan_path: Path) -> List[ActionCall]:
-    """
+    """Reads a plan file and parses each line into an ActionCall.
 
-    :param plan_path:
-    :return:
+    :param plan_path: Path to the plan file containing action calls.
+    :return: List of ActionCall objects parsed from the plan file.
     """
     with open(plan_path, "rt") as plan_file:
         plan_lines = plan_file.readlines()
@@ -82,6 +83,7 @@ class NumericOnlineActionModelLearner:
     agent: AbstractAgent
     episode_statistics: Dict[str, int]
     undecided_failure_observations = Dict[str, Tuple[Set[GroundedPredicate], Dict[str, PDDLFunction]]]
+    episode_recorder: EpisodeInfoRecord
 
     def __init__(
         self,
@@ -91,6 +93,7 @@ class NumericOnlineActionModelLearner:
         agent: AbstractAgent = None,
         solver: AbstractSolver = None,
         exploration_type: ExplorationAlgorithmType = ExplorationAlgorithmType.combined,
+        episode_recorder: EpisodeInfoRecord = None,
     ):
         self.workdir = workdir
         self.logger = logging.getLogger(__name__)
@@ -105,11 +108,12 @@ class NumericOnlineActionModelLearner:
         self._numeric_function_matcher = NumericFunctionMatcher(partial_domain)
         self._vocabulary_creator = VocabularyCreator()
         self._triplet_snapshot = EnvironmentSnapshot(partial_domain=partial_domain)
-        self._solver = solver
+        self._solvers = solver
         self._exploration_policy = exploration_type
         self.undecided_failure_observations = defaultdict(list)
         self._successful_execution_count = defaultdict(int)
         self._applicable_actions = set()
+        self.episode_recorder = episode_recorder
 
     def _construct_safe_action_model(self) -> Domain:
         """Constructs the safe action model for the domain.
@@ -145,6 +149,7 @@ class NumericOnlineActionModelLearner:
         """
         self.logger.info("Constructing the safe action model.")
         optimistic_domain = self.partial_domain.shallow_copy()
+        optimistic_domain.requirements.add(":disjunctive-preconditions")
         for action_name, action in optimistic_domain.actions.items():
             preconditions = Precondition("and")
             optimistic_discrete_preconditions, optimistic_discrete_effects = self._discrete_models_learners[
@@ -169,8 +174,8 @@ class NumericOnlineActionModelLearner:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
-        :param test_set_path: the path to the test set directory where the domain would be exported to.
-        :param file_name: the name of the file to export the domain to.
+        :param is_safe_model: a boolean indicating whether the learned domain is a safe model or an optimistic model.
+        :return: The path to the exported domain file.
         """
         domain_file_name = (
             self.partial_domain.name + f"_{'safe' if is_safe_model else 'optimistic'}_learned_domain.pddl"
@@ -314,6 +319,9 @@ class NumericOnlineActionModelLearner:
         :param is_transition_successful: A boolean indicating whether the transition
             caused by the action was successful. Defaults to True.
         """
+        self.episode_recorder.record_single_step(
+            action_name=action_to_update.name, action_applicable=is_transition_successful
+        )
         previous_state_pb_predicates, previous_state_pb_functions = self._extract_parameter_bound_state_data(
             action=action_to_update,
             state_predicates=self.triplet_snapshot.previous_state_predicates,
@@ -418,7 +426,7 @@ class NumericOnlineActionModelLearner:
                 action_name=action_name,
                 pb_functions=pb_functions,
                 polynom_degree=self._polynomial_degree,
-                qhull_options="QJ Qx Q11 Q12",
+                qhull_options="QJ Q11 Q12",
             )
             self._informative_states_learner[action_name] = InformationStatesLearner(
                 action_name=action_name,
@@ -442,7 +450,7 @@ class NumericOnlineActionModelLearner:
             actions.append(action)
             weights.append(1.0 / (1 + self._successful_execution_count.get(action.name, 0)))
 
-        return random.choices(actions, weights=weights, k=len(actions) * 3)
+        return random.choices(actions, weights=weights, k=len(actions))
 
     def explore_to_refine_models(
         self,
@@ -466,12 +474,13 @@ class NumericOnlineActionModelLearner:
         frontier = self._create_frontier(grounded_actions)
         current_state = init_state.copy()
         while len(frontier) > 0 and step_number < num_steps_till_episode_end:
+            self.logger.info(f"Exploring to improve the action model - exploration step {step_number + 1}.")
             action, is_successful, next_state = self._select_action_and_execute(
                 current_state, frontier, problem_objects
             )
             step_number += 1
             while not is_successful and step_number < num_steps_till_episode_end and len(frontier) > 0:
-                self.logger.debug("The action was not successful, trying again.")
+                self.logger.debug(f"The action was not successful, trying again for step {step_number + 1}.")
                 action, is_successful, next_state = self._select_action_and_execute(
                     current_state, frontier, problem_objects
                 )
@@ -495,10 +504,10 @@ class NumericOnlineActionModelLearner:
         return False, num_steps_till_episode_end
 
     def train_models_using_trace(self, trace: Observation) -> None:
-        """
+        """Train the discrete and numeric action models using a given observation trace.
 
-        :param trace:
-        :return:
+        :param trace: An Observation object containing a sequence of observed transitions, each with previous and next states,
+            the executed action, and success status.
         """
         self.logger.info("Training the models using the trace.")
         for observed_transition in trace.components:
@@ -513,7 +522,9 @@ class NumericOnlineActionModelLearner:
                 is_transition_successful=observed_transition.is_successful,
             )
 
-    def apply_exploration_policy(self, problem_path: Path) -> Tuple[bool, int]:
+    def apply_exploration_policy(
+        self, problem_path: Path, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE
+    ) -> Tuple[bool, int]:
         """Applies the exploration policy to the current state.
 
         :return: the number of steps taken to solve the problem.
@@ -528,7 +539,7 @@ class NumericOnlineActionModelLearner:
             )
             return self.explore_to_refine_models(
                 init_state=initial_state,
-                num_steps_till_episode_end=MAX_STEPS_PER_EPISODE,
+                num_steps_till_episode_end=num_steps_till_episode_end,
                 problem_objects=problem.objects,
             )
 
@@ -539,7 +550,7 @@ class NumericOnlineActionModelLearner:
         )
         optimistic_model = self._construct_optimistic_action_model()
         domain_path = self._export_learned_domain(optimistic_model, is_safe_model=False)
-        solution_status = self._solver.solve_problem(
+        solution_status = self._solvers.solve_problem(
             domain_file_path=domain_path,
             problem_file_path=problem_path,
             problems_directory_path=self.workdir,
@@ -559,32 +570,37 @@ class NumericOnlineActionModelLearner:
                     f"The plan created using the optimistic model could not reach the goal. Valid Plan length: {len(trace)}"
                 )
                 goal_reached, executed_steps = self.explore_to_refine_models(
-                    trace.components[-1].next_state,
-                    num_steps_till_episode_end=MAX_STEPS_PER_EPISODE - len(trace),
+                    trace.components[-1].next_state if len(trace) > 0 else initial_state,
+                    num_steps_till_episode_end=num_steps_till_episode_end - len(trace),
                     problem_objects=trace.grounded_objects,
                 )
                 return goal_reached, executed_steps + len(trace)
 
         self.logger.info(f"The problem {problem_path.stem} could not be solved using the optimistic model.")
         return self.explore_to_refine_models(
-            init_state=initial_state, num_steps_till_episode_end=MAX_STEPS_PER_EPISODE, problem_objects=problem.objects
+            init_state=initial_state,
+            num_steps_till_episode_end=num_steps_till_episode_end,
+            problem_objects=problem.objects,
         )
 
-    def try_to_solve_problem(self, problem_path: Path) -> Tuple[bool, int]:
+    def try_to_solve_problem(
+        self, problem_path: Path, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE
+    ) -> Tuple[bool, int]:
         """Tries to solve the problem using the current domain.
 
         :param problem_path: the path to the problem to solve.
+        :param num_steps_till_episode_end: the number of steps to take until the end of the episode.
         :return: whether the goal was reached and the number of steps taken to solve the problem.
         """
         self.logger.info("Trying to solve the problem.")
-        if self._solver is None:
+        if self._solvers is None:
             raise ValueError("No solver was provided to the learner.")
 
         solution_file_path = self.workdir / f"{problem_path.stem}.solution"
         self.logger.info("Trying to solve the problem using the safe action model.")
         safe_model = self._construct_safe_action_model()
         domain_path = self._export_learned_domain(safe_model, is_safe_model=True)
-        solution_status = self._solver.solve_problem(
+        solution_status = self._solvers.solve_problem(
             domain_file_path=domain_path,
             problem_file_path=problem_path,
             problems_directory_path=self.workdir,
@@ -593,6 +609,26 @@ class NumericOnlineActionModelLearner:
         if solution_status == SolutionOutputTypes.ok:
             self.logger.info("The problem was solved using the safe action model.")
             plan_actions = create_plan_actions(solution_file_path)
-            return True, len(plan_actions)
+            if len(plan_actions) > 0:
+                self.logger.info("The plan created using the safe action model.")
+                trace, goal_reached = self.agent.execute_plan(plan_actions)
+                if not goal_reached:
+                    raise ValueError("The goal should have been reached when used the safe action model!")
 
-        return self.apply_exploration_policy(problem_path)
+                self.train_models_using_trace(trace)
+                self.episode_recorder.end_episode(
+                    undecided_states=self.undecided_failure_observations,
+                    goal_reached=goal_reached,
+                    num_steps_in_episode=num_steps_till_episode_end,
+                )
+                return True, len(trace)
+
+        goal_reached, num_steps_till_episode_end = self.apply_exploration_policy(
+            problem_path, num_steps_till_episode_end
+        )
+        self.episode_recorder.end_episode(
+            undecided_states=self.undecided_failure_observations,
+            goal_reached=goal_reached,
+            num_steps_in_episode=num_steps_till_episode_end,
+        )
+        return goal_reached, num_steps_till_episode_end
