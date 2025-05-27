@@ -86,6 +86,24 @@ class DistributedKFoldSplit:
 
         return fold_train_dir_path, fold_test_dir_path
 
+    def _create_algorithms_directories(
+        self,
+        fold_index: int,
+        num_used_trajectories: Optional[int],
+        selected_trajectories: List[Path],
+        test_set_problems: List[Path],
+        additional_suffix: str = "",
+    ) -> None:
+        for learning_algorithm in self._learning_algorithms:
+            self.create_directories_content(
+                test_set_problems=test_set_problems,
+                selected_training_trajectories=selected_trajectories,
+                fold_index=fold_index,
+                learning_algorithm=learning_algorithm,
+                internal_iteration=num_used_trajectories,
+                additional_suffix=additional_suffix,
+            )
+
     def create_fold_from_scratch(self, folds_data: Dict[str, Any], max_items: int, trajectory_suffix: str) -> None:
         trajectory_paths = list(self.working_directory_path.glob(trajectory_suffix))
         items_per_fold = max_items if (0 < max_items <= len(trajectory_paths)) else len(trajectory_paths)
@@ -99,15 +117,8 @@ class DistributedKFoldSplit:
             training_data = {"internal_iterations": {}}
             if self._internal_iterations is None:
                 self.logger.debug("No internal iterations given, using the full training set.")
-                for learning_algorithm in self._learning_algorithms:
-                    self.create_directories_content(
-                        test_set_problems=test_set_problems,
-                        selected_training_trajectories=train_set_trajectories,
-                        fold_index=fold_index,
-                        learning_algorithm=learning_algorithm,
-                    )
-                    training_data = [str(p.absolute()) for p in train_set_trajectories]
-
+                self._create_algorithms_directories(fold_index, None, train_set_trajectories, test_set_problems)
+                training_data = [str(p.absolute()) for p in train_set_trajectories]
                 folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
                     "train": training_data,
                     "test": [str(p.absolute()) for p in test_set_problems],
@@ -118,26 +129,13 @@ class DistributedKFoldSplit:
             for num_used_trajectories in self._internal_iterations:
                 self.logger.debug(f"Creating fold {fold_index} with {num_used_trajectories} trajectories.")
                 selected_trajectories = train_set_trajectories[:num_used_trajectories]
-                for learning_algorithm in self._learning_algorithms:
-                    self.create_directories_content(
-                        test_set_problems=test_set_problems,
-                        selected_training_trajectories=selected_trajectories,
-                        fold_index=fold_index,
-                        learning_algorithm=learning_algorithm,
-                        internal_iteration=num_used_trajectories,
-                    )
-
+                self._create_algorithms_directories(fold_index, num_used_trajectories, selected_trajectories, test_set_problems)
                 training_data["internal_iterations"][int(num_used_trajectories)] = [str(p.absolute()) for p in selected_trajectories]
 
             max_dataset_size = self._internal_iterations[-1]
-            for learning_algorithm in self._learning_algorithms:
-                self.create_directories_content(
-                    test_set_problems=test_set_problems,
-                    selected_training_trajectories=train_set_trajectories[:max_dataset_size],
-                    fold_index=fold_index,
-                    learning_algorithm=learning_algorithm,
-                    additional_suffix="_triplets",
-                )
+            self._create_algorithms_directories(
+                fold_index, max_dataset_size, train_set_trajectories[:max_dataset_size], test_set_problems, additional_suffix="_triplets"
+            )
 
             folds_data[f"{FOLDS_LABEL}_{fold_index}"] = {
                 "train": training_data,
@@ -171,6 +169,17 @@ class DistributedKFoldSplit:
         if load_configuration and len(folds_data) > 0:
             self.logger.debug("Loading the folds settings from the configuration file.")
             for index, (fold_name, fold_content) in enumerate(folds_data.items()):
+                if "internal_iterations" not in fold_content["train"]:
+                    self.logger.debug("No internal iterations found in the fold content, using the full training set.")
+                    selected_trajectories_paths = [Path(p) for p in fold_content["train"]]
+                    self._create_algorithms_directories(
+                        index,
+                        num_used_trajectories=None,
+                        selected_trajectories=selected_trajectories_paths,
+                        test_set_problems=fold_content["test"],
+                    )
+                    continue
+
                 for iteration_num, selected_trajectories in fold_content["train"]["internal_iterations"].items():
                     selected_trajectories_paths = [Path(p) for p in selected_trajectories]
                     for learning_algorithm in self._learning_algorithms:
