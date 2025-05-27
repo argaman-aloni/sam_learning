@@ -1,2 +1,2 @@
 from .ipc_agent import IPCAgent
-from .minecraft_agent import MinecraftAgent
+from .abstract_agent import AbstractAgent

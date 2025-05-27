@@ -1,4 +1,5 @@
 """An online numeric model learning algorithm."""
+
 from pandas import DataFrame, Series
 
 from sam_learning.core.numeric_learning.linear_regression_learner import LinearRegressionLearner
@@ -34,16 +35,31 @@ class OnlineNumericModelLearner:
     action_name: str
 
     def __init__(
-        self, action_name: str, pb_functions: Dict[str, PDDLFunction], polynom_degree: int = 0, epsilon: float = 0.0, qhull_options: str = "",
+        self,
+        action_name: str,
+        pb_functions: Dict[str, PDDLFunction],
+        polynom_degree: int = 0,
+        epsilon: float = 0.0,
+        qhull_options: str = "",
     ):
         self.logger = logging.getLogger(__name__)
         self.action_name = action_name
         self._convex_hull_learner = IncrementalConvexHullLearner(
-            action_name=action_name, domain_functions=pb_functions, polynom_degree=polynom_degree, qhull_options=qhull_options, epsilon=epsilon,
+            action_name=action_name,
+            domain_functions=pb_functions,
+            polynom_degree=polynom_degree,
+            qhull_options=qhull_options,
+            epsilon=epsilon,
         )
-        self._svm_learner = IncrementalSVMLearner(action_name=action_name, domain_functions=pb_functions, polynom_degree=polynom_degree,)
+        self._svm_learner = IncrementalSVMLearner(
+            action_name=action_name,
+            domain_functions=pb_functions,
+            polynom_degree=polynom_degree,
+        )
         self._linear_regression_learner = LinearRegressionLearner(
-            action_name=action_name, domain_functions=pb_functions, polynom_degree=polynom_degree,
+            action_name=action_name,
+            domain_functions=pb_functions,
+            polynom_degree=polynom_degree,
         )
         self._monomials = create_monomials(list(pb_functions.keys()), polynom_degree)
         self._data_columns = [create_polynomial_string(monomial) for monomial in self._monomials]
@@ -87,7 +103,9 @@ class OnlineNumericModelLearner:
         :param state_fluents: Dictionary containing state variables and their associated PDDLFunction with their values.
         """
         self.logger.info(f"Adding a new numeric positive post-state observation for the action {self.action_name}.")
-        next_state_values = {state_fluent_lifted_str: state_fluent_data.value for state_fluent_lifted_str, state_fluent_data in state_fluents.items()}
+        next_state_values = {
+            state_fluent_lifted_str: state_fluent_data.value for state_fluent_lifted_str, state_fluent_data in state_fluents.items()
+        }
         self._linear_regression_learner.add_new_observation(next_state_values, store_in_prev_state=False)
 
     def _add_negative_pre_state_observation(self, state_fluents: Dict[str, PDDLFunction]) -> None:
@@ -103,7 +121,10 @@ class OnlineNumericModelLearner:
         self._svm_learner.add_new_point(state_fluents, is_successful=False)
 
     def add_transition_data(
-        self, pre_state_functions: Dict[str, PDDLFunction], post_state_functions: Dict[str, PDDLFunction] = None, is_transition_successful: bool = True
+        self,
+        pre_state_functions: Dict[str, PDDLFunction],
+        post_state_functions: Dict[str, PDDLFunction] = None,
+        is_transition_successful: bool = True,
     ) -> None:
         """Adds transition data, including pre-state and post-state functions, to the system. If the transition is
         successful, it updates positive pre- and post-state observations. Otherwise, it updates negative
@@ -142,10 +163,10 @@ class OnlineNumericModelLearner:
         :return: the optimistic model of the action.
         """
         self.logger.info(f"Getting the optimistic model for the action {self.action_name}.")
-        safe_precondition = self._svm_learner.construct_linear_inequalities()
+        optimistic_precondition = self._svm_learner.construct_linear_inequalities()
         numeric_effects, _, _ = self._linear_regression_learner.construct_assignment_equations(allow_unsafe=True)
 
-        return safe_precondition, numeric_effects
+        return optimistic_precondition, numeric_effects
 
     def is_state_in_safe_model(self, state: Dict[str, PDDLFunction]) -> bool:
         """Checks if state predicates hold in the safe model.
