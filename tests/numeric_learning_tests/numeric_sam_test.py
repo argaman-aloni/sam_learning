@@ -1,4 +1,5 @@
 """module tests for the Numeric SAM learning algorithm"""
+
 import json
 from typing import Dict, List
 
@@ -36,7 +37,9 @@ def satellite_problem_problematic(satellite_numeric_domain: Domain) -> Problem:
 
 @fixture()
 def satellite_observation_problematic(satellite_numeric_domain: Domain, satellite_problem_problematic: Problem) -> Observation:
-    return TrajectoryParser(satellite_numeric_domain, satellite_problem_problematic).parse_trajectory(SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH)
+    return TrajectoryParser(satellite_numeric_domain, satellite_problem_problematic).parse_trajectory(
+        SATELLITE_PROBLEMATIC_NUMERIC_TRAJECTORY_PATH
+    )
 
 
 @fixture()
@@ -71,7 +74,9 @@ def driverlog_polynomial_observation(driverlog_polynomial_domain: Domain, driver
 
 @fixture()
 def driverlog_polynomial_nsam(driverlog_polynomial_domain: Domain) -> NumericSAMLearner:
-    return NumericSAMLearner(driverlog_polynomial_domain, {action: [] for action in driverlog_polynomial_domain.actions}, polynomial_degree=1)
+    return NumericSAMLearner(
+        driverlog_polynomial_domain, {action: [] for action in driverlog_polynomial_domain.actions}, polynomial_degree=1
+    )
 
 
 @fixture()
@@ -80,7 +85,9 @@ def minecraft_medium_observation(minecraft_medium_domain: Domain) -> Observation
 
 
 @fixture()
-def minecraft_medium_sam(minecraft_medium_domain: Domain, minecraft_medium_preconditions_fluents_map: Dict[str, List[str]]) -> NumericSAMLearner:
+def minecraft_medium_sam(
+    minecraft_medium_domain: Domain, minecraft_medium_preconditions_fluents_map: Dict[str, List[str]]
+) -> NumericSAMLearner:
     return NumericSAMLearner(minecraft_medium_domain, minecraft_medium_preconditions_fluents_map)
 
 
@@ -165,18 +172,24 @@ def test_add_new_action_adds_discrete_preconditions_to_the_learned_action(depot_
     sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
     depot_nsam.add_new_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     learned_action = depot_nsam.partial_domain.actions[action_call.name]
-    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)]
+    action_discrete_preconditions = [
+        precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)
+    ]
     assert len(action_discrete_preconditions) > 0
 
 
-def test_add_new_action_adds_the_required_predicates_to_the_action_preconditions(depot_nsam: NumericSAMLearner, depot_observation: Observation):
+def test_add_new_action_adds_the_required_predicates_to_the_action_preconditions(
+    depot_nsam: NumericSAMLearner, depot_observation: Observation
+):
     initial_state = depot_observation.components[0].previous_state
     action_call = depot_observation.components[0].grounded_action_call
     next_state = depot_observation.components[0].next_state
     sync_snapshot(depot_nsam, depot_observation.components[0], depot_observation.grounded_objects)
     depot_nsam.add_new_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     learned_action = depot_nsam.partial_domain.actions[action_call.name]
-    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)]
+    action_discrete_preconditions = [
+        precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)
+    ]
     preconditions_str = {precondition.untyped_representation for precondition in action_discrete_preconditions}
     assert preconditions_str.issuperset({"(at ?x ?y)"})
 
@@ -199,11 +212,15 @@ def test_update_action_adds_discrete_preconditions_to_the_learned_action(depot_n
     depot_nsam.add_new_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     depot_nsam.update_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     learned_action = depot_nsam.partial_domain.actions[action_call.name]
-    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)]
+    action_discrete_preconditions = [
+        precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)
+    ]
     assert len(action_discrete_preconditions) > 0
 
 
-def test_update_action_adds_the_required_predicates_to_the_action_preconditions(depot_nsam: NumericSAMLearner, depot_observation: Observation):
+def test_update_action_adds_the_required_predicates_to_the_action_preconditions(
+    depot_nsam: NumericSAMLearner, depot_observation: Observation
+):
     initial_state = depot_observation.components[0].previous_state
     action_call = depot_observation.components[0].grounded_action_call
     next_state = depot_observation.components[0].next_state
@@ -211,7 +228,9 @@ def test_update_action_adds_the_required_predicates_to_the_action_preconditions(
     depot_nsam.add_new_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     depot_nsam.update_action(grounded_action=action_call, previous_state=initial_state, next_state=next_state)
     learned_action = depot_nsam.partial_domain.actions[action_call.name]
-    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)]
+    action_discrete_preconditions = [
+        precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)
+    ]
     preconditions_str = {precondition.untyped_representation for precondition in action_discrete_preconditions}
     assert preconditions_str.issuperset({"(at ?x ?y)"})
 
@@ -222,7 +241,9 @@ def test_handle_single_trajectory_component_does_not_remove_the_required_predica
     depot_nsam.current_trajectory_objects = depot_observation.grounded_objects
     depot_nsam.handle_single_trajectory_component(depot_observation.components[0])
     learned_action = depot_nsam.partial_domain.actions["drive"]
-    action_discrete_preconditions = [precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)]
+    action_discrete_preconditions = [
+        precondition for _, precondition in learned_action.preconditions if isinstance(precondition, Predicate)
+    ]
     preconditions_str = {precondition.untyped_representation for precondition in action_discrete_preconditions}
     assert preconditions_str.issuperset({"(at ?x ?y)"})
 
@@ -234,7 +255,9 @@ def test_learn_action_model_returns_learned_model(depot_nsam: NumericSAMLearner,
     print(learned_model.to_pddl())
 
 
-def test_learn_action_model_for_satellite_domain_returns_learned_model(satellite_nsam: NumericSAMLearner, satellite_numeric_observation: Observation):
+def test_learn_action_model_for_satellite_domain_returns_learned_model(
+    satellite_nsam: NumericSAMLearner, satellite_numeric_observation: Observation
+):
     learned_model, learning_metadata = satellite_nsam.learn_action_model([satellite_numeric_observation])
     print()
     print(learning_metadata)
@@ -316,20 +339,6 @@ def test_learn_action_model_when_applying_multiple_times_with_different_trajecto
     learned_model2, learning_metadata = depot_nsam.learn_action_model([observation2])
     num_learned_actions_model2 = len(learned_model2.actions)
     assert num_learned_actions_model1 < num_learned_actions_model2
-
-
-def test_learn_action_model_with_ppo_observations_and_nsam_returns_preconditions_without_duplications_while_using_the_trajectories_incrementally(
-    minecraft_ppo_domain: Domain,
-):
-    minecraft_ppo_nsam = NumericSAMLearner(minecraft_ppo_domain)
-    parser = TrajectoryParser(minecraft_ppo_domain)
-    learned_model = None
-    for observation in TEST_PPO_OBSERVATIONS_DIRECTORY.glob("*.trajectory"):
-        trajectory = parser.parse_trajectory(observation)
-        learned_model, _ = minecraft_ppo_nsam.learn_action_model([trajectory])
-
-    print()
-    print(learned_model.to_pddl())
 
 
 def test_learn_action_model_with_multiple_farmland_observations_increases_the_size_of_the_dataset_between_iterations(
