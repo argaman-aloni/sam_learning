@@ -1,4 +1,5 @@
 """Utility functions for handling and presenting numeric data."""
+
 import itertools
 import os
 from typing import Union, List, Dict, Tuple, Optional, Set
@@ -80,7 +81,9 @@ def prettify_coefficients(coefficients: List[float]) -> List[float]:
 
 
 def construct_projected_variable_strings(
-    function_variables: List[str], shift_point: Union[np.ndarray, List[float]], projection_basis: Union[np.ndarray, List[List[float]]],
+    function_variables: List[str],
+    shift_point: Union[np.ndarray, List[float]],
+    projection_basis: Union[np.ndarray, List[List[float]]],
 ) -> List[str]:
     """Constructs the strings representing the multiplications of the function variables with the coefficient.
 
@@ -91,7 +94,9 @@ def construct_projected_variable_strings(
     """
     shifted_by_mean = []
     for func, shift_value in zip(function_variables, shift_point):
-        component_function = func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, DECIMAL_DIGITS))})"
+        component_function = (
+            func if shift_value == 0.0 else f"(- {func} {prettify_floating_point_number(round(shift_value, DECIMAL_DIGITS))})"
+        )
         shifted_by_mean.append(component_function)
 
     sum_of_product_by_components = []
@@ -118,6 +123,9 @@ def construct_linear_equation_string(multiplication_parts: List[str]) -> str:
     :param multiplication_parts: the multiplication function strings that are multiplied by the coefficient.
     :return: the string representing the sum of the linear variables.
     """
+    if len(multiplication_parts) == 0:
+        return ""
+
     if len(multiplication_parts) == 1:
         return multiplication_parts[0]
 
@@ -125,7 +133,9 @@ def construct_linear_equation_string(multiplication_parts: List[str]) -> str:
     return f"(+ {multiplication_parts[0]} {inner_layer})"
 
 
-def construct_non_circular_assignment(lifted_function: str, coefficients_map: Dict[str, float], previous_value: float, next_value: float) -> str:
+def construct_non_circular_assignment(
+    lifted_function: str, coefficients_map: Dict[str, float], previous_value: float, next_value: float
+) -> str:
     """Changes circular assignment statements to be non-circular.
 
     Note:
@@ -202,7 +212,9 @@ def filter_constant_features(input_df: DataFrame, columns_to_ignore: Optional[Li
         return DataFrame(), equal_fluent_strs, input_df.columns
 
 
-def detect_linear_dependent_features(data_matrix: DataFrame, columns_to_ignore: List[str] = []) -> Tuple[DataFrame, List[str], Dict[str, str]]:
+def detect_linear_dependent_features(
+    data_matrix: DataFrame, columns_to_ignore: List[str] = []
+) -> Tuple[DataFrame, List[str], Dict[str, str]]:
     """Detects linear dependent features and adds the equality constraints to the problem.
 
     The idea is: put together these column vectors as a matrix and calculate its row-echelon form.
@@ -457,7 +469,9 @@ def _first_non_zero_index(numbers_list: List[float]) -> int:
     return -1
 
 
-def reduce_complementary_conditions_from_convex_hull(convex_hull: List[List[float]], complementary_basis: List[List[float]]) -> List[List[float]]:
+def reduce_complementary_conditions_from_convex_hull(
+    convex_hull: List[List[float]], complementary_basis: List[List[float]]
+) -> List[List[float]]:
     """Reduces the complementary conditions from the Gram-Schmidt basis.
 
     :param convex_hull: the basis of the projection.

@@ -1,4 +1,5 @@
 """This module contains the ConvexHullLearner class."""
+
 import logging
 from typing import Dict, List, Tuple, Optional
 
@@ -80,7 +81,11 @@ class IncrementalSVMLearner:
     relevant_fluents: Optional[List[str]]
 
     def __init__(
-        self, action_name: str, domain_functions: Dict[str, PDDLFunction], polynom_degree: int = 0, relevant_fluents: Optional[List[str]] = None,
+        self,
+        action_name: str,
+        domain_functions: Dict[str, PDDLFunction],
+        polynom_degree: int = 0,
+        relevant_fluents: Optional[List[str]] = None,
     ):
         self.action_name = action_name
         functions = list([function.untyped_representation for function in domain_functions.values()])
@@ -141,9 +146,7 @@ class IncrementalSVMLearner:
             X_filtered = X_reminder[final_mask]
             y_filtered = y_reminder[final_mask]
 
-            classifier = LinearSVC(
-               random_state=0, tol=EPSILON, dual=False, max_iter=5000, C=1e10
-            )
+            classifier = LinearSVC(random_state=0, tol=EPSILON, dual=False, max_iter=5000, C=1e10)
             classifier.fit(X_filtered, y_filtered.tolist())
             A = classifier.coef_[0].copy()
             b = -classifier.intercept_[0].copy()
@@ -190,15 +193,15 @@ class IncrementalSVMLearner:
             coeff_i, bp_i, pred_i = planes[i]
             is_subset = False
 
-            for j in range(i+1, len(planes)):
+            for j in range(i + 1, len(planes)):
                 # Check if the plane i is a subset of another
                 result = planes[j][2] - pred_i
-                if -1 not in result: # plain j is superset of plane i
+                if -1 not in result:  # plain j is superset of plane i
                     is_subset = True
                     break
 
             if not is_subset:
-                filtered_planes.append((coeff_i, bp_i))     
+                filtered_planes.append((coeff_i, bp_i))
         planes = filtered_planes
 
         if debug:
@@ -224,7 +227,9 @@ class IncrementalSVMLearner:
                 inequalities_strs = construct_pddl_inequality_scheme(A, b, self.data.columns.tolist(), sign_to_use=">=")
                 # Since each plane is a linear inequality, we can extract the condition and add it to the preconditions.
                 inequality_condition = construct_numeric_conditions(
-                    inequalities_strs, condition_type=ConditionType.conjunctive, domain_functions=self.domain_functions,
+                    inequalities_strs,
+                    condition_type=ConditionType.conjunctive,
+                    domain_functions=self.domain_functions,
                 )
                 for operand in inequality_condition.operands:
                     preconditions.add_condition(operand)
@@ -233,4 +238,6 @@ class IncrementalSVMLearner:
 
         except ValueError:
             self.logger.warning("Failed to create the SVM based conditions.")
-            raise NotSafeActionError(name=self.action_name, reason="SVM failed to execute.", solution_type=EquationSolutionType.svm_failed_to_train)
+            raise NotSafeActionError(
+                name=self.action_name, reason="SVM failed to execute.", solution_type=EquationSolutionType.svm_failed_to_train
+            )
