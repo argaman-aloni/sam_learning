@@ -24,15 +24,18 @@ def run_validate_script(domain_file_path: Path, problem_file_path: Path, solutio
     :param solution_file_path: the path to the solution file.
     :return: the path to the validation log file.
     """
-    os.chdir(VALIDATOR_DIRECTORY)
+    original_working_dir = os.getcwd()  # Save the current working directory to return to it later
     logger.info("Running VAL to validate the plan's correctness.")
     validation_file_path = domain_file_path.parent / f"validation_log_{uuid.uuid4()}.txt"
-    run_command = f"./Validate -v -t 0.1 {domain_file_path} {problem_file_path} " f"{solution_file_path} > {validation_file_path}"
+    run_command = f"./Validate -v -t 0.1 {domain_file_path.absolute()} {problem_file_path.absolute()} " \
+                  f"{solution_file_path.absolute()} > {validation_file_path.absolute()}"
     try:
+        os.chdir(VALIDATOR_DIRECTORY)
         subprocess.check_output(run_command, shell=True)
 
     except subprocess.CalledProcessError as e:
         logger.warning(f"VAL returned status code {e.returncode}.")
 
+    os.chdir(original_working_dir) # Return to the original working directory
     logger.info("Finished validating the solution file.")
     return validation_file_path
