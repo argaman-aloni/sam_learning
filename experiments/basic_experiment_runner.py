@@ -68,6 +68,7 @@ class OfflineBasicExperimentRunner:
             domain_path=self.working_directory_path / domain_file_name,
             learning_algorithm=learning_algorithm,
         )
+        self.problem_prefix = problem_prefix
         self._learning_algorithm = learning_algorithm
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
@@ -79,7 +80,8 @@ class OfflineBasicExperimentRunner:
         self.semantic_performance_calc = init_semantic_performance_calculator(
             self.working_directory_path,
             self.domain_file_name,
-            self._learning_algorithm,
+            learning_algorithm=self._learning_algorithm,
+            problem_prefix=self.problem_prefix,
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories",
         )
 
