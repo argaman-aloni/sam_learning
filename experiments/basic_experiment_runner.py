@@ -15,7 +15,7 @@ from statistics.ma_performance_calculator import MASamPerformanceCalculator
 from statistics.numeric_performance_calculator import NumericPerformanceCalculator
 from statistics.semantic_performance_calculator import SemanticPerformanceCalculator
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType, SolverType
+from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
 from utilities.k_fold_split import KFoldSplit
 from validators import DomainValidator
 
@@ -52,11 +52,13 @@ class OfflineBasicExperimentRunner:
     _learning_algorithm: LearningAlgorithmType
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
-    semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator, MASamPerformanceCalculator]
+    semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator, MASamPerformanceCalculator],
+    negative_precondition_policy: NegativePreconditionPolicy
 
     def __init__(
         self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType,
-            problem_prefix: str = "pfile", n_split: int = DEFAULT_SPLIT
+            problem_prefix: str = "pfile", n_split: int = DEFAULT_SPLIT,
+            negative_precondition_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
@@ -69,6 +71,7 @@ class OfflineBasicExperimentRunner:
             learning_algorithm=learning_algorithm,
         )
         self.problem_prefix = problem_prefix
+        self.negative_precondition_policy = negative_precondition_policy
         self._learning_algorithm = learning_algorithm
         self.semantic_performance_calc = None
         self.domain_validator = DomainValidator(
@@ -104,6 +107,24 @@ class OfflineBasicExperimentRunner:
 
         return domain_path
 
+    @staticmethod
+    def collect_observations(train_set_dir_path: Path, partial_domain: Domain) -> List[Observation]:
+        """Collects all the observations from the trajectories in the train set directory.
+
+        :param train_set_dir_path: the path to the directory containing the trajectories.
+        :param partial_domain: the partial domain without the actions' preconditions and effects.
+        :return: the allowed observations.
+        """
+        allowed_observations = []
+        sorted_trajectory_paths = sorted(train_set_dir_path.glob("*.trajectory"))  # for consistency
+        for index, trajectory_file_path in enumerate(sorted_trajectory_paths):
+            problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
+            problem = ProblemParser(problem_path, partial_domain).parse_problem()
+            complete_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
+            allowed_observations.append(complete_observation)
+
+        return allowed_observations
+
     def learn_model_offline(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
@@ -115,30 +136,19 @@ class OfflineBasicExperimentRunner:
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        allowed_observations = []
-        learned_domain_path = None
-        for index, trajectory_file_path in enumerate(train_set_dir_path.glob("*.trajectory")):
-            problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
-            problem = ProblemParser(problem_path, partial_domain).parse_problem()
-            new_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path)
-            allowed_observations.append(new_observation)
-            if index == 70:
-                # stopping all the experiments after 50 trajectories so that the experiments will not take too long
-                break
 
-            if (index + 1) % 10 != 0:
-                continue
-
-            self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-            learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
-
-            self.learning_statistics_manager.add_to_action_stats(allowed_observations, learned_model, learning_report)
-
-            learned_domain_path = self.validate_learned_domain(
-                allowed_observations, learned_model, test_set_dir_path, fold_num, float(learning_report["learning_time"])
-            )
-
-        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations))
+        allowed_observations = self.collect_observations(train_set_dir_path, partial_domain)
+        self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
+        learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations,
+                                                                        test_set_dir_path)
+        self.learning_statistics_manager.add_to_action_stats(
+            allowed_observations, learned_model, learning_report, policy=self.negative_precondition_policy
+        )
+        learned_domain_path = self.validate_learned_domain(
+            allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
+        )
+        self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations),
+                                                             self.negative_precondition_policy)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
         self.semantic_performance_calc.export_semantic_performance(fold_num + 1)
         self.domain_validator.write_statistics(fold_num)
