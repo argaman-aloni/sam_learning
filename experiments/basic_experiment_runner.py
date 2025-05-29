@@ -55,11 +55,13 @@ class OfflineBasicExperimentRunner:
     semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator, MASamPerformanceCalculator]
 
     def __init__(
-        self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType, problem_prefix: str = "pfile",
+        self, working_directory_path: Path, domain_file_name: str, learning_algorithm: LearningAlgorithmType,
+            problem_prefix: str = "pfile", n_split: int = DEFAULT_SPLIT
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
-        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name, n_split=DEFAULT_SPLIT)
+        self.k_fold = KFoldSplit(working_directory_path=working_directory_path, domain_file_name=domain_file_name,
+                                 n_split=n_split)
         self.domain_file_name = domain_file_name
         self.learning_statistics_manager = LearningStatisticsManager(
             working_directory_path=working_directory_path,
