@@ -145,7 +145,7 @@ class OfflineBasicExperimentRunner:
             allowed_observations, learned_model, learning_report, policy=self.negative_precondition_policy
         )
         learned_domain_path = self.validate_learned_domain(
-            allowed_observations, learned_model, test_set_dir_path, fold_num, learning_report["learning_time"]
+            allowed_observations, learned_model, test_set_dir_path, fold_num, float(learning_report["learning_time"])
         )
         self.semantic_performance_calc.calculate_performance(learned_domain_path, len(allowed_observations),
                                                              self.negative_precondition_policy)
