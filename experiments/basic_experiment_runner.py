@@ -82,7 +82,7 @@ class OfflineBasicExperimentRunner:
             self.domain_file_name,
             learning_algorithm=self._learning_algorithm,
             problem_prefix=self.problem_prefix,
-            test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories",
+            test_set_dir_path=self.working_directory_path / "test"
         )
 
     def _apply_learning_algorithm(
