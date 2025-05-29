@@ -178,7 +178,7 @@ class OfflineBasicExperimentRunner:
         portfolio = (
             [SolverType.metric_ff, SolverType.enhsp]
             if self._learning_algorithm in NUMERIC_ALGORITHMS
-            else [SolverType.fast_forward, SolverType.fast_downward]
+            else [SolverType.fast_downward]
         )
         self.domain_validator.validate_domain(
             tested_domain_file_path=domain_file_path,
