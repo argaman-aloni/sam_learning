@@ -123,6 +123,9 @@ class KFoldSplit:
         for problem in test_set_problems:
             shutil.copy(problem, self.test_set_dir_path / problem.name)
 
+            trajectory_path = self.working_directory_path / f"{problem.stem}.trajectory"
+            shutil.copy(trajectory_path, self.test_set_dir_path / trajectory_path.name)
+
         for trajectory, problem in zip(trajectory_paths, train_set_problems):
             shutil.copy(trajectory, self.train_set_dir_path / trajectory.name)
             shutil.copy(problem, self.train_set_dir_path / problem.name)
