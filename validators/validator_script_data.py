@@ -36,6 +36,6 @@ def run_validate_script(domain_file_path: Path, problem_file_path: Path, solutio
     except subprocess.CalledProcessError as e:
         logger.warning(f"VAL returned status code {e.returncode}.")
 
-    os.chdir(original_working_dir) # Return to the original working directory
+    os.chdir(original_working_dir)  # Return to the original working directory
     logger.info("Finished validating the solution file.")
     return validation_file_path
