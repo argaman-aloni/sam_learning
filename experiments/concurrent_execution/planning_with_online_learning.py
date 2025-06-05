@@ -2,8 +2,8 @@
 
 import argparse
 import logging
+import shutil
 from pathlib import Path
-from typing import Optional
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import Domain, State
@@ -12,13 +12,13 @@ from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners import NumericOnlineActionModelLearner
 from sam_learning.learners.noam_algorithm import ExplorationAlgorithmType
+from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver, MetricFFSolver
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType
 
 MAX_SIZE_MB = 10
 MAX_EPISODE_NUM_STEPS = 5000
-ITERATIONS_IN_PROBLEM = 5
 
 ONLINE_LEARNING_ALGORITHMS = {
     ExplorationAlgorithmType.combined: LearningAlgorithmType.noam_learning,
@@ -62,18 +62,6 @@ class PIL:
             problem_prefix=self.problems_prefix,
         )
 
-    def _export_learned_domain(self, learned_domain: Domain, output_directory_path: Path, file_name: Optional[str] = None) -> None:
-        """Exports the learned domain into a file so that it will be used to solve the test set problems.
-
-        :param learned_domain: the domain that was learned by the action model learning algorithm.
-        :param output_directory_path: the path to the test set directory where the domain would be exported to.
-        :param file_name: the name of the file to export the domain to.
-        """
-        domain_file_name = file_name or self.domain_file_name
-        domain_path = output_directory_path / domain_file_name
-        with open(domain_path, "wt") as domain_file:
-            domain_file.write(learned_domain.to_pddl())
-
     def _export_domain_and_backup(
         self,
         episode_number: int,
@@ -91,11 +79,12 @@ class PIL:
         """
         domains_backup_dir_path = self.working_directory_path / "results_directory" / "domains_backup"
         domains_backup_dir_path.mkdir(exist_ok=True)
+        domain_file_name = learned_model.name + f"_{'safe' if is_safe_model else 'optimistic'}_learned_domain.pddl"
         backup_domain_name = (
             f"{self._learning_algorithm.name}_fold_{fold_number}_{learned_model.name}"
             f"_episode_{episode_number}_{'safe' if is_safe_model else 'optimistic'}_model.pddl"
         )
-        self._export_learned_domain(learned_model, domains_backup_dir_path, file_name=backup_domain_name)
+        shutil.copy(self.working_directory_path / domain_file_name, domains_backup_dir_path / backup_domain_name)
 
     def learn_model_online(self, fold_num: int) -> None:
         """Learns the model of the environment by learning from the input trajectories.
@@ -108,7 +97,7 @@ class PIL:
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         self._agent = IPCAgent(complete_domain)
-        episode_recorder = EpisodeInfoRecord(action_names=list(partial_domain.actions))
+        episode_recorder = EpisodeInfoRecord(action_names=list(partial_domain.actions), working_directory=train_set_dir_path)
         online_learner = NumericOnlineActionModelLearner(
             workdir=train_set_dir_path,
             partial_domain=partial_domain,
@@ -120,43 +109,60 @@ class PIL:
         )
         online_learner.initialize_learning_algorithms()
         num_training_goal_achieved = 0
-        episode_number = 0
         for problem_index, problem_path in enumerate(sorted(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl"))):
-            for i in range(ITERATIONS_IN_PROBLEM):
-                self.logger.info(f"Starting episode number {problem_index + 1}!")
-                problem = ProblemParser(problem_path, complete_domain).parse_problem()
-                self._agent.initialize_problem(problem)
-                initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
-                num_grounded_actions = len(self._agent.get_environment_actions(initial_state))
-                episode_recorder.add_num_grounded_actions(num_grounded_actions)
-                goal_achieved, num_steps_in_episode = online_learner.try_to_solve_problem(
-                    problem_path,
-                    num_steps_till_episode_end=MAX_EPISODE_NUM_STEPS // (i + 1),
-                )
-                episode_number += 1
-                self.logger.info(
-                    f"Finished episode number {episode_number + 1}! "
-                    f"The current goal was {'achieved' if goal_achieved else 'not achieved'}."
-                )
-                num_training_goal_achieved += 1 if goal_achieved else 0
-                self._export_domain_and_backup(
-                    episode_number=episode_number,
-                    fold_number=fold_num,
-                    learned_model=online_learner.construct_safe_action_model(),
-                    is_safe_model=True,
-                )
-                self._export_domain_and_backup(
-                    episode_number=episode_number,
-                    fold_number=fold_num,
-                    learned_model=online_learner.construct_optimistic_action_model(),
-                    is_safe_model=False,
-                )
+            self.logger.info(f"Starting episode number {problem_index + 1}!")
+            problem = ProblemParser(problem_path, complete_domain).parse_problem()
+            self._agent.initialize_problem(problem)
+            initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents)
+            num_grounded_actions = len(self._agent.get_environment_actions(initial_state))
+            episode_recorder.add_num_grounded_actions(num_grounded_actions)
+            goal_achieved, num_steps_in_episode = online_learner.try_to_solve_problem(
+                problem_path,
+                num_steps_till_episode_end=MAX_EPISODE_NUM_STEPS,
+            )
+            self.logger.info(
+                f"Finished episode number {problem_index + 1}! " f"The current goal was {'achieved' if goal_achieved else 'not achieved'}."
+            )
+            num_training_goal_achieved += 1 if goal_achieved else 0
+            self._export_domain_and_backup(problem_index, fold_num, partial_domain, is_safe_model=True)
+            self._export_domain_and_backup(problem_index, fold_num, partial_domain, is_safe_model=False)
 
-                if goal_achieved:
-                    self.logger.info("The agent successfully solved the current task!")
+            if goal_achieved:
+                self.logger.info("The agent successfully solved the current task!")
 
         self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
 
+        episode_recorder.export_statistics(
+            self.working_directory_path
+            / "results_directory"
+            / f"{LearningAlgorithmType.noam_learning.name}_episode_info_fold_{fold_num}.csv"
+        )
+
+    def learn_model_semi_online(self, fold_num: int) -> None:
+        """Learns the model of the environment by learning from the input trajectories.
+
+        :param fold_num: the index of the current folder that is currently running.
+        """
+        self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
+        # TODO: Change the path to the train set directory
+        train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{LearningAlgorithmType.noam_learning.value}"
+        partial_domain_path = train_set_dir_path / self.domain_file_name
+        complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
+        partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
+        self._agent = IPCAgent(complete_domain)
+        episode_recorder = EpisodeInfoRecord(action_names=list(partial_domain.actions), working_directory=train_set_dir_path)
+        online_learner = SemiOnlineNumericAMLearner(
+            workdir=train_set_dir_path,
+            partial_domain=partial_domain,
+            polynomial_degree=self._polynomial_degree,
+            solvers=[MetricFFSolver(), ENHSPSolver()],
+            agent=self._agent,
+            episode_recorder=episode_recorder,
+        )
+        online_learner.initialize_learning_algorithms()
+        problems_to_solve = sorted(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl"))
+        online_learner.try_to_solve_problems(problems_to_solve)
+        self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
         episode_recorder.export_statistics(
             self.working_directory_path
             / "results_directory"
@@ -200,7 +206,7 @@ def main():
         polynomial_degree=0,  # Assuming linear models for simplicity
         exploration_type=ExplorationAlgorithmType.combined,  # Using combined exploration strategy
     )
-    learner.learn_model_online(fold_num=args.fold_number)
+    learner.learn_model_semi_online(fold_num=args.fold_number)
 
 
 if __name__ == "__main__":
