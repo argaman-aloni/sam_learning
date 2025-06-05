@@ -1,16 +1,16 @@
 """Module test for the online_nsam module."""
 
-import logging
 import shutil
 import time
 from pathlib import Path
-from queue import PriorityQueue
 
 import pytest
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Predicate, Precondition
+from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Precondition
 from pytest import fixture
 
+from sam_learning.core import EpisodeInfoRecord
+from sam_learning.core.online_learning.online_utilities import construct_optimistic_action_model, construct_safe_action_model
 from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners import NumericOnlineActionModelLearner
 from sam_learning.learners.noam_algorithm import ExplorationAlgorithmType
@@ -82,7 +82,8 @@ def depot_noam_informative_explorer(
         partial_domain=depot_domain,
         polynomial_degree=0,
         agent=depot_numeric_agent,
-        solver=ENHSPSolver(),
+        solvers=[ENHSPSolver()],
+        episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
         exploration_type=ExplorationAlgorithmType.informative_explorer,
     )
 
@@ -96,7 +97,8 @@ def counters_noam_informative_explorer(
         partial_domain=counters_numeric_domain,
         polynomial_degree=0,
         agent=counters_numeric_agent,
-        solver=ENHSPSolver(),
+        solvers=[ENHSPSolver()],
+        episode_recorder=EpisodeInfoRecord(list(counters_numeric_domain.actions), working_directory=working_directory),
         exploration_type=ExplorationAlgorithmType.informative_explorer,
     )
 
@@ -110,7 +112,8 @@ def depot_noam_goal_oriented(
         partial_domain=depot_domain,
         polynomial_degree=0,
         agent=depot_numeric_agent,
-        solver=ENHSPSolver(),
+        solvers=[ENHSPSolver()],
+        episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
         exploration_type=ExplorationAlgorithmType.goal_oriented,
     )
 
@@ -124,7 +127,8 @@ def depot_noam_goal_combined_explorer(
         partial_domain=depot_domain,
         polynomial_degree=0,
         agent=depot_numeric_agent,
-        solver=ENHSPSolver(),
+        solvers=[ENHSPSolver()],
+        episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
         exploration_type=ExplorationAlgorithmType.combined,
     )
 
@@ -400,7 +404,11 @@ def test_train_models_using_trace_when_given_an_inapplicable_action_and_then_the
     fixed_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "depot0"])
     trace, _ = depot_numeric_agent.execute_plan(plan=[fixed_action])
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
-    optimistic_model = depot_noam_informative_explorer.construct_optimistic_action_model()
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=depot_noam_informative_explorer.partial_domain,
+        discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+    )
     optimistic_conditions = optimistic_model.actions[failed_first_action.name].preconditions.root.operands.pop()
     assert isinstance(optimistic_conditions, Precondition)
     assert optimistic_conditions.binary_operator == "or"
@@ -417,8 +425,16 @@ def test_train_models_using_trace_when_given_multiple_successful_transitions_doe
         trace, _ = depot_numeric_agent.execute_plan(plan=plan)
         depot_noam_informative_explorer.initialize_learning_algorithms()
         depot_noam_informative_explorer.train_models_using_trace(trace=trace)
-        safe_model = depot_noam_informative_explorer.construct_safe_action_model()
-        optimistic_model = depot_noam_informative_explorer.construct_optimistic_action_model()
+        safe_model = construct_safe_action_model(
+            partial_domain=depot_noam_informative_explorer.partial_domain,
+            discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+            numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+        )
+        optimistic_model = construct_optimistic_action_model(
+            partial_domain=depot_noam_informative_explorer.partial_domain,
+            discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+            numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+        )
         print("Safe model:\n", safe_model.to_pddl())
         print("Optimistic model:\n", optimistic_model.to_pddl())
     except Exception as e:
@@ -435,8 +451,16 @@ def test_train_models_using_trace_when_given_multiple_successful_transitions_ret
         trace, _ = depot_numeric_agent.execute_plan(plan=plan)
         depot_noam_informative_explorer.initialize_learning_algorithms()
         depot_noam_informative_explorer.train_models_using_trace(trace=trace)
-        safe_model = depot_noam_informative_explorer.construct_safe_action_model()
-        optimistic_model = depot_noam_informative_explorer.construct_optimistic_action_model()
+        safe_model = construct_safe_action_model(
+            partial_domain=depot_noam_informative_explorer.partial_domain,
+            discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+            numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+        )
+        optimistic_model = construct_optimistic_action_model(
+            partial_domain=depot_noam_informative_explorer.partial_domain,
+            discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+            numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+        )
         print("Safe model:\n", safe_model.to_pddl())
         print("Optimistic model:\n", optimistic_model.to_pddl())
     except Exception as e:
@@ -448,7 +472,11 @@ def test_construct_safe_action_model_when_no_observation_given_does_not_fail(
 ):
     try:
         depot_noam_informative_explorer.initialize_learning_algorithms()
-        depot_noam_informative_explorer.construct_safe_action_model()
+        construct_safe_action_model(
+            partial_domain=depot_noam_informative_explorer.partial_domain,
+            discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+            numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+        )
     except Exception as e:
         assert False, e
 
@@ -458,7 +486,11 @@ def test_construct_optimistic_action_model_when_no_observation_given_does_not_fa
 ):
     try:
         depot_noam_informative_explorer.initialize_learning_algorithms()
-        depot_noam_informative_explorer.construct_optimistic_action_model()
+        construct_optimistic_action_model(
+            partial_domain=depot_noam_informative_explorer.partial_domain,
+            discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+            numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+        )
     except Exception as e:
         assert False, e
 
@@ -483,8 +515,18 @@ def test_explore_to_refine_models_changes_the_models_after_short_episode_is_done
     assert not goal_reached, "Goal should not be reached in such a short episode"
     assert num_steps_done <= 100
     assert end_time - start_time < 60, "Exploration took too long to finish"
-    print("Safe model:\n", depot_noam_informative_explorer.construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
+    safe_model = construct_safe_action_model(
+        partial_domain=depot_noam_informative_explorer.partial_domain,
+        discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+    )
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=depot_noam_informative_explorer.partial_domain,
+        discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+    )
+    print("Safe model:\n", safe_model.to_pddl())
+    print("Optimistic model:\n", optimistic_model.to_pddl())
 
 
 def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_updates_models_and_safe_and_optimistic_domains_are_available(
@@ -503,8 +545,18 @@ def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_
         problem_objects=depot_problem.objects,
     )
     assert num_steps_done <= 10000
-    print("Safe model:\n", depot_noam_informative_explorer.construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
+    safe_model = construct_safe_action_model(
+        partial_domain=depot_noam_informative_explorer.partial_domain,
+        discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+    )
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=depot_noam_informative_explorer.partial_domain,
+        discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+    )
+    print("Safe model:\n", safe_model.to_pddl())
+    print("Optimistic model:\n", optimistic_model.to_pddl())
 
 
 def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_empty_domain_that_reaches_goal_or_max_steps(
@@ -522,8 +574,18 @@ def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_
         problem_objects=counters_problem.objects,
     )
     assert goal_reached or num_steps_done == 20000, "Goal should be reached or max steps should be done"
-    print("Safe model:\n", counters_noam_informative_explorer.construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", counters_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
+    safe_model = construct_safe_action_model(
+        partial_domain=counters_noam_informative_explorer.partial_domain,
+        discrete_models_learners=counters_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=counters_noam_informative_explorer._numeric_models_learners,
+    )
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=counters_noam_informative_explorer.partial_domain,
+        discrete_models_learners=counters_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=counters_noam_informative_explorer._numeric_models_learners,
+    )
+    print("Safe model:\n", safe_model.to_pddl())
+    print("Optimistic model:\n", optimistic_model.to_pddl())
 
 
 def test_explore_to_refine_models_when_using_goal_oriented_exploration_does_not_fail(
@@ -542,8 +604,18 @@ def test_explore_to_refine_models_when_using_goal_oriented_exploration_does_not_
         problem_objects=depot_problem.objects,
     )
     assert num_steps_done <= 10000
-    print("Safe model:\n", depot_noam_goal_oriented.construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_goal_oriented.construct_optimistic_action_model().to_pddl())
+    safe_model = construct_safe_action_model(
+        partial_domain=depot_noam_goal_oriented.partial_domain,
+        discrete_models_learners=depot_noam_goal_oriented._discrete_models_learners,
+        numeric_models_learners=depot_noam_goal_oriented._numeric_models_learners,
+    )
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=depot_noam_goal_oriented.partial_domain,
+        discrete_models_learners=depot_noam_goal_oriented._discrete_models_learners,
+        numeric_models_learners=depot_noam_goal_oriented._numeric_models_learners,
+    )
+    print("Safe model:\n", safe_model.to_pddl())
+    print("Optimistic model:\n", optimistic_model.to_pddl())
 
 
 def test_apply_exploration_policy_when_exploration_policy_is_informative_explorer_applies_policy_and_returns_less_than_max_number_of_steps_for_episode(
@@ -555,8 +627,18 @@ def test_apply_exploration_policy_when_exploration_policy_is_informative_explore
     depot_noam_informative_explorer.initialize_learning_algorithms()
     goal_reached, _, num_steps = depot_noam_informative_explorer.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
     assert num_steps <= 5000
-    print("Safe model:\n", depot_noam_informative_explorer.construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_informative_explorer.construct_optimistic_action_model().to_pddl())
+    safe_model = construct_safe_action_model(
+        partial_domain=depot_noam_informative_explorer.partial_domain,
+        discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+    )
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=depot_noam_informative_explorer.partial_domain,
+        discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_informative_explorer._numeric_models_learners,
+    )
+    print("Safe model:\n", safe_model.to_pddl())
+    print("Optimistic model:\n", optimistic_model.to_pddl())
 
 
 def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_planner_is_none_fails_as_it_tries_to_call_planner_with_optimistic_domain(
@@ -565,7 +647,7 @@ def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_p
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_goal_oriented.initialize_learning_algorithms()
     depot_noam_goal_oriented._solvers = None  # Set solver to None to simulate the failure case
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         depot_noam_goal_oriented.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
 
 
@@ -577,8 +659,18 @@ def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_p
     depot_noam_goal_oriented.initialize_learning_algorithms()
     goal_reached, _, num_steps = depot_noam_goal_oriented.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
     assert num_steps <= 5000
-    print("Safe model:\n", depot_noam_goal_oriented.construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_goal_oriented.construct_optimistic_action_model().to_pddl())
+    safe_model = construct_safe_action_model(
+        partial_domain=depot_noam_goal_oriented.partial_domain,
+        discrete_models_learners=depot_noam_goal_oriented._discrete_models_learners,
+        numeric_models_learners=depot_noam_goal_oriented._numeric_models_learners,
+    )
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=depot_noam_goal_oriented.partial_domain,
+        discrete_models_learners=depot_noam_goal_oriented._discrete_models_learners,
+        numeric_models_learners=depot_noam_goal_oriented._numeric_models_learners,
+    )
+    print("Safe model:\n", safe_model.to_pddl())
+    print("Optimistic model:\n", optimistic_model.to_pddl())
 
 
 def test_apply_exploration_policy_when_exploration_policy_combined_and_planner_is_set_applies_policy_and_returns_less_than_max_number_of_steps_for_episode(
@@ -591,5 +683,15 @@ def test_apply_exploration_policy_when_exploration_policy_combined_and_planner_i
     depot_noam_goal_combined_explorer.initialize_learning_algorithms()
     goal_reached, _, num_steps = depot_noam_goal_combined_explorer.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
     assert num_steps <= 5000
-    print("Safe model:\n", depot_noam_goal_combined_explorer.construct_safe_action_model().to_pddl())
-    print("Optimistic model:\n", depot_noam_goal_combined_explorer.construct_optimistic_action_model().to_pddl())
+    safe_model = construct_safe_action_model(
+        partial_domain=depot_noam_goal_combined_explorer.partial_domain,
+        discrete_models_learners=depot_noam_goal_combined_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_goal_combined_explorer._numeric_models_learners,
+    )
+    optimistic_model = construct_optimistic_action_model(
+        partial_domain=depot_noam_goal_combined_explorer.partial_domain,
+        discrete_models_learners=depot_noam_goal_combined_explorer._discrete_models_learners,
+        numeric_models_learners=depot_noam_goal_combined_explorer._numeric_models_learners,
+    )
+    print("Safe model:\n", safe_model.to_pddl())
+    print("Optimistic model:\n", optimistic_model.to_pddl())
