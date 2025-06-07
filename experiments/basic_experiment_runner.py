@@ -52,7 +52,7 @@ class OfflineBasicExperimentRunner:
     _learning_algorithm: LearningAlgorithmType
     domain_validator: DomainValidator
     fluents_map: Dict[str, List[str]]
-    semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator, MASamPerformanceCalculator],
+    semantic_performance_calc: Union[SemanticPerformanceCalculator, NumericPerformanceCalculator, MASamPerformanceCalculator]
     negative_precondition_policy: NegativePreconditionPolicy
 
     def __init__(
