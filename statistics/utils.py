@@ -24,8 +24,7 @@ NUMERIC_ALGORITHMS = [
 
 MULTI_AGENT_ALGORITHMS = [
     LearningAlgorithmType.ma_sam,
-    LearningAlgorithmType.ma_sam_plus,
-    LearningAlgorithmType.sam_learning,
+    LearningAlgorithmType.ma_sam_plus
 ]
 
 

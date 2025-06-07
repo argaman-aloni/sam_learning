@@ -61,7 +61,7 @@ class FastDownwardSolver(AbstractSolver):
         :param tolerance: unused parameter (added to create a uniform API).
         :return Whether the execution terminated successfully.
         """
-        os.chdir(FAST_DOWNWARD_DIR_PATH)
+        orig_working_dir = os.getcwd()  # Save the current working directory to return to it late
         self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
         solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
         sas_file_path = f"{domain_file_path.stem}_{uuid.uuid4()}_output.sas"
@@ -85,6 +85,7 @@ class FastDownwardSolver(AbstractSolver):
             os.chdir(FAST_DOWNWARD_DIR_PATH)
             subprocess.check_output(run_command, shell=True)
             self.logger.info(f"Solver succeeded in solving problem - {problem_file_path.stem}")
+            os.chdir(orig_working_dir) # Return to the original working directory
             self._remove_cost_from_file(solution_path)
             self._remove_sas_file(Path(FAST_DOWNWARD_DIR_PATH) / sas_file_path)
             return SolutionOutputTypes.ok
