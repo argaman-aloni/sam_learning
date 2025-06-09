@@ -229,12 +229,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             random.shuffle(shuffled_actions)
             return shuffled_actions
 
-        weights, actions = [], []
-        for action in grounded_actions:
-            actions.append(action)
-            weights.append(1.0 / (1 + self.episode_recorder.get_number_successful_action_executions(action_name=action.name)))
-
-        return random.choices(actions, weights=weights, k=len(actions))
+        return self.sort_ground_actions_based_on_success_rate(grounded_actions)
 
     def explore_to_refine_models(
         self,

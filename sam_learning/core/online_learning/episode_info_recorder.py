@@ -38,10 +38,16 @@ class EpisodeInfoRecord:
             ]
         )
         self.trajectory = Observation()
+        self._action_successful_execution_history = {f"num_{action}_success": 0 for action in action_names}
         self.working_directory = working_directory
 
+    @property
+    def trajectory_path(self) -> Path:
+        """Returns the path to the trajectory file for the current episode."""
+        return self.working_directory / f"trajectory_episode_{self._episode_number}.trajectory"
+
     def get_number_successful_action_executions(self, action_name: str) -> int:
-        return sum(self.summarized_info[f"num_{action_name}_success"])
+        return self._action_successful_execution_history[f"num_{action_name}_success"]
 
     def add_num_grounded_actions(self, num_grounded_actions: int) -> None:
         """Adds the number of grounded actions in the episode.
@@ -72,6 +78,7 @@ class EpisodeInfoRecord:
         if action_applicable:
             self._episode_info[f"num_{action.name}_success"] += 1
             self._episode_info["sum_successful_actions"] += 1
+            self._action_successful_execution_history[f"num_{action.name}_success"] += 1
             return
 
         self._episode_info[f"num_{action.name}_fail"] += 1

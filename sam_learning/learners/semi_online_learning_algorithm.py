@@ -6,7 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Set, List, Tuple, Union, Optional
 
-from pddl_plus_parser.lisp_parsers import ProblemParser
+from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import (
     Domain,
     State,
@@ -19,7 +19,6 @@ from pddl_plus_parser.models import (
 )
 
 from sam_learning.core import (
-    InformationStatesLearner,
     OnlineDiscreteModelLearner,
     PredicatesMatcher,
     NumericFunctionMatcher,
@@ -37,13 +36,13 @@ from sam_learning.core.online_learning.online_utilities import (
 from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
 from solvers import AbstractSolver, SolutionOutputTypes
 
+SAFE_MODEL_TYPE = "safe"
 OPTIMISTIC_MODEL_TYPE = "optimistic"
 
-SAFE_MODEL_TYPE = "safe"
-
-MAX_SUCCESSFUL_STEPS_PER_EPISODE = 100
+MAX_SUCCESSFUL_STEPS_PER_EPISODE = 50
 PROBLEM_SOLVING_TIMEOUT = 30  # 30 seconds
 MIN_EPISODES_TO_PLAN = 50
+MIN_EXECUTIONS_PER_ACTION = 10  # Minimum number of executions per action to consider it partially trained
 
 random.seed(42)  # Set seed for reproducibility
 
@@ -60,7 +59,7 @@ class SemiOnlineNumericAMLearner:
     - Maintains separate learners for discrete and numeric action models for each action in the domain.
     - Handles undecided failure observations and attempts to classify the root cause of action failures.
     - Supports exploration to refine models and uses traces to train models.
-    - Integrates with external solvers to attempt problem solving with learned models.
+    - Integrates with external solvers to attempt problem-solving with learned models.
     - Records detailed episode information for evaluation and debugging.
     """
 
@@ -95,6 +94,7 @@ class SemiOnlineNumericAMLearner:
         self._solvers = solvers
         self.episode_recorder = episode_recorder
         self.undecided_failure_observations = defaultdict(list)
+        self._preprocessed_traces_paths = []
 
     def _handle_execution_failure(
         self,
@@ -166,6 +166,29 @@ class SemiOnlineNumericAMLearner:
         pb_functions = self._numeric_function_matcher.match_state_functions(action, state_functions)
         return pb_predicates, pb_functions
 
+    def sort_ground_actions_based_on_success_rate(self, grounded_actions: Set[ActionCall]) -> List[ActionCall]:
+        """Sorts the grounded actions based on their success rate in the learned models.
+
+        :param grounded_actions: A set of ActionCall instances representing the grounded actions.
+        :return: A list of ActionCall instances sorted by their success rate.
+        """
+        self.logger.debug("Sorting the grounded actions based on their success rate.")
+        grouped_actions = defaultdict(list)
+        for action in grounded_actions:
+            grouped_actions[action.name].append(action)
+
+        for action_list in grouped_actions.values():
+            random.shuffle(action_list)
+
+        action_success_rates = {
+            action: self.episode_recorder.get_number_successful_action_executions(action_name=action)
+            for action in self.partial_domain.actions
+        }
+        sorted_action_groups = sorted(grouped_actions.items(), key=lambda item: action_success_rates[item[0]])
+        # Flatten the sorted, shuffled groups
+        final_sorted_actions = [action for _, group in sorted_action_groups for action in group]
+        return final_sorted_actions
+
     def _add_transition_data(self, action_to_update: ActionCall, is_transition_successful: bool = True) -> None:
         """Adds transition data to the relevant models and updates the model learners with
         information about the state changes caused by an action. This method logs the
@@ -216,12 +239,13 @@ class SemiOnlineNumericAMLearner:
         problem_objects: Dict[str, PDDLObject],
         integrate_in_models: bool = True,
     ) -> Tuple[State, bool]:
-        """
+        """Executes the selected grounded action in the environment using the agent.
 
-        :param selected_ground_action:
-        :param current_state:
-        :param problem_objects:
-        :return:
+        :param selected_ground_action: The ActionCall instance representing the action to execute.
+        :param current_state: The current State before executing the action.
+        :param problem_objects: A dictionary of problem objects used in the domain.
+        :param integrate_in_models: Whether to integrate the observed transition into the learned models (default: True).
+        :return: A tuple containing the next State and a boolean indicating if the transition was successful.
         """
         next_state, is_transition_successful, _ = self.agent.observe(state=current_state, action=selected_ground_action)
         self.triplet_snapshot.create_triplet_snapshot(
@@ -323,7 +347,7 @@ class SemiOnlineNumericAMLearner:
                 trace, goal_reached = self.agent.execute_plan(plan_actions)
                 self.train_models_using_trace(trace)
                 if not goal_reached:
-                    self.logger.warning("The plan created by the solver did not reach the goal.")
+                    self.logger.debug("The plan created by the solver did not reach the goal.")
                     solution_status = (
                         SolutionOutputTypes.not_applicable if len(trace) < len(plan_actions) else SolutionOutputTypes.goal_not_achieved
                     )
@@ -332,6 +356,15 @@ class SemiOnlineNumericAMLearner:
                 return solution_status, len(trace), None
 
         return solution_status, None, None
+
+    def _executed_enough_successful_steps_per_action(self):
+        """Checks if enough steps have been executed per action to consider the to be considerably trained."""
+        for action in self.partial_domain.actions:
+            if self.episode_recorder.get_number_successful_action_executions(action_name=action) < MIN_EXECUTIONS_PER_ACTION:
+                self.logger.info(f"Action {action} has NOT been executed enough times.")
+                return False
+
+        return True
 
     def explore_to_refine_models(
         self,
@@ -350,14 +383,14 @@ class SemiOnlineNumericAMLearner:
         self.logger.info("Searching for informative actions given the current state.")
         step_number = 0
         grounded_actions = self.agent.get_environment_actions(init_state)
-        frontier = list(grounded_actions.copy())
+        frontier = self.sort_ground_actions_based_on_success_rate(grounded_actions)
         current_state = init_state.copy()
         while len(frontier) > 0 and step_number < num_steps_till_episode_end:
             self.logger.info(f"Exploring to improve the action model - exploration step {step_number + 1}.")
             action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
             step_number += 1
             self.logger.info(f"The action {str(action)} was successful. Continuing to the next state.")
-            frontier = list(grounded_actions.copy())
+            frontier = list(self.sort_ground_actions_based_on_success_rate(grounded_actions))
             current_state = next_state
             if self.agent.goal_reached(current_state):
                 self.logger.info("The goal has been reached, returning the learned the number of executed steps.")
@@ -416,6 +449,17 @@ class SemiOnlineNumericAMLearner:
         )
         return self._use_solvers_to_solve_problem(domain_path=domain_path, problem_path=problem_path)
 
+    def _read_trajectories_and_train_models(self) -> None:
+        """"""
+        while len(self._preprocessed_traces_paths) > 0:
+            trace_path, problem_path = self._preprocessed_traces_paths.pop(0)
+            problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
+            self.logger.info(f"Reading the trajectory from the file {trace_path.stem}.")
+            trace = TrajectoryParser(partial_domain=self.partial_domain, problem=problem).parse_trajectory(
+                trajectory_file_path=trace_path, contain_transitions_status=True
+            )
+            self.train_models_using_trace(trace)
+
     def try_to_solve_problems(self, problems_paths: List[Path]) -> None:
         """Tries to solve the problem using the current domain.
 
@@ -427,10 +471,12 @@ class SemiOnlineNumericAMLearner:
             raise ValueError("No solver was provided to the learner.")
 
         for index, problem_path in enumerate(problems_paths):
+            self.episode_recorder.clear_trajectory()
             problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
             self.agent.initialize_problem(problem)
             last_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
-            if index >= MIN_EPISODES_TO_PLAN:
+            if index >= MIN_EPISODES_TO_PLAN or self._executed_enough_successful_steps_per_action():
+                self._read_trajectories_and_train_models()
                 self.logger.info(f"Trying to solve the problem {problem_path.stem} using the safe action model.")
                 solution_status, trace_len, _ = self._construct_model_and_solve_problem(
                     model_type=SAFE_MODEL_TYPE, problem_path=problem_path
@@ -470,4 +516,5 @@ class SemiOnlineNumericAMLearner:
                 num_steps_in_episode=num_steps_till_episode_end,
                 has_solved_solver_problem=False,
             )
-            self.train_models_using_trace(self.episode_recorder.trajectory)
+            self.logger.info("Training the learning algorithms using the trajectories.")
+            self._preprocessed_traces_paths.append((self.episode_recorder.trajectory_path, problem_path))
