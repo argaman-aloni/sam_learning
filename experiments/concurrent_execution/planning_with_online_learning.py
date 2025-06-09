@@ -5,10 +5,11 @@ import logging
 import shutil
 from pathlib import Path
 
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import Domain, State
 
 from sam_learning.core import EpisodeInfoRecord
+from sam_learning.core.online_learning.online_utilities import construct_safe_action_model
 from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners import NumericOnlineActionModelLearner
 from sam_learning.learners.noam_algorithm import ExplorationAlgorithmType
@@ -120,6 +121,7 @@ class PIL:
                 problem_path,
                 num_steps_till_episode_end=MAX_EPISODE_NUM_STEPS,
             )
+            episode_recorder.clear_trajectory()
             self.logger.info(
                 f"Finished episode number {problem_index + 1}! " f"The current goal was {'achieved' if goal_achieved else 'not achieved'}."
             )
@@ -144,7 +146,7 @@ class PIL:
         :param fold_num: the index of the current folder that is currently running.
         """
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
-        # TODO: Change the path to the train set directory
+        # TODO: Change the path to the train set directory of the correct algorithm.
         train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{LearningAlgorithmType.noam_learning.value}"
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
@@ -168,6 +170,38 @@ class PIL:
             / "results_directory"
             / f"{LearningAlgorithmType.noam_learning.name}_episode_info_fold_{fold_num}.csv"
         )
+
+    def test(self):
+        train_set_dir_path = self.working_directory_path / "train" / f"fold_0_{LearningAlgorithmType.noam_learning.value}"
+        partial_domain_path = train_set_dir_path / self.domain_file_name
+        complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
+        partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
+        self._agent = IPCAgent(complete_domain)
+        episode_recorder = EpisodeInfoRecord(action_names=list(partial_domain.actions), working_directory=train_set_dir_path)
+        online_learner = SemiOnlineNumericAMLearner(
+            workdir=train_set_dir_path,
+            partial_domain=partial_domain,
+            polynomial_degree=self._polynomial_degree,
+            solvers=[MetricFFSolver(), ENHSPSolver()],
+            agent=self._agent,
+            episode_recorder=episode_recorder,
+        )
+        online_learner.initialize_learning_algorithms()
+        problems_to_solve = sorted(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl"))
+        for trajectory, problem in zip(sorted(train_set_dir_path.glob(f"trajectory_episode_*.trajectory")), problems_to_solve):
+            self.logger.info(f"Starting episode with trajectory {trajectory.name}!")
+            problem = ProblemParser(problem, complete_domain).parse_problem()
+            observation = TrajectoryParser(partial_domain=complete_domain, problem=problem).parse_trajectory(
+                trajectory, contain_transitions_status=True
+            )
+            online_learner.train_models_using_trace(observation)
+            safe_model = construct_safe_action_model(
+                partial_domain=online_learner.partial_domain,
+                discrete_models_learners=online_learner._discrete_models_learners,
+                numeric_models_learners=online_learner._numeric_models_learners,
+            )
+            print(safe_model.to_pddl())
+            self.logger.info(f"Finished episode with trajectory {trajectory.name}!")
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -207,6 +241,7 @@ def main():
         exploration_type=ExplorationAlgorithmType.combined,  # Using combined exploration strategy
     )
     learner.learn_model_semi_online(fold_num=args.fold_number)
+    # learner.test()
 
 
 if __name__ == "__main__":

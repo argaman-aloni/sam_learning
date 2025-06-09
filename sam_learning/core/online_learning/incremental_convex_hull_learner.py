@@ -182,7 +182,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             try:
                 self._convex_hull.add_points([projected_point])
             except QhullError:
-                print("ERROR!")
+                self.logger.warning(
+                    "The new point could not be incrementally added to the convex hull. Trying to recalculate the hull from scratch."
+                )
+                self._learn_new_convex_hull(incremental=True)
 
     def add_new_point(self, point: Dict[str, float]) -> None:
         """Adds a new point to the convex hull learner.
