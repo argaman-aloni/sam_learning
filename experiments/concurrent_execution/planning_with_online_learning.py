@@ -179,10 +179,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     parser.add_argument(
         "--exploration_policy",
-        required=True,
+        required=False,
         help="The policy of the online learning algorithm being tested",
         type=str,
         choices=["informative_explorer", "goal_oriented", "combined"],
+        default="combined",
     )
     args = parser.parse_args()
     return args
