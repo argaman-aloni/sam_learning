@@ -72,7 +72,7 @@ def setup_experiments_folds_job(
 ):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
     internal_iterations_arg = (
-        "" if not internal_iterations else f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
+        "" if internal_iterations is None else f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
     )
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
