@@ -12,6 +12,8 @@ from experiments.cluster_scripts.common import (
     EXPERIMENTS_CONFIG_STR,
     submit_job_and_validate_execution,
     create_execution_arguments,
+    setup_experiments_folds_job,
+    validate_job_running,
 )
 
 signal.signal(signal.SIGINT, sigint_handler)
@@ -22,11 +24,19 @@ def main():
     environment_variables = get_environment_variables(configurations)
     code_directory = configurations["code_directory_path"]
     print("Starting to setup and run the experiments!")
-    create_all_experiments_folders(
-        code_directory,
-        environment_variables,
-        configurations,
+    parallelization_data = configurations["parallelization_data"]
+    sid = setup_experiments_folds_job(
+        code_directory=code_directory,
+        environment_variables=environment_variables,
+        experiment=configurations,
+        internal_iterations=None,
+        experiment_size=parallelization_data.get("experiment_size", 100),
+        should_create_random_trajectories=True,
     )
+    while validate_job_running(sid) is not None:
+        print("Waiting for the fold creation jobs to finish.")
+        time.sleep(5)
+
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         experiment_sids = []
         for fold in range(configurations["num_folds"]):
