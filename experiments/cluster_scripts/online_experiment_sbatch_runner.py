@@ -22,7 +22,7 @@ def main():
     environment_variables = get_environment_variables(configurations)
     code_directory = configurations["code_directory_path"]
     print("Starting to setup and run the experiments!")
-    create_all_experiments_folders(code_directory, environment_variables, configurations)
+    create_all_experiments_folders(code_directory, environment_variables, configurations, should_create_internal_iterations=False)
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         experiment_sids = []
         for fold in range(configurations["num_folds"]):
