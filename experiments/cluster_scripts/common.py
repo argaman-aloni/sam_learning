@@ -126,8 +126,8 @@ def create_experiment_folders(
     code_directory,
     environment_variables,
     experiment,
-    should_create_random_trajectories: bool = True,
-    should_create_internal_iterations: bool = True,
+    should_create_random_trajectories=True,
+    should_create_internal_iterations=True,
 ):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
@@ -151,8 +151,8 @@ def create_all_experiments_folders(
     code_directory,
     environment_variables,
     configurations,
-    should_create_random_trajectories: bool = True,
-    should_create_internal_iterations: bool = True,
+    should_create_random_trajectories=True,
+    should_create_internal_iterations=True,
 ):
     print("Creating the directories containing the folds datasets for the experiments.")
     jobs_sids = []
