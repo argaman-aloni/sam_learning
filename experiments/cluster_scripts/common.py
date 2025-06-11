@@ -152,7 +152,7 @@ def create_all_experiments_folders(
     environment_variables,
     configurations,
     should_create_random_trajectories=True,
-    should_create_internal_iterations=False,
+    should_create_internal_iterations=True,
 ):
     print("Creating the directories containing the folds datasets for the experiments.")
     jobs_sids = []
