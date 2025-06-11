@@ -1,4 +1,5 @@
 """Module to learn action models from multi-agent trajectories with joint actions."""
+
 import logging
 from typing import Dict, List, Tuple, Set, Optional
 
@@ -11,9 +12,10 @@ from pddl_plus_parser.models import (
     State,
     GroundedPredicate,
     JointActionCall,
+    Action,
 )
 
-from sam_learning.core import LearnerDomain, extract_discrete_effects, LiteralCNF, LearnerAction, extract_predicate_data
+from sam_learning.core import extract_discrete_effects, LiteralCNF, extract_predicate_data
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
@@ -47,7 +49,11 @@ class MultiAgentSAM(SAMLearner):
             negative_predicate = Predicate(name=predicate.name, signature=predicate.signature, is_positive=False)
             self.literals_cnf[negative_predicate.untyped_representation] = LiteralCNF(action_names=list(self.partial_domain.actions.keys()))
 
-    def _extract_relevant_not_effects(self, executing_actions: List[ActionCall], relevant_action: ActionCall,) -> List[GroundedPredicate]:
+    def _extract_relevant_not_effects(
+        self,
+        executing_actions: List[ActionCall],
+        relevant_action: ActionCall,
+    ) -> List[GroundedPredicate]:
         """Extracts the literals that cannot be an effect of the relevant action.
 
         :param executing_actions: the actions that are being executed in the joint action triplet.
@@ -59,7 +65,10 @@ class MultiAgentSAM(SAMLearner):
         for predicate in self.triplet_snapshot.next_state_predicates:
             not_in_state_predicates.append(
                 GroundedPredicate(
-                    name=predicate.name, signature=predicate.signature, object_mapping=predicate.object_mapping, is_positive=not predicate.is_positive
+                    name=predicate.name,
+                    signature=predicate.signature,
+                    object_mapping=predicate.object_mapping,
+                    is_positive=not predicate.is_positive,
                 )
             )
 
@@ -74,7 +83,7 @@ class MultiAgentSAM(SAMLearner):
 
         return combined_not_effects
 
-    def _is_action_safe(self, action: LearnerAction, preconditions_to_filter: Set[Predicate]) -> bool:
+    def _is_action_safe(self, action: Action, preconditions_to_filter: Set[Predicate]) -> bool:
         """Checks if the given action is safe to execute.
 
         :param action: the lifted action that is to be learned.
@@ -144,7 +153,7 @@ class MultiAgentSAM(SAMLearner):
         )
         return interacting_actions
 
-    def extract_effects_from_cnf(self, action: LearnerAction, relevant_preconditions: Set[Predicate]) -> None:
+    def extract_effects_from_cnf(self, action: Action, relevant_preconditions: Set[Predicate]) -> None:
         """Extracts the action's relevant effects from the CNF object.
 
         :param action: the action that is currently being handled.
@@ -195,7 +204,10 @@ class MultiAgentSAM(SAMLearner):
         )
         self.logger.debug("Updating the literals that must be effects of the action.")
         self.add_must_be_effect_to_cnf(executed_action, grounded_add_effects.union(grounded_del_effects))
-        not_effects = self._extract_relevant_not_effects(executing_actions=[executed_action], relevant_action=executed_action,)
+        not_effects = self._extract_relevant_not_effects(
+            executing_actions=[executed_action],
+            relevant_action=executed_action,
+        )
         self.add_not_effect_to_cnf(executed_action, not_effects)
 
     def update_multiple_executed_actions(self, joint_action: JointActionCall, previous_state: State, next_state: State) -> None:
@@ -226,7 +238,10 @@ class MultiAgentSAM(SAMLearner):
             self.triplet_snapshot.previous_state_predicates, self.triplet_snapshot.next_state_predicates
         )
         for executed_action in executing_actions:
-            not_effects = self._extract_relevant_not_effects(executing_actions=[executed_action], relevant_action=executed_action,)
+            not_effects = self._extract_relevant_not_effects(
+                executing_actions=[executed_action],
+                relevant_action=executed_action,
+            )
             self.add_not_effect_to_cnf(executed_action, not_effects)
 
         for grounded_effect in grounded_add_effects.union(grounded_del_effects):
@@ -264,10 +279,12 @@ class MultiAgentSAM(SAMLearner):
 
         :param should_remove_actions: whether to remove the actions that are not safe to execute. (for MA-SAM+)
         """
-        super()._remove_unobserved_actions_from_partial_domain()
+        super()._handle_unobserved_actions()
         for action in self.partial_domain.actions.values():
             self.logger.debug("Constructing safe action for %s", action.name)
-            action_preconditions = {precondition for precondition in action.preconditions.root.operands if isinstance(precondition, Predicate)}
+            action_preconditions = {
+                precondition for precondition in action.preconditions.root.operands if isinstance(precondition, Predicate)
+            }
             if not self._is_action_safe(action, action_preconditions):
                 self.logger.warning("Action %s is not safe to execute!", action.name)
                 self._unsafe_actions.add(action.name)
@@ -281,7 +298,7 @@ class MultiAgentSAM(SAMLearner):
             for unsafe_action in self._unsafe_actions:
                 self.partial_domain.actions.pop(unsafe_action)
 
-    def learn_combined_action_model(self, observations: List[MultiAgentObservation]) -> Tuple[LearnerDomain, Dict[str, str]]:
+    def learn_combined_action_model(self, observations: List[MultiAgentObservation]) -> Tuple[Domain, Dict[str, str]]:
         """Learn the SAFE action model from the input multi-agent trajectories.
 
         :param observations: the multi-agent observations.

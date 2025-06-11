@@ -1,4 +1,5 @@
 """An agent for the active learning of IPC models"""
+
 import logging
 from typing import Dict, Set, Tuple, List
 
@@ -32,7 +33,9 @@ class IPCAgent(AbstractAgent):
         self._problem = None
         self._vocabulary_creator = VocabularyCreator()
 
-    def _assign_state_fluent_value(self, state_fluents: Dict[str, PDDLFunction], goal_required_expressions: Set[NumericalExpressionTree]) -> None:
+    def _assign_state_fluent_value(
+        self, state_fluents: Dict[str, PDDLFunction], goal_required_expressions: Set[NumericalExpressionTree]
+    ) -> None:
         """Assigns the values of the state fluents to later verify if the goal was achieved.
 
         :param state_fluents: the state fluents to be assigned to the goal expressions.
@@ -104,7 +107,7 @@ class IPCAgent(AbstractAgent):
         :param state: the state to be evaluated.
         :return: whether the goal has been reached.
         """
-        self.logger.info("Evaluating the reward for the state %s.", state.serialize())
+        self.logger.info("Evaluating the reward for the state %s", state.serialize())
         goal_predicates = {p.untyped_representation for p in self._problem.goal_state_predicates}
         goal_fluents = self._problem.goal_state_fluents
 

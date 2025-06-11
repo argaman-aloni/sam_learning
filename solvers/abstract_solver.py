@@ -1,4 +1,5 @@
 """Abstract class for all solvers."""
+
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
@@ -15,6 +16,9 @@ class SolutionOutputTypes(Enum):
 
 
 class AbstractSolver(ABC):
+
+    name: str = "AbstractSolver"
+
     @abstractmethod
     def __init__(self):
         """Initialize the solver."""

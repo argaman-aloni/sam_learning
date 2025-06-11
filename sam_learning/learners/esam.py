@@ -4,10 +4,26 @@ from typing import List, Tuple, Dict, Hashable, Set, Callable, Optional
 
 from nnf import And, Or, Var
 from pddl_plus_parser.lisp_parsers.parsing_utils import parse_predicate_from_string
-from pddl_plus_parser.models import Observation, Predicate, ActionCall, State, Domain, ObservedComponent, SignatureType, PDDLType, GroundedPredicate
+from pddl_plus_parser.models import (
+    Observation,
+    Predicate,
+    ActionCall,
+    State,
+    Domain,
+    ObservedComponent,
+    SignatureType,
+    PDDLType,
+    GroundedPredicate,
+)
 from scipy.cluster.hierarchy import DisjointSet
 
-from sam_learning.core import extract_discrete_effects, LearnerDomain, LearnerAction, extract_not_effects, NotSafeActionError, EquationSolutionType
+from sam_learning.core import (
+    extract_discrete_effects,
+    LearnerAction,
+    extract_not_effects,
+    NotSafeActionError,
+    EquationSolutionType,
+)
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
@@ -135,7 +151,10 @@ class ExtendedSamLearner(SAMLearner):
         action_name = grounded_action.name
 
         self.triplet_snapshot.create_triplet_snapshot(
-            previous_state=previous_state, next_state=next_state, current_action=grounded_action, observation_objects=self.current_trajectory_objects
+            previous_state=previous_state,
+            next_state=next_state,
+            current_action=grounded_action,
+            observation_objects=self.current_trajectory_objects,
         )
         if action_name in self.observed_actions:
             self.update_action(grounded_action, previous_state, next_state)
@@ -186,19 +205,19 @@ class ExtendedSamLearner(SAMLearner):
         proxy_number: Optional[int] = None,
     ) -> LearnerAction:
         """
-            constructs a proxy action based on information learned.
+        constructs a proxy action based on information learned.
 
-            Args:
-                action_name (str): the name of the Original lifted action.
-                proxy_missing_precondition (Set[Predicate]): A unique set of predicates to add for the action's preconditions.
-                proxy_effects (Set[Predicate]): set of predicates that are deducted as effects after solving
-                 cnf_effect formula.
-                modified_parameter_mapping_dict (Dict[str, str]): a dictionary that maps each argument of the original
-                  action to its new representative in the signature.
-                proxy_number (int): the index of proxy to be generated
+        Args:
+            action_name (str): the name of the Original lifted action.
+            proxy_missing_precondition (Set[Predicate]): A unique set of predicates to add for the action's preconditions.
+            proxy_effects (Set[Predicate]): set of predicates that are deducted as effects after solving
+             cnf_effect formula.
+            modified_parameter_mapping_dict (Dict[str, str]): a dictionary that maps each argument of the original
+              action to its new representative in the signature.
+            proxy_number (int): the index of proxy to be generated
 
-            Returns:
-                constructed proxy action
+        Returns:
+            constructed proxy action
         """
         proxy_action_name = f"{action_name}{'_' + str(proxy_number) if proxy_number else ''}"
         self.logger.debug(f"Starting the constructing proxy action: {proxy_action_name}")
@@ -206,7 +225,8 @@ class ExtendedSamLearner(SAMLearner):
         discrete_effects = modify_predicate_signature(proxy_effects, modified_parameter_mapping_dict)
         # use new mapping to modify preconditions bindings
         preconds = modify_predicate_signature(
-            {*proxy_missing_precondition, *self.partial_domain.actions[action_name].preconditions.root.operands}, modified_parameter_mapping_dict
+            {*proxy_missing_precondition, *self.partial_domain.actions[action_name].preconditions.root.operands},
+            modified_parameter_mapping_dict,
         )
 
         # use reverse the new mapping for min minimizing action's signature
@@ -280,8 +300,12 @@ class ExtendedSamLearner(SAMLearner):
                 if len(set(original_action_call.parameters)) != len(proxy_data.signature.keys()):
                     return res
 
-                original_signature = {param_name: index for index, param_name in enumerate(self.partial_domain.actions[action_name].signature.keys())}
-                original_param_mapping = {param_name: original_action_call.parameters[index] for param_name, index in original_signature.items()}
+                original_signature = {
+                    param_name: index for index, param_name in enumerate(self.partial_domain.actions[action_name].signature.keys())
+                }
+                original_param_mapping = {
+                    param_name: original_action_call.parameters[index] for param_name, index in original_signature.items()
+                }
                 grounded_proxy_parameters = {proxy_data.signature[param_name]: obj for param_name, obj in original_param_mapping.items()}
                 for param, obj_pddl_type in new_proxy.signature.items():
                     if self.partial_domain.types[grounded_proxy_parameters[param]].is_sub_type(obj_pddl_type):
@@ -303,10 +327,10 @@ class ExtendedSamLearner(SAMLearner):
 
     def construct_safe_actions(self) -> None:
         """
-            Creates and adds all safe instances of action.
-            if injective binding assumption holds for at least 1 observation, only 1 instance is initialized in the learned domain
-            if injective binding assumption does not hold for all observations of the action,
-                proxy actions are created and added to the domain.
+        Creates and adds all safe instances of action.
+        if injective binding assumption holds for at least 1 observation, only 1 instance is initialized in the learned domain
+        if injective binding assumption does not hold for all observations of the action,
+            proxy actions are created and added to the domain.
         """
         for action_name in self.observed_actions:
             action_proxies = []
@@ -354,7 +378,7 @@ class ExtendedSamLearner(SAMLearner):
             else:
                 raise ValueError(f"No valid assignments found for action: {action_name}")
 
-    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
+    def learn_action_model(self, observations: List[Observation]) -> Tuple[Domain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
         :param observations: the list of trajectories that are used to learn the safe action model.
@@ -368,7 +392,7 @@ class ExtendedSamLearner(SAMLearner):
                 self.handle_single_trajectory_component(component)
 
         super().handle_negative_preconditions_policy()
-        self._remove_unobserved_actions_from_partial_domain()
+        self._handle_unobserved_actions()
         self.logger.debug(f"building domain actions CNF formulas")
         self.build_cnf_formulas()
         self.construct_safe_actions()

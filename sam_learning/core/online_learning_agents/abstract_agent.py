@@ -2,13 +2,21 @@
 
 from abc import ABC, abstractmethod
 
-from pddl_plus_parser.models import State, ActionCall, Observation
+from pddl_plus_parser.models import State, ActionCall, Observation, Problem
 from typing import Tuple, Set, List, Optional
 
 
 class AbstractAgent(ABC):
     @abstractmethod
     def __init__(self):
+        pass
+
+    @abstractmethod
+    def initialize_problem(self, problem: Problem) -> None:
+        """Initializes the agent with a problem.
+
+        :param problem: the problem to be initialized.
+        """
         pass
 
     @abstractmethod

@@ -51,6 +51,7 @@ class SAMLearner:
         self,
         partial_domain: Domain,
         negative_preconditions_policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
+        should_enforce_injective_binding: bool = True,
     ):
 
         self.logger = logging.getLogger(__name__)
@@ -64,17 +65,20 @@ class SAMLearner:
         self.learning_start_time = 0
         self.learning_end_time = 0
         self.cannot_be_effect = {action: set() for action in self.partial_domain.actions}
-        self._action_signatures = {
-            action_name: action.signature for action_name, action in partial_domain.actions.items()
-        }
+        self._action_signatures = {action_name: action.signature for action_name, action in partial_domain.actions.items()}
         self.negative_preconditions_policy = negative_preconditions_policy
+        self.should_enforce_injective_binding = should_enforce_injective_binding
 
-    def _remove_unobserved_actions_from_partial_domain(self):
+    def _handle_unobserved_actions(self):
         """Removes the actions that were not observed from the partial domain."""
         self.logger.debug("Removing unobserved actions from the partial domain")
-        actions_to_remove = [action for action in self.partial_domain.actions if action not in self.observed_actions]
-        for action in actions_to_remove:
-            self.partial_domain.actions.pop(action)
+        unobserved_actions = [action for action in self.partial_domain.actions if action not in self.observed_actions]
+        for action in unobserved_actions:
+            preconditions_superset = self.vocabulary_creator.create_lifted_vocabulary(
+                self.partial_domain, self.partial_domain.actions[action].signature
+            )
+            for precondition in preconditions_superset:
+                self.partial_domain.actions[action].preconditions.add_condition(precondition)
 
     def _handle_consts_in_effects(self, grounded_action: ActionCall) -> None:
         """The function filters out literals that cannot be effects because they are not observed in the next state.
@@ -87,9 +91,7 @@ class SAMLearner:
         lifted_next_state_predicates = self.matcher.get_possible_literal_matches(
             grounded_action, list(self.triplet_snapshot.next_state_predicates)
         )
-        lifted_next_state_predicates_str = {
-            predicate.untyped_representation for predicate in lifted_next_state_predicates
-        }
+        lifted_next_state_predicates_str = {predicate.untyped_representation for predicate in lifted_next_state_predicates}
         for predicate in action_predicate_vocabulary:
             if predicate.untyped_representation not in lifted_next_state_predicates_str:
                 self.cannot_be_effect[grounded_action.name].add(predicate)
@@ -119,9 +121,7 @@ class SAMLearner:
         """
         current_action = self.partial_domain.actions[grounded_action.name]
         previous_state_predicates = set(
-            self.matcher.get_possible_literal_matches(
-                grounded_action, list(self.triplet_snapshot.previous_state_predicates)
-            )
+            self.matcher.get_possible_literal_matches(grounded_action, list(self.triplet_snapshot.previous_state_predicates))
         )
 
         conditions_to_remove = []
@@ -141,9 +141,7 @@ class SAMLearner:
         self.logger.debug(f"Adding the preconditions of {grounded_action.name} to the action model.")
         current_action = self.partial_domain.actions[grounded_action.name]
         previous_state_predicates = set(
-            self.matcher.get_possible_literal_matches(
-                grounded_action, list(self.triplet_snapshot.previous_state_predicates)
-            )
+            self.matcher.get_possible_literal_matches(grounded_action, list(self.triplet_snapshot.previous_state_predicates))
         )
 
         for predicate in previous_state_predicates:
@@ -159,11 +157,7 @@ class SAMLearner:
 
         learning_report = {action_name: "OK" for action_name in self.safe_actions}
         learning_report.update(
-            {
-                action_name: "NOT SAFE"
-                for action_name in self.partial_domain.actions
-                if action_name in observed_unsafe_actions
-            }
+            {action_name: "NOT SAFE" for action_name in self.partial_domain.actions if action_name in observed_unsafe_actions}
         )
         learning_report.update({action_name: "UNOBSERVED" for action_name in unobserved_actions})
         learning_report["learning_time"] = str(self.learning_end_time - self.learning_start_time)
@@ -250,8 +244,7 @@ class SAMLearner:
 
         if self._verify_parameter_duplication(grounded_action):
             self.logger.warning(
-                f"{str(grounded_action)} contains duplicated parameters! Not supported in SAM."
-                f"aborting learning from component"
+                f"{str(grounded_action)} contains duplicated parameters! Not supported in SAM." f"aborting learning from component"
             )
             return
 
@@ -269,6 +262,9 @@ class SAMLearner:
 
     def deduce_initial_inequality_preconditions(self) -> None:
         """Tries to deduce which objects in the actions' signature cannot be equal."""
+        if not self.should_enforce_injective_binding:
+            return
+
         self.logger.debug("Starting to deduce inequality preconditions")
         for action_name, action_data in self.partial_domain.actions.items():
             for lifted_param1, lifted_param2 in combinations(action_data.parameter_names, 2):
@@ -282,9 +278,7 @@ class SAMLearner:
 
             for precondition in action.preconditions.root.operands:
                 if isinstance(precondition, Predicate) and not precondition.is_positive:
-                    action_add_effects = [
-                        effect.untyped_representation for effect in action.discrete_effects if effect.is_positive
-                    ]
+                    action_add_effects = [effect.untyped_representation for effect in action.discrete_effects if effect.is_positive]
                     copy_precondition_positive = precondition.copy(is_negated=True)
                     if (
                         not self.negative_preconditions_policy == NegativePreconditionPolicy.soft
@@ -311,9 +305,7 @@ class SAMLearner:
     def end_measure_learning_time(self) -> None:
         """Ends measuring the learning time."""
         self.learning_end_time = time.time()
-        self.logger.info(
-            f"Finished learning the action model in " f"{self.learning_end_time - self.learning_start_time} seconds."
-        )
+        self.logger.info(f"Finished learning the action model in " f"{self.learning_end_time - self.learning_start_time} seconds.")
 
     def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
@@ -335,7 +327,7 @@ class SAMLearner:
                 self.handle_single_trajectory_component(component)
 
         self.construct_safe_actions()
-        self._remove_unobserved_actions_from_partial_domain()
+        self._handle_unobserved_actions()
         self.handle_negative_preconditions_policy()
         self.end_measure_learning_time()
         learning_report = self._construct_learning_report()

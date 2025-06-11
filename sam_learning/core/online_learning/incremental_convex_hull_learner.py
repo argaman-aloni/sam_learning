@@ -179,7 +179,13 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         if self._convex_hull is not None:
             # If reached here - the point is spanned by the base and the convex hull is not None
             projected_point = np.dot(self._shift_new_point(self.affine_independent_data.iloc[-1]), np.array(self._gsp_base).T)
-            self._convex_hull.add_points([projected_point])
+            try:
+                self._convex_hull.add_points([projected_point])
+            except QhullError:
+                self.logger.warning(
+                    "The new point could not be incrementally added to the convex hull. Trying to recalculate the hull from scratch."
+                )
+                self._learn_new_convex_hull(incremental=True)
 
     def add_new_point(self, point: Dict[str, float]) -> None:
         """Adds a new point to the convex hull learner.

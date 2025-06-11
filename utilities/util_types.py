@@ -14,6 +14,7 @@ class LearningAlgorithmType(Enum):
     noam_informative_explorer = 17
     noam_goal_oriented_explorer = 18
     incremental_nsam = 19
+    semi_online = 20
 
     # learning algorithms relating to fault repair not to be used for POL
     oblique_tree = 11
