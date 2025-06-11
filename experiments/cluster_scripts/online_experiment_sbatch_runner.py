@@ -26,8 +26,6 @@ def main():
         code_directory,
         environment_variables,
         configurations,
-        True,
-        False,
     )
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         experiment_sids = []
