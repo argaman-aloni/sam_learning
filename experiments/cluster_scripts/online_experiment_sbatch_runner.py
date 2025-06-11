@@ -4,12 +4,10 @@ import time
 from datetime import datetime
 
 from experiments.cluster_scripts.common import (
-    submit_job,
     progress_bar,
     sigint_handler,
     get_configurations,
     get_environment_variables,
-    validate_job_running,
     create_all_experiments_folders,
     EXPERIMENTS_CONFIG_STR,
     submit_job_and_validate_execution,
