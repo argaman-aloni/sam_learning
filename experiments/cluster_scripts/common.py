@@ -147,13 +147,23 @@ def create_experiment_folders(
     return internal_iterations, sid
 
 
-def create_all_experiments_folders(code_directory, environment_variables, configurations, should_create_random_trajectories: bool = True):
+def create_all_experiments_folders(
+    code_directory,
+    environment_variables,
+    configurations,
+    should_create_random_trajectories: bool = True,
+    should_create_internal_iterations: bool = True,
+):
     print("Creating the directories containing the folds datasets for the experiments.")
     jobs_sids = []
     output_internal_iterations = []
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         internal_iterations, fold_creation_sid = create_experiment_folders(
-            code_directory, environment_variables, experiment, should_create_random_trajectories
+            code_directory,
+            environment_variables,
+            experiment,
+            should_create_random_trajectories,
+            should_create_internal_iterations=should_create_internal_iterations,
         )
         jobs_sids.append(fold_creation_sid)
         output_internal_iterations.append(internal_iterations)
