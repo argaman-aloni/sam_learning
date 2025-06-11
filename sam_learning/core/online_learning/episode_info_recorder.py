@@ -13,7 +13,15 @@ RECORD_COLUMNS = [
     "goal_reached",
     "num_steps_in_episode",
     "solver_solved_problem",
+    "safe_model_solution_status",
+    "optimistic_model_solution_status",
 ]
+
+DISCRETE = "discrete"
+NUMERIC = "numeric"
+UNKNOWN = "unknown"
+
+not_used_for_solving = "irrelevant"
 
 
 class EpisodeInfoRecord:
@@ -27,6 +35,9 @@ class EpisodeInfoRecord:
             **{record_name: 0 for record_name in RECORD_COLUMNS},
             **{f"num_{action_name}_success": 0 for action_name in action_names},
             **{f"num_{action_name}_fail": 0 for action_name in action_names},
+            **{f"num_failed_due_to_discrete_condition_{action_name}": 0 for action_name in action_names},
+            **{f"num_failed_due_to_numeric_condition_{action_name}": 0 for action_name in action_names},
+            **{f"num_unknown_failed_transitions_{action_name}": 0 for action_name in action_names},
         }
         self.summarized_info = DataFrame(
             columns=[
@@ -35,6 +46,8 @@ class EpisodeInfoRecord:
                 *{f"num_{action_name}_success" for action_name in action_names},
                 *{f"num_{action_name}_fail" for action_name in action_names},
                 *{f"num_unknown_failed_transitions_{action_name}" for action_name in action_names},
+                *{f"num_failed_due_to_discrete_condition_{action_name}" for action_name in action_names},
+                *{f"num_failed_due_to_numeric_condition_{action_name}" for action_name in action_names},
             ]
         )
         self.trajectory = Observation()
@@ -55,6 +68,24 @@ class EpisodeInfoRecord:
         :param num_grounded_actions: the number of grounded actions in the episode.
         """
         self._episode_info["num_grounded_actions"] = num_grounded_actions
+
+    def record_failure_reason(self, action_name: str, failure_reason: str) -> None:
+        """Records the reason for a failure of an action in the episode.
+
+        :param action_name: the name of the action that failed.
+        :param failure_reason: the reason for the failure of the action.
+        """
+        if failure_reason == DISCRETE:
+            self._episode_info[f"num_failed_due_to_discrete_condition_{action_name}"] += 1
+
+        elif failure_reason == NUMERIC:
+            self._episode_info[f"num_failed_due_to_numeric_condition_{action_name}"] += 1
+
+        elif failure_reason == UNKNOWN:
+            self._episode_info[f"num_unknown_failed_transitions_{action_name}"] += 1
+
+        else:
+            raise ValueError(f"Unknown failure reason: {failure_reason}")
 
     def record_single_step(
         self,
@@ -86,30 +117,28 @@ class EpisodeInfoRecord:
 
     def end_episode(
         self,
-        undecided_states: Dict[str, List[Tuple]],
         goal_reached: bool,
-        num_steps_in_episode: int,
         has_solved_solver_problem: bool = False,
+        safe_model_solution_stat: str = not_used_for_solving,
+        optimistic_model_solution_stat: str = not_used_for_solving,
     ) -> None:
         """Ends the episode by recording summary statistics, updating the episode counter,
         and exporting the episode trajectory. This method should be called at the end of each episode
         to ensure all relevant information is saved and the recorder is reset for the next episode.
 
-        :param undecided_states: a dictionary mapping action names to lists of undecided state transitions.
         :param goal_reached: whether the goal was reached in this episode.
-        :param num_steps_in_episode: the number of steps taken in this episode.
         :param has_solved_solver_problem: whether the solver successfully solved the problem in this episode.
+        :param safe_model_solution_stat: the solution status of the safe model in this episode.
+        :param optimistic_model_solution_stat: the solution status of the optimistic model in this episode.
         """
         self.summarized_info.loc[len(self.summarized_info)] = {
             **{"episode_number": self._episode_number},
             **self._episode_info,
-            **{
-                f"num_unknown_failed_transitions_{action_name}": len(undecided_states.get(action_name, []))
-                for action_name in self._action_names
-            },
             **{"goal_reached": goal_reached},
-            "num_steps_in_episode": num_steps_in_episode,
+            "num_steps_in_episode": self._episode_info["sum_successful_actions"] + self._episode_info["sum_failed_actions"],
             "solver_solved_problem": has_solved_solver_problem,
+            "safe_model_solution_status": safe_model_solution_stat,
+            "optimistic_model_solution_status": optimistic_model_solution_stat,
         }
 
         self._episode_info = {record_name: 0 for record_name in self._episode_info}
