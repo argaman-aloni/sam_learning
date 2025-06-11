@@ -71,6 +71,9 @@ def setup_experiments_folds_job(
     code_directory, environment_variables, experiment, internal_iterations, experiment_size, should_create_random_trajectories: bool = True
 ):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
+    internal_iterations_arg = (
+        "" if not internal_iterations else f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
+    )
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
         mem="4G",
@@ -81,7 +84,7 @@ def setup_experiments_folds_job(
             f"--working_directory_path {experiment['working_directory_path']}",
             f"--domain_file_name {experiment['domain_file_name']}",
             f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
+            internal_iterations_arg,
             f"--problem_prefix {experiment['problems_prefix']}",
             f"--experiment_size {experiment_size}",
             f"--no_random_trajectories" if not should_create_random_trajectories else "",
@@ -109,7 +112,9 @@ def create_execution_arguments(experiment, fold, compared_version):
 
 def create_internal_iterations_list(parallelization_data):
     max_train_size = (
-        int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
+        int(parallelization_data["experiment_size"] * 0.8) + 1
+        if "experiment_size" in parallelization_data
+        else parallelization_data["max_index"] + 1
     )
     if parallelization_data["hop"] == 100:
         return [1] + list(range(10, 100, 10)) + list(range(100, max_train_size, 100))
@@ -117,11 +122,20 @@ def create_internal_iterations_list(parallelization_data):
     return list(range(1, FIRST_BREAKPOINT)) + list(range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"]))
 
 
-def create_experiment_folders(code_directory, environment_variables, experiment, should_create_random_trajectories: bool = True):
+def create_experiment_folders(
+    code_directory,
+    environment_variables,
+    experiment,
+    should_create_random_trajectories: bool = True,
+    should_create_internal_iterations: bool = True,
+):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
-    internal_iterations = create_internal_iterations_list(parallelization_data)
-    print(f"Internal iterations: {internal_iterations}")
+    internal_iterations = None
+    if should_create_internal_iterations:
+        internal_iterations = create_internal_iterations_list(parallelization_data)
+        print(f"Internal iterations: {internal_iterations}")
+
     sid = setup_experiments_folds_job(
         code_directory=code_directory,
         environment_variables=environment_variables,

@@ -40,7 +40,7 @@ from solvers import AbstractSolver, SolutionOutputTypes
 SAFE_MODEL_TYPE = "safe"
 OPTIMISTIC_MODEL_TYPE = "optimistic"
 
-MAX_SUCCESSFUL_STEPS_PER_EPISODE = 40
+MAX_SUCCESSFUL_STEPS_PER_EPISODE = 50
 PROBLEM_SOLVING_TIMEOUT = 60 * 5  # 300 seconds
 MIN_EPISODES_TO_PLAN = 50
 MIN_EXECUTIONS_PER_ACTION = 10  # Minimum number of executions per action to consider it partially trained
