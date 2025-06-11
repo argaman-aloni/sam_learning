@@ -26,6 +26,7 @@ from sam_learning.core import (
     EnvironmentSnapshot,
     EpisodeInfoRecord,
 )
+from sam_learning.core.online_learning.episode_info_recorder import NUMERIC, DISCRETE, UNKNOWN
 from sam_learning.core.online_learning.online_numeric_models_learner import OnlineNumericModelLearner
 from sam_learning.core.online_learning.online_utilities import (
     construct_safe_action_model,
@@ -39,8 +40,8 @@ from solvers import AbstractSolver, SolutionOutputTypes
 SAFE_MODEL_TYPE = "safe"
 OPTIMISTIC_MODEL_TYPE = "optimistic"
 
-MAX_SUCCESSFUL_STEPS_PER_EPISODE = 50
-PROBLEM_SOLVING_TIMEOUT = 30  # 30 seconds
+MAX_SUCCESSFUL_STEPS_PER_EPISODE = 40
+PROBLEM_SOLVING_TIMEOUT = 60 * 5  # 300 seconds
 MIN_EPISODES_TO_PLAN = 50
 MIN_EXECUTIONS_PER_ACTION = 10  # Minimum number of executions per action to consider it partially trained
 
@@ -118,6 +119,7 @@ class SemiOnlineNumericAMLearner:
                 "The action was not successful, but the discrete model claimed that the state upheld the action's preconditions."
             )
             self._numeric_models_learners[action_name].add_transition_data(previous_state_pb_functions, is_transition_successful=False)
+            self.episode_recorder.record_failure_reason(action_name=action_name, failure_reason=NUMERIC)
             return
 
         if self._numeric_models_learners[action_name].is_state_in_safe_model(state=previous_state_pb_functions):
@@ -125,12 +127,14 @@ class SemiOnlineNumericAMLearner:
                 "The action was not successful, but the numeric model claimed that the state upheld the action's preconditions."
             )
             self._discrete_models_learners[action_name].add_transition_data(previous_state_pb_predicates, is_transition_successful=False)
+            self.episode_recorder.record_failure_reason(action_name=action_name, failure_reason=DISCRETE)
             return
 
         self.logger.debug(
             "Cannot decide if the action was not successful due to the discrete or numeric model. Adding to the undecided observations."
         )
         self.undecided_failure_observations[action_name].append((previous_state_pb_predicates, previous_state_pb_functions))
+        self.episode_recorder.record_failure_reason(action_name=action_name, failure_reason=UNKNOWN)
 
     def _eliminate_undecided_observations(self, action_name: str) -> None:
         """Eliminates undecided failure observations for a given action by re-evaluating them
@@ -275,8 +279,7 @@ class SemiOnlineNumericAMLearner:
         :return: A tuple containing the selected ActionCall, a boolean indicating if the transition was successful, and the resulting State.
         """
         self.logger.debug("Selecting an action from the grounded actions set.")
-        selected_ground_action = random.choice(frontier)
-        frontier.remove(selected_ground_action)
+        selected_ground_action = frontier.pop(0)
         self.logger.debug(
             f"Selected the informative action {selected_ground_action.name} with parameters {selected_ground_action.parameters}."
         )
@@ -288,8 +291,7 @@ class SemiOnlineNumericAMLearner:
             self.logger.debug(
                 f"Tried to execute the action {selected_ground_action.name}, but it was not successful. Number of unsuccessful attempts: {num_unsuccessful_attempts + 1}."
             )
-            selected_ground_action = random.choice(frontier)
-            frontier.remove(selected_ground_action)
+            selected_ground_action = frontier.pop(0)
             next_state, is_transition_successful = self._execute_selected_action(
                 selected_ground_action, current_state, problem_objects, integrate_in_models=False
             )
@@ -471,36 +473,37 @@ class SemiOnlineNumericAMLearner:
             raise ValueError("No solver was provided to the learner.")
 
         for index, problem_path in enumerate(problems_paths):
+            safe_model_solution_status, optimistic_model_solution_status = SolutionOutputTypes.no_solution, SolutionOutputTypes.no_solution
             self.episode_recorder.clear_trajectory()
             problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
             self.agent.initialize_problem(problem)
             last_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
+            self.episode_recorder.add_num_grounded_actions(len(self.agent.get_environment_actions(last_state)))
             if index >= MIN_EPISODES_TO_PLAN or self._executed_enough_successful_steps_per_action():
                 self._read_trajectories_and_train_models()
                 self.logger.info(f"Trying to solve the problem {problem_path.stem} using the safe action model.")
-                solution_status, trace_len, _ = self._construct_model_and_solve_problem(
+                safe_model_solution_status, trace_len, _ = self._construct_model_and_solve_problem(
                     model_type=SAFE_MODEL_TYPE, problem_path=problem_path
                 )
-                if solution_status == SolutionOutputTypes.ok:
+                if safe_model_solution_status == SolutionOutputTypes.ok:
                     self.logger.info("The problem was solved using the safe action model.")
                     self.episode_recorder.end_episode(
-                        undecided_states={},
                         goal_reached=True,
-                        num_steps_in_episode=trace_len,
                         has_solved_solver_problem=True,
+                        safe_model_solution_stat=safe_model_solution_status.name,
                     )
                     continue
 
-                (solution_status, trace_len, last_state) = self._construct_model_and_solve_problem(
+                (optimistic_model_solution_status, trace_len, last_state) = self._construct_model_and_solve_problem(
                     model_type=OPTIMISTIC_MODEL_TYPE, problem_path=problem_path
                 )
-                if solution_status == SolutionOutputTypes.ok:
+                if optimistic_model_solution_status == SolutionOutputTypes.ok:
                     self.logger.info("The problem was solved using the optimistic action model.")
                     self.episode_recorder.end_episode(
-                        undecided_states={},
                         goal_reached=True,
-                        num_steps_in_episode=trace_len,
                         has_solved_solver_problem=True,
+                        safe_model_solution_stat=safe_model_solution_status.name,
+                        optimistic_model_solution_stat=optimistic_model_solution_status.name,
                     )
                     continue
 
@@ -511,10 +514,12 @@ class SemiOnlineNumericAMLearner:
                 problem_objects=problem.objects,
             )
             self.episode_recorder.end_episode(
-                undecided_states={},
                 goal_reached=goal_reached,
-                num_steps_in_episode=num_steps_till_episode_end,
                 has_solved_solver_problem=False,
+                safe_model_solution_stat=safe_model_solution_status.name,
+                optimistic_model_solution_stat=optimistic_model_solution_status.name,
             )
             self.logger.info("Training the learning algorithms using the trajectories.")
             self._preprocessed_traces_paths.append((self.episode_recorder.trajectory_path, problem_path))
+            self.logger.debug("Exporting the episode statistics to a CSV file.")
+            self.episode_recorder.export_statistics(self.workdir / "exploration_statistics.csv")

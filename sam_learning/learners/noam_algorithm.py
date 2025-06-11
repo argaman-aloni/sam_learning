@@ -354,9 +354,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         solution_status, trace_length, _ = self._construct_model_and_solve_problem(SAFE_MODEL_TYPE, problem_path)
         if solution_status == SolutionOutputTypes.ok:
             self.episode_recorder.end_episode(
-                undecided_states=self.undecided_failure_observations,
                 goal_reached=True,
-                num_steps_in_episode=trace_length,
                 has_solved_solver_problem=True,
             )
             return True, trace_length
@@ -368,9 +366,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             problem_path, num_steps_till_episode_end
         )
         self.episode_recorder.end_episode(
-            undecided_states=self.undecided_failure_observations,
             goal_reached=goal_reached,
-            num_steps_in_episode=num_steps_till_episode_end,
             has_solved_solver_problem=solver_reached_goal,
         )
         return goal_reached, num_steps_till_episode_end
