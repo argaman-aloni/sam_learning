@@ -14,6 +14,7 @@ from solvers import ENHSPSolver
 from tests.consts import (
     DEPOTS_NUMERIC_DOMAIN_PATH,
     DEPOT_ONLINE_LEARNING_PROBLEM,
+    DEPOTS_NUMERIC_EMPTY_DOMAIN_PATH,
 )
 
 
@@ -288,3 +289,20 @@ def test_explore_to_refine_models_executes_the_correct_number_of_successful_acti
     )
     num_successful_actions = depot_semi_online_learner.episode_recorder._episode_info["sum_successful_actions"]
     assert num_successful_actions == 10
+
+
+def test_use_solvers_to_solve_problem_returns_state_when_no_solution_is_found(
+    depot_semi_online_learner: SemiOnlineNumericAMLearner,
+    depot_problem: Problem,
+):
+    """Test that the use_solvers_to_solve_problem method returns the state when no solution is found."""
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
+
+    # Simulate a situation where no solution is found
+    solution_stat, _, result_state = depot_semi_online_learner._use_solvers_to_solve_problem(
+        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM,
+        domain_path=DEPOTS_NUMERIC_EMPTY_DOMAIN_PATH,
+        init_state=initial_state,
+    )
+
+    assert isinstance(result_state, State), "The returned state should be an instance of State"

@@ -148,7 +148,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         :param is_transition_successful: A boolean indicating whether the transition
             caused by the action was successful. Defaults to True.
         """
-        super()._add_transition_data(action_to_update, is_transition_successful, previous_state, next_state)
+        super()._add_transition_data(action_to_update, is_transition_successful)
         previous_state_pb_predicates, previous_state_pb_functions = self._extract_parameter_bound_state_data(
             action=action_to_update,
             state_predicates=self.triplet_snapshot.previous_state_predicates,
@@ -318,7 +318,9 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         self.logger.info(
             f"Could not solve the problem {problem_path.stem} using the safe action model, transitioning to the optimistic model."
         )
-        solution_status, trace_length, last_state = self._construct_model_and_solve_problem(OPTIMISTIC_MODEL_TYPE, problem_path)
+        solution_status, trace_length, last_state = self._construct_model_and_solve_problem(
+            OPTIMISTIC_MODEL_TYPE, problem_path, init_state=initial_state
+        )
         if solution_status == SolutionOutputTypes.ok:
             self.logger.info("The problem was solved using the optimistic action model.")
             return True, True, trace_length
@@ -352,7 +354,9 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             raise ValueError("No solver was provided to the learner.")
 
         self.logger.info("Trying to solve the problem using the safe action model.")
-        solution_status, trace_length, _ = self._construct_model_and_solve_problem(SAFE_MODEL_TYPE, problem_path)
+        problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
+        initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
+        solution_status, trace_length, _ = self._construct_model_and_solve_problem(SAFE_MODEL_TYPE, problem_path, init_state=initial_state)
         if solution_status == SolutionOutputTypes.ok:
             self.episode_recorder.end_episode(
                 goal_reached=True,
