@@ -11,19 +11,15 @@ class LearningAlgorithmType(Enum):
     universal_sam = 10
     online_nsam = 13
     noam_learning = 14
-    noam_informative_explorer = 17
-    noam_goal_oriented_explorer = 18
+    informative_explorer = 17
+    goal_oriented_explorer = 18
     incremental_nsam = 19
     semi_online = 20
-
-    # learning algorithms relating to fault repair not to be used for POL
-    oblique_tree = 11
-    extended_svc = 12
+    ma_sam_plus = 25
 
     # To remove
     naive_nsam = 15
     naive_polysam = 16
-    ma_sam_plus = 25
 
 
 class SolverType(Enum):

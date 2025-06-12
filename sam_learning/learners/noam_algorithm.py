@@ -25,6 +25,7 @@ from sam_learning.core import (
 from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
 from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner, OPTIMISTIC_MODEL_TYPE, SAFE_MODEL_TYPE
 from solvers import AbstractSolver, SolutionOutputTypes
+from utilities import LearningAlgorithmType
 
 APPLICABLE_ACTIONS_SELECTION_RATE = 0.2
 MAX_STEPS_PER_EPISODE = 1000
@@ -62,13 +63,13 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         polynomial_degree: int = 0,
         agent: AbstractAgent = None,
         solvers: List[AbstractSolver] = None,
-        exploration_type: ExplorationAlgorithmType = ExplorationAlgorithmType.combined,
+        exploration_type: LearningAlgorithmType = LearningAlgorithmType.noam_learning,
         episode_recorder: EpisodeInfoRecord = None,
     ):
         super().__init__(workdir, partial_domain, polynomial_degree, agent, solvers, episode_recorder)
         self._informative_states_learner = {}
         self.triplet_snapshot = EnvironmentSnapshot(partial_domain=partial_domain)
-        self._exploration_policy = exploration_type
+        self._exploration_algorithm_type = exploration_type
         self._successful_execution_count = defaultdict(int)
         self._applicable_actions = set()
 
@@ -172,7 +173,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         """
         self.logger.debug("Selecting an action from the grounded actions set.")
         random_action = random.choice(frontier)
-        if self._exploration_policy == ExplorationAlgorithmType.goal_oriented:
+        if self._exploration_algorithm_type == LearningAlgorithmType.goal_oriented_explorer:
             selected_ground_action = frontier.pop(0)
             next_state, is_transition_successful = self._execute_selected_action(selected_ground_action, current_state, problem_objects)
             return selected_ground_action, is_transition_successful, next_state
@@ -224,7 +225,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         :param grounded_actions: The set of grounded actions available for exploration.
         :return: A set of actions to explore.
         """
-        if self._exploration_policy == ExplorationAlgorithmType.goal_oriented:
+        if self._exploration_algorithm_type == LearningAlgorithmType.goal_oriented_explorer:
             shuffled_actions = list(grounded_actions)
             random.shuffle(shuffled_actions)
             return shuffled_actions
@@ -304,7 +305,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         """
         problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
         initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
-        if self._exploration_policy == ExplorationAlgorithmType.informative_explorer:
+        if self._exploration_algorithm_type == LearningAlgorithmType.informative_explorer:
             self.logger.info("Applying the informative explorer exploration policy - starting to explore the environment.")
             goal_reached, executed_steps = self.explore_to_refine_models(
                 init_state=initial_state,

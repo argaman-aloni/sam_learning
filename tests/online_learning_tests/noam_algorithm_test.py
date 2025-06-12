@@ -13,7 +13,6 @@ from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning.online_utilities import construct_optimistic_action_model, construct_safe_action_model
 from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners import NumericOnlineActionModelLearner
-from sam_learning.learners.noam_algorithm import ExplorationAlgorithmType
 from solvers import ENHSPSolver
 from tests.consts import (
     DEPOTS_NUMERIC_DOMAIN_PATH,
@@ -23,6 +22,7 @@ from tests.consts import (
     COUNTERS_ONLINE_LEARNING_DOMAIN_PATH,
     COUNTERS_ONLINE_LEARNING_PROBLEM_PATH,
 )
+from utilities import LearningAlgorithmType
 
 
 @fixture()
@@ -84,7 +84,7 @@ def depot_noam_informative_explorer(
         agent=depot_numeric_agent,
         solvers=[ENHSPSolver()],
         episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
-        exploration_type=ExplorationAlgorithmType.informative_explorer,
+        exploration_type=LearningAlgorithmType.informative_explorer,
     )
 
 
@@ -99,7 +99,7 @@ def counters_noam_informative_explorer(
         agent=counters_numeric_agent,
         solvers=[ENHSPSolver()],
         episode_recorder=EpisodeInfoRecord(list(counters_numeric_domain.actions), working_directory=working_directory),
-        exploration_type=ExplorationAlgorithmType.informative_explorer,
+        exploration_type=LearningAlgorithmType.informative_explorer,
     )
 
 
@@ -114,7 +114,7 @@ def depot_noam_goal_oriented(
         agent=depot_numeric_agent,
         solvers=[ENHSPSolver()],
         episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
-        exploration_type=ExplorationAlgorithmType.goal_oriented,
+        exploration_type=LearningAlgorithmType.goal_oriented_explorer,
     )
 
 
@@ -129,7 +129,7 @@ def depot_noam_goal_combined_explorer(
         agent=depot_numeric_agent,
         solvers=[ENHSPSolver()],
         episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
-        exploration_type=ExplorationAlgorithmType.combined,
+        exploration_type=LearningAlgorithmType.noam_learning,
     )
 
 
