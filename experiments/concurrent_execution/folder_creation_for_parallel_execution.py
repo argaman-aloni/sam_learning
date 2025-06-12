@@ -121,6 +121,8 @@ if __name__ == "__main__":
     split_internal_iterations = [int(val) for val in args.internal_iterations.split(",")] if args.internal_iterations else None
     if split_internal_iterations is not None:
         print(f"Internal iterations: {split_internal_iterations}")
+    else:
+        print("No internal iterations specified, will not create internal iterations for the folds.")
 
     folds_creator = FoldsCreator(
         working_directory_path=Path(args.working_directory_path),
