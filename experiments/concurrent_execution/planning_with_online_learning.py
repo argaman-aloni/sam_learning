@@ -11,7 +11,6 @@ from pddl_plus_parser.models import Domain, State
 from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners import NumericOnlineActionModelLearner
-from sam_learning.learners.noam_algorithm import ExplorationAlgorithmType
 from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver, MetricFFSolver
 from statistics.utils import init_semantic_performance_calculator
@@ -19,12 +18,6 @@ from utilities import LearningAlgorithmType
 
 MAX_SIZE_MB = 10
 MAX_EPISODE_NUM_STEPS = 5000
-
-ONLINE_LEARNING_ALGORITHMS = {
-    ExplorationAlgorithmType.combined: LearningAlgorithmType.noam_learning,
-    ExplorationAlgorithmType.informative_explorer: LearningAlgorithmType.noam_informative_explorer,
-    ExplorationAlgorithmType.goal_oriented: LearningAlgorithmType.noam_goal_oriented_explorer,
-}
 
 
 class PIL:
@@ -41,7 +34,7 @@ class PIL:
         domain_file_name: str,
         problem_prefix: str = "pfile",
         polynomial_degree: int = 0,
-        exploration_type: ExplorationAlgorithmType = ExplorationAlgorithmType.combined,
+        exploration_type: LearningAlgorithmType = LearningAlgorithmType.semi_online,
     ):
         self.logger = logging.getLogger(__name__)
         self.working_directory_path = working_directory_path
@@ -50,7 +43,7 @@ class PIL:
         self._polynomial_degree = polynomial_degree
         self._exploration_type = exploration_type
         self._agent = None
-        self._learning_algorithm = ONLINE_LEARNING_ALGORITHMS[exploration_type]
+        self._learning_algorithm = exploration_type
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
@@ -178,12 +171,12 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     parser.add_argument(
-        "--exploration_policy",
+        "--learning_algorithms",
         required=False,
-        help="The policy of the online learning algorithm being tested",
-        type=str,
-        choices=["informative_explorer", "goal_oriented", "combined"],
-        default="combined",
+        help="The type of learning algorithm to use for the numeric action model learning.",
+        type=int,
+        choices=[20, 14, 17, 18],
+        default=20,
     )
     args = parser.parse_args()
     return args
@@ -206,7 +199,7 @@ def main():
         domain_file_name=args.domain_file_name,
         problem_prefix=args.problems_prefix,
         polynomial_degree=0,  # Assuming linear models for simplicity
-        exploration_type=ExplorationAlgorithmType.combined,  # Using combined exploration strategy
+        exploration_type=LearningAlgorithmType.semi_online,  # Using combined exploration strategy
     )
     learner.learn_model_semi_online(fold_num=args.fold_number)
 
