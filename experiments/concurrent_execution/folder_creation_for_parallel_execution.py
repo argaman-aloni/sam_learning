@@ -76,7 +76,7 @@ class FoldsCreator:
         self.logger.info("Creating a logs directory.")
         (self.working_directory_path / "logs").mkdir(exist_ok=True)
         self.logger.info("Creating the folds directories.")
-        self.k_fold.create_k_fold(max_items=experiment_size)
+        self.k_fold.create_k_fold(max_items=experiment_size, should_ignore_internal_iterations=not self.create_internal_iterations)
         self.logger.info("Done creating the folds directories!")
 
     def create_random_performance_evaluation_trajectories(
