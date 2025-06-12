@@ -2,7 +2,9 @@
 
 import argparse
 import logging
+import os
 import shutil
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
@@ -16,7 +18,7 @@ from solvers import ENHSPSolver, MetricFFSolver
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType
 
-MAX_SIZE_MB = 10
+MAX_SIZE_MB = 5
 MAX_EPISODE_NUM_STEPS = 5000
 
 
@@ -178,22 +180,44 @@ def parse_arguments() -> argparse.Namespace:
         choices=[20, 14, 17, 18],
         default=20,
     )
+    parser.add_argument("--debug", required=False, help="Whether in debug mode.", type=bool, default=False)
     args = parser.parse_args()
     return args
 
 
-def configure_logger():
+def configure_logger(args: argparse.Namespace):
     """Configures the logger for the numeric action model learning algorithms evaluation experiments."""
+    learning_algorithm = LearningAlgorithmType(args.learning_algorithm)
+    local_logs_parent_path = os.environ.get("LOCAL_LOGS_PATH", args.working_directory_path)
+    working_directory_path = Path(local_logs_parent_path)
+    logs_directory_path = working_directory_path / "logs"
+    try:
+        logs_directory_path.mkdir(exist_ok=True)
+    except PermissionError:
+        # This is a hack to not fail and just avoid logging in case the directory cannot be created
+        return
+
+    # Create a rotating file handler
+    max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
+    file_handler = RotatingFileHandler(
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}.log",
+        maxBytes=max_bytes,
+        backupCount=1,
+    )
     stream_handler = logging.StreamHandler()
     # Create a formatter and set it for the handler
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    stream_handler.setFormatter(formatter)
-    logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[stream_handler])
+    file_handler.setFormatter(formatter)
+    if args.debug:
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.DEBUG, handlers=[file_handler, stream_handler])
+
+    else:
+        logging.basicConfig(datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[file_handler])
 
 
 def main():
     args = parse_arguments()
-    configure_logger()
+    configure_logger(args)
     learner = PIL(
         working_directory_path=Path(args.working_directory_path),
         domain_file_name=args.domain_file_name,
