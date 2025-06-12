@@ -139,7 +139,7 @@ class PIL:
         """
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         # TODO: Change the path to the train set directory of the correct algorithm.
-        train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{LearningAlgorithmType.noam_learning.value}"
+        train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{self._exploration_type.value}"
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
