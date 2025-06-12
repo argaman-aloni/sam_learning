@@ -322,12 +322,13 @@ class SemiOnlineNumericAMLearner:
             )
 
     def _use_solvers_to_solve_problem(
-        self, problem_path: Path, domain_path: Path
+        self, problem_path: Path, domain_path: Path, init_state: State
     ) -> Tuple[SolutionOutputTypes, Optional[int], Optional[State]]:
         """Uses the solvers to solve the problem defined in the given path.
 
         :param problem_path: The path to the PDDL problem file.
         :param domain_path: The path to the PDDL domain file.
+        :param init_state: The initial state from which the problem-solving starts.
         :return: The solution status of the problem-solving attempt.
         """
         solution_path = self.workdir / f"{problem_path.stem}.solution"
@@ -357,7 +358,7 @@ class SemiOnlineNumericAMLearner:
 
                 return solution_status, len(trace), None
 
-        return solution_status, None, None
+        return solution_status, None, init_state
 
     def _executed_enough_successful_steps_per_action(self):
         """Checks if enough steps have been executed per action to consider the to be considerably trained."""
@@ -421,12 +422,13 @@ class SemiOnlineNumericAMLearner:
             )
 
     def _construct_model_and_solve_problem(
-        self, model_type: str, problem_path: Path
+        self, model_type: str, problem_path: Path, init_state: State
     ) -> Tuple[SolutionOutputTypes, Optional[int], Optional[State]]:
         """Constructs a model of the specified type and attempts to solve the problem.
 
         :param model_type: The type of model to construct ('safe' or 'optimistic').
         :param problem_path: The path to the PDDL problem file.
+        :param init_state: The initial state from which the problem-solving starts.
         :return: The solution status of the problem-solving attempt.
         """
         if model_type == SAFE_MODEL_TYPE:
@@ -449,7 +451,7 @@ class SemiOnlineNumericAMLearner:
         domain_path = export_learned_domain(
             workdir=self.workdir, partial_domain=self.partial_domain, learned_domain=model, is_safe_model=(model_type == SAFE_MODEL_TYPE)
         )
-        return self._use_solvers_to_solve_problem(domain_path=domain_path, problem_path=problem_path)
+        return self._use_solvers_to_solve_problem(domain_path=domain_path, problem_path=problem_path, init_state=init_state)
 
     def _read_trajectories_and_train_models(self) -> None:
         """"""
@@ -483,7 +485,7 @@ class SemiOnlineNumericAMLearner:
                 self._read_trajectories_and_train_models()
                 self.logger.info(f"Trying to solve the problem {problem_path.stem} using the safe action model.")
                 safe_model_solution_status, trace_len, _ = self._construct_model_and_solve_problem(
-                    model_type=SAFE_MODEL_TYPE, problem_path=problem_path
+                    model_type=SAFE_MODEL_TYPE, problem_path=problem_path, init_state=last_state
                 )
                 if safe_model_solution_status == SolutionOutputTypes.ok:
                     self.logger.info("The problem was solved using the safe action model.")
@@ -495,7 +497,7 @@ class SemiOnlineNumericAMLearner:
                     continue
 
                 (optimistic_model_solution_status, trace_len, last_state) = self._construct_model_and_solve_problem(
-                    model_type=OPTIMISTIC_MODEL_TYPE, problem_path=problem_path
+                    model_type=OPTIMISTIC_MODEL_TYPE, problem_path=problem_path, init_state=last_state
                 )
                 if optimistic_model_solution_status == SolutionOutputTypes.ok:
                     self.logger.info("The problem was solved using the optimistic action model.")

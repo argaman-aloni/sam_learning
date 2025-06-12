@@ -24,6 +24,7 @@ WOODWORKING_PROBLEM_PATH = EXAMPLES_DIR_PATH / "woodworking_problem.pddl"
 WOODWORKING_TRAJECTORY_PATH = EXAMPLES_DIR_PATH / "woodworking_trajectory.trajectory"
 
 DEPOTS_NUMERIC_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_numeric.pddl"
+DEPOTS_NUMERIC_EMPTY_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_numeric_empty.pddl"
 DEPOTS_NUMERIC_PROBLEM_PATH = EXAMPLES_DIR_PATH / "pfile2.pddl"
 
 DEPOTS_DISCRETE_DOMAIN_PATH = EXAMPLES_DIR_PATH / "depot_discrete.pddl"
@@ -130,9 +131,7 @@ FARMLAND_SPAN_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "span_convex_state_data.csv"
 
 
 DEPOT_ONLINE_LEARNING_PROBLEM = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.pddl"
-DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL = (
-    EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning_with_numeric_goals.pddl"
-)
+DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning_with_numeric_goals.pddl"
 DEPOT_ONLINE_LEARNING_PLAN = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.solution"
 
 OBJECT_TYPE = PDDLType(name="object")
