@@ -71,8 +71,25 @@ def setup_experiments_folds_job(
     code_directory, environment_variables, experiment, internal_iterations, experiment_size, should_create_random_trajectories: bool = True
 ):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
-    internal_iterations_arg = (
-        "" if internal_iterations is None else f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
+    arguments = (
+        [
+            f"--working_directory_path {experiment['working_directory_path']}",
+            f"--domain_file_name {experiment['domain_file_name']}",
+            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
+            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
+            f"--problem_prefix {experiment['problems_prefix']}",
+            f"--experiment_size {experiment_size}",
+            f"--no_random_trajectories" if not should_create_random_trajectories else "",
+        ]
+        if internal_iterations
+        else [
+            f"--working_directory_path {experiment['working_directory_path']}",
+            f"--domain_file_name {experiment['domain_file_name']}",
+            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
+            f"--problem_prefix {experiment['problems_prefix']}",
+            f"--experiment_size {experiment_size}",
+            f"--no_random_trajectories" if not should_create_random_trajectories else "",
+        ]
     )
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
@@ -80,15 +97,7 @@ def setup_experiments_folds_job(
         python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
         suppress_output=False,
-        arguments=[
-            f"--working_directory_path {experiment['working_directory_path']}",
-            f"--domain_file_name {experiment['domain_file_name']}",
-            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            internal_iterations_arg,
-            f"--problem_prefix {experiment['problems_prefix']}",
-            f"--experiment_size {experiment_size}",
-            f"--no_random_trajectories" if not should_create_random_trajectories else "",
-        ],
+        arguments=arguments,
         environment_variables=environment_variables,
         logs_directory=pathlib.Path(experiment["working_directory_path"]) / "logs",
     )
