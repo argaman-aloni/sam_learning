@@ -140,7 +140,6 @@ class PIL:
         :param fold_num: the index of the current folder that is currently running.
         """
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
-        # TODO: Change the path to the train set directory of the correct algorithm.
         train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{self._exploration_type.value}"
         partial_domain_path = train_set_dir_path / self.domain_file_name
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
@@ -173,7 +172,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     parser.add_argument(
-        "--learning_algorithms",
+        "--learning_algorithm",
         required=False,
         help="The type of learning algorithm to use for the numeric action model learning.",
         type=int,
