@@ -68,29 +68,28 @@ def validate_job_running(sid: int):
 
 
 def setup_experiments_folds_job(
-    code_directory, environment_variables, experiment, internal_iterations, experiment_size, should_create_random_trajectories: bool = True
+    code_directory,
+    environment_variables,
+    experiment,
+    internal_iterations,
+    experiment_size,
+    should_create_random_trajectories: bool = True,
+    should_create_internal_iterations: bool = True,
 ):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
-    arguments = (
-        [
-            f"--working_directory_path {experiment['working_directory_path']}",
-            f"--domain_file_name {experiment['domain_file_name']}",
-            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
-            f"--problem_prefix {experiment['problems_prefix']}",
-            f"--experiment_size {experiment_size}",
-            f"--no_random_trajectories" if not should_create_random_trajectories else "",
-        ]
-        if internal_iterations
-        else [
-            f"--working_directory_path {experiment['working_directory_path']}",
-            f"--domain_file_name {experiment['domain_file_name']}",
-            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            f"--problem_prefix {experiment['problems_prefix']}",
-            f"--experiment_size {experiment_size}",
-            f"--no_random_trajectories" if not should_create_random_trajectories else "",
-        ]
-    )
+    arguments = [
+        f"--working_directory_path {experiment['working_directory_path']}",
+        f"--domain_file_name {experiment['domain_file_name']}",
+        f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
+        (
+            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}"
+            if should_create_internal_iterations
+            else "--ignore_internal_iterations"
+        ),
+        f"--problem_prefix {experiment['problems_prefix']}",
+        f"--experiment_size {experiment_size}",
+        f"--no_random_trajectories" if not should_create_random_trajectories else "",
+    ]
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
         mem="4G",
@@ -152,6 +151,7 @@ def create_experiment_folders(
         internal_iterations=internal_iterations,
         experiment_size=parallelization_data.get("experiment_size", 100),
         should_create_random_trajectories=should_create_random_trajectories,
+        should_create_internal_iterations=should_create_internal_iterations,
     )
     return internal_iterations, sid
 
