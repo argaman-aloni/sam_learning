@@ -359,6 +359,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         solution_status, trace_length, _ = self._construct_model_and_solve_problem(SAFE_MODEL_TYPE, problem_path, init_state=initial_state)
         if solution_status == SolutionOutputTypes.ok:
             self.episode_recorder.end_episode(
+                problem_name=problem_path.stem,
                 goal_reached=True,
                 has_solved_solver_problem=True,
             )
@@ -371,6 +372,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             problem_path, num_steps_till_episode_end
         )
         self.episode_recorder.end_episode(
+            problem_name=problem_path.stem,
             goal_reached=goal_reached,
             has_solved_solver_problem=solver_reached_goal,
         )

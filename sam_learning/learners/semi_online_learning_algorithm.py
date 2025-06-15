@@ -490,6 +490,7 @@ class SemiOnlineNumericAMLearner:
                 if safe_model_solution_status == SolutionOutputTypes.ok:
                     self.logger.info("The problem was solved using the safe action model.")
                     self.episode_recorder.end_episode(
+                        problem_name=problem_path.stem,
                         goal_reached=True,
                         has_solved_solver_problem=True,
                         safe_model_solution_stat=safe_model_solution_status.name,
@@ -502,6 +503,7 @@ class SemiOnlineNumericAMLearner:
                 if optimistic_model_solution_status == SolutionOutputTypes.ok:
                     self.logger.info("The problem was solved using the optimistic action model.")
                     self.episode_recorder.end_episode(
+                        problem_name=problem_path.stem,
                         goal_reached=True,
                         has_solved_solver_problem=True,
                         safe_model_solution_stat=safe_model_solution_status.name,
@@ -516,6 +518,7 @@ class SemiOnlineNumericAMLearner:
                 problem_objects=problem.objects,
             )
             self.episode_recorder.end_episode(
+                problem_name=problem_path.stem,
                 goal_reached=goal_reached,
                 has_solved_solver_problem=False,
                 safe_model_solution_stat=safe_model_solution_status.name,
