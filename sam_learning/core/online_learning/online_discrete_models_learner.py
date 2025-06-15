@@ -55,7 +55,7 @@ class OnlineDiscreteModelLearner:
         self.cannot_be_effects.update([predicate.copy(is_negated=True) for predicate in post_state_predicates])
         self.must_be_effects.update(set([predicate.copy() for predicate in post_state_predicates.difference(pre_state_predicates)]))
         # Removing the predicates that cannot be effects from the must be effects set.
-        self.must_be_effects.difference_update(self.cannot_be_preconditions)
+        self.must_be_effects.difference_update(self.cannot_be_effects)
 
     def _apply_unit_propagation(self) -> None:
         """Applies unit propagation to the must be preconditions CNFs."""
