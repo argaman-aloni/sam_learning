@@ -474,6 +474,7 @@ class SemiOnlineNumericAMLearner:
         if self._solvers is None:
             raise ValueError("No solver was provided to the learner.")
 
+        statistics_path = self.workdir / "exploration_statistics.csv"
         for index, problem_path in enumerate(problems_paths):
             safe_model_solution_status, optimistic_model_solution_status = SolutionOutputTypes.no_solution, SolutionOutputTypes.no_solution
             self.episode_recorder.clear_trajectory()
@@ -495,6 +496,7 @@ class SemiOnlineNumericAMLearner:
                         has_solved_solver_problem=True,
                         safe_model_solution_stat=safe_model_solution_status.name,
                     )
+                    self.episode_recorder.export_statistics(statistics_path)
                     continue
 
                 (optimistic_model_solution_status, trace_len, last_state) = self._construct_model_and_solve_problem(
@@ -509,6 +511,7 @@ class SemiOnlineNumericAMLearner:
                         safe_model_solution_stat=safe_model_solution_status.name,
                         optimistic_model_solution_stat=optimistic_model_solution_status.name,
                     )
+                    self.episode_recorder.export_statistics(statistics_path)
                     continue
 
             self.logger.info(f"Exploring the environment to solve the problem {problem_path.stem}.")
@@ -528,4 +531,4 @@ class SemiOnlineNumericAMLearner:
             self.logger.info("Training the learning algorithms using the trajectories.")
             self._preprocessed_traces_paths.append((self.episode_recorder.trajectory_path, problem_path))
             self.logger.debug("Exporting the episode statistics to a CSV file.")
-            self.episode_recorder.export_statistics(self.workdir / "exploration_statistics.csv")
+            self.episode_recorder.export_statistics(statistics_path)
