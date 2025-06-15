@@ -517,6 +517,7 @@ class SemiOnlineNumericAMLearner:
                 num_steps_till_episode_end=MAX_SUCCESSFUL_STEPS_PER_EPISODE,
                 problem_objects=problem.objects,
             )
+            self.logger.info(f"Recording the exploration of the episode for the problem {problem_path.stem}.")
             self.episode_recorder.end_episode(
                 problem_name=problem_path.stem,
                 goal_reached=goal_reached,
