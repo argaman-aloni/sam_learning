@@ -7,6 +7,7 @@ from pandas import DataFrame
 from pddl_plus_parser.models import ActionCall, Observation, State
 
 RECORD_COLUMNS = [
+    "problem_name",
     "num_grounded_actions",
     "sum_failed_actions",
     "sum_successful_actions",
@@ -117,6 +118,7 @@ class EpisodeInfoRecord:
 
     def end_episode(
         self,
+        problem_name: str,
         goal_reached: bool,
         has_solved_solver_problem: bool = False,
         safe_model_solution_stat: str = not_used_for_solving,
@@ -126,6 +128,7 @@ class EpisodeInfoRecord:
         and exporting the episode trajectory. This method should be called at the end of each episode
         to ensure all relevant information is saved and the recorder is reset for the next episode.
 
+        :param problem_name: the name of the problem that was solved in this episode.
         :param goal_reached: whether the goal was reached in this episode.
         :param has_solved_solver_problem: whether the solver successfully solved the problem in this episode.
         :param safe_model_solution_stat: the solution status of the safe model in this episode.
@@ -135,6 +138,7 @@ class EpisodeInfoRecord:
             **{"episode_number": self._episode_number},
             **self._episode_info,
             **{"goal_reached": goal_reached},
+            "problem_name": problem_name,
             "num_steps_in_episode": self._episode_info["sum_successful_actions"] + self._episode_info["sum_failed_actions"],
             "solver_solved_problem": has_solved_solver_problem,
             "safe_model_solution_status": safe_model_solution_stat,
