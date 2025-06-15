@@ -140,8 +140,9 @@ class IPCAgent(AbstractAgent):
             trace.add_component(previous_state=current_state, next_state=next_state, call=action, is_successful_transition=is_successful)
             current_state = next_state
             if not is_successful:
-                self.logger.debug(f"Could not apply the action {str(action)} to the state, the plan was inapplicable in step {index + 1}.")
+                self.logger.info(f"Could not apply the action {str(action)} to the state, the plan was inapplicable in step {index + 1}.")
                 break
 
         is_goal_reached = self.goal_reached(current_state)
+        self.logger.info(f"The plan execution finished with goal reached: {is_goal_reached}.")
         return trace, is_goal_reached
