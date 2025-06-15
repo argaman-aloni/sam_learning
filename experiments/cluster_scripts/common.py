@@ -246,7 +246,7 @@ def submit_job_and_validate_execution(
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
         conda_env="online_nsam",
-        mem="16G",
+        mem="32G",
         python_file=python_file or f"{code_directory}/{configurations['experiments_script_path']}",
         jobname=job_name,
         dependency=dependency_argument,
