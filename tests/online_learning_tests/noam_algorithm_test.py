@@ -158,7 +158,7 @@ def test_add_transition_data_when_failure_caused_by_discrete_condition_not_holdi
     depot_numeric_agent: IPCAgent,
 ):
     first_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "distributor2"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     component = trace.components[0]
     depot_noam_informative_explorer.triplet_snapshot.create_triplet_snapshot(
@@ -189,7 +189,7 @@ def test_add_transition_data_when_transition_is_not_successful_adds_data_to_all_
     depot_numeric_agent: IPCAgent,
 ):
     failed_first_action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     component = trace.components[0]
     depot_noam_informative_explorer.triplet_snapshot.create_triplet_snapshot(
@@ -211,7 +211,7 @@ def test_add_transition_data_when_transition_is_successful_adds_data_to_all_mode
     depot_numeric_agent: IPCAgent,
 ):
     first_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "distributor2"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     component = trace.components[0]
     depot_noam_informative_explorer.triplet_snapshot.create_triplet_snapshot(
@@ -291,7 +291,7 @@ def test_select_action_and_execute_when_exploration_policy_is_goal_oriented_sele
     depot_noam_goal_oriented.initialize_learning_algorithms()
     depot_noam_informative_explorer.initialize_learning_algorithms()
     first_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "distributor2"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     component = trace.components[0]
     depot_noam_goal_oriented.triplet_snapshot.create_triplet_snapshot(
         previous_state=component.previous_state,
@@ -330,7 +330,7 @@ def test_train_models_using_trace_when_given_a_single_action_adds_the_action_dat
 ):
     first_action = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))[0]
     depot_numeric_agent.initialize_problem(depot_problem)
-    trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
     assert len(depot_noam_informative_explorer._discrete_models_learners[first_action.name].cannot_be_effects) > 0
@@ -345,7 +345,7 @@ def test_train_models_using_trace_when_given_an_already_observed_state_and_actio
 ):
     initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     first_action = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))[0]
-    trace, _ = depot_numeric_agent.execute_plan(plan=[first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     is_informative, action_applicable = depot_noam_informative_explorer._calculate_state_action_informative(
         current_state=initial_state, action_to_test=first_action, problem_objects=depot_problem.objects
@@ -365,7 +365,7 @@ def test_train_models_using_trace_when_given_an_inapplicable_action_in_a_state_w
 ):
     initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
     failed_first_action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor1", "depot3"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     is_informative, action_applicable = depot_noam_informative_explorer._calculate_state_action_informative(
         current_state=initial_state, action_to_test=failed_first_action, problem_objects=depot_problem.objects
@@ -381,12 +381,12 @@ def test_train_models_using_trace_when_given_an_inapplicable_action_and_then_the
     depot_numeric_agent: IPCAgent,
 ):
     failed_first_action = ActionCall(name="drive", grounded_parameters=["truck0", "distributor2", "depot3"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
     assert len(depot_noam_informative_explorer.undecided_failure_observations[failed_first_action.name]) == 1
     fixed_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "depot0"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[fixed_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[fixed_action])
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
     assert len(depot_noam_informative_explorer.undecided_failure_observations[failed_first_action.name]) == 0
 
@@ -397,12 +397,12 @@ def test_train_models_using_trace_when_given_an_inapplicable_action_and_then_the
     depot_numeric_agent: IPCAgent,
 ):
     failed_first_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot2", "depot3"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[failed_first_action])
     depot_noam_informative_explorer.initialize_learning_algorithms()
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
     assert len(depot_noam_informative_explorer.undecided_failure_observations[failed_first_action.name]) == 1
     fixed_action = ActionCall(name="drive", grounded_parameters=["truck0", "depot3", "depot0"])
-    trace, _ = depot_numeric_agent.execute_plan(plan=[fixed_action])
+    trace, _, _ = depot_numeric_agent.execute_plan(plan=[fixed_action])
     depot_noam_informative_explorer.train_models_using_trace(trace=trace)
     optimistic_model = construct_optimistic_action_model(
         partial_domain=depot_noam_informative_explorer.partial_domain,
@@ -422,7 +422,7 @@ def test_train_models_using_trace_when_given_multiple_successful_transitions_doe
 ):
     try:
         plan = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))
-        trace, _ = depot_numeric_agent.execute_plan(plan=plan)
+        trace, _, _ = depot_numeric_agent.execute_plan(plan=plan)
         depot_noam_informative_explorer.initialize_learning_algorithms()
         depot_noam_informative_explorer.train_models_using_trace(trace=trace)
         safe_model = construct_safe_action_model(
@@ -448,7 +448,7 @@ def test_train_models_using_trace_when_given_multiple_successful_transitions_ret
 ):
     try:
         plan = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))
-        trace, _ = depot_numeric_agent.execute_plan(plan=plan)
+        trace, _, _ = depot_numeric_agent.execute_plan(plan=plan)
         depot_noam_informative_explorer.initialize_learning_algorithms()
         depot_noam_informative_explorer.train_models_using_trace(trace=trace)
         safe_model = construct_safe_action_model(

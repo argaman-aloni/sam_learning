@@ -124,16 +124,17 @@ class IPCAgent(AbstractAgent):
         self.logger.debug("Goal has not been reached according to the IPC agent.")
         return False
 
-    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool]:
+    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool, bool]:
         """Executes a plan in the environment and returns the trace created from the plan, and whether using the plan's
         actions the goal was reached.
 
         :param plan: the plan to be executed.
-        :return: The trace created from the plan and whether the goal was reached.
+        :return: The trace created from the plan and whether the goal was reached amd whether the plan was successful
         """
         self.logger.info("Executing the plan %s.", ", ".join([str(action) for action in plan]))
         trace = Observation()
         trace.add_problem_objects(self._problem.objects)
+        plan_applicable = True
         current_state = State(predicates=self._problem.initial_state_predicates, fluents=self._problem.initial_state_fluents)
         for index, action in enumerate(plan):
             next_state, is_successful, reward = self.observe(current_state, action)
@@ -141,8 +142,9 @@ class IPCAgent(AbstractAgent):
             current_state = next_state
             if not is_successful:
                 self.logger.info(f"Could not apply the action {str(action)} to the state, the plan was inapplicable in step {index + 1}.")
+                plan_applicable = False
                 break
 
         is_goal_reached = self.goal_reached(current_state)
         self.logger.info(f"The plan execution finished with goal reached: {is_goal_reached}.")
-        return trace, is_goal_reached
+        return trace, is_goal_reached, plan_applicable

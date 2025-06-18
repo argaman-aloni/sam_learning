@@ -54,7 +54,7 @@ class AbstractAgent(ABC):
         pass
 
     @abstractmethod
-    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool]:
+    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool, bool]:
         """Executes a plan in the environment and returns the trace created from the plan, and whether using the plan's
         actions the goal was reached.
 

@@ -347,13 +347,11 @@ class SemiOnlineNumericAMLearner:
             if solution_status == SolutionOutputTypes.ok:
                 self.logger.info("The problem was solved successfully.")
                 plan_actions = create_plan_actions(solution_path)
-                trace, goal_reached = self.agent.execute_plan(plan_actions)
+                trace, goal_reached, plan_applicable = self.agent.execute_plan(plan_actions)
                 self.train_models_using_trace(trace)
                 if not goal_reached:
                     self.logger.debug("The plan created by the solver did not reach the goal.")
-                    solution_status = (
-                        SolutionOutputTypes.not_applicable if len(trace) < len(plan_actions) else SolutionOutputTypes.goal_not_achieved
-                    )
+                    solution_status = SolutionOutputTypes.not_applicable if not plan_applicable else SolutionOutputTypes.goal_not_achieved
                     return solution_status, len(trace), trace.components[-1].next_state
 
                 return solution_status, len(trace), None
