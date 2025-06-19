@@ -307,7 +307,7 @@ class SAMLearner:
         self.learning_end_time = time.time()
         self.logger.info(f"Finished learning the action model in " f"{self.learning_end_time - self.learning_start_time} seconds.")
 
-    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
+    def learn_action_model(self, observations: List[Observation]) -> Tuple[Domain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
         :param observations: the list of trajectories that are used to learn the safe action model.

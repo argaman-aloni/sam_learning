@@ -25,6 +25,7 @@ from sam_learning.core import (
     VocabularyCreator,
     EnvironmentSnapshot,
     EpisodeInfoRecord,
+    contains_duplicates,
 )
 from sam_learning.core.online_learning.episode_info_recorder import NUMERIC, DISCRETE, UNKNOWN
 from sam_learning.core.online_learning.online_numeric_models_learner import OnlineNumericModelLearner
@@ -408,6 +409,12 @@ class SemiOnlineNumericAMLearner:
         """
         self.logger.info("Training the models using the trace.")
         for observed_transition in trace.components:
+            if contains_duplicates(observed_transition.grounded_action_call.parameters):
+                self.logger.debug(
+                    f"Action {observed_transition.grounded_action_call.name} contains duplicated parameters - no support for non-injective transitions."
+                )
+                continue
+
             self.triplet_snapshot.create_triplet_snapshot(
                 previous_state=observed_transition.previous_state,
                 next_state=observed_transition.next_state,

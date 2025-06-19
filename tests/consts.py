@@ -133,6 +133,8 @@ FARMLAND_SPAN_EXAMPLES_PATH = EXAMPLES_DIR_PATH / "span_convex_state_data.csv"
 DEPOT_ONLINE_LEARNING_PROBLEM = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.pddl"
 DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning_with_numeric_goals.pddl"
 DEPOT_ONLINE_LEARNING_PLAN = EXAMPLES_DIR_PATH / "depot_numeric_problem_online_learning.solution"
+DEPOT_ONLINE_LEARNING_PROD_BUG_TRAJECTORY = EXAMPLES_DIR_PATH / "depot_semi_online_bug_traj.trajectory"
+DEPOT_ONLINE_LEARNING_PROD_BUG_PROBLEM = EXAMPLES_DIR_PATH / "depot_problem_pfile160.pddl"
 
 OBJECT_TYPE = PDDLType(name="object")
 AGENT_TYPE = PDDLType(name="agent")
