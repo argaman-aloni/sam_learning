@@ -3,8 +3,8 @@ import time
 from pathlib import Path
 
 from pandas import DataFrame
-from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import Domain, Problem, State, ActionCall
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
+from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Observation
 from pytest import fixture
 
 from sam_learning.core import EpisodeInfoRecord
@@ -15,6 +15,8 @@ from tests.consts import (
     DEPOTS_NUMERIC_DOMAIN_PATH,
     DEPOT_ONLINE_LEARNING_PROBLEM,
     DEPOTS_NUMERIC_EMPTY_DOMAIN_PATH,
+    DEPOT_ONLINE_LEARNING_PROD_BUG_PROBLEM,
+    DEPOT_ONLINE_LEARNING_PROD_BUG_TRAJECTORY,
 )
 
 
@@ -67,6 +69,20 @@ def depot_semi_online_learner(
         solvers=[ENHSPSolver()],
         episode_recorder=episode_info_recorder,
     )
+
+
+@fixture()
+def depot_effects_bug_problem(depot_numeric_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=DEPOT_ONLINE_LEARNING_PROD_BUG_PROBLEM, domain=depot_numeric_domain).parse_problem()
+
+
+@fixture()
+def depot_effects_bug_trajectory(depot_numeric_domain: Domain, depot_effects_bug_problem: Problem) -> Observation:
+    """Fixture to create a trajectory that reproduces the effects bug."""
+    observation = TrajectoryParser(partial_domain=depot_numeric_domain, problem=depot_effects_bug_problem).parse_trajectory(
+        trajectory_file_path=DEPOT_ONLINE_LEARNING_PROD_BUG_TRAJECTORY, contain_transitions_status=True
+    )
+    return observation
 
 
 def test_sort_ground_actions_based_on_success_rate_does_not_fail_when_no_observations_are_given(
@@ -306,3 +322,21 @@ def test_use_solvers_to_solve_problem_returns_state_when_no_solution_is_found(
     )
 
     assert isinstance(result_state, State), "The returned state should be an instance of State"
+
+
+def test_train_models_using_trace_using_trajectory_from_production_bug_returns_correct_effects_to_the_safe_action_model_when_trace_contains_non_injective_transitions(
+    depot_semi_online_learner: SemiOnlineNumericAMLearner,
+    depot_effects_bug_problem: Problem,
+    depot_effects_bug_trajectory: Observation,
+):
+    """Test that the train_models_using_trace method correctly trains the safe action model."""
+    # Train the models using the trajectory
+    depot_semi_online_learner.initialize_learning_algorithms()
+    depot_semi_online_learner.train_models_using_trace(depot_effects_bug_trajectory)
+
+    # Check that the safe action model has been updated with the correct effects
+    discrete_drive_action_model = depot_semi_online_learner._discrete_models_learners["drive"]
+    effect_strings = [eff.untyped_representation for eff in discrete_drive_action_model.must_be_effects]
+    assert "(not (at ?x ?y))" in effect_strings
+    assert "(at ?x ?z)" in effect_strings
+    assert len(effect_strings) == 2, "There should be exactly two effects for the drive action model"
