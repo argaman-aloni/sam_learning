@@ -38,6 +38,13 @@ def parse_arguments() -> argparse.Namespace:
         dest="should_create_random_trajectories",
         help="If specified, no random trajectories would be created.",
     )
+    parser.add_argument(
+        "--num_splits",
+        type=int,
+        default=5,
+        required=False,
+        help="default number of splits to create for the k-fold cross validation.",
+    )
     parsed_args = parser.parse_args()
     return parsed_args
 
@@ -53,11 +60,12 @@ class FoldsCreator:
         learning_algorithms: List[int] = None,
         internal_iterations: List[int] = None,
         create_internal_iterations: bool = True,
+        n_split: int = 5,
     ):
         self.k_fold = DistributedKFoldSplit(
             working_directory_path=working_directory_path,
             domain_file_name=domain_file_name,
-            n_split=5,
+            n_split=n_split,
             learning_algorithms=learning_algorithms,
             internal_iterations=internal_iterations,
         )
@@ -136,6 +144,7 @@ if __name__ == "__main__":
         learning_algorithms=experiment_learning_algorithms,
         internal_iterations=split_internal_iterations,
         create_internal_iterations=not args.should_not_create_internal_iterations,
+        n_split=args.num_splits,
     )
     folds_creator.create_folds_from_cross_validation(experiment_size=args.experiment_size)
     folds_creator.create_random_performance_evaluation_trajectories(
