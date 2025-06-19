@@ -201,3 +201,7 @@ class EpisodeInfoRecord:
     def clear_trajectory(self):
         """Clears the trajectory of the episode."""
         self.trajectory = Observation()
+
+    def clear_paths(self):
+        """Clears the paths of the trajectory files."""
+        self._trajectory_paths = []

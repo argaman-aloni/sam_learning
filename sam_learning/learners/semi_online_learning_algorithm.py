@@ -539,5 +539,6 @@ class SemiOnlineNumericAMLearner:
             )
             self.logger.info("Training the learning algorithms using the trajectories.")
             self._preprocessed_traces_paths.extend(self.episode_recorder.trajectory_paths)
+            self.episode_recorder.clear_paths()
             self.logger.debug("Exporting the episode statistics to a CSV file.")
             self.episode_recorder.export_statistics(statistics_path)
