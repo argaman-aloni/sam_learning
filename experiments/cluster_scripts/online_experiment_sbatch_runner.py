@@ -47,6 +47,7 @@ def main():
                         environment_variables,
                         f"{experiment['domain_file_name']}_{fold}_semi_online_experiment_runner",
                         None,
+                        memory="32G",
                     )
 
                 experiment_sids.append(sid)

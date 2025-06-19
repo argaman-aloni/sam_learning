@@ -94,7 +94,7 @@ def test_export_episode_trajectory_export_trajectory_in_correct_format(episode_i
     episode_info_recorder.record_single_step(action, True, previous_state, next_state)
 
     # Export the trajectory
-    trajectory_str = episode_info_recorder.export_episode_trajectory(test_mode=True)
+    trajectory_str = episode_info_recorder.export_episode_trajectory(problem_name="test_problem", test_mode=True)
 
     # Check if the file exists and is not empty
     assert trajectory_str is not None
@@ -117,7 +117,7 @@ def test_export_episode_trajectory_export_trajectory_in_correct_format_when_the_
         )
 
     # Export the trajectory
-    trajectory_str = depot_numeric_episode_info_recorder.export_episode_trajectory(test_mode=True)
+    trajectory_str = depot_numeric_episode_info_recorder.export_episode_trajectory(problem_name="test_problem", test_mode=True)
 
     # Check if the file exists and is not empty
     assert trajectory_str is not None

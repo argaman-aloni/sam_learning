@@ -2,6 +2,7 @@
 
 import logging
 import random
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Set, List, Tuple, Union, Optional
@@ -47,6 +48,7 @@ MIN_EPISODES_TO_PLAN = 50
 MIN_EXECUTIONS_PER_ACTION = 10  # Minimum number of executions per action to consider it partially trained
 
 random.seed(42)  # Set seed for reproducibility
+PROBLEM_NAME_REGEX = re.compile(r"trajectory_(\w+)_episode")
 
 
 class SemiOnlineNumericAMLearner:
@@ -459,9 +461,11 @@ class SemiOnlineNumericAMLearner:
         return self._use_solvers_to_solve_problem(domain_path=domain_path, problem_path=problem_path, init_state=init_state)
 
     def _read_trajectories_and_train_models(self) -> None:
-        """"""
+        """Reads preprocessed trajectory files from the work directory and trains the action models using the data."""
         while len(self._preprocessed_traces_paths) > 0:
-            trace_path, problem_path = self._preprocessed_traces_paths.pop(0)
+            trace_path = self._preprocessed_traces_paths.pop(0)
+            problem_name = re.search(PROBLEM_NAME_REGEX, trace_path.stem).group(1)
+            problem_path = self.workdir / f"{problem_name}.pddl"
             problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
             self.logger.info(f"Reading the trajectory from the file {trace_path.stem}.")
             trace = TrajectoryParser(partial_domain=self.partial_domain, problem=problem).parse_trajectory(
@@ -534,6 +538,6 @@ class SemiOnlineNumericAMLearner:
                 optimistic_model_solution_stat=optimistic_model_solution_status.name,
             )
             self.logger.info("Training the learning algorithms using the trajectories.")
-            self._preprocessed_traces_paths.append((self.episode_recorder.trajectory_path, problem_path))
+            self._preprocessed_traces_paths.extend(self.episode_recorder.trajectory_paths)
             self.logger.debug("Exporting the episode statistics to a CSV file.")
             self.episode_recorder.export_statistics(statistics_path)

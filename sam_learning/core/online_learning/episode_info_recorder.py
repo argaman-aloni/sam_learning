@@ -23,6 +23,7 @@ NUMERIC = "numeric"
 UNKNOWN = "unknown"
 
 not_used_for_solving = "irrelevant"
+MAX_STEPS_IN_FILE = 5000  # Maximum number of steps to record in a single trajectory file
 
 
 class EpisodeInfoRecord:
@@ -54,11 +55,12 @@ class EpisodeInfoRecord:
         self.trajectory = Observation()
         self._action_successful_execution_history = {f"num_{action}_success": 0 for action in action_names}
         self.working_directory = working_directory
+        self._trajectory_paths = []
 
     @property
-    def trajectory_path(self) -> Path:
+    def trajectory_paths(self) -> List[Path]:
         """Returns the path to the trajectory file for the current episode."""
-        return self.working_directory / f"trajectory_episode_{self._episode_number}.trajectory"
+        return self._trajectory_paths
 
     def get_number_successful_action_executions(self, action_name: str) -> int:
         return self._action_successful_execution_history[f"num_{action_name}_success"]
@@ -147,7 +149,7 @@ class EpisodeInfoRecord:
 
         self._episode_info = {record_name: 0 for record_name in self._episode_info}
         self._episode_number += 1
-        self.export_episode_trajectory()
+        self.export_episode_trajectory(problem_name)
 
     def export_statistics(self, path: Path) -> None:
         """Exports the statistics of the episode to a CSV file.
@@ -156,34 +158,45 @@ class EpisodeInfoRecord:
         """
         self.summarized_info.to_csv(path, index=False)
 
-    def export_episode_trajectory(self, test_mode: bool = False) -> Optional[str]:
+    def export_episode_trajectory(self, problem_name: str, test_mode: bool = False) -> Optional[str]:
         """Exports the trajectory of the episode to a CSV file.
 
+        :param problem_name: the name of the problem that was solved in this episode.
         :param test_mode: whether the function is called in test mode. If True, the trajectory will not be saved to a file.
         """
         if len(self.trajectory) == 0:
             return None
 
-        trajectory_path = Path(f"trajectory_episode_{self._episode_number}.trajectory")
-        trajectory_str = "("
-        for index, component in enumerate(self.trajectory.components):
-            if index == 0:
-                trajectory_str += f"{component.previous_state.serialize()}"
+        # splitting the observation to multiple files and writing them separately
+        for i in range(0, len(self.trajectory.components), MAX_STEPS_IN_FILE):
+            trajectory_slice = self.trajectory.components[i : i + MAX_STEPS_IN_FILE]
+            if not trajectory_slice:
+                continue
 
-            trajectory_str += (
-                f"(operator: {str(component.grounded_action_call)})\n"
-                f"(:transition_status ({'success' if component.is_successful else 'failure'}))\n"
-                f"{component.next_state.serialize()}"
+            trajectory_str = "("
+            for index, component in enumerate(trajectory_slice):
+                if index == 0:
+                    trajectory_str += f"{component.previous_state.serialize()}"
+
+                trajectory_str += (
+                    f"(operator: {str(component.grounded_action_call)})\n"
+                    f"(:transition_status ({'success' if component.is_successful else 'failure'}))\n"
+                    f"{component.next_state.serialize()}"
+                )
+
+            trajectory_str += ")"
+            if test_mode:
+                return trajectory_str
+
+            trajectory_path = Path(
+                self.working_directory
+                / f"trajectory_{problem_name}_episode_{self._episode_number}_part_{i // MAX_STEPS_IN_FILE}.trajectory"
             )
+            self._trajectory_paths.append(trajectory_path)
+            with open(trajectory_path, "wt") as trajectory_file:
+                trajectory_file.write(trajectory_str)
 
-        trajectory_str += ")"
-        if test_mode:
-            return trajectory_str
-
-        with open(self.working_directory / trajectory_path, "wt") as trajectory_file:
-            trajectory_file.write(trajectory_str)
-
-        return trajectory_str
+        return None
 
     def clear_trajectory(self):
         """Clears the trajectory of the episode."""
