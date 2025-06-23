@@ -107,7 +107,8 @@ class IncrementalSVMLearner:
         grounded_monomials = create_grounded_monomials(self.monomials, point)
         new_sample = pd.DataFrame({**{k: [v] for k, v in grounded_monomials.items()}, LABEL_COLUMN: [1 if is_successful else -1]})
         self.data = pd.concat([self.data, new_sample], ignore_index=True)
-        self.data.dropna(axis=1, inplace=True)
+        if is_successful:
+            self.data.dropna(axis=1, inplace=True)
 
     def _incremental_create_svm_linear_conditions(self, debug: bool = False) -> List[Tuple[List[float], float]]:
         """Create the convex hull and returns the matrix representing the inequalities.

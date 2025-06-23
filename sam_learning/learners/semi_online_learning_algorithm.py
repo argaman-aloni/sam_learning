@@ -3,10 +3,12 @@
 import logging
 import random
 import re
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Set, List, Tuple, Union, Optional
 
+import numpy as np
 from pddl_plus_parser.lisp_parsers import ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import (
     Domain,
@@ -180,21 +182,16 @@ class SemiOnlineNumericAMLearner:
         :return: A list of ActionCall instances sorted by their success rate.
         """
         self.logger.debug("Sorting the grounded actions based on their success rate.")
-        grouped_actions = defaultdict(list)
-        for action in grounded_actions:
-            grouped_actions[action.name].append(action)
-
-        for action_list in grouped_actions.values():
-            random.shuffle(action_list)
-
         action_success_rates = {
-            action: self.episode_recorder.get_number_successful_action_executions(action_name=action)
+            action: 1 / (self.episode_recorder.get_number_successful_action_executions(action_name=action) + 1)
             for action in self.partial_domain.actions
         }
-        sorted_action_groups = sorted(grouped_actions.items(), key=lambda item: action_success_rates[item[0]])
-        # Flatten the sorted, shuffled groups
-        final_sorted_actions = [action for _, group in sorted_action_groups for action in group]
-        return final_sorted_actions
+        grounded_weights = {action: action_success_rates[action.name] for action in grounded_actions if action.name in action_success_rates}
+        total = sum(grounded_weights.values())
+        probabilities = [w / total for w in grounded_weights.values()]
+        grounded_action_list = list(grounded_weights.keys())
+        randomized_grounded_list = list(np.random.choice(grounded_action_list, size=len(grounded_actions), replace=False, p=probabilities))
+        return randomized_grounded_list
 
     def _add_transition_data(self, action_to_update: ActionCall, is_transition_successful: bool = True) -> None:
         """Adds transition data to the relevant models and updates the model learners with
@@ -462,6 +459,7 @@ class SemiOnlineNumericAMLearner:
 
     def _read_trajectories_and_train_models(self) -> None:
         """Reads preprocessed trajectory files from the work directory and trains the action models using the data."""
+        model_loading_start_time = time.time()
         while len(self._preprocessed_traces_paths) > 0:
             trace_path = self._preprocessed_traces_paths.pop(0)
             problem_name = re.search(PROBLEM_NAME_REGEX, trace_path.stem).group(1)
@@ -472,6 +470,8 @@ class SemiOnlineNumericAMLearner:
                 trajectory_file_path=trace_path, contain_transitions_status=True
             )
             self.train_models_using_trace(trace)
+
+        self.episode_recorder.add_model_loading_time(time.time() - model_loading_start_time)
 
     def try_to_solve_problems(self, problems_paths: List[Path]) -> None:
         """Tries to solve the problem using the current domain.
@@ -524,18 +524,21 @@ class SemiOnlineNumericAMLearner:
                     continue
 
             self.logger.info(f"Exploring the environment to solve the problem {problem_path.stem}.")
+            exploration_start_time = time.time()
             goal_reached, num_steps_till_episode_end = self.explore_to_refine_models(
                 init_state=last_state,
                 num_steps_till_episode_end=MAX_SUCCESSFUL_STEPS_PER_EPISODE,
                 problem_objects=problem.objects,
             )
             self.logger.info(f"Recording the exploration of the episode for the problem {problem_path.stem}.")
+            exploration_time = time.time() - exploration_start_time
             self.episode_recorder.end_episode(
                 problem_name=problem_path.stem,
                 goal_reached=goal_reached,
                 has_solved_solver_problem=False,
                 safe_model_solution_stat=safe_model_solution_status.name,
                 optimistic_model_solution_stat=optimistic_model_solution_status.name,
+                exploration_time=exploration_time,
             )
             self.logger.info("Training the learning algorithms using the trajectories.")
             self._preprocessed_traces_paths.extend(self.episode_recorder.trajectory_paths)

@@ -28,7 +28,7 @@ from solvers import AbstractSolver, SolutionOutputTypes
 from utilities import LearningAlgorithmType
 
 APPLICABLE_ACTIONS_SELECTION_RATE = 0.2
-MAX_STEPS_PER_EPISODE = 1000
+MAX_STEPS_PER_EPISODE = 50
 PROBLEM_SOLVING_TIMEOUT = 60 * 10  # 1 minutes
 
 random.seed(42)  # Set seed for reproducibility
@@ -255,15 +255,13 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             self.logger.info(f"Exploring to improve the action model - exploration step {step_number + 1}.")
             action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
             step_number += 1
-            while not is_successful and step_number < num_steps_till_episode_end and len(frontier) > 0:
+            while not is_successful and len(frontier) > 0:
                 self.logger.debug(f"The action was not successful, trying again for step {step_number + 1}.")
                 action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
-                step_number += 1
 
             if not is_successful:
                 self.logger.debug(
-                    f"The last explored action was not successful but reached the end of the episode with "
-                    f"{step_number} steps / could not execute any more actions..."
+                    "The last explored action was not successful but reached the end of the episode since the frontier is empty."
                 )
                 return False, num_steps_till_episode_end
 
@@ -276,25 +274,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
 
         self.logger.info("Reached a state with no neighbors to pull an action from, returning the learned model.")
         return False, num_steps_till_episode_end
-
-    def train_models_using_trace(self, trace: Observation) -> None:
-        """Train the discrete and numeric action models using a given observation trace.
-
-        :param trace: An Observation object containing a sequence of observed transitions, each with previous and next states,
-            the executed action, and success status.
-        """
-        self.logger.info("Training the models using the trace.")
-        for observed_transition in trace.components:
-            self.triplet_snapshot.create_triplet_snapshot(
-                previous_state=observed_transition.previous_state,
-                next_state=observed_transition.next_state,
-                current_action=observed_transition.grounded_action_call,
-                observation_objects=trace.grounded_objects,
-            )
-            self._add_transition_data(
-                action_to_update=observed_transition.grounded_action_call,
-                is_transition_successful=observed_transition.is_successful,
-            )
 
     def apply_exploration_policy(
         self, problem_path: Path, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE

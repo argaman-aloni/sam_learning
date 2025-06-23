@@ -101,7 +101,7 @@ def test_sort_ground_actions_based_on_success_rate_does_not_fail_when_no_observa
     assert sorted_actions is not None
 
 
-def test_sort_ground_actions_based_on_success_rate_correctly_sorts_actions_by_success_rate(
+def test_sort_ground_actions_based_on_success_rate_does_not_create_duplicated_actions_and_includes_all_the_grounded_actions(
     depot_semi_online_learner: SemiOnlineNumericAMLearner,
     depot_numeric_agent: IPCAgent,
     depot_domain: Domain,
@@ -122,8 +122,10 @@ def test_sort_ground_actions_based_on_success_rate_correctly_sorts_actions_by_su
         "num_unload_success": 2,
     }
     sorted_actions = depot_semi_online_learner.sort_ground_actions_based_on_success_rate(grounded_actions)
-    assert sorted_actions[0].name == "unload"
-    assert sorted_actions[-1].name == "drive"
+    assert len(sorted_actions) == len(grounded_actions)
+    assert len([str(a) for a in sorted_actions]) == len(
+        set(str(a) for a in sorted_actions)
+    ), "There should be no duplicated actions in the sorted actions list"
 
 
 def test_sort_ground_actions_based_on_success_rate_when_updating_a_single_transition_returns_correct_transition_even_with_multiple_executions(

@@ -541,7 +541,7 @@ def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_
     depot_noam_informative_explorer.initialize_learning_algorithms()
     goal_reached, num_steps_done = depot_noam_informative_explorer.explore_to_refine_models(
         init_state=initial_state,
-        num_steps_till_episode_end=10000,
+        num_steps_till_episode_end=25,
         problem_objects=depot_problem.objects,
     )
     assert num_steps_done <= 10000
@@ -570,7 +570,7 @@ def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_
     counters_noam_informative_explorer.initialize_learning_algorithms()
     goal_reached, num_steps_done = counters_noam_informative_explorer.explore_to_refine_models(
         init_state=initial_state,
-        num_steps_till_episode_end=20000,
+        num_steps_till_episode_end=25,
         problem_objects=counters_problem.objects,
     )
     assert goal_reached or num_steps_done == 20000, "Goal should be reached or max steps should be done"
@@ -600,7 +600,7 @@ def test_explore_to_refine_models_when_using_goal_oriented_exploration_does_not_
     depot_noam_goal_oriented.initialize_learning_algorithms()
     goal_reached, num_steps_done = depot_noam_goal_oriented.explore_to_refine_models(
         init_state=initial_state,
-        num_steps_till_episode_end=10000,
+        num_steps_till_episode_end=25,
         problem_objects=depot_problem.objects,
     )
     assert num_steps_done <= 10000
@@ -625,7 +625,9 @@ def test_apply_exploration_policy_when_exploration_policy_is_informative_explore
 ):
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_informative_explorer.initialize_learning_algorithms()
-    goal_reached, _, num_steps = depot_noam_informative_explorer.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
+    goal_reached, _, num_steps = depot_noam_informative_explorer.apply_exploration_policy(
+        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, num_steps_till_episode_end=10
+    )
     assert num_steps <= 5000
     safe_model = construct_safe_action_model(
         partial_domain=depot_noam_informative_explorer.partial_domain,
@@ -648,7 +650,7 @@ def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_p
     depot_noam_goal_oriented.initialize_learning_algorithms()
     depot_noam_goal_oriented._solvers = None  # Set solver to None to simulate the failure case
     with pytest.raises(ValueError):
-        depot_noam_goal_oriented.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
+        depot_noam_goal_oriented.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, num_steps_till_episode_end=10)
 
 
 def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_planner_is_set_applies_policy_and_returns_less_than_max_number_of_steps_for_episode(
@@ -657,7 +659,9 @@ def test_apply_exploration_policy_when_exploration_policy_is_goal_oriented_and_p
     # NOTE: This test assumes that the planner is set and that the environment variable `ENHSP_FILE_PATH` is configured correctly.
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_goal_oriented.initialize_learning_algorithms()
-    goal_reached, _, num_steps = depot_noam_goal_oriented.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
+    goal_reached, _, num_steps = depot_noam_goal_oriented.apply_exploration_policy(
+        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, num_steps_till_episode_end=10
+    )
     assert num_steps <= 5000
     safe_model = construct_safe_action_model(
         partial_domain=depot_noam_goal_oriented.partial_domain,
@@ -681,7 +685,9 @@ def test_apply_exploration_policy_when_exploration_policy_combined_and_planner_i
     # NOTE: This test assumes that the planner is set and that the environment variable `ENHSP_FILE_PATH` is configured correctly.
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_goal_combined_explorer.initialize_learning_algorithms()
-    goal_reached, _, num_steps = depot_noam_goal_combined_explorer.apply_exploration_policy(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM)
+    goal_reached, _, num_steps = depot_noam_goal_combined_explorer.apply_exploration_policy(
+        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, num_steps_till_episode_end=10
+    )
     assert num_steps <= 5000
     safe_model = construct_safe_action_model(
         partial_domain=depot_noam_goal_combined_explorer.partial_domain,

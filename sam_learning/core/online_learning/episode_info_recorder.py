@@ -9,6 +9,8 @@ from pddl_plus_parser.models import ActionCall, Observation, State
 RECORD_COLUMNS = [
     "problem_name",
     "num_grounded_actions",
+    "exploration_time",
+    "model_load_time",
     "sum_failed_actions",
     "sum_successful_actions",
     "goal_reached",
@@ -56,6 +58,7 @@ class EpisodeInfoRecord:
         self._action_successful_execution_history = {f"num_{action}_success": 0 for action in action_names}
         self.working_directory = working_directory
         self._trajectory_paths = []
+        self._model_loading_time = -1
 
     @property
     def trajectory_paths(self) -> List[Path]:
@@ -71,6 +74,13 @@ class EpisodeInfoRecord:
         :param num_grounded_actions: the number of grounded actions in the episode.
         """
         self._episode_info["num_grounded_actions"] = num_grounded_actions
+
+    def add_model_loading_time(self, model_loading_time: float) -> None:
+        """Adds the time taken to load the model in the episode.
+
+        :param model_loading_time: the time taken to load the model in seconds.
+        """
+        self._model_loading_time = model_loading_time
 
     def record_failure_reason(self, action_name: str, failure_reason: str) -> None:
         """Records the reason for a failure of an action in the episode.
@@ -125,6 +135,7 @@ class EpisodeInfoRecord:
         has_solved_solver_problem: bool = False,
         safe_model_solution_stat: str = not_used_for_solving,
         optimistic_model_solution_stat: str = not_used_for_solving,
+        exploration_time: float = 0.0,
     ) -> None:
         """Ends the episode by recording summary statistics, updating the episode counter,
         and exporting the episode trajectory. This method should be called at the end of each episode
@@ -145,10 +156,13 @@ class EpisodeInfoRecord:
             "solver_solved_problem": has_solved_solver_problem,
             "safe_model_solution_status": safe_model_solution_stat,
             "optimistic_model_solution_status": optimistic_model_solution_stat,
+            "exploration_time": exploration_time,
+            "model_load_time": self._model_loading_time,
         }
 
         self._episode_info = {record_name: 0 for record_name in self._episode_info}
         self._episode_number += 1
+        self._model_loading_time = -1
         self.export_episode_trajectory(problem_name)
 
     def export_statistics(self, path: Path) -> None:

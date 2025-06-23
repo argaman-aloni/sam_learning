@@ -26,7 +26,10 @@ def domain_functions():
 def two_dim_svm_learner():
     return IncrementalSVMLearner(
         action_name="test_action",
-        domain_functions={"(x )": PDDLFunction(name="x", signature={}), "(y )": PDDLFunction(name="y", signature={}),},
+        domain_functions={
+            "(x )": PDDLFunction(name="x", signature={}),
+            "(y )": PDDLFunction(name="y", signature={}),
+        },
         polynom_degree=0,
     )
 
@@ -69,6 +72,19 @@ def test_add_new_point_with_failure_label_successfully(svm_learner: IncrementalS
 
     assert len(svm_learner.data) == 1
     assert svm_learner.data.iloc[0]["label"] == -1
+
+
+def test_add_new_point_with_failure_does_not_remove_columns_where_there_are_missing_values(svm_learner: IncrementalSVMLearner):
+    func_values = [1.0, 0.5, 0.0]
+    sample_point = {}
+    for val, name in zip(func_values, FUNC_NAMES[:-1]):
+        sample_point[name] = PDDLFunction(name=name, signature={})
+        sample_point[name].set_value(val)
+
+    svm_learner.add_new_point(point=sample_point, is_successful=False)
+
+    assert len(svm_learner.data) == 1
+    assert len(svm_learner.data.columns) == 5  # All columns should still exist
 
 
 def test_create_svm_conditions_returns_empty_preconditions_when_no_data_was_added(svm_learner: IncrementalSVMLearner):
@@ -136,7 +152,8 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
-    assert len(result.operands) >=  2 + 1 # at least number of dimensions + 1
+    assert len(result.operands) >= 2 + 1  # at least number of dimensions + 1
+
 
 def test_create_svm_conditions_when_given_hundredth_positive_samples_as_box(
     two_dim_svm_learner: IncrementalSVMLearner,
@@ -158,7 +175,8 @@ def test_create_svm_conditions_when_given_hundredth_positive_samples_as_box(
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
-    assert len(result.operands) >=  2 + 1 # at least number of dimensions + 1
+    assert len(result.operands) >= 2 + 1  # at least number of dimensions + 1
+
 
 def test_create_svm_conditions_when_negative_points_are_close_to_the_condition_box(
     two_dim_svm_learner: IncrementalSVMLearner,
@@ -166,21 +184,19 @@ def test_create_svm_conditions_when_negative_points_are_close_to_the_condition_b
     with open(CLOSE_TO_BOX_PATH, "r") as csvfile:
 
         reader = csv.reader(csvfile)
-        
-        next(reader) # Skip the header   
-        for row in reader: # For each row in the CSV file
-            point = {
-                name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]
-            }
+
+        next(reader)  # Skip the header
+        for row in reader:  # For each row in the CSV file
+            point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
             point["(x )"].set_value(float(row[0]))
             point["(y )"].set_value(float(row[1]))
-            label = row[2] == 'True'
+            label = row[2] == "True"
             two_dim_svm_learner.add_new_point(point=point, is_successful=label)
 
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
-    assert len(result.operands) >=  2 + 1 # at least number of dimensions + 1
+    assert len(result.operands) >= 2 + 1  # at least number of dimensions + 1
 
 
 def test_create_svm_conditions_when_given_negative_points_from_two_sides_of_the_condition_box(
@@ -189,21 +205,20 @@ def test_create_svm_conditions_when_given_negative_points_from_two_sides_of_the_
     with open(TWO_SIDES_OF_BOX_PATH, "r") as csvfile:
 
         reader = csv.reader(csvfile)
-        
-        next(reader) # Skip the header   
-        for row in reader: # For each row in the CSV file
-            point = {
-                name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]
-            }
+
+        next(reader)  # Skip the header
+        for row in reader:  # For each row in the CSV file
+            point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
             point["(x )"].set_value(float(row[0]))
             point["(y )"].set_value(float(row[1]))
-            label = row[2] == 'True'
+            label = row[2] == "True"
             two_dim_svm_learner.add_new_point(point=point, is_successful=label)
 
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
-    assert len(result.operands) ==  2 # two sides of the box
+    assert len(result.operands) == 2  # two sides of the box
+
 
 def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_accurate_conditions_when_conditions_are_linear(
     two_dim_svm_learner: IncrementalSVMLearner,
@@ -221,7 +236,8 @@ def test_create_svm_conditions_when_given_multiple_samples_returns_moderatly_acc
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
-    assert len(result.operands) >=  1 # at least one condition
+    assert len(result.operands) >= 1  # at least one condition
+
 
 def test_create_svm_conditions_when_negative_points_are_close_to_the_linear_condition(
     two_dim_svm_learner: IncrementalSVMLearner,
@@ -229,18 +245,16 @@ def test_create_svm_conditions_when_negative_points_are_close_to_the_linear_cond
     with open(CLOSE_TO_LINEAR_CONDITION_PATH, "r") as csvfile:
 
         reader = csv.reader(csvfile)
-        
-        next(reader) # Skip the header   
-        for row in reader: # For each row in the CSV file
-            point = {
-                name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]
-            }
+
+        next(reader)  # Skip the header
+        for row in reader:  # For each row in the CSV file
+            point = {name: PDDLFunction(name=name, signature={}) for name in ["(x )", "(y )"]}
             point["(x )"].set_value(float(row[0]))
             point["(y )"].set_value(float(row[1]))
-            label = row[2] == 'True'
+            label = row[2] == "True"
             two_dim_svm_learner.add_new_point(point=point, is_successful=label)
 
     result = two_dim_svm_learner.construct_linear_inequalities()
     assert isinstance(result, Precondition)
     print(str(result))
-    assert 1 <= len(result.operands) <=  2 # Have 4 planes when 2 of them are subset of the other 2
+    assert 1 <= len(result.operands) <= 2  # Have 4 planes when 2 of them are subset of the other 2
