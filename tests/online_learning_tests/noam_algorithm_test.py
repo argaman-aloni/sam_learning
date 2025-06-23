@@ -573,7 +573,7 @@ def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_
         num_steps_till_episode_end=25,
         problem_objects=counters_problem.objects,
     )
-    assert goal_reached or num_steps_done == 20000, "Goal should be reached or max steps should be done"
+    assert goal_reached or num_steps_done == 25, "Goal should be reached or max steps should be done"
     safe_model = construct_safe_action_model(
         partial_domain=counters_noam_informative_explorer.partial_domain,
         discrete_models_learners=counters_noam_informative_explorer._discrete_models_learners,
