@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional
+from typing import List, Optional
 
 from pandas import DataFrame
 from pddl_plus_parser.models import ActionCall, Observation, State
