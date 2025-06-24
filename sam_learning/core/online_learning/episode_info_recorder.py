@@ -219,7 +219,7 @@ class EpisodeInfoRecord:
             if test_mode:
                 return trajectory_str
 
-            export_directory_path = Path(os.environ.get(REMOTE_TRAJECTORY_PATH_ENV_VAR), self.working_directory)
+            export_directory_path = Path(os.environ.get(REMOTE_TRAJECTORY_PATH_ENV_VAR, self.working_directory))
             trajectory_path = Path(
                 export_directory_path / f"trajectory_{problem_name}_episode_{self._episode_number}_part_{i // MAX_STEPS_IN_FILE}.trajectory"
             )

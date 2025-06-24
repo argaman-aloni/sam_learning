@@ -164,7 +164,7 @@ class PIL:
         online_learner.try_to_solve_problems(problems_to_solve)
         self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
         episode_recorder.export_statistics(
-            self.working_directory_path / "results_directory" / f"{self._exploration_type.name}_episode_info_fold_{fold_num}.csv"
+            self.working_directory_path / "results_directory" / f"{self._exploration_type.name}_exploration_statistics_fold_{fold_num}.csv"
         )
 
 

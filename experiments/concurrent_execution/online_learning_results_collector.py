@@ -9,7 +9,7 @@ from pandas import DataFrame
 def export_unified_statistics_to_csv(working_directory: Path, filename) -> DataFrame:
     """Exports the unified statistics DataFrame to a CSV file."""
     # Load the new CSV files for the Counters Exploration
-    path_format = working_directory / "exploration_statistics_fold_*.csv"
+    path_format = working_directory / "results_directory" / "exploration_statistics_fold_*.csv"
     statistics_file_paths = sorted(glob(str(path_format)))
     fold_data = [pd.read_csv(fp) for fp in statistics_file_paths]
 
