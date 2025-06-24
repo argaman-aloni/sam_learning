@@ -32,6 +32,9 @@ echo "${cluster_temp_logs_path}"
 mkdir ${cluster_temp_logs_path}/logs
 chmod -R 777 ${cluster_temp_logs_path}/logs
 
+mkdir ${cluster_temp_logs_path}/trajectories
+chmod -R 777 ${cluster_temp_logs_path}/trajectories
+
 ### Start your code below ####
 module load anaconda				### load anaconda module (must be present when working with conda environments)
 source activate ${conda_env}				### activate a conda environment, replace my_env with your conda environment

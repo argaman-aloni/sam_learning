@@ -47,7 +47,7 @@ OPTIMISTIC_MODEL_TYPE = "optimistic"
 MAX_SUCCESSFUL_STEPS_PER_EPISODE = 50
 PROBLEM_SOLVING_TIMEOUT = 60 * 5  # 300 seconds
 MIN_EPISODES_TO_PLAN = 50
-MIN_EXECUTIONS_PER_ACTION = 10  # Minimum number of executions per action to consider it partially trained
+MIN_EXECUTIONS_PER_ACTION = 5  # Minimum number of executions per action to consider it partially trained
 
 random.seed(42)  # Set seed for reproducibility
 PROBLEM_NAME_REGEX = re.compile(r"trajectory_(\w+)_episode")

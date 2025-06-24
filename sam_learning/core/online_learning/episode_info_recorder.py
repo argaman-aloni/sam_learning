@@ -1,5 +1,6 @@
 """class to record the information about each episode of the online learning process."""
 
+import os
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 
@@ -30,6 +31,7 @@ UNKNOWN = "unknown"
 
 not_used_for_solving = "irrelevant"
 MAX_STEPS_IN_FILE = 5000  # Maximum number of steps to record in a single trajectory file
+REMOTE_TRAJECTORY_PATH_ENV_VAR = "REMOTE_TRAJECTORY_PATH"
 
 
 class EpisodeInfoRecord:
@@ -217,9 +219,9 @@ class EpisodeInfoRecord:
             if test_mode:
                 return trajectory_str
 
+            export_directory_path = Path(os.environ.get(REMOTE_TRAJECTORY_PATH_ENV_VAR), self.working_directory)
             trajectory_path = Path(
-                self.working_directory
-                / f"trajectory_{problem_name}_episode_{self._episode_number}_part_{i // MAX_STEPS_IN_FILE}.trajectory"
+                export_directory_path / f"trajectory_{problem_name}_episode_{self._episode_number}_part_{i // MAX_STEPS_IN_FILE}.trajectory"
             )
             self._trajectory_paths.append(trajectory_path)
             with open(trajectory_path, "wt") as trajectory_file:
