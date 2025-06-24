@@ -72,7 +72,7 @@ def plot_statistics(working_directory: Path, output_csv: str):
     )
 
     plt.xlabel("Episode", fontsize=18)
-    plt.ylabel("Percentage (%)", fontsize=18)
+    plt.ylabel("Solving Rate", fontsize=18)
     plt.ylim(0, 1)
     plt.xlim(0, 80)
     # plt.title("Model Solution Status Percentages per Episode")
@@ -81,7 +81,6 @@ def plot_statistics(working_directory: Path, output_csv: str):
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(working_directory / "model_solution_status_percentages.pdf", bbox_inches="tight", dpi=300)
-    plt.show()
 
 
 if __name__ == "__main__":

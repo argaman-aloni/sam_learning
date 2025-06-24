@@ -470,6 +470,7 @@ class SemiOnlineNumericAMLearner:
                 trajectory_file_path=trace_path, contain_transitions_status=True
             )
             self.train_models_using_trace(trace)
+            trace_path.unlink(missing_ok=True)  # Remove the file after processing
 
         self.episode_recorder.add_model_loading_time(time.time() - model_loading_start_time)
 

@@ -145,7 +145,12 @@ class PIL:
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         self._agent = IPCAgent(complete_domain)
-        episode_recorder = EpisodeInfoRecord(action_names=list(partial_domain.actions), working_directory=train_set_dir_path)
+        episode_recorder = EpisodeInfoRecord(
+            action_names=list(partial_domain.actions),
+            working_directory=train_set_dir_path,
+            fold_number=fold_num,
+            algorithm_type=self._exploration_type,
+        )
         online_learner = SemiOnlineNumericAMLearner(
             workdir=train_set_dir_path,
             partial_domain=partial_domain,
@@ -159,9 +164,7 @@ class PIL:
         online_learner.try_to_solve_problems(problems_to_solve)
         self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
         episode_recorder.export_statistics(
-            self.working_directory_path
-            / "results_directory"
-            / f"{LearningAlgorithmType.noam_learning.name}_episode_info_fold_{fold_num}.csv"
+            self.working_directory_path / "results_directory" / f"{self._exploration_type.name}_episode_info_fold_{fold_num}.csv"
         )
 
 

@@ -6,7 +6,11 @@ from typing import List, Tuple, Dict, Optional
 from pandas import DataFrame
 from pddl_plus_parser.models import ActionCall, Observation, State
 
+from utilities import LearningAlgorithmType
+
 RECORD_COLUMNS = [
+    "fold_number",
+    "algorithm_type",
     "problem_name",
     "num_grounded_actions",
     "exploration_time",
@@ -31,10 +35,18 @@ MAX_STEPS_IN_FILE = 5000  # Maximum number of steps to record in a single trajec
 class EpisodeInfoRecord:
     """Records the information about the execution of each episode of the online learning process."""
 
-    def __init__(self, action_names: List[str], working_directory: Path):
+    def __init__(
+        self,
+        action_names: List[str],
+        working_directory: Path,
+        fold_number: int = 0,
+        algorithm_type: LearningAlgorithmType = LearningAlgorithmType.semi_online,
+    ):
         self._episode_number = 0
         self._num_informative_actions_in_step = []
         self._action_names = action_names
+        self._fold_number = fold_number
+        self._algorithm_type = algorithm_type
         self._episode_info = {
             **{record_name: 0 for record_name in RECORD_COLUMNS},
             **{f"num_{action_name}_success": 0 for action_name in action_names},
@@ -146,8 +158,11 @@ class EpisodeInfoRecord:
         :param has_solved_solver_problem: whether the solver successfully solved the problem in this episode.
         :param safe_model_solution_stat: the solution status of the safe model in this episode.
         :param optimistic_model_solution_stat: the solution status of the optimistic model in this episode.
+        :param exploration_time: the time spent on exploration in this episode, in seconds.
         """
         self.summarized_info.loc[len(self.summarized_info)] = {
+            "fold_number": self._fold_number,
+            "algorithm_type": self._algorithm_type.name,
             **{"episode_number": self._episode_number},
             **self._episode_info,
             **{"goal_reached": goal_reached},
