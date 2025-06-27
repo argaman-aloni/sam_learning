@@ -48,7 +48,7 @@ def main():
                         fold,
                         arguments,
                         environment_variables,
-                        f"{experiment['domain_file_name']}_{fold}_{learning_algorithms_map[version_index]}_experiment_runner",
+                        f"{experiment['domain_file_name']}_{fold}_{learning_algorithms_map[compared_version]}_experiment_runner",
                         None,
                         memory="32G",
                     )
@@ -56,7 +56,7 @@ def main():
                 experiment_sids.append(sid)
                 formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
                 print(
-                    f"{formatted_date_time} - submitted job with sid {sid} for algorithm {learning_algorithms_map[version_index]} fold {fold}."
+                    f"{formatted_date_time} - submitted job with sid {sid} for algorithm {learning_algorithms_map[compared_version]} fold {fold}."
                 )
                 pathlib.Path("temp.sbatch").unlink()
                 progress_bar(version_index, len(experiment["compared_versions"]))
