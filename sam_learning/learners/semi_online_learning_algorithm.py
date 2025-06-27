@@ -40,6 +40,7 @@ from sam_learning.core.online_learning.online_utilities import (
 )
 from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
 from solvers import AbstractSolver, SolutionOutputTypes
+from utilities import LearningAlgorithmType
 
 SAFE_MODEL_TYPE = "safe"
 OPTIMISTIC_MODEL_TYPE = "optimistic"
@@ -83,6 +84,7 @@ class SemiOnlineNumericAMLearner:
         agent: AbstractAgent = None,
         solvers: List[AbstractSolver] = None,
         episode_recorder: EpisodeInfoRecord = None,
+        exploration_type: LearningAlgorithmType = LearningAlgorithmType.semi_online,
     ):
         self.workdir = workdir
         self.logger = logging.getLogger(__name__)
@@ -101,6 +103,7 @@ class SemiOnlineNumericAMLearner:
         self.episode_recorder = episode_recorder
         self.undecided_failure_observations = defaultdict(list)
         self._preprocessed_traces_paths = []
+        self._exploration_algorithm_type = exploration_type
 
     def _handle_execution_failure(
         self,
@@ -233,9 +236,6 @@ class SemiOnlineNumericAMLearner:
             previous_state_pb_functions, next_state_pb_functions, is_transition_successful=is_transition_successful
         )
 
-        self.logger.debug("Checking if can eliminate some of the undecided observations.")
-        self._eliminate_undecided_observations(action_to_update.name)
-
     def _execute_selected_action(
         self,
         selected_ground_action: ActionCall,
@@ -354,7 +354,7 @@ class SemiOnlineNumericAMLearner:
 
                 return solution_status, len(trace), None
 
-        return solution_status, None, init_state
+        return solution_status, 0, init_state
 
     def _executed_enough_successful_steps_per_action(self):
         """Checks if enough steps have been executed per action to consider the to be considerably trained."""
@@ -396,6 +396,10 @@ class SemiOnlineNumericAMLearner:
                 return True, step_number
 
         self.logger.info("Reached a state with no neighbors to pull an action from, returning the learned model.")
+        for action_name in self.partial_domain.actions:
+            self.logger.debug(f"Checking if can eliminate some of the undecided observations for the action {action_name}.")
+            self._eliminate_undecided_observations(action_name)
+
         return False, num_steps_till_episode_end
 
     def train_models_using_trace(self, trace: Observation) -> None:
@@ -404,6 +408,7 @@ class SemiOnlineNumericAMLearner:
         :param trace: An Observation object containing a sequence of observed transitions, each with previous and next states,
             the executed action, and success status.
         """
+        model_loading_start_time = time.time()
         self.logger.info("Training the models using the trace.")
         for observed_transition in trace.components:
             if contains_duplicates(observed_transition.grounded_action_call.parameters):
@@ -422,6 +427,12 @@ class SemiOnlineNumericAMLearner:
                 action_to_update=observed_transition.grounded_action_call,
                 is_transition_successful=observed_transition.is_successful,
             )
+
+        for action_name in self.partial_domain.actions:
+            self.logger.debug(f"Checking if can eliminate some of the undecided observations for the action {action_name}.")
+            self._eliminate_undecided_observations(action_name)
+
+        self.episode_recorder.add_model_loading_time(time.time() - model_loading_start_time)
 
     def _construct_model_and_solve_problem(
         self, model_type: str, problem_path: Path, init_state: State
@@ -457,7 +468,6 @@ class SemiOnlineNumericAMLearner:
 
     def _read_trajectories_and_train_models(self) -> None:
         """Reads preprocessed trajectory files from the work directory and trains the action models using the data."""
-        model_loading_start_time = time.time()
         while len(self._preprocessed_traces_paths) > 0:
             trace_path = self._preprocessed_traces_paths.pop(0)
             problem_name = re.search(PROBLEM_NAME_REGEX, trace_path.stem).group(1)
@@ -469,8 +479,6 @@ class SemiOnlineNumericAMLearner:
             )
             self.train_models_using_trace(trace)
             trace_path.unlink(missing_ok=True)  # Remove the file after processing
-
-        self.episode_recorder.add_model_loading_time(time.time() - model_loading_start_time)
 
     def try_to_solve_problems(self, problems_paths: List[Path]) -> None:
         """Tries to solve the problem using the current domain.

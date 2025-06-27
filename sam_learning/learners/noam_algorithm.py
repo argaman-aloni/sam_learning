@@ -1,8 +1,8 @@
 """An online version of the Numeric SAM learner."""
 
 import random
+import time
 from collections import defaultdict
-from enum import Enum
 from pathlib import Path
 from typing import Dict, Set, List, Tuple, Union
 
@@ -11,7 +11,6 @@ from pddl_plus_parser.models import (
     Domain,
     State,
     ActionCall,
-    Observation,
     PDDLObject,
     PDDLFunction,
     Predicate,
@@ -29,17 +28,8 @@ from utilities import LearningAlgorithmType
 
 APPLICABLE_ACTIONS_SELECTION_RATE = 0.2
 MAX_STEPS_PER_EPISODE = 50
-PROBLEM_SOLVING_TIMEOUT = 60 * 10  # 1 minutes
 
 random.seed(42)  # Set seed for reproducibility
-
-
-class ExplorationAlgorithmType(Enum):
-    """Enum representing the exploration algorithm types."""
-
-    informative_explorer = "informative_explorer"
-    goal_oriented = "goal_oriented"
-    combined = "combined"
 
 
 class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
@@ -66,10 +56,9 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         exploration_type: LearningAlgorithmType = LearningAlgorithmType.noam_learning,
         episode_recorder: EpisodeInfoRecord = None,
     ):
-        super().__init__(workdir, partial_domain, polynomial_degree, agent, solvers, episode_recorder)
+        super().__init__(workdir, partial_domain, polynomial_degree, agent, solvers, episode_recorder, exploration_type=exploration_type)
         self._informative_states_learner = {}
         self.triplet_snapshot = EnvironmentSnapshot(partial_domain=partial_domain)
-        self._exploration_algorithm_type = exploration_type
         self._successful_execution_count = defaultdict(int)
         self._applicable_actions = set()
 
@@ -173,11 +162,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         """
         self.logger.debug("Selecting an action from the grounded actions set.")
         random_action = random.choice(frontier)
-        if self._exploration_algorithm_type == LearningAlgorithmType.goal_oriented_explorer:
-            selected_ground_action = frontier.pop(0)
-            next_state, is_transition_successful = self._execute_selected_action(selected_ground_action, current_state, problem_objects)
-            return selected_ground_action, is_transition_successful, next_state
-
         selected_ground_action = frontier.pop(0)
         action_informative, action_applicable = self._calculate_state_action_informative(
             current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects
@@ -225,11 +209,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         :param grounded_actions: The set of grounded actions available for exploration.
         :return: A set of actions to explore.
         """
-        if self._exploration_algorithm_type == LearningAlgorithmType.goal_oriented_explorer:
-            shuffled_actions = list(grounded_actions)
-            random.shuffle(shuffled_actions)
-            return shuffled_actions
-
         return self.sort_ground_actions_based_on_success_rate(grounded_actions)
 
     def explore_to_refine_models(
@@ -254,7 +233,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         while len(frontier) > 0 and step_number < num_steps_till_episode_end:
             self.logger.info(f"Exploring to improve the action model - exploration step {step_number + 1}.")
             action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
-            step_number += 1
             while not is_successful and len(frontier) > 0:
                 self.logger.debug(f"The action was not successful, trying again for step {step_number + 1}.")
                 action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
@@ -265,6 +243,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
                 )
                 return False, num_steps_till_episode_end
 
+            step_number += 1
             self.logger.info(f"The action {str(action)} was successful. Continuing to the next state.")
             frontier = self._create_frontier(grounded_actions)
             current_state = next_state
@@ -275,8 +254,51 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         self.logger.info("Reached a state with no neighbors to pull an action from, returning the learned model.")
         return False, num_steps_till_episode_end
 
+    def _explore_and_terminate_episode(
+        self,
+        initial_state: State,
+        problem_path: Path,
+        num_steps_till_episode_end: int,
+        problem_objects: Dict[str, PDDLObject],
+        safe_model_solution_stat: SolutionOutputTypes = SolutionOutputTypes.no_solution,
+        optimistic_model_solution_stat: SolutionOutputTypes = None,
+    ) -> Tuple[bool, bool, int]:
+        """
+
+        :param initial_state:
+        :param problem_path:
+        :param num_steps_till_episode_end:
+        :param problem_objects:
+        :param safe_model_solution_stat:
+        :param optimistic_model_solution_stat:
+        :return:
+        """
+        exploration_start_time = time.time()
+        goal_reached, executed_steps = self.explore_to_refine_models(
+            init_state=initial_state,
+            num_steps_till_episode_end=num_steps_till_episode_end,
+            problem_objects=problem_objects,
+        )
+        for action_name in self.partial_domain.actions:
+            self.logger.debug(f"Checking if can eliminate some of the undecided observations for the action {action_name}.")
+            self._eliminate_undecided_observations(action_name)
+
+        self.episode_recorder.end_episode(
+            problem_name=problem_path.stem,
+            goal_reached=goal_reached,
+            has_solved_solver_problem=False,
+            safe_model_solution_stat=safe_model_solution_stat.name,
+            optimistic_model_solution_stat=None if not optimistic_model_solution_stat else optimistic_model_solution_stat.name,
+            exploration_time=time.time() - exploration_start_time,
+            export_trajectory=False,
+        )
+        return goal_reached, False, executed_steps
+
     def apply_exploration_policy(
-        self, problem_path: Path, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE
+        self,
+        problem_path: Path,
+        num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE,
+        safe_model_solution_stat: SolutionOutputTypes = SolutionOutputTypes.no_solution,
     ) -> Tuple[bool, bool, int]:
         """Applies the exploration policy to the current state.
 
@@ -284,42 +306,34 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         """
         problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
         initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
-        if self._exploration_algorithm_type == LearningAlgorithmType.informative_explorer:
-            self.logger.info("Applying the informative explorer exploration policy - starting to explore the environment.")
-            goal_reached, executed_steps = self.explore_to_refine_models(
-                init_state=initial_state,
-                num_steps_till_episode_end=num_steps_till_episode_end,
-                problem_objects=problem.objects,
-            )
-            return goal_reached, False, executed_steps
-
-        self.logger.debug("Applying goal oriented exploration approach.")
         self.logger.info(
             f"Could not solve the problem {problem_path.stem} using the safe action model, transitioning to the optimistic model."
         )
         solution_status, trace_length, last_state = self._construct_model_and_solve_problem(
             OPTIMISTIC_MODEL_TYPE, problem_path, init_state=initial_state
         )
+
         if solution_status == SolutionOutputTypes.ok:
             self.logger.info("The problem was solved using the optimistic action model.")
+            self.episode_recorder.end_episode(
+                problem_name=problem_path.stem,
+                goal_reached=True,
+                has_solved_solver_problem=True,
+                safe_model_solution_stat=safe_model_solution_stat.name,
+                optimistic_model_solution_stat=solution_status.name,
+                export_trajectory=False,
+            )
             return True, True, trace_length
 
-        elif solution_status in [SolutionOutputTypes.not_applicable, SolutionOutputTypes.goal_not_achieved]:
-            self.logger.info("The optimistic action model could not solve the problem, exploring to refine models.")
-            goal_reached, executed_steps = self.explore_to_refine_models(
-                init_state=last_state,
-                num_steps_till_episode_end=num_steps_till_episode_end - trace_length,
-                problem_objects=problem.objects,
-            )
-            return goal_reached, False, executed_steps
-
-        self.logger.info(f"The optimistic action model could not solve the problem, exploring to refine models. Status: {solution_status}")
-        goal_reached, executed_steps = self.explore_to_refine_models(
-            init_state=initial_state,
+        self.logger.info("The optimistic action model could not solve the problem, exploring to refine models.")
+        return self._explore_and_terminate_episode(
+            initial_state=initial_state,
+            problem_path=problem_path,
             num_steps_till_episode_end=num_steps_till_episode_end,
             problem_objects=problem.objects,
+            safe_model_solution_stat=safe_model_solution_stat,
+            optimistic_model_solution_stat=solution_status,
         )
-        return goal_reached, False, executed_steps
 
     def try_to_solve_problem(self, problem_path: Path, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE) -> Tuple[bool, int]:
         """Tries to solve the problem using the current domain.
@@ -341,6 +355,8 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
                 problem_name=problem_path.stem,
                 goal_reached=True,
                 has_solved_solver_problem=True,
+                safe_model_solution_stat=solution_status.name,
+                export_trajectory=False,
             )
             return True, trace_length
 
@@ -348,11 +364,100 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             raise ValueError("The goal should have been reached when used the safe action model!")
 
         goal_reached, solver_reached_goal, num_steps_till_episode_end = self.apply_exploration_policy(
-            problem_path, num_steps_till_episode_end
-        )
-        self.episode_recorder.end_episode(
-            problem_name=problem_path.stem,
-            goal_reached=goal_reached,
-            has_solved_solver_problem=solver_reached_goal,
+            problem_path, num_steps_till_episode_end, solution_status
         )
         return goal_reached, num_steps_till_episode_end
+
+
+class GoalOrientedExplorer(NumericOnlineActionModelLearner):
+    """
+    A specialized learner that focuses on goal-oriented exploration in the domain.
+
+    This class extends the NumericOnlineActionModelLearner to implement a goal-oriented
+    exploration strategy, allowing for targeted learning and refinement of action models
+    based on specific goals within the domain.
+    """
+
+    def __init__(
+        self,
+        workdir: Path,
+        partial_domain: Domain,
+        polynomial_degree: int = 0,
+        agent: AbstractAgent = None,
+        solvers: List[AbstractSolver] = None,
+        episode_recorder: EpisodeInfoRecord = None,
+        exploration_type: LearningAlgorithmType = LearningAlgorithmType.goal_oriented_explorer,
+    ):
+        super().__init__(
+            workdir=workdir,
+            partial_domain=partial_domain,
+            polynomial_degree=polynomial_degree,
+            agent=agent,
+            solvers=solvers,
+            exploration_type=exploration_type,
+            episode_recorder=episode_recorder,
+        )
+
+    def _create_frontier(self, grounded_actions: Set[ActionCall]) -> List[ActionCall]:
+        """Creates a frontier of actions to explore.
+
+        :param grounded_actions: The set of grounded actions available for exploration.
+        :return: A set of actions to explore.
+        """
+        shuffled_actions = list(grounded_actions)
+        random.shuffle(shuffled_actions)
+        return shuffled_actions
+
+    def _select_action_and_execute(
+        self, current_state: State, frontier: List[ActionCall], problem_objects: Dict[str, PDDLObject]
+    ) -> Tuple[ActionCall, bool, State]:
+        selected_ground_action = frontier.pop(0)
+        next_state, is_transition_successful = self._execute_selected_action(selected_ground_action, current_state, problem_objects)
+        return selected_ground_action, is_transition_successful, next_state
+
+
+class InformativeExplorer(NumericOnlineActionModelLearner):
+    """
+    A specialized learner that focuses on informative exploration in the domain.
+
+    This class extends the NumericOnlineActionModelLearner to implement an informative
+    exploration strategy, allowing for targeted learning and refinement of action models
+    based on informative states within the domain.
+    """
+
+    def __init__(
+        self,
+        workdir: Path,
+        partial_domain: Domain,
+        polynomial_degree: int = 0,
+        agent: AbstractAgent = None,
+        solvers: List[AbstractSolver] = None,
+        episode_recorder: EpisodeInfoRecord = None,
+        exploration_type: LearningAlgorithmType = LearningAlgorithmType.informative_explorer,
+    ):
+        super().__init__(
+            workdir=workdir,
+            partial_domain=partial_domain,
+            polynomial_degree=polynomial_degree,
+            agent=agent,
+            solvers=solvers,
+            exploration_type=exploration_type,
+            episode_recorder=episode_recorder,
+        )
+
+    def apply_exploration_policy(
+        self,
+        problem_path: Path,
+        num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE,
+        safe_model_solution_stat: SolutionOutputTypes = None,
+    ) -> Tuple[bool, bool, int]:
+        problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
+        initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
+        self.logger.info("Applying the informative explorer exploration policy - starting to explore the environment.")
+        return self._explore_and_terminate_episode(
+            initial_state=initial_state,
+            problem_path=problem_path,
+            num_steps_till_episode_end=num_steps_till_episode_end,
+            problem_objects=problem.objects,
+            safe_model_solution_stat=safe_model_solution_stat,
+        )

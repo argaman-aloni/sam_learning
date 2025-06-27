@@ -59,6 +59,8 @@ class EpisodeInfoRecord:
         }
         self.summarized_info = DataFrame(
             columns=[
+                "fold_number",
+                "algorithm_type",
                 "episode_number",
                 *RECORD_COLUMNS,
                 *{f"num_{action_name}_success" for action_name in action_names},
@@ -150,6 +152,7 @@ class EpisodeInfoRecord:
         safe_model_solution_stat: str = not_used_for_solving,
         optimistic_model_solution_stat: str = not_used_for_solving,
         exploration_time: float = 0.0,
+        export_trajectory: bool = True,
     ) -> None:
         """Ends the episode by recording summary statistics, updating the episode counter,
         and exporting the episode trajectory. This method should be called at the end of each episode
@@ -161,10 +164,10 @@ class EpisodeInfoRecord:
         :param safe_model_solution_stat: the solution status of the safe model in this episode.
         :param optimistic_model_solution_stat: the solution status of the optimistic model in this episode.
         :param exploration_time: the time spent on exploration in this episode, in seconds.
+        :param export_trajectory: whether to export the trajectory of the episode to a file.
         """
         self.summarized_info.loc[len(self.summarized_info)] = {
             "fold_number": self._fold_number,
-            "algorithm_type": self._algorithm_type.name,
             **{"episode_number": self._episode_number},
             **self._episode_info,
             **{"goal_reached": goal_reached},
@@ -176,11 +179,12 @@ class EpisodeInfoRecord:
             "exploration_time": exploration_time,
             "model_load_time": self._model_loading_time,
         }
-
+        self.summarized_info["algorithm_type"] = self._algorithm_type.name
         self._episode_info = {record_name: 0 for record_name in self._episode_info}
         self._episode_number += 1
         self._model_loading_time = -1
-        self.export_episode_trajectory(problem_name)
+        if export_trajectory:
+            self.export_episode_trajectory(problem_name)
 
     def export_statistics(self, path: Path) -> None:
         """Exports the statistics of the episode to a CSV file.

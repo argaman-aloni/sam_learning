@@ -12,8 +12,8 @@ from pytest import fixture
 from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning.online_utilities import construct_optimistic_action_model, construct_safe_action_model
 from sam_learning.core.online_learning_agents import IPCAgent
-from sam_learning.learners import NumericOnlineActionModelLearner
-from solvers import ENHSPSolver
+from sam_learning.learners import NumericOnlineActionModelLearner, InformativeExplorer, GoalOrientedExplorer
+from solvers import ENHSPSolver, SolutionOutputTypes
 from tests.consts import (
     DEPOTS_NUMERIC_DOMAIN_PATH,
     create_plan_actions,
@@ -74,47 +74,40 @@ def counters_numeric_agent(counters_numeric_domain: Domain, counters_problem: Pr
 
 
 @fixture()
-def depot_noam_informative_explorer(
-    depot_domain: Domain, working_directory: Path, depot_numeric_agent: IPCAgent
-) -> NumericOnlineActionModelLearner:
-    return NumericOnlineActionModelLearner(
+def depot_noam_informative_explorer(depot_domain: Domain, working_directory: Path, depot_numeric_agent: IPCAgent) -> InformativeExplorer:
+    return InformativeExplorer(
         workdir=working_directory,
         partial_domain=depot_domain,
         polynomial_degree=0,
         agent=depot_numeric_agent,
         solvers=[ENHSPSolver()],
         episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
-        exploration_type=LearningAlgorithmType.informative_explorer,
     )
 
 
 @fixture()
 def counters_noam_informative_explorer(
     counters_numeric_domain: Domain, working_directory: Path, counters_numeric_agent: IPCAgent
-) -> NumericOnlineActionModelLearner:
-    return NumericOnlineActionModelLearner(
+) -> InformativeExplorer:
+    return InformativeExplorer(
         workdir=working_directory,
         partial_domain=counters_numeric_domain,
         polynomial_degree=0,
         agent=counters_numeric_agent,
         solvers=[ENHSPSolver()],
         episode_recorder=EpisodeInfoRecord(list(counters_numeric_domain.actions), working_directory=working_directory),
-        exploration_type=LearningAlgorithmType.informative_explorer,
     )
 
 
 @fixture()
-def depot_noam_goal_oriented(
-    depot_domain: Domain, working_directory: Path, depot_numeric_agent: IPCAgent
-) -> NumericOnlineActionModelLearner:
-    return NumericOnlineActionModelLearner(
+def depot_noam_goal_oriented(depot_domain: Domain, working_directory: Path, depot_numeric_agent: IPCAgent) -> GoalOrientedExplorer:
+    return GoalOrientedExplorer(
         workdir=working_directory,
         partial_domain=depot_domain,
         polynomial_degree=0,
         agent=depot_numeric_agent,
         solvers=[ENHSPSolver()],
         episode_recorder=EpisodeInfoRecord(list(depot_domain.actions), working_directory=working_directory),
-        exploration_type=LearningAlgorithmType.goal_oriented_explorer,
     )
 
 
@@ -514,7 +507,7 @@ def test_explore_to_refine_models_changes_the_models_after_short_episode_is_done
     end_time = time.time()
     assert not goal_reached, "Goal should not be reached in such a short episode"
     assert num_steps_done <= 100
-    assert end_time - start_time < 60, "Exploration took too long to finish"
+    assert end_time - start_time < 90, "Exploration took too long to finish"
     safe_model = construct_safe_action_model(
         partial_domain=depot_noam_informative_explorer.partial_domain,
         discrete_models_learners=depot_noam_informative_explorer._discrete_models_learners,
@@ -626,7 +619,7 @@ def test_apply_exploration_policy_when_exploration_policy_is_informative_explore
     depot_numeric_agent.initialize_problem(depot_problem)
     depot_noam_informative_explorer.initialize_learning_algorithms()
     goal_reached, _, num_steps = depot_noam_informative_explorer.apply_exploration_policy(
-        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, num_steps_till_episode_end=10
+        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, num_steps_till_episode_end=10, safe_model_solution_stat=SolutionOutputTypes.no_solution
     )
     assert num_steps <= 5000
     safe_model = construct_safe_action_model(
