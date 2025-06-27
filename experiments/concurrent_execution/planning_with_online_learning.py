@@ -79,7 +79,7 @@ class PIL:
             action_names=list(partial_domain.actions),
             working_directory=train_set_dir_path,
             fold_number=fold_num,
-            learning_algorithm=self._learning_algorithm,
+            algorithm_type=self._learning_algorithm,
         )
         online_learner = LEARNING_ALGORITHMS[self._learning_algorithm](
             workdir=train_set_dir_path,
