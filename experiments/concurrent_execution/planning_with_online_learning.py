@@ -75,7 +75,12 @@ class PIL:
         complete_domain = DomainParser(domain_path=partial_domain_path).parse_domain()
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         self._agent = IPCAgent(complete_domain)
-        episode_recorder = EpisodeInfoRecord(action_names=list(partial_domain.actions), working_directory=train_set_dir_path)
+        episode_recorder = EpisodeInfoRecord(
+            action_names=list(partial_domain.actions),
+            working_directory=train_set_dir_path,
+            fold_number=fold_num,
+            learning_algorithm=self._learning_algorithm,
+        )
         online_learner = LEARNING_ALGORITHMS[self._learning_algorithm](
             workdir=train_set_dir_path,
             partial_domain=partial_domain,
