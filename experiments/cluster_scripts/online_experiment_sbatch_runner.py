@@ -16,6 +16,8 @@ from experiments.cluster_scripts.common import (
 
 signal.signal(signal.SIGINT, sigint_handler)
 
+learning_algorithms_map = {14: "noam_algorithm", 18: "goal_oriented", 20: "semi_online"}
+
 
 def main():
     configurations = get_configurations()
@@ -46,14 +48,16 @@ def main():
                         fold,
                         arguments,
                         environment_variables,
-                        f"{experiment['domain_file_name']}_{fold}_semi_online_experiment_runner",
+                        f"{experiment['domain_file_name']}_{fold}_{learning_algorithms_map[version_index]}_experiment_runner",
                         None,
                         memory="32G",
                     )
 
                 experiment_sids.append(sid)
                 formatted_date_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-                print(f"{formatted_date_time} - submitted job with sid {sid} for algorithm semi_online fold {fold}.")
+                print(
+                    f"{formatted_date_time} - submitted job with sid {sid} for algorithm {learning_algorithms_map[version_index]} fold {fold}."
+                )
                 pathlib.Path("temp.sbatch").unlink()
                 progress_bar(version_index, len(experiment["compared_versions"]))
                 arguments.pop(-1)  # removing the internal iteration from the arguments list
