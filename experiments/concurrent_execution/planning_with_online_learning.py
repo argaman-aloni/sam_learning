@@ -135,7 +135,7 @@ def parse_arguments() -> argparse.Namespace:
         required=False,
         help="The type of learning algorithm to use for the numeric action model learning.",
         type=int,
-        choices=[20, 14, 17, 18],
+        choices=[20, 14, 17, 18, 21],
         default=20,
     )
     parser.add_argument("--debug", required=False, help="Whether in debug mode.", type=bool, default=False)

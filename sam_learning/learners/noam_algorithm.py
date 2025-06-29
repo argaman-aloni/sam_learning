@@ -173,7 +173,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         :return: A tuple containing the selected ActionCall, a boolean indicating if the transition was successful, and the resulting State.
         """
         self.logger.debug("Selecting an action from the grounded actions set.")
-        random_action = random.choice(frontier)
         selected_ground_action = frontier.pop(0)
         action_informative, action_applicable = self._calculate_state_action_informative(
             current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects
@@ -186,9 +185,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             action_informative, action_applicable = self._calculate_state_action_informative(
                 current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects
             )
-
-        if len(frontier) == 0 and not action_informative:
-            selected_ground_action = random.choice(list(self._applicable_actions)) if len(self._applicable_actions) > 0 else random_action
 
         self.logger.debug(
             f"Selected the informative action {selected_ground_action.name} with parameters {selected_ground_action.parameters}."
@@ -246,10 +242,12 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
                 action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
 
             if not is_successful:
-                self.logger.debug(
-                    "The last explored action was not successful but reached the end of the episode since the frontier is empty."
-                )
-                return False, num_steps_till_episode_end
+                self.logger.debug(f"Informative search failed, trying to execute a random action to move forward.")
+                frontier = self._create_frontier(grounded_actions)
+                action, is_successful, next_state = super()._select_action_and_execute(current_state, frontier, problem_objects)
+                if not is_successful:
+                    self.logger.info("Reached a dead end - ending the episode...")
+                    return False, num_steps_till_episode_end
 
             step_number += 1
             self._applicable_actions = set()
