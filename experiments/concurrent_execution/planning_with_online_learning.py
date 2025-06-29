@@ -3,16 +3,15 @@
 import argparse
 import logging
 import os
-import shutil
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
-from pddl_plus_parser.models import Domain, State
+from pddl_plus_parser.models import State
 
 from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning_agents import IPCAgent
-from sam_learning.learners import NumericOnlineActionModelLearner, InformativeExplorer, GoalOrientedExplorer
+from sam_learning.learners import NumericOnlineActionModelLearner, InformativeExplorer, GoalOrientedExplorer, OptimisticExplorer
 from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver, MetricFFSolver
 from statistics.utils import init_semantic_performance_calculator
@@ -26,6 +25,7 @@ LEARNING_ALGORITHMS = {
     LearningAlgorithmType.semi_online: SemiOnlineNumericAMLearner,
     LearningAlgorithmType.informative_explorer: InformativeExplorer,
     LearningAlgorithmType.goal_oriented_explorer: GoalOrientedExplorer,
+    LearningAlgorithmType.optimistic_explorer: OptimisticExplorer,
 }
 
 
@@ -107,7 +107,7 @@ class PIL:
                 episode_recorder.add_num_grounded_actions(num_grounded_actions)
                 goal_achieved, num_steps_in_episode = online_learner.try_to_solve_problem(problem_path)
                 episode_recorder.clear_trajectory()
-                episode_recorder.export_statistics(train_set_dir_path / "exploration_statistics.csv")
+                episode_recorder.export_statistics(train_set_dir_path / f"{self._learning_algorithm.name}_exploration_statistics.csv")
                 self.logger.info(
                     f"Finished episode number {problem_index + 1}! "
                     f"The current goal was {'achieved' if goal_achieved else 'not achieved'}."
@@ -118,7 +118,9 @@ class PIL:
 
         self.logger.info(f"Finished learning the action models for the fold {fold_num + 1}.")
         episode_recorder.export_statistics(
-            self.working_directory_path / "results_directory" / f"{LearningAlgorithmType.name}_exploration_statistics_fold_{fold_num}.csv"
+            self.working_directory_path
+            / "results_directory"
+            / f"{self._learning_algorithm.name}_exploration_statistics_fold_{fold_num}.csv"
         )
 
 

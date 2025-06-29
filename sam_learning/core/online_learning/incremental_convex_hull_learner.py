@@ -113,6 +113,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :return: whether the new point is spanned by the base.
         """
         shifted_sample = self._shift_new_point(point)
+        if len(self._gsp_base) > 0 and len(list(shifted_sample)) != len(self._gsp_base[0]):
+            self.logger.debug("The new point is not spanned by the base, the dimensions do not match.")
+            return False
+
         return len(extended_gram_schmidt([list(shifted_sample)], self._gsp_base)) == 0
 
     def _learn_new_bases(self) -> None:
@@ -180,7 +184,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             # If reached here - the point is spanned by the base and the convex hull is not None
             projected_point = np.dot(self._shift_new_point(self.affine_independent_data.iloc[-1]), np.array(self._gsp_base).T)
             try:
-                self._convex_hull.add_points([projected_point])
+                self._convex_hull.add_points([projected_point], restart=self._spanning_standard_base)
             except QhullError:
                 self.logger.warning(
                     "The new point could not be incrementally added to the convex hull. Trying to recalculate the hull from scratch."

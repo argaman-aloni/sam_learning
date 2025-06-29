@@ -185,15 +185,18 @@ class SemiOnlineNumericAMLearner:
         :return: A list of ActionCall instances sorted by their success rate.
         """
         self.logger.debug("Sorting the grounded actions based on their success rate.")
+        injective_actions = [action for action in grounded_actions if not contains_duplicates(action.parameters)]
         action_success_rates = {
-            action: 1 / (self.episode_recorder.get_number_successful_action_executions(action_name=action) + 1)
+            action: 1 / ((self.episode_recorder.get_number_successful_action_executions(action_name=action) ** 2) + 1)
             for action in self.partial_domain.actions
         }
-        grounded_weights = {action: action_success_rates[action.name] for action in grounded_actions if action.name in action_success_rates}
+        grounded_weights = {
+            action: action_success_rates[action.name] for action in injective_actions if action.name in action_success_rates
+        }
         total = sum(grounded_weights.values())
         probabilities = [w / total for w in grounded_weights.values()]
         grounded_action_list = list(grounded_weights.keys())
-        randomized_grounded_list = list(np.random.choice(grounded_action_list, size=len(grounded_actions), replace=False, p=probabilities))
+        randomized_grounded_list = list(np.random.choice(grounded_action_list, size=len(injective_actions), replace=False, p=probabilities))
         return randomized_grounded_list
 
     def _add_transition_data(self, action_to_update: ActionCall, is_transition_successful: bool = True) -> None:
@@ -230,10 +233,14 @@ class SemiOnlineNumericAMLearner:
 
         self.logger.debug("The action was successful, adding the transition data to the model.")
         self._discrete_models_learners[action_to_update.name].add_transition_data(
-            previous_state_pb_predicates, next_state_pb_predicates, is_transition_successful=is_transition_successful
+            previous_state_pb_predicates,
+            next_state_pb_predicates,
+            is_transition_successful=is_transition_successful,
         )
         self._numeric_models_learners[action_to_update.name].add_transition_data(
-            previous_state_pb_functions, next_state_pb_functions, is_transition_successful=is_transition_successful
+            previous_state_pb_functions,
+            next_state_pb_functions,
+            is_transition_successful=is_transition_successful,
         )
 
     def _execute_selected_action(

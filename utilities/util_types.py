@@ -15,6 +15,7 @@ class LearningAlgorithmType(Enum):
     goal_oriented_explorer = 18
     incremental_nsam = 19
     semi_online = 20
+    optimistic_explorer = 21
     ma_sam_plus = 25
 
     # To remove

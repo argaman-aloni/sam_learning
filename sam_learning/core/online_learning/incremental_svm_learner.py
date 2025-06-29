@@ -237,8 +237,8 @@ class IncrementalSVMLearner:
 
             return preconditions
 
-        except ValueError:
-            self.logger.warning("Failed to create the SVM based conditions.")
+        except ValueError as error:
+            self.logger.warning(f"Failed to create the SVM based conditions. Error message: {error}")
             raise NotSafeActionError(
                 name=self.action_name, reason="SVM failed to execute.", solution_type=EquationSolutionType.svm_failed_to_train
             )

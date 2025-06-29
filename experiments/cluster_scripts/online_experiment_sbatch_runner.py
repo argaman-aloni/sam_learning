@@ -16,7 +16,7 @@ from experiments.cluster_scripts.common import (
 
 signal.signal(signal.SIGINT, sigint_handler)
 
-learning_algorithms_map = {14: "noam_algorithm", 18: "goal_oriented", 20: "semi_online"}
+learning_algorithms_map = {14: "noam_algorithm", 18: "goal_oriented", 20: "semi_online", 21: "optimistic_explorer"}
 
 
 def main():
