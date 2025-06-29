@@ -524,9 +524,6 @@ class OptimisticExplorer(GoalOrientedExplorer):
             )
             return True, trace_length
 
-        elif solution_status in [SolutionOutputTypes.not_applicable, SolutionOutputTypes.goal_not_achieved]:
-            raise ValueError("The goal should have been reached when used the safe action model!")
-
         goal_reached, solver_reached_goal, num_steps_till_episode_end = self._explore_and_terminate_episode(
             initial_state=initial_state,
             problem_path=problem_path,
