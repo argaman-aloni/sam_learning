@@ -34,43 +34,6 @@ def export_unified_statistics_to_csv(
     return unified_df
 
 
-def plot_statistics(
-    working_directory: Path, output_csv: str, learning_algorithm: LearningAlgorithmType = LearningAlgorithmType.semi_online
-):
-    """Plots the statistics of model solution statuses per episode."""
-    unified_df = export_unified_statistics_to_csv(working_directory, output_csv, learning_algorithm)
-
-    averaged = unified_df.groupby("episode_number")[["not_solved", "optimistic_not_applicable", "optimistic_solved", "safe_solved"]].mean()
-    smoothed = averaged.rolling(window=5, min_periods=1, center=True).mean()
-
-    # Plotting the graph
-    plt.figure(figsize=(12, 8))
-    plt.stackplot(
-        smoothed.index,
-        smoothed["not_solved"],
-        smoothed["optimistic_not_applicable"],
-        smoothed["optimistic_solved"],
-        smoothed["safe_solved"],
-        labels=["Not Solved", "Optimistic Not Applicable", "Optimistic Solved", "Safe Solved"],
-        colors=["#F20000", "#FA915C", "#E0FA5C", "#71FA5C"],  # distinct colorblind-friendly palette
-    )
-
-    plt.xlabel("Episode", fontsize=18)
-    plt.ylabel("Solving Rate", fontsize=18)
-    plt.ylim(0, 1)
-    plt.xlim(0, 80)
-    # plt.title("Model Solution Status Percentages per Episode")
-    plt.legend(fontsize=18)
-    plt.tick_params(axis="both", which="major", labelsize=16)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(
-        working_directory / "results_directory" / f"{learning_algorithm.name}_model_solution_status_percentages.pdf",
-        bbox_inches="tight",
-        dpi=300,
-    )
-
-
 def collect_results_for_all_algorithms(
     working_directory: Path, learning_algorithms: List[LearningAlgorithmType], domain_name: str, output_csv: str = "unified_statistics.csv"
 ):

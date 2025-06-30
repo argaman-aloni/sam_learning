@@ -369,7 +369,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             )
             return True, trace_length
 
-        elif solution_status in [SolutionOutputTypes.not_applicable, SolutionOutputTypes.goal_not_achieved]:
+        if solution_status == SolutionOutputTypes.not_applicable:
             raise ValueError("The goal should have been reached when used the safe action model!")
 
         goal_reached, solver_reached_goal, num_steps_till_episode_end = self.apply_exploration_policy(
@@ -523,7 +523,7 @@ class OptimisticExplorer(GoalOrientedExplorer):
                 problem_name=problem_path.stem,
                 goal_reached=True,
                 has_solved_solver_problem=True,
-                safe_model_solution_stat=solution_status.name,
+                optimistic_model_solution_stat=solution_status.name,
                 export_trajectory=False,
             )
             return True, trace_length

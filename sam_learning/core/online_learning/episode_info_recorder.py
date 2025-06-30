@@ -44,7 +44,7 @@ class EpisodeInfoRecord:
         fold_number: int = 0,
         algorithm_type: LearningAlgorithmType = LearningAlgorithmType.semi_online,
     ):
-        self._episode_number = 0
+        self._episode_number = 1
         self._num_informative_actions_in_step = []
         self._action_names = action_names
         self._fold_number = fold_number
@@ -167,7 +167,6 @@ class EpisodeInfoRecord:
         :param export_trajectory: whether to export the trajectory of the episode to a file.
         """
         self.summarized_info.loc[len(self.summarized_info)] = {
-            "fold_number": self._fold_number,
             **{"episode_number": self._episode_number},
             **self._episode_info,
             **{"goal_reached": goal_reached},
@@ -180,6 +179,7 @@ class EpisodeInfoRecord:
             "model_load_time": self._model_loading_time,
         }
         self.summarized_info["algorithm_type"] = self._algorithm_type.name
+        self.summarized_info["fold_number"] = self._fold_number
         self._episode_info = {record_name: 0 for record_name in self._episode_info}
         self._episode_number += 1
         self._model_loading_time = -1
