@@ -4,6 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 from pandas import DataFrame
+from typing import List
 
 from experiments.plotting.plot_online_learning_results import plot_online_learning_statistics
 from utilities import LearningAlgorithmType
@@ -70,6 +71,16 @@ def plot_statistics(
     )
 
 
+def collect_results_for_all_algorithms(
+    working_directory: Path, learning_algorithms: List[LearningAlgorithmType], domain_name: str, output_csv: str = "unified_statistics.csv"
+):
+    """Collects results for all specified learning algorithms and plots the statistics."""
+    for algorithm in learning_algorithms:
+        print(f"Processing {algorithm.name}...")
+        unified_df = export_unified_statistics_to_csv(working_directory, output_csv, domain_name, algorithm)
+        plot_online_learning_statistics(working_directory, algorithm, unified_df, domain_name)
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -78,14 +89,9 @@ if __name__ == "__main__":
         "--working_directory", type=Path, required=True, help="Path to the working directory containing the statistics files."
     )
     parser.add_argument("--output_csv", type=str, default="unified_statistics.csv", help="Output CSV file name for unified statistics.")
-    parser.add_argument(
-        "--learning_algorithm", type=int, help="The index representing the learning algorithm used in the experiment.", required=True
-    )
+    parser.add_argument("--learning_algorithms", required=True, help="the list of algorithms that will run in parallel")
     parser.add_argument("--domain_name", type=str, required=True, help="The name of the domain the results belong to.")
     args = parser.parse_args()
-    unified_df = export_unified_statistics_to_csv(
-        Path(args.working_directory), args.output_csv, args.domain_name, LearningAlgorithmType(args.learning_algorithm)
-    )
-    plot_online_learning_statistics(
-        Path(args.working_directory), LearningAlgorithmType(args.learning_algorithm), unified_df, args.domain_name
-    )
+    experiment_learning_algorithms = args.learning_algorithms.split(",")
+    input_learning_algorithms = [LearningAlgorithmType(int(e)) for e in experiment_learning_algorithms]
+    collect_results_for_all_algorithms(Path(args.working_directory), input_learning_algorithms, args.domain_name, args.output_csv)

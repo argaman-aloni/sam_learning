@@ -23,11 +23,15 @@ from sam_learning.core import (
     contains_duplicates,
 )
 from sam_learning.core.online_learning_agents.abstract_agent import AbstractAgent
-from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner, OPTIMISTIC_MODEL_TYPE, SAFE_MODEL_TYPE
+from sam_learning.learners.semi_online_learning_algorithm import (
+    SemiOnlineNumericAMLearner,
+    OPTIMISTIC_MODEL_TYPE,
+    SAFE_MODEL_TYPE,
+    MAX_SUCCESSFUL_STEPS_PER_EPISODE,
+)
 from solvers import AbstractSolver, SolutionOutputTypes
 from utilities import LearningAlgorithmType
 
-MAX_STEPS_PER_EPISODE = 50
 
 random.seed(42)  # Set seed for reproducibility
 
@@ -178,9 +182,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects
         )
         while len(frontier) > 0 and not action_informative:
-            if action_applicable:
-                self._applicable_actions.add(selected_ground_action)
-
             selected_ground_action = frontier.pop(0)
             action_informative, action_applicable = self._calculate_state_action_informative(
                 current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects
@@ -218,7 +219,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
     def explore_to_refine_models(
         self,
         init_state: State,
-        num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE,
+        num_steps_till_episode_end: int = MAX_SUCCESSFUL_STEPS_PER_EPISODE,
         problem_objects: Dict[str, PDDLObject] = None,
     ) -> Tuple[bool, int]:
         """
@@ -250,7 +251,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
                     return False, num_steps_till_episode_end
 
             step_number += 1
-            self._applicable_actions = set()
             self.logger.info(f"The action {str(action)} was successful. Continuing to the next state.")
             frontier = self._create_frontier(grounded_actions)
             current_state = next_state
@@ -304,7 +304,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
     def apply_exploration_policy(
         self,
         problem_path: Path,
-        num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE,
+        num_steps_till_episode_end: int = MAX_SUCCESSFUL_STEPS_PER_EPISODE,
         safe_model_solution_stat: SolutionOutputTypes = SolutionOutputTypes.no_solution,
     ) -> Tuple[bool, bool, int]:
         """Applies the exploration policy to the current state.
@@ -342,7 +342,9 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
             optimistic_model_solution_stat=solution_status,
         )
 
-    def try_to_solve_problem(self, problem_path: Path, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE) -> Tuple[bool, int]:
+    def try_to_solve_problem(
+        self, problem_path: Path, num_steps_till_episode_end: int = MAX_SUCCESSFUL_STEPS_PER_EPISODE
+    ) -> Tuple[bool, int]:
         """Tries to solve the problem using the current domain.
 
         :param problem_path: the path to the problem to solve.
@@ -453,7 +455,7 @@ class InformativeExplorer(GoalOrientedExplorer):
     def apply_exploration_policy(
         self,
         problem_path: Path,
-        num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE,
+        num_steps_till_episode_end: int = MAX_SUCCESSFUL_STEPS_PER_EPISODE,
         safe_model_solution_stat: SolutionOutputTypes = None,
     ) -> Tuple[bool, bool, int]:
         problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
@@ -497,7 +499,9 @@ class OptimisticExplorer(GoalOrientedExplorer):
             episode_recorder=episode_recorder,
         )
 
-    def try_to_solve_problem(self, problem_path: Path, num_steps_till_episode_end: int = MAX_STEPS_PER_EPISODE) -> Tuple[bool, int]:
+    def try_to_solve_problem(
+        self, problem_path: Path, num_steps_till_episode_end: int = MAX_SUCCESSFUL_STEPS_PER_EPISODE
+    ) -> Tuple[bool, int]:
         """Tries to solve the problem using the current domain.
 
         :param problem_path: the path to the problem to solve.

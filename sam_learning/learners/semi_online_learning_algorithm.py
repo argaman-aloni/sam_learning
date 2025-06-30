@@ -187,7 +187,7 @@ class SemiOnlineNumericAMLearner:
         self.logger.debug("Sorting the grounded actions based on their success rate.")
         injective_actions = [action for action in grounded_actions if not contains_duplicates(action.parameters)]
         action_success_rates = {
-            action: 1 / ((self.episode_recorder.get_number_successful_action_executions(action_name=action) ** 2) + 1)
+            action: 1 / (self.episode_recorder.get_number_successful_action_executions(action_name=action) + 1)
             for action in self.partial_domain.actions
         }
         grounded_weights = {
