@@ -7,6 +7,7 @@ from typing import List, Optional
 from pandas import DataFrame
 from pddl_plus_parser.models import ActionCall, Observation, State
 
+from solvers import SolutionOutputTypes
 from utilities import LearningAlgorithmType
 
 RECORD_COLUMNS = [
@@ -29,7 +30,6 @@ DISCRETE = "discrete"
 NUMERIC = "numeric"
 UNKNOWN = "unknown"
 
-not_used_for_solving = "irrelevant"
 MAX_STEPS_IN_FILE = 5000  # Maximum number of steps to record in a single trajectory file
 REMOTE_TRAJECTORY_PATH_ENV_VAR = "REMOTE_TRAJECTORY_PATH"
 
@@ -149,8 +149,8 @@ class EpisodeInfoRecord:
         problem_name: str,
         goal_reached: bool,
         has_solved_solver_problem: bool = False,
-        safe_model_solution_stat: str = not_used_for_solving,
-        optimistic_model_solution_stat: str = not_used_for_solving,
+        safe_model_solution_stat: str = SolutionOutputTypes.irrelevant,
+        optimistic_model_solution_stat: str = SolutionOutputTypes.irrelevant,
         exploration_time: float = 0.0,
         export_trajectory: bool = True,
     ) -> None:

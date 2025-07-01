@@ -467,6 +467,7 @@ class InformativeExplorer(GoalOrientedExplorer):
             num_steps_till_episode_end=num_steps_till_episode_end,
             problem_objects=problem.objects,
             safe_model_solution_stat=safe_model_solution_stat,
+            optimistic_model_solution_stat=SolutionOutputTypes.irrelevant,
         )
 
 

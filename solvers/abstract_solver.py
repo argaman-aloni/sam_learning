@@ -13,6 +13,7 @@ class SolutionOutputTypes(Enum):
     not_applicable = 4
     goal_not_achieved = 5
     solver_error = 6
+    irrelevant = 7
 
 
 class AbstractSolver(ABC):

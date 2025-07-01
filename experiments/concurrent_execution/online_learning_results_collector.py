@@ -22,9 +22,14 @@ def export_unified_statistics_to_csv(
     # Add a 'fold' column to each new DataFrame
     for i, df in enumerate(fold_data):
         df["fold"] = i
-        df["not_solved"] = ~df["safe_model_solution_status"].isin(["ok", "not_applicable", "irrelevant"]) & ~df[
-            "optimistic_model_solution_status"
-        ].isin(["ok", "not_applicable", "irrelevant"]).astype(int)
+        df["not_solved"] = (
+            df["safe_model_solution_status"].isin(["no_solution", "timeout", "solver_error", "goal_not_achieved"])
+            & df["optimistic_model_solution_status"].isin(["no_solution", "timeout", "solver_error", "goal_not_achieved"])
+            | df["safe_model_solution_status"].isin(["irrelevant"])
+            & df["optimistic_model_solution_status"].isin(["no_solution", "timeout", "solver_error", "goal_not_achieved"])
+            | df["optimistic_model_solution_status"].isin(["irrelevant"])
+            & df["safe_model_solution_status"].isin(["no_solution", "timeout", "solver_error", "goal_not_achieved"]).astype(int)
+        )
         df["optimistic_not_applicable"] = (df["optimistic_model_solution_status"] == "not_applicable").astype(int)
         df["optimistic_solved"] = (df["optimistic_model_solution_status"] == "ok").astype(int)
         df["safe_solved"] = (df["safe_model_solution_status"] == "ok").astype(int)

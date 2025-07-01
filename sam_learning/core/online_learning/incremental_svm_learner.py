@@ -119,7 +119,7 @@ class IncrementalSVMLearner:
         Note: the returned values represents the linear inequalities of the convex hull, i.e.,  Ax <= b.
         """
         planes = []
-        no_label_columns = self.data.drop(columns=[LABEL_COLUMN])
+        no_label_columns = self.data.dropna(axis=1).drop(columns=[LABEL_COLUMN])
         X_reminder, y_reminder = no_label_columns.to_numpy(), self.data[LABEL_COLUMN]
         for i in range(MAX_ALLOWED_CONDITIONS):
             if len(X_reminder) <= MIN_ALLOWED_UNRESOLVED_POINTS:
