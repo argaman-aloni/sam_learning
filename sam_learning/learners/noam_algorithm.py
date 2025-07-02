@@ -32,7 +32,7 @@ from sam_learning.learners.semi_online_learning_algorithm import (
 from solvers import AbstractSolver, SolutionOutputTypes
 from utilities import LearningAlgorithmType
 
-
+NUM_STEPS_FOR_STARVATION = 100  # Number of steps after which an action is considered starved
 random.seed(42)  # Set seed for reproducibility
 
 
@@ -64,6 +64,8 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         self._informative_states_learner = {}
         self.triplet_snapshot = EnvironmentSnapshot(partial_domain=partial_domain)
         self._successful_execution_count = defaultdict(int)
+        self._action_last_executed_step = defaultdict(int)
+        self._global_step_counter = 0
 
     @staticmethod
     def _create_random_actions_frontier(grounded_actions: Set[ActionCall]) -> List[ActionCall]:
@@ -176,6 +178,25 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         :return: A tuple containing the selected ActionCall, a boolean indicating if the transition was successful, and the resulting State.
         """
         self.logger.debug("Selecting an action from the grounded actions set.")
+        # Build a mapping from action name to list of actions in the frontier
+        frontier_by_name = {}
+        for action in frontier:
+            frontier_by_name.setdefault(action.name, []).append(action)
+
+        # Find action names in the frontier that have not been executed in the last 100 steps
+        starved_action_names = [
+            name
+            for name in frontier_by_name
+            if self._action_last_executed_step.get(name, -float("inf")) <= self._global_step_counter - NUM_STEPS_FOR_STARVATION
+        ]
+        if starved_action_names:
+            # Pick the first starved action name and pop an action with that name from the frontier
+            starved_name = starved_action_names[0]
+            selected_ground_action = random.choice(frontier_by_name[starved_name])
+            frontier.remove(selected_ground_action)
+            next_state, is_transition_successful = self._execute_selected_action(selected_ground_action, current_state, problem_objects)
+            return selected_ground_action, is_transition_successful, next_state
+
         selected_ground_action = frontier.pop(0)
         action_informative, action_applicable = self._calculate_state_action_informative(
             current_state=current_state, action_to_test=selected_ground_action, problem_objects=problem_objects
@@ -237,14 +258,21 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         while len(frontier) > 0 and step_number < num_steps_till_episode_end:
             self.logger.info(f"Exploring to improve the action model - exploration step {step_number + 1}.")
             action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
+            self._action_last_executed_step[action.name] = step_number
+            self._global_step_counter += 1
             while not is_successful and len(frontier) > 0:
                 self.logger.debug(f"The action was not successful, trying again for step {step_number + 1}.")
                 action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
+                self._action_last_executed_step[action.name] = step_number
+                self._global_step_counter += 1
 
             if not is_successful:
                 self.logger.debug(f"Informative search failed, trying to execute a random action to move forward.")
                 frontier = self._create_frontier(grounded_actions)
                 action, is_successful, next_state = super()._select_action_and_execute(current_state, frontier, problem_objects)
+                self._action_last_executed_step[action.name] = step_number
+                self._global_step_counter += 1
+
                 if not is_successful:
                     self.logger.info("Reached a dead end - ending the episode...")
                     return False, num_steps_till_episode_end
