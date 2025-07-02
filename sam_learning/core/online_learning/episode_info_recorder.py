@@ -149,8 +149,8 @@ class EpisodeInfoRecord:
         problem_name: str,
         goal_reached: bool,
         has_solved_solver_problem: bool = False,
-        safe_model_solution_stat: str = SolutionOutputTypes.irrelevant,
-        optimistic_model_solution_stat: str = SolutionOutputTypes.irrelevant,
+        safe_model_solution_stat: str = SolutionOutputTypes.irrelevant.name,
+        optimistic_model_solution_stat: str = SolutionOutputTypes.irrelevant.name,
         exploration_time: float = 0.0,
         export_trajectory: bool = True,
     ) -> None:
