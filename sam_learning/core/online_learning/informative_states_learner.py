@@ -57,9 +57,7 @@ class InformationStatesLearner:
         self.numeric_model_learner = numeric_model_learner
         self.monomials = self.numeric_model_learner.monomials
         monomial_strs = self.numeric_model_learner.data_columns
-        self.parameter_bound_predicates = [
-            p.untyped_representation for p in self.discrete_model_learner.predicates_superset
-        ]
+        self.parameter_bound_predicates = [p.untyped_representation for p in self.discrete_model_learner.predicates_superset]
         self.combined_data = DataFrame(columns=[*monomial_strs, self.parameter_bound_predicates, LABEL_COLUMN])
         self.numeric_failure_data = DataFrame(columns=[*monomial_strs])
 
@@ -100,9 +98,7 @@ class InformationStatesLearner:
         # Create combined sample data
         new_sample_data = self._create_combined_sample_data(new_numeric_sample, new_propositional_sample)
         new_sample_data[LABEL_COLUMN] = False
-        return len(pd.concat([self.combined_data, new_sample_data], ignore_index=True).drop_duplicates()) == len(
-            self.combined_data
-        )
+        return len(pd.concat([self.combined_data, new_sample_data], ignore_index=True).drop_duplicates()) == len(self.combined_data)
 
     def _is_state_not_applicable_in_safe_numeric_model(self, new_numeric_sample: Dict[str, PDDLFunction]) -> bool:
         """Determines if a given numeric sample results in a state that is not applicable
@@ -120,7 +116,10 @@ class InformationStatesLearner:
         :return: Returns True if a negative sample is located within the constructed convex hull,
             indicating the state is not applicable. Otherwise, returns False.
         """
-        validation_convex_hull = self.numeric_model_learner.copy_convex_hull_learner(one_shot=False)
+        validation_convex_hull = self.numeric_model_learner.copy_convex_hull_learner()
+        if len(validation_convex_hull.data) <= 1:
+            return False
+
         validation_convex_hull.add_new_point(create_grounded_monomials(self.monomials, new_numeric_sample))
         for _, negative_sample in self.numeric_failure_data.iterrows():
             data_columns = [col for col in self.numeric_failure_data.columns.tolist() if col != LABEL_COLUMN]
@@ -181,9 +180,7 @@ class InformationStatesLearner:
             self.combined_data.dropna(axis="columns", inplace=True)
             self.combined_data = self.combined_data.drop_duplicates()
 
-    def is_applicable(
-        self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]
-    ) -> bool:
+    def is_applicable(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
         """Checks whether the action is applicable in the state.
 
         :param new_numeric_sample: The numeric sample to check.
@@ -194,9 +191,7 @@ class InformationStatesLearner:
             new_propositional_sample
         ) and self.numeric_model_learner.is_state_in_safe_model(new_numeric_sample)
 
-    def is_sample_informative(
-        self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]
-    ) -> bool:
+    def is_sample_informative(self, new_numeric_sample: Dict[str, PDDLFunction], new_propositional_sample: Set[Predicate]) -> bool:
         """Checks whether the sample is informative.
 
         :param new_numeric_sample: The new sample to calculate whether it is informative.

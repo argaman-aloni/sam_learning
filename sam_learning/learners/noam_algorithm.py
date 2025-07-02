@@ -64,7 +64,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         self._informative_states_learner = {}
         self.triplet_snapshot = EnvironmentSnapshot(partial_domain=partial_domain)
         self._successful_execution_count = defaultdict(int)
-        self._applicable_actions = set()
 
     @staticmethod
     def _create_random_actions_frontier(grounded_actions: Set[ActionCall]) -> List[ActionCall]:
