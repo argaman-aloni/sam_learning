@@ -32,7 +32,7 @@ from sam_learning.learners.semi_online_learning_algorithm import (
 from solvers import AbstractSolver, SolutionOutputTypes
 from utilities import LearningAlgorithmType
 
-NUM_STEPS_FOR_STARVATION = 100  # Number of steps after which an action is considered starved
+NUM_STEPS_FOR_STARVATION = 1000  # Number of steps after which an action is considered starved
 random.seed(42)  # Set seed for reproducibility
 
 
