@@ -1,10 +1,9 @@
 from glob import glob
 from pathlib import Path
+from typing import List
 
-import matplotlib.pyplot as plt
 import pandas as pd
 from pandas import DataFrame
-from typing import List
 
 from experiments.plotting.plot_online_learning_results import plot_online_learning_statistics
 from utilities import LearningAlgorithmType
