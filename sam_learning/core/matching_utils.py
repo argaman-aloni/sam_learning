@@ -1,4 +1,5 @@
 """Auxiliary functions to help the matching process."""
+
 from itertools import permutations
 from typing import List, Tuple, Set
 
@@ -47,4 +48,4 @@ def extract_not_effects(next_state_predicate: Set[GroundedPredicate]) -> Set[Gro
     :param next_state_predicate: all the grounded literals in the next state (negative and positive predicates).
     :return: A tuple representing the predicates that cannot be add-effects and those that cannot be delete-effects.
     """
-    return {predicate.copy(is_negated=predicate.is_positive) for predicate in next_state_predicate}
+    return {predicate.copy(is_negated=True) for predicate in next_state_predicate}
