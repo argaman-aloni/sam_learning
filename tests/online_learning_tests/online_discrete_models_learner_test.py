@@ -3,10 +3,11 @@
 from typing import Set
 
 import pytest
-from pddl_plus_parser.models import Domain, Predicate, Precondition
+from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
+from pddl_plus_parser.models import Domain, Predicate, Precondition, Problem
 
 from sam_learning.core import OnlineDiscreteModelLearner, VocabularyCreator
-from sam_learning.core.online_learning.online_discrete_models_learner import DUMMY_EFFECT
+from tests.consts import MINECRAFT_LARGE_DOMAIN_PATH, MINECRAFT_LARGE_PROBLEM_PATH
 
 TEST_ACTION_NAME = "test_action"
 
@@ -23,6 +24,24 @@ def depot_lifted_vocabulary(depot_domain: Domain) -> Set[Predicate]:
     return VocabularyCreator().create_lifted_vocabulary(domain=depot_domain, possible_parameters=depot_domain.actions["lift"].signature)
 
 
+@pytest.fixture()
+def minecraft_large_domain() -> Domain:
+    domain_parser = DomainParser(MINECRAFT_LARGE_DOMAIN_PATH, partial_parsing=False)
+    return domain_parser.parse_domain()
+
+
+@pytest.fixture()
+def minecraft_large_problem(minecraft_large_domain: Domain) -> Problem:
+    return ProblemParser(problem_path=MINECRAFT_LARGE_PROBLEM_PATH, domain=minecraft_large_domain).parse_problem()
+
+
+@pytest.fixture
+def minecraft_lifted_vocabulary(minecraft_large_domain: Domain) -> Set[Predicate]:
+    return VocabularyCreator().create_lifted_vocabulary(
+        domain=minecraft_large_domain, possible_parameters=minecraft_large_domain.actions["break"].signature
+    )
+
+
 @pytest.fixture
 def online_discrete_model_learner(lifted_vocabulary) -> OnlineDiscreteModelLearner:
     return OnlineDiscreteModelLearner(TEST_ACTION_NAME, lifted_vocabulary)
@@ -31,6 +50,11 @@ def online_discrete_model_learner(lifted_vocabulary) -> OnlineDiscreteModelLearn
 @pytest.fixture
 def depot_online_discrete_model_learner(depot_lifted_vocabulary) -> OnlineDiscreteModelLearner:
     return OnlineDiscreteModelLearner("lift", depot_lifted_vocabulary)
+
+
+@pytest.fixture
+def minecraft_online_discrete_model_learner(minecraft_lifted_vocabulary) -> OnlineDiscreteModelLearner:
+    return OnlineDiscreteModelLearner("break", minecraft_lifted_vocabulary)
 
 
 def test_initialization_of_learner_with_empty_predicates_set_works_correctly():
@@ -346,6 +370,62 @@ def test_add_transition_data_when_transition_is_successful_adds_positive_pre_and
     assert len(online_discrete_model_learner.cannot_be_effects) == len(lifted_vocabulary) - 2
     assert len(online_discrete_model_learner.must_be_preconditions) == 0
     assert len(online_discrete_model_learner.cannot_be_preconditions) == 2
+
+
+def test_add_transition_data_with_minecraft_break_action_correctly_corrects_the_conditions_when_learning_from_failures_and_successes(
+    minecraft_online_discrete_model_learner: OnlineDiscreteModelLearner,
+    minecraft_large_domain: Domain,
+    minecraft_large_problem: Problem,
+):
+    # Trying to apply the break action on a cell where the agent is not present AND it is a tree cell -- action fails
+    pre_state_predicates = {
+        Predicate(name="position", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="tree_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="air_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="crafting_table_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="have_pogo_stick", signature={}, is_positive=False),
+    }
+    minecraft_online_discrete_model_learner.add_transition_data(pre_state_predicates, pre_state_predicates, is_transition_successful=False)
+    # Trying to apply the break action on a cell that is not a tree cell and not a crafting table cell -- action fails
+    pre_state_predicates = {
+        Predicate(name="position", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="tree_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="air_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="crafting_table_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="have_pogo_stick", signature={}, is_positive=False),
+    }
+    minecraft_online_discrete_model_learner.add_transition_data(pre_state_predicates, pre_state_predicates, is_transition_successful=False)
+    assert len(minecraft_online_discrete_model_learner.must_be_preconditions) == 2
+    # Trying to apply the break action on a cell that is a tree cell -- action successful
+    pre_state_predicates = {
+        Predicate(name="position", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="tree_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="air_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="crafting_table_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="have_pogo_stick", signature={}, is_positive=False),
+    }
+    post_state_predicates = {
+        Predicate(name="position", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="tree_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="air_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="crafting_table_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="have_pogo_stick", signature={}, is_positive=False),
+    }
+    minecraft_online_discrete_model_learner.add_transition_data(pre_state_predicates, post_state_predicates, is_transition_successful=True)
+    assert len(minecraft_online_discrete_model_learner.must_be_preconditions[0]) == 1
+    assert len(minecraft_online_discrete_model_learner.must_be_preconditions[1]) == 2
+    # Trying to apply the break action on a cell that is a crafting table cell -- action fails
+    pre_state_predicates = {
+        Predicate(name="position", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="tree_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="air_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=False),
+        Predicate(name="crafting_table_cell", signature={"?pos": minecraft_large_domain.types["cell"]}, is_positive=True),
+        Predicate(name="have_pogo_stick", signature={}, is_positive=False),
+    }
+    minecraft_online_discrete_model_learner.add_transition_data(pre_state_predicates, post_state_predicates, is_transition_successful=False)
+    assert len(minecraft_online_discrete_model_learner.must_be_preconditions) == 3
+    optimistic_preconditions, _ = minecraft_online_discrete_model_learner.get_optimistic_model()
+    assert len(optimistic_preconditions.operands) == 3
 
 
 def test_add_transition_data_when_transition_is_not_successful_adds_negative_pre_and_does_not_change_effects_data(

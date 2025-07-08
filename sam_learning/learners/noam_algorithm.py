@@ -361,7 +361,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
 
         self.logger.info("The optimistic action model could not solve the problem, exploring to refine models.")
         return self._explore_and_terminate_episode(
-            initial_state=initial_state,
+            initial_state=last_state,
             problem_path=problem_path,
             num_steps_till_episode_end=num_steps_till_episode_end,
             problem_objects=problem.objects,
