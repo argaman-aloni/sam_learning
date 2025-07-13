@@ -88,6 +88,9 @@ def create_plan_actions(plan_path: Path) -> List[ActionCall]:
     :param plan_path: Path to the plan file containing action calls.
     :return: List of ActionCall objects parsed from the plan file.
     """
+    if not plan_path.exists():
+        return []
+
     with open(plan_path, "rt") as plan_file:
         plan_lines = plan_file.readlines()
 

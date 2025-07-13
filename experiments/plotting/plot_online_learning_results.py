@@ -24,17 +24,17 @@ def plot_online_learning_statistics(
         smoothed["optimistic_not_applicable"],
         smoothed["optimistic_solved"],
         smoothed["safe_solved"],
-        labels=["Not Solved", "Optimistic Not Applicable", "Optimistic Solved", "Safe Solved"],
+        labels=["Not Solved", "SVR-AM Inapplicable", "SVR-AM Solved", "NSAM Solved"],
         colors=["#F20000", "#FA915C", "#E0FA5C", "#71FA5C"],  # distinct colorblind-friendly palette
     )
 
-    plt.xlabel("Episode", fontsize=18)
-    plt.ylabel("Solving Rate", fontsize=18)
+    plt.xlabel("Episode", fontsize=36)
+    plt.ylabel("Solving Rate", fontsize=36)
     plt.ylim(0, 1)
     plt.xlim(0, 80)
     # plt.title("Model Solution Status Percentages per Episode")
-    plt.legend(fontsize=18)
-    plt.tick_params(axis="both", which="major", labelsize=16)
+    plt.legend(fontsize=36)
+    plt.tick_params(axis="both", which="major", labelsize=36)
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(

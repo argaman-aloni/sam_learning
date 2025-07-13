@@ -135,13 +135,12 @@ class MetricFFSolver(AbstractSolver):
 
 if __name__ == "__main__":
     args = sys.argv
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO
-    )
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
     solver = MetricFFSolver()
-    solver.execute_solver(
-        problems_directory_path=Path(args[1]),
-        domain_file_path=Path(args[2]),
-        problems_prefix=args[3],
+    solver.solve_problem(
+        domain_file_path=Path(args[1]),
+        problem_file_path=Path(args[2]),
+        problems_directory_path=Path(args[3]),
         solving_timeout=int(args[4]),
+        tolerance=float(args[5]),
     )
