@@ -28,6 +28,7 @@ from sam_learning.learners.semi_online_learning_algorithm import (
     OPTIMISTIC_MODEL_TYPE,
     SAFE_MODEL_TYPE,
     MAX_SUCCESSFUL_STEPS_PER_EPISODE,
+    MAX_FAILED_STEPS_PER_EPISODE,
 )
 from solvers import AbstractSolver, SolutionOutputTypes
 from utilities import LearningAlgorithmType
@@ -255,7 +256,12 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
         grounded_actions = self.agent.get_environment_actions(init_state)
         frontier = self._create_frontier(grounded_actions)
         current_state = init_state.copy()
-        while len(frontier) > 0 and step_number < num_steps_till_episode_end:
+        self.episode_step_failure_counter = 0
+        while (
+            len(frontier) > 0
+            and step_number < num_steps_till_episode_end
+            and self.episode_step_failure_counter < MAX_FAILED_STEPS_PER_EPISODE
+        ):
             self.logger.info(f"Exploring to improve the action model - exploration step {step_number + 1}.")
             action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
             self._action_last_executed_step[action.name] = step_number
@@ -265,6 +271,7 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
                 action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
                 self._action_last_executed_step[action.name] = step_number
                 self._global_step_counter += 1
+                self.episode_step_failure_counter += 1
 
             if not is_successful:
                 self.logger.debug(f"Informative search failed, trying to execute a random action to move forward.")

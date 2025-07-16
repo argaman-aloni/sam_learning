@@ -4,12 +4,10 @@ import time
 from datetime import datetime
 
 from experiments.cluster_scripts.common import (
-    submit_job,
     progress_bar,
     sigint_handler,
     get_configurations,
     get_environment_variables,
-    validate_job_running,
     create_all_experiments_folders,
     EXPERIMENTS_CONFIG_STR,
     submit_job_and_validate_execution,
@@ -18,31 +16,6 @@ from experiments.cluster_scripts.common import (
 
 signal.signal(signal.SIGINT, sigint_handler)
 learning_algorithms_map = {3: "nsam", 15: "naive_nsam", 5: "plan_miner"}
-
-
-def execute_statistics_collection_job(code_directory, configuration, environment_variables, experiment, job_ids, internal_iterations):
-    print(f"Creating the job that will collect the statistics from all the domain's experiments.")
-    filtered_sids = [sid for sid in job_ids if validate_job_running(sid) is not None]
-    statistics_collection_job = submit_job(
-        conda_env="online_nsam",
-        mem="4G",
-        python_file=f"{code_directory}/numeric_distributed_results_collector.py",
-        dependency=f"afterok:{':'.join([str(e) for e in filtered_sids])}",
-        jobname=f"collect_statistics_{experiment['domain_file_name']}",
-        suppress_output=False,
-        arguments=[
-            f"--working_directory_path {experiment['working_directory_path']}",
-            f"--domain_file_name {experiment['domain_file_name']}",
-            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            f"--num_folds {configuration['num_folds']}",
-            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
-        ],
-        environment_variables=environment_variables,
-    )
-    print(f"Submitted job with sid {statistics_collection_job}\n")
-    time.sleep(1)
-    print("Removing the temp.sbatch for the statistics collection file")
-    pathlib.Path("temp.sbatch").unlink()
 
 
 def main():
@@ -86,9 +59,6 @@ def main():
             time.sleep(5)
 
         print("Finished building the experiment folds!")
-        execute_statistics_collection_job(
-            code_directory, configurations, environment_variables, experiment, experiment_sids, internal_iterations,
-        )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 """Utility functionality for the experiments"""
+
 from pathlib import Path
 from typing import List, Union
 from typing import Optional
@@ -20,12 +21,10 @@ NUMERIC_ALGORITHMS = [
     LearningAlgorithmType.naive_polysam,
     LearningAlgorithmType.incremental_nsam,
     LearningAlgorithmType.plan_miner,
+    LearningAlgorithmType.noam_learning,
 ]
 
-MULTI_AGENT_ALGORITHMS = [
-    LearningAlgorithmType.ma_sam,
-    LearningAlgorithmType.ma_sam_plus
-]
+MULTI_AGENT_ALGORITHMS = [LearningAlgorithmType.ma_sam, LearningAlgorithmType.ma_sam_plus]
 
 
 def init_semantic_performance_calculator(

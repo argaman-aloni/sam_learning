@@ -49,6 +49,7 @@ MAX_SUCCESSFUL_STEPS_PER_EPISODE = 100
 PROBLEM_SOLVING_TIMEOUT = 60 * 5  # 300 seconds
 MIN_EPISODES_TO_PLAN = 50
 MIN_EXECUTIONS_PER_ACTION = 10  # Minimum number of executions per action to consider it partially trained
+MAX_FAILED_STEPS_PER_EPISODE = 50000
 
 random.seed(42)  # Set seed for reproducibility
 PROBLEM_NAME_REGEX = re.compile(r"trajectory_(\w+)_episode")
@@ -104,6 +105,7 @@ class SemiOnlineNumericAMLearner:
         self.undecided_failure_observations = defaultdict(list)
         self._preprocessed_traces_paths = []
         self._exploration_algorithm_type = exploration_type
+        self.episode_step_failure_counter = 0
 
     def _handle_execution_failure(
         self,
@@ -391,7 +393,11 @@ class SemiOnlineNumericAMLearner:
         grounded_actions = self.agent.get_environment_actions(init_state)
         frontier = self.sort_ground_actions_based_on_success_rate(grounded_actions)
         current_state = init_state.copy()
-        while len(frontier) > 0 and step_number < num_steps_till_episode_end:
+        while (
+            len(frontier) > 0
+            and step_number < num_steps_till_episode_end
+            and self.episode_step_failure_counter < MAX_FAILED_STEPS_PER_EPISODE
+        ):
             self.logger.info(f"Exploring to improve the action model - exploration step {step_number + 1}.")
             action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
             step_number += 1

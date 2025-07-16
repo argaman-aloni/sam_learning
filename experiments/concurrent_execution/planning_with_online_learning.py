@@ -15,7 +15,7 @@ from sam_learning.learners import NumericOnlineActionModelLearner, InformativeEx
 from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver, MetricFFSolver
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType
+from utilities import LearningAlgorithmType, NegativePreconditionPolicy
 
 MAX_SIZE_MB = 5
 
@@ -53,6 +53,7 @@ class PIL:
         self._exploration_type = exploration_type
         self._agent = None
         self._learning_algorithm = exploration_type
+        self.semantic_performance_calc = None
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
@@ -63,6 +64,30 @@ class PIL:
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
             problem_prefix=self.problems_prefix,
         )
+
+    def validate_online_model(self, fold_num: int) -> None:
+        """Learns the model of the environment by learning from the input trajectories.
+
+        :param fold_num: the index of the current folder that is currently running.
+        """
+        self._init_semantic_performance_calculator(fold_num)
+        self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
+        train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{self._learning_algorithm.value}"
+        partial_domain_path = train_set_dir_path / self.domain_file_name
+        num_training_episodes = len(list(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")))
+        partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
+        safe_domain_path = train_set_dir_path / f"{partial_domain.name}_safe_learned_domain.pddl"
+        self.logger.info("Validating the model performance of the safe model.")
+        self.semantic_performance_calc.calculate_performance(
+            safe_domain_path, num_training_episodes, policy=NegativePreconditionPolicy.no_remove
+        )
+
+        optimistic_domain_path = train_set_dir_path / f"{partial_domain.name}_optimistic_learned_domain.pddl"
+        self.logger.info("Validating the model performance of the safe model.")
+        self.semantic_performance_calc.calculate_performance(
+            optimistic_domain_path, num_training_episodes, policy=NegativePreconditionPolicy.hard
+        )
+        self.semantic_performance_calc.export_semantic_performance(fold_num, num_training_episodes)
 
     def learn_model_online(self, fold_num: int) -> None:
         """Learns the model of the environment by learning from the input trajectories.
@@ -185,6 +210,7 @@ def main():
     )
 
     learner.learn_model_online(fold_num=args.fold_number)
+    learner.validate_online_model(fold_num=args.fold_number)
 
 
 if __name__ == "__main__":
