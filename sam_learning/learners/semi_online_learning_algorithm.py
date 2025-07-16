@@ -274,6 +274,9 @@ class SemiOnlineNumericAMLearner:
             self.logger.debug("Integrating the transition data into the learned models.")
             self._add_transition_data(selected_ground_action, is_transition_successful=is_transition_successful)
 
+        if not is_transition_successful:
+            self.episode_step_failure_counter += 1
+
         return next_state, is_transition_successful
 
     def _select_action_and_execute(

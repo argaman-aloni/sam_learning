@@ -271,7 +271,6 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
                 action, is_successful, next_state = self._select_action_and_execute(current_state, frontier, problem_objects)
                 self._action_last_executed_step[action.name] = step_number
                 self._global_step_counter += 1
-                self.episode_step_failure_counter += 1
 
             if not is_successful:
                 self.logger.debug(f"Informative search failed, trying to execute a random action to move forward.")

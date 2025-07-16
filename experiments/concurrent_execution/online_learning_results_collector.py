@@ -61,6 +61,22 @@ def collect_results_for_all_algorithms(
     pivot_table.to_csv(output_path, index=False)
 
 
+def collect_sematic_performance_statistics(working_directory: Path, learning_algorithm: LearningAlgorithmType, domain_name: str) -> None:
+    """Collects semantic performance statistics for the specified learning algorithm."""
+    path_format = working_directory / "results_directory" / f"{learning_algorithm.name}_*_numeric_learning_performance_stats_fold*.csv"
+    statistics_file_paths = sorted(glob(str(path_format)))
+    fold_data = [pd.read_csv(fp) for fp in statistics_file_paths]
+
+    # Add a 'fold' column to each new DataFrame
+    for i, df in enumerate(fold_data):
+        df["fold"] = i
+
+    unified_df = pd.concat(fold_data, ignore_index=True)
+    unified_df.to_csv(
+        working_directory / "results_directory" / f"{domain_name}_{learning_algorithm.name}_combined_semantic_performance.csv", index=False
+    )
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -75,3 +91,4 @@ if __name__ == "__main__":
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     input_learning_algorithms = [LearningAlgorithmType(int(e)) for e in experiment_learning_algorithms]
     collect_results_for_all_algorithms(Path(args.working_directory), input_learning_algorithms, args.domain_name, args.output_csv)
+    collect_sematic_performance_statistics(Path(args.working_directory), LearningAlgorithmType.noam_learning, args.domain_name)
