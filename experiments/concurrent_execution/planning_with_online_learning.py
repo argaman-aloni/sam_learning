@@ -77,12 +77,20 @@ class PIL:
         num_training_episodes = len(list(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")))
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         safe_domain_path = train_set_dir_path / f"{partial_domain.name}_safe_learned_domain.pddl"
+        if not safe_domain_path.exists():
+            self.logger.error(f"The safe domain file {safe_domain_path} does not exist. Cannot validate performance.")
+            return
+
         self.logger.info("Validating the model performance of the safe model.")
         self.semantic_performance_calc.calculate_performance(
             safe_domain_path, num_training_episodes, policy=NegativePreconditionPolicy.no_remove
         )
 
         optimistic_domain_path = train_set_dir_path / f"{partial_domain.name}_optimistic_learned_domain.pddl"
+        if not optimistic_domain_path.exists():
+            self.logger.error(f"The optimistic domain file {optimistic_domain_path} does not exist. Cannot validate performance.")
+            return
+
         self.logger.info("Validating the model performance of the safe model.")
         self.semantic_performance_calc.calculate_performance(
             optimistic_domain_path, num_training_episodes, policy=NegativePreconditionPolicy.hard
