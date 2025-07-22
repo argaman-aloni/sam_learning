@@ -570,3 +570,71 @@ class OptimisticExplorer(GoalOrientedExplorer):
             optimistic_model_solution_stat=solution_status,
         )
         return goal_reached, num_steps_till_episode_end
+
+
+class InformativeSVM(NumericOnlineActionModelLearner):
+    """
+    A specialized learner that focuses on optimistic exploration in the domain.
+
+    This class extends the NumericOnlineActionModelLearner to implement an optimistic
+    exploration strategy, allowing for targeted learning and refinement of action models
+    based on optimistic assumptions within the domain.
+    """
+
+    def __init__(
+        self,
+        workdir: Path,
+        partial_domain: Domain,
+        polynomial_degree: int = 0,
+        agent: AbstractAgent = None,
+        solvers: List[AbstractSolver] = None,
+        episode_recorder: EpisodeInfoRecord = None,
+        exploration_type: LearningAlgorithmType = LearningAlgorithmType.optimistic_explorer,
+    ):
+        super().__init__(
+            workdir=workdir,
+            partial_domain=partial_domain,
+            polynomial_degree=polynomial_degree,
+            agent=agent,
+            solvers=solvers,
+            exploration_type=exploration_type,
+            episode_recorder=episode_recorder,
+        )
+
+    def try_to_solve_problem(
+        self, problem_path: Path, num_steps_till_episode_end: int = MAX_SUCCESSFUL_STEPS_PER_EPISODE
+    ) -> Tuple[bool, int]:
+        """Tries to solve the problem using the current domain.
+
+        :param problem_path: the path to the problem to solve.
+        :param num_steps_till_episode_end: the number of steps to take until the end of the episode.
+        :return: whether the goal was reached and the number of steps taken to solve the problem.
+        """
+        self.logger.info("Trying to solve the problem.")
+        if self._solvers is None:
+            raise ValueError("No solver was provided to the learner.")
+
+        self.logger.info("Trying to solve the problem using the optimistic action model.")
+        problem = ProblemParser(problem_path=problem_path, domain=self.partial_domain).parse_problem()
+        initial_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
+        solution_status, trace_length, _ = self._construct_model_and_solve_problem(
+            OPTIMISTIC_MODEL_TYPE, problem_path, init_state=initial_state
+        )
+        if solution_status == SolutionOutputTypes.ok:
+            self.episode_recorder.end_episode(
+                problem_name=problem_path.stem,
+                goal_reached=True,
+                has_solved_solver_problem=True,
+                optimistic_model_solution_stat=solution_status.name,
+                export_trajectory=False,
+            )
+            return True, trace_length
+
+        goal_reached, solver_reached_goal, num_steps_till_episode_end = self._explore_and_terminate_episode(
+            initial_state=initial_state,
+            problem_path=problem_path,
+            num_steps_till_episode_end=num_steps_till_episode_end,
+            problem_objects=problem.objects,
+            optimistic_model_solution_stat=solution_status,
+        )
+        return goal_reached, num_steps_till_episode_end

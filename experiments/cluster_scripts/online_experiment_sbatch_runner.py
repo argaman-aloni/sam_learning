@@ -22,6 +22,7 @@ learning_algorithms_map = {
     18: "goal_oriented",
     20: "semi_online",
     21: "optimistic_explorer",
+    22: "informative_svm",
 }
 
 

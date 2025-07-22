@@ -552,6 +552,24 @@ def test_explore_to_refine_models_changes_the_models_after_long_episode_is_done_
     print("Optimistic model:\n", optimistic_model.to_pddl())
 
 
+def test_explore_to_refine_models_does_not_exceed_the_maximal_number_of_failed_steps(
+    depot_noam_informative_explorer: NumericOnlineActionModelLearner,
+    depot_problem: Problem,
+    depot_domain: Domain,
+    depot_numeric_agent: IPCAgent,
+):
+    depot_numeric_agent.initialize_problem(depot_problem)
+    initial_state = State(predicates=depot_problem.initial_state_predicates, fluents=depot_problem.initial_state_fluents)
+
+    depot_noam_informative_explorer.initialize_learning_algorithms()
+    depot_noam_informative_explorer.explore_to_refine_models(
+        init_state=initial_state,
+        num_steps_till_episode_end=100,
+        problem_objects=depot_problem.objects,
+    )
+    assert depot_noam_informative_explorer.episode_step_failure_counter <= 50000
+
+
 def test_explore_to_refine_models_when_domain_is_only_numeric_able_to_learn_non_empty_domain_that_reaches_goal_or_max_steps(
     counters_noam_informative_explorer: NumericOnlineActionModelLearner,
     counters_problem: Problem,

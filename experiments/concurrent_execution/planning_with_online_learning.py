@@ -12,6 +12,7 @@ from pddl_plus_parser.models import State
 from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners import NumericOnlineActionModelLearner, InformativeExplorer, GoalOrientedExplorer, OptimisticExplorer
+from sam_learning.learners.noam_algorithm import InformativeSVM
 from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver, MetricFFSolver
 from statistics.utils import init_semantic_performance_calculator
@@ -26,6 +27,7 @@ LEARNING_ALGORITHMS = {
     LearningAlgorithmType.informative_explorer: InformativeExplorer,
     LearningAlgorithmType.goal_oriented_explorer: GoalOrientedExplorer,
     LearningAlgorithmType.optimistic_explorer: OptimisticExplorer,
+    LearningAlgorithmType.informative_svm: InformativeSVM,
 }
 
 
@@ -168,7 +170,7 @@ def parse_arguments() -> argparse.Namespace:
         required=False,
         help="The type of learning algorithm to use for the numeric action model learning.",
         type=int,
-        choices=[20, 14, 17, 18, 21],
+        choices=[20, 14, 17, 18, 21, 22],
         default=20,
     )
     parser.add_argument("--debug", required=False, help="Whether in debug mode.", type=bool, default=False)
