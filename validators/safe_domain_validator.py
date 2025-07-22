@@ -1,4 +1,5 @@
 """Module to validate the correctness of the learned action models that were generated."""
+
 import csv
 import logging
 import re
@@ -68,7 +69,7 @@ VALIDATED_AGAINST_EXPERT_PLAN = "validated_against_expert_plan"
 NOT_VALIDATED_AGAINST_EXPERT_PLAN = "not_validated_against_expert_plan"
 
 NUMERIC_STATISTICS_LABELS = [
-    *[solution_type.name for solution_type in SolutionOutputTypes],
+    *[solution_type.name for solution_type in SolutionOutputTypes if solution_type != SolutionOutputTypes.irrelevant],
     VALIDATED_AGAINST_EXPERT_PLAN,
     NOT_VALIDATED_AGAINST_EXPERT_PLAN,
 ]
@@ -94,7 +95,11 @@ class DomainValidator:
     problem_prefix: str
 
     def __init__(
-        self, working_directory_path: Path, learning_algorithm: LearningAlgorithmType, reference_domain_path: Path, problem_prefix: str = "pfile",
+        self,
+        working_directory_path: Path,
+        learning_algorithm: LearningAlgorithmType,
+        reference_domain_path: Path,
+        problem_prefix: str = "pfile",
     ):
         self.logger = logging.getLogger(__name__)
         self.solving_stats = []
@@ -115,7 +120,11 @@ class DomainValidator:
             solver_output_path.unlink(missing_ok=True)
 
     def _validate_against_expert_plan(
-        self, solution_file_path: Path, problem_file_path: Path, iteration_statistics: Dict[str, Union[int, List[str]]], tested_domain_path: Path
+        self,
+        solution_file_path: Path,
+        problem_file_path: Path,
+        iteration_statistics: Dict[str, Union[int, List[str]]],
+        tested_domain_path: Path,
     ) -> None:
         """Validates that the expert solution can be used against the learned domain.
 
@@ -202,7 +211,9 @@ class DomainValidator:
 
         :param solving_stats: the solving statistics.
         """
-        total_validated = sum([solving_stats[statistic] for statistic in [VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]])
+        total_validated = sum(
+            [solving_stats[statistic] for statistic in [VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]]
+        )
         total_validated = total_validated if total_validated > 0 else 1
 
         for statistic in [VALIDATED_AGAINST_EXPERT_PLAN, NOT_VALIDATED_AGAINST_EXPERT_PLAN]:
@@ -235,7 +246,9 @@ class DomainValidator:
         new_lines = []
         for line in lines:
             extracted_lines = MacroActionParser.extract_actions_from_macro_action(action_line=line, mapper=mapping)
-            new_lines.extend([extracted_line if extracted_line.endswith("\n") else f"{extracted_line}\n" for extracted_line in extracted_lines])
+            new_lines.extend(
+                [extracted_line if extracted_line.endswith("\n") else f"{extracted_line}\n" for extracted_line in extracted_lines]
+            )
 
         with open(solution_path, "w") as file:
             file.writelines(new_lines)
