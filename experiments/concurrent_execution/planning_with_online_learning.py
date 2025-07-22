@@ -16,7 +16,8 @@ from sam_learning.learners.noam_algorithm import InformativeSVM
 from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver, MetricFFSolver
 from statistics.utils import init_semantic_performance_calculator
-from utilities import LearningAlgorithmType, NegativePreconditionPolicy
+from utilities import LearningAlgorithmType, NegativePreconditionPolicy, SolverType
+from validators import DomainValidator
 
 MAX_SIZE_MB = 5
 
@@ -56,6 +57,12 @@ class PIL:
         self._agent = None
         self._learning_algorithm = exploration_type
         self.semantic_performance_calc = None
+        self.domain_validator = DomainValidator(
+            self.working_directory_path,
+            exploration_type,
+            self.working_directory_path / domain_file_name,
+            problem_prefix=problem_prefix,
+        )
 
     def _init_semantic_performance_calculator(self, fold_num: int) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
@@ -75,6 +82,7 @@ class PIL:
         self._init_semantic_performance_calculator(fold_num)
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{self._learning_algorithm.value}"
+        test_set_dir_path = self.working_directory_path / "test" / f"fold_{fold_num}_{self._learning_algorithm.value}"
         partial_domain_path = train_set_dir_path / self.domain_file_name
         num_training_episodes = len(list(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")))
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
@@ -87,7 +95,16 @@ class PIL:
         self.semantic_performance_calc.calculate_performance(
             safe_domain_path, num_training_episodes, policy=NegativePreconditionPolicy.no_remove
         )
-
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=safe_domain_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=list(train_set_dir_path.glob(f"{self.problems_prefix}*.trajectory")),
+            tolerance=0.1,
+            timeout=300,
+            learning_time=0,
+            solvers_portfolio=[SolverType.metric_ff, SolverType.enhsp],
+            preconditions_removal_policy=NegativePreconditionPolicy.no_remove,
+        )
         optimistic_domain_path = train_set_dir_path / f"{partial_domain.name}_optimistic_learned_domain.pddl"
         if not optimistic_domain_path.exists():
             self.logger.error(f"The optimistic domain file {optimistic_domain_path} does not exist. Cannot validate performance.")
@@ -97,7 +114,23 @@ class PIL:
         self.semantic_performance_calc.calculate_performance(
             optimistic_domain_path, num_training_episodes, policy=NegativePreconditionPolicy.hard
         )
+
+        for solution_file_path in test_set_dir_path.glob("*.solution"):
+            solution_file_path.unlink()
+
+        self.domain_validator.validate_domain(
+            tested_domain_file_path=optimistic_domain_path,
+            test_set_directory_path=test_set_dir_path,
+            used_observations=list(train_set_dir_path.glob(f"{self.problems_prefix}*.trajectory")),
+            tolerance=0.1,
+            timeout=300,
+            learning_time=0,
+            solvers_portfolio=[SolverType.metric_ff, SolverType.enhsp],
+            preconditions_removal_policy=NegativePreconditionPolicy.no_remove,
+        )
+
         self.semantic_performance_calc.export_semantic_performance(fold_num, num_training_episodes)
+        self.domain_validator.write_statistics(fold_num, num_training_episodes)
 
     def learn_model_online(self, fold_num: int) -> None:
         """Learns the model of the environment by learning from the input trajectories.
