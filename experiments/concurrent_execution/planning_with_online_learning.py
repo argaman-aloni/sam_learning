@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import State
+from typing import Tuple
 
 from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning.online_utilities import (
@@ -79,14 +80,21 @@ class PIL:
             problem_prefix=self.problems_prefix,
         )
 
-    def construct_domains_for_evaluation(self, online_algorithm: SemiOnlineNumericAMLearner) -> None:
+    def construct_domains_for_evaluation(self, fold_num: int, online_algorithm: SemiOnlineNumericAMLearner) -> Tuple[Path, Path]:
+        """
+
+        :param fold_num: the index of the current folder that is currently running.
+        :param online_algorithm:
+        :return:
+        """
+        workdir = self.working_directory_path / "train" / f"fold_{fold_num}_{self._learning_algorithm.value}"
         model = construct_safe_action_model(
             partial_domain=online_algorithm.partial_domain,
             discrete_models_learners=online_algorithm._discrete_models_learners,
             numeric_models_learners=online_algorithm._numeric_models_learners,
         )
-        export_learned_domain(
-            workdir=self.working_directory_path / "train",
+        safe_domain_path = export_learned_domain(
+            workdir=workdir,
             partial_domain=online_algorithm.partial_domain,
             learned_domain=model,
             is_safe_model=True,
@@ -97,14 +105,16 @@ class PIL:
             numeric_models_learners=online_algorithm._numeric_models_learners,
         )
 
-        export_learned_domain(
-            workdir=self.working_directory_path / "train",
+        optimistic_domain_path = export_learned_domain(
+            workdir=workdir,
             partial_domain=online_algorithm.partial_domain,
             learned_domain=model,
             is_safe_model=False,
         )
 
-    def validate_test_set_solving_rates(self, fold_num: int) -> None:
+        return safe_domain_path, optimistic_domain_path
+
+    def validate_test_set_solving_rates(self, fold_num: int, safe_domain_path: Path, optimistic_domain_path: Path) -> None:
         """
 
         :param fold_num:
@@ -113,12 +123,9 @@ class PIL:
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{self._learning_algorithm.value}"
         test_set_dir_path = self.working_directory_path / "test" / f"fold_{fold_num}_{self._learning_algorithm.value}"
-        partial_domain_path = train_set_dir_path / self.domain_file_name
         num_training_episodes = len(list(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")))
-        partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        safe_domain_path = train_set_dir_path / f"{partial_domain.name}_safe_learned_domain.pddl"
-        if not safe_domain_path.exists():
-            self.logger.error(f"The safe domain file {safe_domain_path} does not exist. Cannot validate performance.")
+        if not safe_domain_path.exists() or not optimistic_domain_path.exists():
+            self.logger.error(f"One of the domains does not exist. Skipping model validation.")
             return
 
         self.domain_validator.validate_domain(
@@ -131,10 +138,6 @@ class PIL:
             solvers_portfolio=[SolverType.metric_ff, SolverType.enhsp],
             preconditions_removal_policy=NegativePreconditionPolicy.no_remove,
         )
-        optimistic_domain_path = train_set_dir_path / f"{partial_domain.name}_optimistic_learned_domain.pddl"
-        if not optimistic_domain_path.exists():
-            self.logger.error(f"The optimistic domain file {optimistic_domain_path} does not exist. Cannot validate performance.")
-            return
 
         for solution_file_path in test_set_dir_path.glob("*.solution"):
             solution_file_path.unlink()
@@ -152,7 +155,7 @@ class PIL:
 
         self.domain_validator.write_statistics(fold_num, num_training_episodes)
 
-    def validate_online_model(self, fold_num: int) -> None:
+    def validate_online_model(self, fold_num: int, safe_domain_path: Path, optimistic_domain_path: Path) -> None:
         """Learns the model of the environment by learning from the input trajectories.
 
         :param fold_num: the index of the current folder that is currently running.
@@ -160,23 +163,15 @@ class PIL:
         self._init_semantic_performance_calculator(fold_num)
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         train_set_dir_path = self.working_directory_path / "train" / f"fold_{fold_num}_{self._learning_algorithm.value}"
-        partial_domain_path = train_set_dir_path / self.domain_file_name
         num_training_episodes = len(list(train_set_dir_path.glob(f"{self.problems_prefix}*.pddl")))
-        partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        safe_domain_path = train_set_dir_path / f"{partial_domain.name}_safe_learned_domain.pddl"
-        if not safe_domain_path.exists():
-            self.logger.error(f"The safe domain file {safe_domain_path} does not exist. Cannot validate performance.")
+        if not safe_domain_path.exists() or not optimistic_domain_path.exists():
+            self.logger.error(f"One of the domains does not exist. Skipping model validation.")
             return
 
         self.logger.info("Validating the model performance of the safe model.")
         self.semantic_performance_calc.calculate_performance(
             safe_domain_path, num_training_episodes, policy=NegativePreconditionPolicy.no_remove
         )
-
-        optimistic_domain_path = train_set_dir_path / f"{partial_domain.name}_optimistic_learned_domain.pddl"
-        if not optimistic_domain_path.exists():
-            self.logger.error(f"The optimistic domain file {optimistic_domain_path} does not exist. Cannot validate performance.")
-            return
 
         self.logger.info("Validating the model performance of the safe model.")
         self.semantic_performance_calc.calculate_performance(
@@ -298,18 +293,28 @@ def configure_logger(args: argparse.Namespace):
 def main():
     args = parse_arguments()
     configure_logger(args)
+    tested_algorithm = LearningAlgorithmType(args.learning_algorithm)
     learner = PIL(
         working_directory_path=Path(args.working_directory_path),
         domain_file_name=args.domain_file_name,
         problem_prefix=args.problems_prefix,
         polynomial_degree=0,  # Assuming linear models for simplicity
-        exploration_type=LearningAlgorithmType(args.learning_algorithm),
+        exploration_type=tested_algorithm,
     )
 
     online_algorithm = learner.learn_model_online(fold_num=args.fold_number)
-    learner.construct_domains_for_evaluation(online_algorithm=online_algorithm)
-    learner.validate_online_model(fold_num=args.fold_number)
-    learner.validate_online_model(fold_num=args.fold_number)
+    if tested_algorithm not in [LearningAlgorithmType.noam_learning, LearningAlgorithmType.informative_svm]:
+        return
+
+    safe_domain_path, optimistic_domain_path = learner.construct_domains_for_evaluation(
+        fold_num=args.fold_number, online_algorithm=online_algorithm
+    )
+    learner.validate_online_model(
+        fold_num=args.fold_number, safe_domain_path=safe_domain_path, optimistic_domain_path=optimistic_domain_path
+    )
+    learner.validate_online_model(
+        fold_num=args.fold_number, safe_domain_path=safe_domain_path, optimistic_domain_path=optimistic_domain_path
+    )
 
 
 if __name__ == "__main__":
