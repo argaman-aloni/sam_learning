@@ -303,7 +303,7 @@ def main():
     )
 
     online_algorithm = learner.learn_model_online(fold_num=args.fold_number)
-    if tested_algorithm not in [LearningAlgorithmType.noam_learning, LearningAlgorithmType.informative_svm]:
+    if tested_algorithm not in [LearningAlgorithmType.noam_learning, LearningAlgorithmType.goal_oriented_explorer]:
         return
 
     safe_domain_path, optimistic_domain_path = learner.construct_domains_for_evaluation(
