@@ -312,7 +312,7 @@ def main():
     learner.validate_online_model(
         fold_num=args.fold_number, safe_domain_path=safe_domain_path, optimistic_domain_path=optimistic_domain_path
     )
-    learner.validate_online_model(
+    learner.validate_test_set_solving_rates(
         fold_num=args.fold_number, safe_domain_path=safe_domain_path, optimistic_domain_path=optimistic_domain_path
     )
 
