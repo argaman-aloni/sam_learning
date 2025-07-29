@@ -150,7 +150,7 @@ class PIL:
             timeout=300,
             learning_time=0,
             solvers_portfolio=[SolverType.metric_ff, SolverType.enhsp],
-            preconditions_removal_policy=NegativePreconditionPolicy.no_remove,
+            preconditions_removal_policy=NegativePreconditionPolicy.hard,
         )
 
         self.domain_validator.write_statistics(fold_num, num_training_episodes)
