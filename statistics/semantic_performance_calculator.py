@@ -178,7 +178,9 @@ class SemanticPerformanceCalculator:
         for observation_triplet in observation.components:
             model_previous_state = observation_triplet.previous_state
             executed_action = observation_triplet.grounded_action_call
-            model_pre_state_predicates = model_snapshot._create_state_discrete_snapshot(model_previous_state, observation.grounded_objects)
+            model_pre_state_predicates = model_snapshot._create_state_discrete_snapshot(
+                model_previous_state, {**observation.grounded_objects, **self.model_domain.constants}
+            )
             if executed_action.name not in learned_domain.actions:
                 continue
 
@@ -200,13 +202,15 @@ class SemanticPerformanceCalculator:
                     learned_next_state = learned_operator.apply(model_previous_state)
                     model_next_state = model_operator.apply(learned_next_state)
 
-                except [ValueError, ZeroDivisionError]:
+                except (ValueError, ZeroDivisionError):
                     continue
 
                 self.logger.debug("Validating if there are any false negatives.")
-                model_next_state_predicates = model_snapshot._create_state_discrete_snapshot(model_next_state, observation.grounded_objects)
+                model_next_state_predicates = model_snapshot._create_state_discrete_snapshot(
+                    model_next_state, {**observation.grounded_objects, **self.model_domain.constants}
+                )
                 learned_next_state_predicates = learned_snapshot._create_state_discrete_snapshot(
-                    learned_next_state, observation.grounded_objects
+                    learned_next_state, {**observation.grounded_objects, **self.model_domain.constants}
                 )
                 model_effects = {predicate for predicate in model_next_state_predicates.difference(model_pre_state_predicates)}
                 learned_effects = {predicate for predicate in learned_next_state_predicates.difference(model_pre_state_predicates)}

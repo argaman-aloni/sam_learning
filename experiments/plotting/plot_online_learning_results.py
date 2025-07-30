@@ -17,7 +17,6 @@ def plot_online_learning_statistics(
     """Plots the statistics of model solution statuses per episode."""
     averaged = unified_df.groupby("episode_number")[["not_solved", "optimistic_not_applicable", "optimistic_solved", "safe_solved"]].mean()
     smoothed = averaged.rolling(window=5, min_periods=1, center=True).mean()
-    categories = ["Not Solved", "SVR-AM Inapplicable", "SVR-AM Solved", "NSAM Solved"]
     # Plotting the graph
     fig, ax = plt.subplots(figsize=(12, 8))
     stacks = ax.stackplot(

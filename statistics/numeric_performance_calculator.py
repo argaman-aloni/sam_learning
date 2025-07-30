@@ -55,6 +55,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         :param learned_domain: the domain that was learned by the action model learning algorithm.
         :return: a mapping between the action name and its MSE value.
         """
+        self.logger.info("Calculating the effects MSE for the learned domain.")
         squared_errors = defaultdict(list)
         mse_values = {action_name: 0 for action_name in learned_domain.actions.keys()}
         for observation in self.dataset_observations:
