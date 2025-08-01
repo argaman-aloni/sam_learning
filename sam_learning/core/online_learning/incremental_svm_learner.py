@@ -122,9 +122,6 @@ class IncrementalSVMLearner:
         no_label_columns = self.data.dropna(axis=1).drop(columns=[LABEL_COLUMN])
         X_reminder, y_reminder = no_label_columns.to_numpy(), self.data[LABEL_COLUMN]
         for i in range(MAX_ALLOWED_CONDITIONS):
-            if len(X_reminder) <= MIN_ALLOWED_UNRESOLVED_POINTS:
-                self.logger.debug(f"The number of points to classify - {len(X_reminder)} is less than the minimum allowed points.")
-                break
             if len(y_reminder.unique()) <= 1:
                 self.logger.debug("Remaining points have only one label cannot continue running SVM.")
                 break
