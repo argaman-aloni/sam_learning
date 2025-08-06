@@ -1,4 +1,5 @@
 """An agent for the active learning of IPC models"""
+
 import logging
 from typing import Dict, Set, Tuple, List
 
@@ -32,7 +33,9 @@ class IPCAgent(AbstractAgent):
         self._problem = None
         self._vocabulary_creator = VocabularyCreator()
 
-    def _assign_state_fluent_value(self, state_fluents: Dict[str, PDDLFunction], goal_required_expressions: Set[NumericalExpressionTree]) -> None:
+    def _assign_state_fluent_value(
+        self, state_fluents: Dict[str, PDDLFunction], goal_required_expressions: Set[NumericalExpressionTree]
+    ) -> None:
         """Assigns the values of the state fluents to later verify if the goal was achieved.
 
         :param state_fluents: the state fluents to be assigned to the goal expressions.
@@ -104,7 +107,7 @@ class IPCAgent(AbstractAgent):
         :param state: the state to be evaluated.
         :return: whether the goal has been reached.
         """
-        self.logger.info("Evaluating the reward for the state %s.", state.serialize())
+        self.logger.info("Evaluating the reward for the state %s", state.serialize())
         goal_predicates = {p.untyped_representation for p in self._problem.goal_state_predicates}
         goal_fluents = self._problem.goal_state_fluents
 
@@ -121,24 +124,27 @@ class IPCAgent(AbstractAgent):
         self.logger.debug("Goal has not been reached according to the IPC agent.")
         return False
 
-    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool]:
+    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool, bool]:
         """Executes a plan in the environment and returns the trace created from the plan, and whether using the plan's
         actions the goal was reached.
 
         :param plan: the plan to be executed.
-        :return: The trace created from the plan and whether the goal was reached.
+        :return: The trace created from the plan and whether the goal was reached amd whether the plan was successful
         """
         self.logger.info("Executing the plan %s.", ", ".join([str(action) for action in plan]))
         trace = Observation()
         trace.add_problem_objects(self._problem.objects)
+        plan_applicable = True
         current_state = State(predicates=self._problem.initial_state_predicates, fluents=self._problem.initial_state_fluents)
         for index, action in enumerate(plan):
             next_state, is_successful, reward = self.observe(current_state, action)
             trace.add_component(previous_state=current_state, next_state=next_state, call=action, is_successful_transition=is_successful)
             current_state = next_state
             if not is_successful:
-                self.logger.debug(f"Could not apply the action {str(action)} to the state, the plan was inapplicable in step {index + 1}.")
+                self.logger.info(f"Could not apply the action {str(action)} to the state, the plan was inapplicable in step {index + 1}.")
+                plan_applicable = False
                 break
 
         is_goal_reached = self.goal_reached(current_state)
-        return trace, is_goal_reached
+        self.logger.info(f"The plan execution finished with goal reached: {is_goal_reached}.")
+        return trace, is_goal_reached, plan_applicable

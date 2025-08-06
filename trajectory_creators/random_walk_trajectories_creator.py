@@ -1,4 +1,5 @@
 """Creates the trajectories that will be used in the trajectory"""
+
 import logging
 import random
 import shutil
@@ -13,8 +14,8 @@ from pddl_plus_parser.models import PDDLObject, Domain, ActionCall, Problem, Sta
 from sam_learning.core import VocabularyCreator
 from utilities import SolverType
 
-MAX_NUM_STEPS_IN_TRAJECTORY = 200
-inapplicable_action_probability = 0.25
+MAX_NUM_STEPS_IN_TRAJECTORY = 500
+inapplicable_action_probability = 0.4
 random.seed(42)
 
 
@@ -95,7 +96,9 @@ class RandomWalkTrajectoriesCreator:
         next_state = operator.apply(current_state, skip_validation=True)
         return operator, next_state
 
-    def create_random_plan(self, domain: Domain, problem: Problem, grounded_actions: Set[ActionCall]) -> Tuple[List[TrajectoryTriplet], List[str]]:
+    def create_random_plan(
+        self, domain: Domain, problem: Problem, grounded_actions: Set[ActionCall]
+    ) -> Tuple[List[TrajectoryTriplet], List[str]]:
         """Creates a random trajectory from the input domain and problem by randomly executing actions.
 
         :param domain: The domain that contain the actions to execute.

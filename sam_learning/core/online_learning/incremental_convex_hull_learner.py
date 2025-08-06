@@ -113,6 +113,10 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         :return: whether the new point is spanned by the base.
         """
         shifted_sample = self._shift_new_point(point)
+        if len(self._gsp_base) > 0 and len(list(shifted_sample)) != len(self._gsp_base[0]):
+            self.logger.debug("The new point is not spanned by the base, the dimensions do not match.")
+            return False
+
         return len(extended_gram_schmidt([list(shifted_sample)], self._gsp_base)) == 0
 
     def _learn_new_bases(self) -> None:
@@ -129,21 +133,16 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
             self._gsp_base = [list(vector) for vector in np.eye(self.affine_independent_data.shape[1])]
             self._spanning_standard_base = True
 
-    def _learn_new_convex_hull(self, incremental: bool = True) -> None:
+    def _learn_new_convex_hull(self) -> None:
         """Learns the convex hull of the points in the storage dataframe.
 
-        :param incremental: whether to use the incremental convex hull algorithm.
         :return: the convex hull of the points in the storage dataframe.
         """
-        if self._convex_hull is not None:
-            self._convex_hull.close()
-            self._convex_hull = None
-
         self.logger.debug("Creating the convex hull for the first time (or in case that the base had changed).")
         points = self.affine_independent_data.to_numpy()
         shift_axis = points[0].tolist() if not self._spanning_standard_base else [0] * len(self.affine_independent_data.columns.tolist())
         projected_points = np.dot(points - shift_axis, np.array(self._gsp_base).T)
-        self._convex_hull = self._epsilon_approximate_hull(points=projected_points, incremental=incremental)
+        self._convex_hull = self._epsilon_approximate_hull(points=projected_points)
 
     def _calculate_basis_and_hull(self, from_reset: bool = False) -> None:
         """Calculates the basis and the convex hull of the points in the storage dataframe."""
@@ -169,17 +168,12 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         if not self._is_spanned_in_base(self.affine_independent_data.iloc[-1]):
             self.logger.debug("New point is not spanned by base. Relearning base and CH.")
             self._learn_new_bases()
-            if len(self._gsp_base) <= 1:
-                self.logger.debug("New base is 1D or empty. Cannot form a convex hull.")
-                return
 
-            self._learn_new_convex_hull()
+        if len(self._gsp_base) <= 1:
+            self.logger.debug("New base is 1D or empty. Cannot form a convex hull.")
             return
 
-        if self._convex_hull is not None:
-            # If reached here - the point is spanned by the base and the convex hull is not None
-            projected_point = np.dot(self._shift_new_point(self.affine_independent_data.iloc[-1]), np.array(self._gsp_base).T)
-            self._convex_hull.add_points([projected_point])
+        self._learn_new_convex_hull()
 
     def add_new_point(self, point: Dict[str, float]) -> None:
         """Adds a new point to the convex hull learner.
@@ -371,10 +365,9 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         self._convex_hull = None
         self._calculate_basis_and_hull(from_reset=True)
 
-    def copy(self, one_shot: bool = False) -> "IncrementalConvexHullLearner":
+    def copy(self) -> "IncrementalConvexHullLearner":
         """Creates a copy of the current object.
 
-        :param one_shot: whether to create a one-shot copy of the covex hull.
         :return: a copy of the current object.
         """
         new_learner = IncrementalConvexHullLearner(
@@ -396,7 +389,7 @@ class IncrementalConvexHullLearner(ConvexHullLearner):
         new_learner._complementary_base = self._complementary_base.copy() if self._complementary_base is not None else None
         new_learner._spanning_standard_base = self._spanning_standard_base
         if self._convex_hull is not None:
-            new_learner._learn_new_convex_hull(incremental=not one_shot)
+            new_learner._learn_new_convex_hull()
 
         return new_learner
 

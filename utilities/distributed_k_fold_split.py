@@ -159,6 +159,7 @@ class DistributedKFoldSplit:
         :param max_items: the maximum number of items to be used in the train and test set together.
         :param load_configuration: whether to load folds settings from the configuration file.
         :param should_ignore_internal_iterations: whether to ignore the internal iterations in the folds settings.
+            (for experiments without internal iterations)
         :return: a generator for the train and test set directories.
         """
         self.logger.info("Starting to create the folds for the cross validation process.")

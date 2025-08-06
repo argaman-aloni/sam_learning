@@ -177,9 +177,9 @@ class OnlineNumericModelLearner:
         sample_dataset = create_grounded_monomials(self._monomials, state)
         return self._convex_hull_learner.is_point_in_convex_hull(Series({func_name: val for func_name, val in sample_dataset.items()}))
 
-    def copy_convex_hull_learner(self, one_shot: bool) -> IncrementalConvexHullLearner:
+    def copy_convex_hull_learner(self) -> IncrementalConvexHullLearner:
         """Returns a copy of the convex hull learner.
 
         :return: a copy of the convex hull learner.
         """
-        return self._convex_hull_learner.copy(one_shot)
+        return self._convex_hull_learner.copy()

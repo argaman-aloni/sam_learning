@@ -127,9 +127,7 @@ def test_observe_on_state_with_inapplicable_action_returns_the_same_state_as_bef
     assert not is_applicable
 
 
-def test_get_environment_actions_gets_the_correct_number_of_grounded_actions(
-    minecraft_agent: IPCAgent, minecraft_large_problem: Problem
-):
+def test_get_environment_actions_gets_the_correct_number_of_grounded_actions(minecraft_agent: IPCAgent, minecraft_large_problem: Problem):
     # Arrange
     state_predicates = minecraft_large_problem.initial_state_predicates
     state_fluents = minecraft_large_problem.initial_state_fluents
@@ -149,10 +147,11 @@ def test_execute_plan_when_plan_is_valid_and_goal_was_reached_returns_trace_of_s
     plan = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))
 
     # Act
-    trace, goal_reached = depot_numeric_agent.execute_plan(plan)
+    trace, goal_reached, plan_applicable = depot_numeric_agent.execute_plan(plan)
 
     # Assert
     assert len(trace) == len(plan)
+    assert plan_applicable
     assert goal_reached
     assert all([component.is_successful for component in trace.components])
 
@@ -166,11 +165,12 @@ def test_execute_plan_when_plan_is_valid_but_last_action_does_not_reach_goal_ret
     plan = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))
 
     # Act
-    trace, goal_reached = depot_numeric_agent.execute_plan(plan[:-1])
+    trace, goal_reached, plan_applicable = depot_numeric_agent.execute_plan(plan[:-1])
 
     # Assert
     assert len(trace) == len(plan) - 1
     assert not goal_reached
+    assert plan_applicable
     assert all([component.is_successful for component in trace.components])
 
 
@@ -185,25 +185,24 @@ def test_execute_plan_when_plan_contains_invalid_action_returns_trace_with_lengt
     plan[9] = test_failing_action
 
     # Act
-    trace, goal_reached = depot_numeric_agent.execute_plan(plan)
+    trace, goal_reached, plan_applicable = depot_numeric_agent.execute_plan(plan)
 
     # Assert
     assert len(trace) == 10
     assert not goal_reached
+    assert not plan_applicable
     assert all([component.is_successful for component in trace.components[:-1]])
     assert trace.components[-1].is_successful is False
 
 
-def test_execute_plan_adds_problem_objects_to_trace_when_trace_created(
-    depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain
-):
+def test_execute_plan_adds_problem_objects_to_trace_when_trace_created(depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain):
     # Arrange
     problem = ProblemParser(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM, domain=depot_numeric_domain).parse_problem()
     depot_numeric_agent.initialize_problem(problem)
     plan = create_plan_actions(Path(DEPOT_ONLINE_LEARNING_PLAN))
 
     # Act
-    trace, goal_reached = depot_numeric_agent.execute_plan(plan)
+    trace, goal_reached, plan_applicable = depot_numeric_agent.execute_plan(plan)
 
     # Assert
     assert len(trace.grounded_objects) > 0
@@ -213,9 +212,7 @@ def test_goal_reached_when_goal_is_only_numeric_correctly_evaluates_that_goal_wa
     depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain
 ):
     # Arrange
-    problem = ProblemParser(
-        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL, domain=depot_numeric_domain
-    ).parse_problem()
+    problem = ProblemParser(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL, domain=depot_numeric_domain).parse_problem()
     depot_numeric_agent.initialize_problem(problem)
     state_predicates = problem.initial_state_predicates
     state_fluents = problem.initial_state_fluents
@@ -229,9 +226,7 @@ def test_goal_reached_when_goal_is_only_numeric_and_goal_fluents_not_matching_go
     depot_numeric_agent: IPCAgent, depot_numeric_domain: Domain
 ):
     # Arrange
-    problem = ProblemParser(
-        problem_path=DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL, domain=depot_numeric_domain
-    ).parse_problem()
+    problem = ProblemParser(problem_path=DEPOT_ONLINE_LEARNING_PROBLEM_WITH_NUMERIC_GOAL, domain=depot_numeric_domain).parse_problem()
     depot_numeric_agent.initialize_problem(problem)
     state_predicates = problem.initial_state_predicates
     state_fluents = problem.initial_state_fluents

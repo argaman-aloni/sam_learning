@@ -68,24 +68,35 @@ def validate_job_running(sid: int):
 
 
 def setup_experiments_folds_job(
-    code_directory, environment_variables, experiment, internal_iterations, experiment_size, should_create_random_trajectories: bool = True
+    code_directory,
+    environment_variables,
+    experiment,
+    internal_iterations,
+    experiment_size,
+    should_create_random_trajectories: bool = True,
+    should_create_internal_iterations: bool = True,
 ):
     print(f"Working on the experiment with domain {experiment['domain_file_name']}\n")
+    arguments = [
+        f"--working_directory_path {experiment['working_directory_path']}",
+        f"--domain_file_name {experiment['domain_file_name']}",
+        f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
+        (
+            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}"
+            if should_create_internal_iterations
+            else "--ignore_internal_iterations"
+        ),
+        f"--problem_prefix {experiment['problems_prefix']}",
+        f"--experiment_size {experiment_size}",
+        f"--no_random_trajectories" if not should_create_random_trajectories else "",
+    ]
     fold_creation_sid = submit_job(
         conda_env="online_nsam",
         mem="4G",
         python_file=f"{code_directory}/folder_creation_for_parallel_execution.py",
         jobname=f"create_folds_job_{experiment['domain_file_name']}",
         suppress_output=False,
-        arguments=[
-            f"--working_directory_path {experiment['working_directory_path']}",
-            f"--domain_file_name {experiment['domain_file_name']}",
-            f"--learning_algorithms {','.join([str(e) for e in experiment['compared_versions']])}",
-            f"--internal_iterations {','.join([str(e) for e in internal_iterations])}",
-            f"--problem_prefix {experiment['problems_prefix']}",
-            f"--experiment_size {experiment_size}",
-            f"--no_random_trajectories" if not should_create_random_trajectories else "",
-        ],
+        arguments=arguments,
         environment_variables=environment_variables,
         logs_directory=pathlib.Path(experiment["working_directory_path"]) / "logs",
     )
@@ -109,7 +120,9 @@ def create_execution_arguments(experiment, fold, compared_version):
 
 def create_internal_iterations_list(parallelization_data):
     max_train_size = (
-        int(parallelization_data["experiment_size"] * 0.8) + 1 if "experiment_size" in parallelization_data else parallelization_data["max_index"] + 1
+        int(parallelization_data["experiment_size"] * 0.8) + 1
+        if "experiment_size" in parallelization_data
+        else parallelization_data["max_index"] + 1
     )
     if parallelization_data["hop"] == 100:
         return [1] + list(range(10, 100, 10)) + list(range(100, max_train_size, 100))
@@ -117,11 +130,20 @@ def create_internal_iterations_list(parallelization_data):
     return list(range(1, FIRST_BREAKPOINT)) + list(range(FIRST_BREAKPOINT, max_train_size, parallelization_data["hop"]))
 
 
-def create_experiment_folders(code_directory, environment_variables, experiment, should_create_random_trajectories: bool = True):
+def create_experiment_folders(
+    code_directory,
+    environment_variables,
+    experiment,
+    should_create_random_trajectories: bool = True,
+    should_create_internal_iterations: bool = True,
+):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
-    internal_iterations = create_internal_iterations_list(parallelization_data)
-    print(f"Internal iterations: {internal_iterations}")
+    internal_iterations = None
+    if should_create_internal_iterations:
+        internal_iterations = create_internal_iterations_list(parallelization_data)
+        print(f"Internal iterations: {internal_iterations}")
+
     sid = setup_experiments_folds_job(
         code_directory=code_directory,
         environment_variables=environment_variables,
@@ -129,17 +151,28 @@ def create_experiment_folders(code_directory, environment_variables, experiment,
         internal_iterations=internal_iterations,
         experiment_size=parallelization_data.get("experiment_size", 100),
         should_create_random_trajectories=should_create_random_trajectories,
+        should_create_internal_iterations=should_create_internal_iterations,
     )
     return internal_iterations, sid
 
 
-def create_all_experiments_folders(code_directory, environment_variables, configurations, should_create_random_trajectories: bool = True):
+def create_all_experiments_folders(
+    code_directory,
+    environment_variables,
+    configurations,
+    should_create_random_trajectories: bool = True,
+    should_create_internal_iterations: bool = True,
+):
     print("Creating the directories containing the folds datasets for the experiments.")
     jobs_sids = []
     output_internal_iterations = []
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         internal_iterations, fold_creation_sid = create_experiment_folders(
-            code_directory, environment_variables, experiment, should_create_random_trajectories
+            code_directory,
+            environment_variables,
+            experiment,
+            should_create_random_trajectories,
+            should_create_internal_iterations=should_create_internal_iterations,
         )
         jobs_sids.append(fold_creation_sid)
         output_internal_iterations.append(internal_iterations)
@@ -208,12 +241,21 @@ def submit_job(
 
 
 def submit_job_and_validate_execution(
-    code_directory, configurations, experiment, fold, arguments, environment_variables, job_name, fold_creation_sid=None, python_file=None
+    code_directory,
+    configurations,
+    experiment,
+    fold,
+    arguments,
+    environment_variables,
+    job_name,
+    fold_creation_sid=None,
+    python_file=None,
+    memory=None,
 ):
     dependency_argument = None if not fold_creation_sid else f"afterok:{fold_creation_sid}"
     sid = submit_job(
         conda_env="online_nsam",
-        mem="16G",
+        mem="16G" if memory is None else memory,
         python_file=python_file or f"{code_directory}/{configurations['experiments_script_path']}",
         jobname=job_name,
         dependency=dependency_argument,

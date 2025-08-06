@@ -19,7 +19,10 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--learning_algorithms", required=True, help="the list of algorithms that will run in parallel")
     parser.add_argument(
-        "--ignore_internal_iterations", required=False, default=False, help="If specified, the internal iterations will not be used."
+        "--ignore_internal_iterations",
+        help="If specified, the internal iterations will not be used.",
+        action="store_false",
+        dest="should_not_create_internal_iterations",
     )
     parser.add_argument("--internal_iterations", required=False, help="The internal iterations that the algorithm will run in parallel.")
     parser.add_argument(
@@ -35,6 +38,13 @@ def parse_arguments() -> argparse.Namespace:
         dest="should_create_random_trajectories",
         help="If specified, no random trajectories would be created.",
     )
+    parser.add_argument(
+        "--num_splits",
+        type=int,
+        default=5,
+        required=False,
+        help="default number of splits to create for the k-fold cross validation.",
+    )
     parsed_args = parser.parse_args()
     return parsed_args
 
@@ -49,11 +59,13 @@ class FoldsCreator:
         domain_file_name: str,
         learning_algorithms: List[int] = None,
         internal_iterations: List[int] = None,
+        create_internal_iterations: bool = True,
+        n_split: int = 5,
     ):
         self.k_fold = DistributedKFoldSplit(
             working_directory_path=working_directory_path,
             domain_file_name=domain_file_name,
-            n_split=5,
+            n_split=n_split,
             learning_algorithms=learning_algorithms,
             internal_iterations=internal_iterations,
         )
@@ -61,6 +73,7 @@ class FoldsCreator:
         self.working_directory_path = working_directory_path
         self.logger = logging.getLogger("cluster-folder-creator")
         self._internal_iterations = internal_iterations
+        self.create_internal_iterations = create_internal_iterations
 
     def create_folds_from_cross_validation(self, experiment_size: int = DEFAULT_EXPERIMENT_SIZE) -> None:
         """Runs that cross validation process on the domain's working directory and validates the results."""
@@ -71,7 +84,7 @@ class FoldsCreator:
         self.logger.info("Creating a logs directory.")
         (self.working_directory_path / "logs").mkdir(exist_ok=True)
         self.logger.info("Creating the folds directories.")
-        self.k_fold.create_k_fold(max_items=experiment_size, should_ignore_internal_iterations=self._internal_iterations is None)
+        self.k_fold.create_k_fold(max_items=experiment_size, should_ignore_internal_iterations=not self.create_internal_iterations)
         self.logger.info("Done creating the folds directories!")
 
     def create_random_performance_evaluation_trajectories(
@@ -119,7 +132,10 @@ if __name__ == "__main__":
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     split_internal_iterations = [int(val) for val in args.internal_iterations.split(",")] if args.internal_iterations else None
-    if split_internal_iterations is not None:
+    if args.should_not_create_internal_iterations:
+        print("No internal iterations specified, will not create internal iterations for the folds.")
+
+    else:
         print(f"Internal iterations: {split_internal_iterations}")
 
     folds_creator = FoldsCreator(
@@ -127,6 +143,8 @@ if __name__ == "__main__":
         domain_file_name=args.domain_file_name,
         learning_algorithms=experiment_learning_algorithms,
         internal_iterations=split_internal_iterations,
+        create_internal_iterations=not args.should_not_create_internal_iterations,
+        n_split=args.num_splits,
     )
     folds_creator.create_folds_from_cross_validation(experiment_size=args.experiment_size)
     folds_creator.create_random_performance_evaluation_trajectories(

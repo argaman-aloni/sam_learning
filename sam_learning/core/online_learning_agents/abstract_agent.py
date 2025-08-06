@@ -2,13 +2,21 @@
 
 from abc import ABC, abstractmethod
 
-from pddl_plus_parser.models import State, ActionCall, Observation
+from pddl_plus_parser.models import State, ActionCall, Observation, Problem
 from typing import Tuple, Set, List, Optional
 
 
 class AbstractAgent(ABC):
     @abstractmethod
     def __init__(self):
+        pass
+
+    @abstractmethod
+    def initialize_problem(self, problem: Problem) -> None:
+        """Initializes the agent with a problem.
+
+        :param problem: the problem to be initialized.
+        """
         pass
 
     @abstractmethod
@@ -46,7 +54,7 @@ class AbstractAgent(ABC):
         pass
 
     @abstractmethod
-    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool]:
+    def execute_plan(self, plan: List[ActionCall]) -> Tuple[Observation, bool, bool]:
         """Executes a plan in the environment and returns the trace created from the plan, and whether using the plan's
         actions the goal was reached.
 

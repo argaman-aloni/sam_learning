@@ -107,7 +107,8 @@ class IncrementalSVMLearner:
         grounded_monomials = create_grounded_monomials(self.monomials, point)
         new_sample = pd.DataFrame({**{k: [v] for k, v in grounded_monomials.items()}, LABEL_COLUMN: [1 if is_successful else -1]})
         self.data = pd.concat([self.data, new_sample], ignore_index=True)
-        self.data.dropna(axis=1, inplace=True)
+        if is_successful:
+            self.data.dropna(axis=1, inplace=True)
 
     def _incremental_create_svm_linear_conditions(self, debug: bool = False) -> List[Tuple[List[float], float]]:
         """Create the convex hull and returns the matrix representing the inequalities.
@@ -118,12 +119,9 @@ class IncrementalSVMLearner:
         Note: the returned values represents the linear inequalities of the convex hull, i.e.,  Ax <= b.
         """
         planes = []
-        no_label_columns = self.data.drop(columns=[LABEL_COLUMN])
+        no_label_columns = self.data.dropna(axis=1).drop(columns=[LABEL_COLUMN])
         X_reminder, y_reminder = no_label_columns.to_numpy(), self.data[LABEL_COLUMN]
         for i in range(MAX_ALLOWED_CONDITIONS):
-            if len(X_reminder) <= MIN_ALLOWED_UNRESOLVED_POINTS:
-                self.logger.debug(f"The number of points to classify - {len(X_reminder)} is less than the minimum allowed points.")
-                break
             if len(y_reminder.unique()) <= 1:
                 self.logger.debug("Remaining points have only one label cannot continue running SVM.")
                 break
@@ -236,8 +234,8 @@ class IncrementalSVMLearner:
 
             return preconditions
 
-        except ValueError:
-            self.logger.warning("Failed to create the SVM based conditions.")
+        except ValueError as error:
+            self.logger.warning(f"Failed to create the SVM based conditions. Error message: {error}")
             raise NotSafeActionError(
                 name=self.action_name, reason="SVM failed to execute.", solution_type=EquationSolutionType.svm_failed_to_train
             )

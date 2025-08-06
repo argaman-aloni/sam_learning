@@ -1,4 +1,5 @@
 """Module responsible for calculating our approach for numeric precision and recall."""
+
 import csv
 import os
 from collections import defaultdict
@@ -27,7 +28,7 @@ NUMERIC_PERFORMANCE_STATS = [
     "effects_mse",
 ]
 
-MAX_INT = 10 ** 6
+MAX_INT = 10**6
 
 
 class NumericPerformanceCalculator(SemanticPerformanceCalculator):
@@ -54,6 +55,7 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         :param learned_domain: the domain that was learned by the action model learning algorithm.
         :return: a mapping between the action name and its MSE value.
         """
+        self.logger.info("Calculating the effects MSE for the learned domain.")
         squared_errors = defaultdict(list)
         mse_values = {action_name: 0 for action_name in learned_domain.actions.keys()}
         for observation in self.dataset_observations:
@@ -104,7 +106,11 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
         effects_mse = self.calculate_effects_mse(learned_domain)
         for action in self.model_domain.actions:
             for action_stats in self.combined_stats:
-                if action_stats["action_name"] == action and action_stats["num_trajectories"] == num_used_observations:
+                if (
+                    action_stats["action_name"] == action
+                    and action_stats["num_trajectories"] == num_used_observations
+                    and action_stats["policy"] == policy.name
+                ):
                     action_stats["effects_mse"] = effects_mse.get(action, 0)
                     action_stats["epsilon_precision"] = self.epsilon_precision
                     break
@@ -130,7 +136,9 @@ class NumericPerformanceCalculator(SemanticPerformanceCalculator):
 
     def export_combined_semantic_performance(self) -> None:
         """Export the numeric learning statistics to a CSV report file."""
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_numeric_performance.csv"
+        statistics_path = (
+            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}" "combined_numeric_performance.csv"
+        )
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=NUMERIC_PERFORMANCE_STATS)
             stats_writer.writeheader()

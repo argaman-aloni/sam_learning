@@ -1,4 +1,5 @@
 """Module to calculate the information gain of the propositional part of an action."""
+
 import logging
 from typing import Set, List, Tuple
 
@@ -36,11 +37,13 @@ class OnlineDiscreteModelLearner:
         """
         self.logger.info(f"Adding a new positive pre-state observation for the action {self.action_name}.")
         not_preconditions = self.predicates_superset.difference(predicates_in_state)
-        self.cannot_be_preconditions = not_preconditions if len(self.cannot_be_preconditions) == 0 else self.cannot_be_preconditions.union(not_preconditions)
-        for not_precondition in self.cannot_be_preconditions:
-            self.logger.debug("Removing false positives from the must be preconditions set.")
-            for must_be_preconditions_set in self.must_be_preconditions:
-                must_be_preconditions_set.discard(not_precondition)
+        self.cannot_be_preconditions = (
+            not_preconditions if len(self.cannot_be_preconditions) == 0 else self.cannot_be_preconditions.union(not_preconditions)
+        )
+
+        self.logger.debug("Removing false positives from the must be preconditions set.")
+        for cnf_clause in self.must_be_preconditions:
+            cnf_clause.difference_update(self.cannot_be_preconditions)
 
     def _add_positive_post_state_observation(self, pre_state_predicates: Set[Predicate], post_state_predicates: Set[Predicate]) -> None:
         """Adds a positive pre and post-state observation and deduces the predicates to filter from the effects.
@@ -51,12 +54,14 @@ class OnlineDiscreteModelLearner:
         self.logger.info(f"Adding a new positive post-state observation for the action {self.action_name}.")
         self.cannot_be_effects.update([predicate.copy(is_negated=True) for predicate in post_state_predicates])
         self.must_be_effects.update(set([predicate.copy() for predicate in post_state_predicates.difference(pre_state_predicates)]))
+        # Removing the predicates that cannot be effects from the must be effects set.
+        self.must_be_effects.difference_update(self.cannot_be_effects)
 
     def _apply_unit_propagation(self) -> None:
         """Applies unit propagation to the must be preconditions CNFs."""
         self.logger.debug("Applying unit propagation to the must be preconditions CNFs.")
         unit_clauses = [cnf for cnf in self.must_be_preconditions if len(cnf) == 1]
-        new_must_be_preconditions = unit_clauses
+        new_must_be_preconditions = unit_clauses.copy()
         for cnf in self.must_be_preconditions:
             if len(cnf) == 1:
                 # We verify externally that no duplication clauses are added.
@@ -78,12 +83,9 @@ class OnlineDiscreteModelLearner:
         """
         self.logger.debug(f"Adding a new negative sample for the action {self.action_name}.")
         preconditions_not_in_state = self.predicates_superset.difference(predicates_in_state)
-        if any([cnf.issubset(predicates_in_state) and predicates_in_state.issubset(cnf) for cnf in self.must_be_preconditions]):
-            self.logger.debug("The state is already in the must be preconditions. No need to add it again.")
-            return
-
-        self.must_be_preconditions.append(preconditions_not_in_state.difference(self.cannot_be_preconditions))
-        self._apply_unit_propagation()
+        if preconditions_not_in_state not in self.must_be_preconditions:
+            self.must_be_preconditions.append(preconditions_not_in_state.difference(self.cannot_be_preconditions))
+            self._apply_unit_propagation()
 
     def add_transition_data(
         self, pre_state_predicates: Set[Predicate], post_state_predicates: Set[Predicate] = None, is_transition_successful: bool = True
@@ -94,7 +96,9 @@ class OnlineDiscreteModelLearner:
         :param post_state_predicates: the predicates observed in the state following the action execution.
         :param is_transition_successful: a boolean indicating if the action was successfully applied in the pre-state.
         """
-        self.logger.debug(f"Adding {'positive' if is_transition_successful else 'negative'} transition data for the action {self.action_name}.")
+        self.logger.debug(
+            f"Adding {'positive' if is_transition_successful else 'negative'} transition data for the action {self.action_name}."
+        )
         if is_transition_successful:
             self._add_positive_pre_state_observation(pre_state_predicates)
             self._add_positive_post_state_observation(pre_state_predicates, post_state_predicates)

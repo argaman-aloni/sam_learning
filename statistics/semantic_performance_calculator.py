@@ -1,4 +1,5 @@
 """Module responsible for calculating our approach for numeric precision and recall."""
+
 import csv
 import logging
 import uuid
@@ -19,7 +20,7 @@ from pddl_plus_parser.models import (
     Problem,
 )
 
-from sam_learning.core import VocabularyCreator
+from sam_learning.core import VocabularyCreator, EnvironmentSnapshot
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy
 from validators import run_validate_script, VALID_PLAN
 
@@ -91,7 +92,11 @@ class SemanticPerformanceCalculator:
         self._random_actions = []
 
     def _calculate_action_applicability_rate(
-        self, action_call: ActionCall, learned_domain_path: Path, observed_state: State, problem_objects: Dict[str, PDDLObject],
+        self,
+        action_call: ActionCall,
+        learned_domain_path: Path,
+        observed_state: State,
+        problem_objects: Dict[str, PDDLObject],
     ) -> Tuple[int, int, int]:
         """Test whether an action is applicable in both the model domain and the generated domain.
 
@@ -118,8 +123,12 @@ class SemanticPerformanceCalculator:
         ProblemExporter().export_problem(problem=applicability_validation_problem, export_path=current_problem_file_path)
 
         self.logger.debug(f"Exported the problem to {current_problem_file_path}, now validating the action's applicability.")
-        applicable_in_model = self._calculate_applicability_in_state(current_problem_file_path, current_solution_file_path, self.model_domain_path)
-        applicable_in_learned = self._calculate_applicability_in_state(current_problem_file_path, current_solution_file_path, learned_domain_path)
+        applicable_in_model = self._calculate_applicability_in_state(
+            current_problem_file_path, current_solution_file_path, self.model_domain_path
+        )
+        applicable_in_learned = self._calculate_applicability_in_state(
+            current_problem_file_path, current_solution_file_path, learned_domain_path
+        )
 
         current_problem_file_path.unlink()
         current_solution_file_path.unlink()
@@ -164,10 +173,14 @@ class SemanticPerformanceCalculator:
         :param num_true_positives: the dictionary mapping between the action name and the number of true positive
         """
         self.logger.info("Calculating effects difference rate for the observation.")
+        model_snapshot = EnvironmentSnapshot(self.model_domain)
+        learned_snapshot = EnvironmentSnapshot(learned_domain)
         for observation_triplet in observation.components:
             model_previous_state = observation_triplet.previous_state
             executed_action = observation_triplet.grounded_action_call
-            model_next_state = observation_triplet.next_state
+            model_pre_state_predicates = model_snapshot._create_state_discrete_snapshot(
+                model_previous_state, {**observation.grounded_objects, **self.model_domain.constants}
+            )
             if executed_action.name not in learned_domain.actions:
                 continue
 
@@ -178,38 +191,36 @@ class SemanticPerformanceCalculator:
                     grounded_action_call=executed_action.parameters,
                     problem_objects=observation.grounded_objects,
                 )
+                model_operator = Operator(
+                    action=self.model_domain.actions[executed_action.name],
+                    domain=self.model_domain,
+                    grounded_action_call=executed_action.parameters,
+                    problem_objects=observation.grounded_objects,
+                )
                 # cannot apply when the action is inapplicable since the linear regression is fitted on applicable numeric points.
                 try:
                     learned_next_state = learned_operator.apply(model_previous_state)
+                    model_next_state = model_operator.apply(learned_next_state)
 
-                except ValueError:
-                    self.logger.debug("The action is not applicable in the state.")
-                    learned_next_state = model_previous_state.copy()
-                    model_next_state = model_previous_state.copy()
-
-                except ZeroDivisionError:
-                    self.logger.debug("Tried to perform a division by zero!")
-                    learned_next_state = model_previous_state.copy()
-                    model_next_state = model_previous_state.copy()
+                except (ValueError, ZeroDivisionError):
+                    continue
 
                 self.logger.debug("Validating if there are any false negatives.")
-                model_state_predicates = {
-                    predicate.untyped_representation
-                    for grounded_predicate in model_next_state.state_predicates.values()
-                    for predicate in grounded_predicate
-                }
-                learned_state_predicates = {
-                    predicate.untyped_representation
-                    for grounded_predicate in learned_next_state.state_predicates.values()
-                    for predicate in grounded_predicate
-                }
-                if len(model_state_predicates) == 0 and len(learned_state_predicates) == 0:
+                model_next_state_predicates = model_snapshot._create_state_discrete_snapshot(
+                    model_next_state, {**observation.grounded_objects, **self.model_domain.constants}
+                )
+                learned_next_state_predicates = learned_snapshot._create_state_discrete_snapshot(
+                    learned_next_state, {**observation.grounded_objects, **self.model_domain.constants}
+                )
+                model_effects = {predicate for predicate in model_next_state_predicates.difference(model_pre_state_predicates)}
+                learned_effects = {predicate for predicate in learned_next_state_predicates.difference(model_pre_state_predicates)}
+                if len(model_effects) == 0 and len(learned_effects) == 0:
                     num_true_positives[executed_action.name] += 1
                     continue
 
-                num_true_positives[executed_action.name] += len(model_state_predicates.intersection(learned_state_predicates))
-                num_false_positives[executed_action.name] += len(learned_state_predicates.difference(model_state_predicates))
-                num_false_negatives[executed_action.name] += len(model_state_predicates.difference(learned_state_predicates))
+                num_true_positives[executed_action.name] += len(model_effects.intersection(learned_effects))
+                num_false_positives[executed_action.name] += len(learned_effects.difference(model_effects))
+                num_false_negatives[executed_action.name] += len(model_effects.difference(learned_effects))
 
             except ValueError:
                 self.logger.debug("The action is not applicable in the state.")
@@ -236,7 +247,10 @@ class SemanticPerformanceCalculator:
                     continue
 
                 true_positive, false_positive, false_negative = self._calculate_action_applicability_rate(
-                    action, learned_domain_path, component.previous_state, observation_objects,
+                    action,
+                    learned_domain_path,
+                    component.previous_state,
+                    observation_objects,
                 )
                 num_true_positives[action.name] += true_positive
                 num_false_positives[action.name] += false_positive
@@ -261,7 +275,9 @@ class SemanticPerformanceCalculator:
             )
 
         for observation in self.dataset_observations:
-            self._calculate_effects_difference_rate(observation, learned_domain, num_false_negatives, num_false_positives, num_true_positives)
+            self._calculate_effects_difference_rate(
+                observation, learned_domain, num_false_negatives, num_false_positives, num_true_positives
+            )
 
         return _calculate_precision_recall(num_false_negatives, num_false_positives, num_true_positives)
 
@@ -274,7 +290,9 @@ class SemanticPerformanceCalculator:
         """
         learned_domain = DomainParser(domain_path=learned_domain_path, partial_parsing=False).parse_domain()
         self.logger.info("Starting to calculate the semantic preconditions performance of the learned domain.")
-        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(learned_domain, learned_domain_path)
+        preconditions_precision, preconditions_recall = self.calculate_preconditions_semantic_performance(
+            learned_domain, learned_domain_path
+        )
         self.logger.info("Starting to calculate the semantic effects performance of the learned domain.")
         effects_precision, effects_recall = self.calculate_effects_semantic_performance(learned_domain)
         for action_name in self.model_domain.actions:
@@ -298,7 +316,8 @@ class SemanticPerformanceCalculator:
         """
         iterations_suffix = f"{iteration_num}" if iteration_num is not None else ""
         statistics_path = (
-            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_{fold_num}_{iterations_suffix}_semantic_performance.csv"
+            self.results_dir_path
+            / f"{self.learning_algorithm.name}_{self.model_domain.name}_{fold_num}_{iterations_suffix}_semantic_performance.csv"
         )
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PRECISION_STATS)
@@ -308,7 +327,9 @@ class SemanticPerformanceCalculator:
 
     def export_combined_semantic_performance(self) -> None:
         """Export the numeric learning statistics to a CSV report file."""
-        statistics_path = self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_combined_semantic_performance.csv"
+        statistics_path = (
+            self.results_dir_path / f"{self.learning_algorithm.name}_{self.model_domain.name}_combined_semantic_performance.csv"
+        )
         with open(statistics_path, "wt", newline="") as statistics_file:
             stats_writer = csv.DictWriter(statistics_file, fieldnames=SEMANTIC_PRECISION_STATS)
             stats_writer.writeheader()
