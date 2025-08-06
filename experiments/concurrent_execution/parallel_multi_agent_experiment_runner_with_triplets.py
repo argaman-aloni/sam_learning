@@ -1,4 +1,5 @@
 """Runs experiments for the numeric model learning algorithms."""
+
 import argparse
 import os
 from pathlib import Path
@@ -52,7 +53,7 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
             used to solve.
         """
         self.logger.info(f"Executing the experiments on the action triplets instead of the trajectories for the fold - {fold_num}!")
-        self._init_semantic_performance_calculator(fold_num)
+        self._init_semantic_performance_calculator(fold_num, should_include_sam_in_ma_evaluation=True)
         partial_domain = self.read_domain_file(train_set_dir_path)
         complete_train_set: List[MultiAgentObservation] = super().collect_observations(train_set_dir_path, partial_domain)
         triplets_per_experiment = MAX_TRIPLETS_FOR_EXPERIMENT if partial_domain.name != "rover" else ROVERS_TRIPLETS_PER_EXPERIMENT
@@ -66,7 +67,9 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
             allowed_observations = []
             # create the allowed observations for the SAM learning algorithm
             for observation in transitions_based_training_set:
-                filtered_observation, num_trivial_triplets, num_non_trivial_triplets = self._filter_baseline_single_agent_trajectory(observation)
+                filtered_observation, num_trivial_triplets, num_non_trivial_triplets = self._filter_baseline_single_agent_trajectory(
+                    observation
+                )
                 allowed_observations.append(filtered_observation)
                 num_trivial_action_triplets += num_trivial_triplets
                 num_non_trivial_action_triplets += num_non_trivial_triplets
@@ -99,7 +102,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
-        "--learning_algorithm", required=True, type=int, choices=[1, 7, 25],
+        "--learning_algorithm",
+        required=True,
+        type=int,
+        choices=[1, 7, 25],
     )
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)
     parser.add_argument("--debug", required=False, help="Whether in debug mode.", type=bool, default=False)
