@@ -1,4 +1,5 @@
 """Module to learn action models with macro actions from multi-agent trajectories with joint actions."""
+
 from itertools import combinations, chain
 from typing import Dict, List, Tuple, Optional, Set
 
@@ -62,7 +63,7 @@ def generate_supersets_of_actions(action_groups: List[Set[str]]) -> List[Set[str
 
 class MASAMPlus(MultiAgentSAM):
     """Class designated to learning action models with macro actions
-        from multi-agent trajectories with joint actions."""
+    from multi-agent trajectories with joint actions."""
 
     mapping: Dict[str, MappingElement]
 
@@ -113,10 +114,10 @@ class MASAMPlus(MultiAgentSAM):
     def extract_relevant_parameter_groupings(self, action_group_names: List[str]) -> List[PGType]:
         """Extracts relevant parameter groups, that is, the parameters of the actions in the action group.
 
-            Note:
-                This implementation only extracts one such possible parameter groups
+        Note:
+            This implementation only extracts one such possible parameter groups
 
-            :param action_group_names: the names of the actions in the action group.
+        :param action_group_names: the names of the actions in the action group.
         """
         all_param_groups = [
             param_set
@@ -130,7 +131,9 @@ class MASAMPlus(MultiAgentSAM):
 
         return [flattened_groups]
 
-    def extract_effects_for_macro_from_cnf(self, lma_set: Set[LearnerAction], param_grouping: PGType, mapping: BindingType) -> Set[Predicate]:
+    def extract_effects_for_macro_from_cnf(
+        self, lma_set: Set[LearnerAction], param_grouping: PGType, mapping: BindingType
+    ) -> Set[Predicate]:
         """Extract the effects of the macro action containing the input single-agent actions.
 
         :param lma_set: the single agent actions contained in the macro action.
@@ -213,7 +216,7 @@ class MASAMPlus(MultiAgentSAM):
 
     def learn_combined_action_model_with_macro_actions(
         self, observations: List[MultiAgentObservation]
-    ) -> Tuple[LearnerDomain, Dict[str, str], Dict[str, MappingElement]]:
+    ) -> Tuple[Domain, Dict[str, str], Dict[str, MappingElement]]:
         """Learn the SAFE action model from the input multi-agent trajectories.
 
         :param observations: the multi-agent observations.

@@ -35,6 +35,7 @@ def init_semantic_performance_calculator(
     executing_agents: Optional[List[str]] = None,
     test_set_dir_path: Path = None,
     problem_prefix: str = "pfile",
+    should_include_sam_in_ma_evaluation: bool = False,
 ) -> Union[NumericPerformanceCalculator, SemanticPerformanceCalculator, MASamPerformanceCalculator]:
     """Initializes a numeric performance calculator object.
 
@@ -45,10 +46,12 @@ def init_semantic_performance_calculator(
     :param executing_agents: the agents that are executing the domain.
     :param test_set_dir_path: the path to the directory containing the test set.
     :param problem_prefix: the prefix of the problem files.
+    :param should_include_sam_in_ma_evaluation: whether to include SAM in the multi-agent evaluation.
     :return: the initialized numeric performance calculator object.
     """
     if domain_file_name is None and domain_file_path is None:
         raise ValueError("Either 'domain_file_name' or 'domain_file_path' must be provided.")
+
     domain_path = domain_file_path if domain_file_path is not None else working_directory_path / domain_file_name
     model_domain = partial_domain = DomainParser(domain_path=domain_path, partial_parsing=False).parse_domain()
     observations = []
@@ -68,7 +71,9 @@ def init_semantic_performance_calculator(
             learning_algorithm=learning_algorithm,
         )
 
-    elif learning_algorithm in MULTI_AGENT_ALGORITHMS:
+    elif learning_algorithm in MULTI_AGENT_ALGORITHMS or (
+        learning_algorithm.name == LearningAlgorithmType.sam_learning.name and should_include_sam_in_ma_evaluation
+    ):
         return MASamPerformanceCalculator(
             model_domain=model_domain,
             observations=observations,

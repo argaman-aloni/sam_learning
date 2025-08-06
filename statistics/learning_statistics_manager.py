@@ -1,4 +1,5 @@
 """Module to manage the action model learning statistics."""
+
 import csv
 from collections import Counter
 from pathlib import Path
@@ -90,7 +91,9 @@ class LearningStatisticsManager:
         return action_appearance_counter
 
     def _extract_all_preconditions(self, action_name, learned_domain):
-        learned_preconditions = [p.untyped_representation for _, p in learned_domain.actions[action_name].preconditions if isinstance(p, Predicate)]
+        learned_preconditions = [
+            p.untyped_representation for _, p in learned_domain.actions[action_name].preconditions if isinstance(p, Predicate)
+        ]
         ground_truth_preconditions = [
             p.untyped_representation for _, p in self.model_domain.actions[action_name].preconditions if isinstance(p, Predicate)
         ]
@@ -149,7 +152,7 @@ class LearningStatisticsManager:
     def add_to_action_stats(
         self,
         used_observations: List[Union[Observation, MultiAgentObservation]],
-        learned_domain: LearnerDomain,
+        learned_domain: Domain,
         learning_report: Optional[Dict[str, str]] = None,
         policy: NegativePreconditionPolicy = NegativePreconditionPolicy.no_remove,
     ) -> None:
@@ -231,7 +234,9 @@ class LearningStatisticsManager:
         :param fold_number: the number of the currently running fold.
         :param iteration_num: the number of the current iteration.
         """
-        self._export_statistics_data(fold_number, iteration_num, LEARNED_ACTIONS_STATS_COLUMNS, self.action_learning_stats, "action_stats_fold")
+        self._export_statistics_data(
+            fold_number, iteration_num, LEARNED_ACTIONS_STATS_COLUMNS, self.action_learning_stats, "action_stats_fold"
+        )
 
     def export_all_folds_action_stats(self) -> None:
         """Export the statistics collected about the actions."""

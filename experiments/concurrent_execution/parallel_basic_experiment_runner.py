@@ -12,7 +12,6 @@ from pddl_plus_parser.lisp_parsers import DomainParser, TrajectoryParser, Proble
 from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 
 from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_NUMERIC_TOLERANCE, NUMERIC_ALGORITHMS
-from sam_learning.core import LearnerDomain
 from statistics.learning_statistics_manager import LearningStatisticsManager
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
@@ -38,8 +37,7 @@ def configure_iteration_logger(args: argparse.Namespace):
     # Create a rotating file handler
     max_bytes = MAX_SIZE_MB * 1024 * 1024  # Convert megabytes to bytes
     file_handler = RotatingFileHandler(
-        logs_directory_path
-        / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}_{iteration_number}.log",
+        logs_directory_path / f"log_{args.domain_file_name}_fold_{learning_algorithm.name}_{args.fold_number}_{iteration_number}.log",
         maxBytes=max_bytes,
         backupCount=1,
     )
@@ -94,7 +92,7 @@ class ParallelExperimentRunner:
             learning_algorithm=learning_algorithm,
         )
 
-    def _init_semantic_performance_calculator(self, fold_num: int) -> None:
+    def _init_semantic_performance_calculator(self, fold_num: int, should_include_sam_in_ma_evaluation: bool = False) -> None:
         """Initializes the algorithm of the semantic precision - recall calculator."""
         self.semantic_performance_calc = init_semantic_performance_calculator(
             working_directory_path=self.working_directory_path,
@@ -103,16 +101,15 @@ class ParallelExperimentRunner:
             test_set_dir_path=self.working_directory_path / "performance_evaluation_trajectories" / f"fold_{fold_num}",
             problem_prefix=self.problem_prefix,
             executing_agents=self.executing_agents,
+            should_include_sam_in_ma_evaluation=should_include_sam_in_ma_evaluation,
         )
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
-    ) -> Tuple[LearnerDomain, Dict[str, Any]]:
+    ) -> Tuple[Domain, Dict[str, Any]]:
         raise NotImplementedError
 
-    def _export_learned_domain(
-        self, learned_domain: LearnerDomain, test_set_path: Path, file_name: Optional[str] = None
-    ) -> Path:
+    def _export_learned_domain(self, learned_domain: Domain, test_set_path: Path, file_name: Optional[str] = None) -> Path:
         """Exports the learned domain into a file so that it will be used to solve the test set problems.
 
         :param learned_domain: the domain that was learned by the action model learning algorithm.
@@ -150,9 +147,7 @@ class ParallelExperimentRunner:
                     break
 
                 new_obs = (
-                    MultiAgentObservation(executing_agents=self.executing_agents)
-                    if self.executing_agents is not None
-                    else Observation()
+                    MultiAgentObservation(executing_agents=self.executing_agents) if self.executing_agents is not None else Observation()
                 )
                 new_obs.add_problem_objects(observation.grounded_objects)
                 new_obs.components = observation.components[index : index + num_triplets_per_testing]
@@ -164,7 +159,7 @@ class ParallelExperimentRunner:
         self,
         allowed_observations: Union[List[Observation], List[MultiAgentObservation]],
         fold_number: int,
-        learned_model: LearnerDomain,
+        learned_model: Domain,
         negative_preconditions_policy: NegativePreconditionPolicy,
         test_set_dir_path: Path,
     ) -> Path:
@@ -216,9 +211,7 @@ class ParallelExperimentRunner:
             # assuming that the folders were created so that each folder contains only the correct number of trajectories, i.e., iteration_number
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
-            complete_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(
-                trajectory_file_path, self.executing_agents
-            )
+            complete_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(trajectory_file_path, self.executing_agents)
             allowed_observations.append(complete_observation)
 
         return allowed_observations
@@ -243,9 +236,7 @@ class ParallelExperimentRunner:
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
         allowed_observations = self.collect_observations(train_set_dir_path, partial_domain)
         self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
-        learned_model, learning_report = self._apply_learning_algorithm(
-            partial_domain, allowed_observations, test_set_dir_path
-        )
+        learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
         self.learning_statistics_manager.add_to_action_stats(
             allowed_observations, learned_model, learning_report, policy=negative_preconditions_policy
         )
@@ -256,9 +247,7 @@ class ParallelExperimentRunner:
             learned_domain_path, len(allowed_observations), policy=negative_preconditions_policy
         )
 
-    def run_fold_iteration(
-        self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int
-    ) -> None:
+    def run_fold_iteration(self, fold_num: int, train_set_dir_path: Path, test_set_dir_path: Path, iteration_number: int) -> None:
         """Runs the numeric action model learning algorithms on the input fold.
 
         :param fold_num: the number of the fold to run.
@@ -271,14 +260,12 @@ class ParallelExperimentRunner:
         self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
         self.domain_validator.write_statistics(fold_num, iteration_number)
         self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
-        self.learning_statistics_manager.export_action_learning_statistics(
-            fold_number=fold_num, iteration_num=iteration_number
-        )
+        self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num, iteration_num=iteration_number)
 
     def validate_learned_domain(
         self,
         allowed_observations: Union[List[Observation], List[MultiAgentObservation]],
-        learned_model: LearnerDomain,
+        learned_model: Domain,
         test_set_dir_path: Path,
         fold_number: int,
         learning_time: float,
@@ -299,9 +286,7 @@ class ParallelExperimentRunner:
         )
         self.logger.debug("Checking that the test set problems can be solved using the learned domain.")
         portfolio = (
-            [SolverType.metric_ff, SolverType.enhsp]
-            if self._learning_algorithm in NUMERIC_ALGORITHMS
-            else [SolverType.fast_downward]
+            [SolverType.metric_ff, SolverType.enhsp] if self._learning_algorithm in NUMERIC_ALGORITHMS else [SolverType.fast_downward]
         )
         if "ABORT_SOLVING" in os.environ:
             self.logger.debug("Skipping the validation of the learned domain due to request in the experiment.")
