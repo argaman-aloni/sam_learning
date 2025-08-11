@@ -23,7 +23,13 @@ def main():
     environment_variables = get_environment_variables(configurations)
     code_directory = configurations["code_directory_path"]
     print("Starting to setup and run the mult-agent experiments!")
-    iterations_to_use = create_all_experiments_folders(code_directory, environment_variables, configurations, should_create_random_trajectories=False)
+    iterations_to_use = create_all_experiments_folders(
+        code_directory,
+        environment_variables,
+        configurations,
+        should_create_random_trajectories=False,
+        should_create_internal_iterations=True,
+    )
     for experiment_index, experiment in enumerate(configurations[EXPERIMENTS_CONFIG_STR]):
         internal_iterations = iterations_to_use[experiment_index]
         experiment_sids = []
