@@ -139,8 +139,11 @@ def create_experiment_folders(
 ):
     print(f"Creating the directories containing the folds datasets for the experiments.")
     parallelization_data = experiment["parallelization_data"]
-    internal_iterations = create_internal_iterations_list(parallelization_data)
-    print(f"Internal iterations: {internal_iterations}")
+    internal_iterations = None
+    if should_create_internal_iterations:
+        print("Creating the internal iterations list for the experiment.")
+        internal_iterations = create_internal_iterations_list(parallelization_data)
+        print(f"Internal iterations: {internal_iterations}")
 
     sid = setup_experiments_folds_job(
         code_directory=code_directory,
