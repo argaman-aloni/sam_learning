@@ -170,7 +170,7 @@ class DistributedKFoldSplit:
         if load_configuration and len(folds_data) > 0:
             self.logger.debug("Loading the folds settings from the configuration file.")
             for index, (fold_name, fold_content) in enumerate(folds_data.items()):
-                if "internal_iterations" not in fold_content["train"]:
+                if should_ignore_internal_iterations:
                     self.logger.debug("No internal iterations found in the fold content, using the full training set.")
                     selected_trajectories_paths = [Path(p) for p in fold_content["train"]]
                     self._create_algorithms_directories(
