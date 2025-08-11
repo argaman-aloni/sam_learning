@@ -22,6 +22,13 @@ def parse_arguments() -> argparse.Namespace:
         "--internal_iterations", required=False, help="The internal iterations that the algorithm will run in parallel.", default=None
     )
     parser.add_argument(
+        "--triplets_experiment",
+        required=False,
+        help="Whether should create the triplets folders for the experiments.",
+        default=True,
+        type=bool,
+    )
+    parser.add_argument(
         "--experiment_size",
         required=False,
         help="The max items to use in each fold of the experiment.",
@@ -57,6 +64,7 @@ class FoldsCreator:
         internal_iterations: List[int] = None,
         create_internal_iterations: bool = True,
         n_split: int = 5,
+        triplets_experiment: bool = True,
     ):
         self.k_fold = DistributedKFoldSplit(
             working_directory_path=working_directory_path,
@@ -64,6 +72,7 @@ class FoldsCreator:
             n_split=n_split,
             learning_algorithms=learning_algorithms,
             internal_iterations=internal_iterations,
+            triplets_experiment=triplets_experiment,
         )
         self.domain_file_name = domain_file_name
         self.working_directory_path = working_directory_path
@@ -141,6 +150,7 @@ if __name__ == "__main__":
         internal_iterations=split_internal_iterations,
         create_internal_iterations=split_internal_iterations is not None,
         n_split=args.num_splits,
+        triplets_experiment=args.triplets_experiment,
     )
     folds_creator.create_folds_from_cross_validation(experiment_size=args.experiment_size)
     folds_creator.create_random_performance_evaluation_trajectories(
