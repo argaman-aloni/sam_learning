@@ -12,9 +12,7 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
     configure_iteration_logger,
     PLANNER_EXECUTION_TIMEOUT,
 )
-from sam_learning.core import LearnerDomain
 from sam_learning.learners import SAMLearner, MultiAgentSAM, MASAMPlus
-from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy, MappingElement, SolverType
 from validators import DomainValidator
 
