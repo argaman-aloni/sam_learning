@@ -18,12 +18,6 @@ def parse_arguments() -> argparse.Namespace:
         "--problem_prefix", required=True, help="the prefix of the name of the problems to be able to generate trajectories from them."
     )
     parser.add_argument("--learning_algorithms", required=True, help="the list of algorithms that will run in parallel")
-    parser.add_argument(
-        "--ignore_internal_iterations",
-        help="If specified, the internal iterations will not be used.",
-        action="store_false",
-        dest="should_not_create_internal_iterations",
-    )
     parser.add_argument("--internal_iterations", required=False, help="The internal iterations that the algorithm will run in parallel.")
     parser.add_argument(
         "--experiment_size",
@@ -132,7 +126,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
     split_internal_iterations = [int(val) for val in args.internal_iterations.split(",")] if args.internal_iterations else None
-    if args.should_not_create_internal_iterations:
+    if split_internal_iterations is None:
         print("No internal iterations specified, will not create internal iterations for the folds.")
 
     else:
@@ -143,7 +137,7 @@ if __name__ == "__main__":
         domain_file_name=args.domain_file_name,
         learning_algorithms=experiment_learning_algorithms,
         internal_iterations=split_internal_iterations,
-        create_internal_iterations=not args.should_not_create_internal_iterations,
+        create_internal_iterations=split_internal_iterations is None,
         n_split=args.num_splits,
     )
     folds_creator.create_folds_from_cross_validation(experiment_size=args.experiment_size)
