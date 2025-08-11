@@ -139,7 +139,7 @@ if __name__ == "__main__":
         domain_file_name=args.domain_file_name,
         learning_algorithms=experiment_learning_algorithms,
         internal_iterations=split_internal_iterations,
-        create_internal_iterations=split_internal_iterations is None,
+        create_internal_iterations=split_internal_iterations is not None,
         n_split=args.num_splits,
     )
     folds_creator.create_folds_from_cross_validation(experiment_size=args.experiment_size)
