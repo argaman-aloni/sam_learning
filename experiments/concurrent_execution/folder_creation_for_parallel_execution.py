@@ -18,7 +18,9 @@ def parse_arguments() -> argparse.Namespace:
         "--problem_prefix", required=True, help="the prefix of the name of the problems to be able to generate trajectories from them."
     )
     parser.add_argument("--learning_algorithms", required=True, help="the list of algorithms that will run in parallel")
-    parser.add_argument("--internal_iterations", required=False, help="The internal iterations that the algorithm will run in parallel.")
+    parser.add_argument(
+        "--internal_iterations", required=False, help="The internal iterations that the algorithm will run in parallel.", default=None
+    )
     parser.add_argument(
         "--experiment_size",
         required=False,
@@ -125,7 +127,7 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s %(name)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
     args = parse_arguments()
     experiment_learning_algorithms = args.learning_algorithms.split(",")
-    split_internal_iterations = [int(val) for val in args.internal_iterations.split(",")] if args.internal_iterations else None
+    split_internal_iterations = [int(val) for val in args.internal_iterations.split(",")] if args.internal_iterations is not None else None
     if split_internal_iterations is None:
         print("No internal iterations specified, will not create internal iterations for the folds.")
 
