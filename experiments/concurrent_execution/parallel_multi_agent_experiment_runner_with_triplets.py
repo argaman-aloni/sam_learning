@@ -56,7 +56,9 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
         self._init_semantic_performance_calculator(fold_num, should_include_sam_in_ma_evaluation=True)
         partial_domain = self.read_domain_file(train_set_dir_path)
         complete_train_set: List[MultiAgentObservation] = super().collect_observations(train_set_dir_path, partial_domain)
-        triplets_per_experiment = MAX_TRIPLETS_FOR_EXPERIMENT if partial_domain.name != "rover" else ROVERS_TRIPLETS_PER_EXPERIMENT
+        triplets_per_experiment = (
+            MAX_TRIPLETS_FOR_EXPERIMENT if partial_domain.name not in ["rover", "grid_overcooked"] else ROVERS_TRIPLETS_PER_EXPERIMENT
+        )
         transitions_based_training_set = self.create_transitions_based_training_set(
             complete_train_set, num_triplets_per_testing=triplets_per_experiment
         )
@@ -78,7 +80,9 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
             self._export_dataset_statistics(fold_num, num_trivial_action_triplets, num_non_trivial_action_triplets)
 
         # run the experiments with up to 100 triplets
-        iterations_to_run = MAX_NUM_ITERATIONS if partial_domain.name != "rover" else ROVERS_EXPERIMENT_MAX_TRIPLETS
+        iterations_to_run = (
+            MAX_NUM_ITERATIONS if partial_domain.name not in ["rover", "grid_overcooked"] else ROVERS_EXPERIMENT_MAX_TRIPLETS
+        )
         for index in range(1, iterations_to_run):  # we want to run the experiments with up to 100 triplets
             if self._learning_algorithm == LearningAlgorithmType.sam_learning:
                 self._learn_model_offline(
