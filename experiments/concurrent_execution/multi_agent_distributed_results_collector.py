@@ -1,15 +1,12 @@
 import argparse
-import csv
 import logging
 from pathlib import Path
 from typing import List, Optional
 
 from pddl_plus_parser.lisp_parsers import DomainParser
-from pddl_plus_parser.models import Domain
 
-from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector, FOLD_FIELD
+from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector
 from experiments.plotting.plot_masam_results import plot_solving_results
-from statistics.semantic_performance_calculator import SEMANTIC_PRECISION_STATS
 from utilities import LearningAlgorithmType
 
 
@@ -53,7 +50,9 @@ class MultiAgentExperimentsResultsCollector(DistributedResultsCollector):
         combined_statistics_file_path_with_triplets = results_directory / "solving_combined_statistics_with_triplets.csv"
         plot_solving_results(combined_statistics_file_path, results_directory / "solving_combined_statistics.pdf")
         plot_solving_results(
-            combined_statistics_file_path_with_triplets, results_directory / "solving_combined_statistics_with_triplets.pdf", using_triplets=True
+            combined_statistics_file_path_with_triplets,
+            results_directory / "solving_combined_statistics_with_triplets.pdf",
+            using_triplets=True,
         )
         self._collect_performance_statistics(exclude_algorithm=LearningAlgorithmType.ma_sam_plus)
 
