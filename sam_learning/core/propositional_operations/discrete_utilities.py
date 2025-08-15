@@ -7,13 +7,17 @@ from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObj
 
 from sam_learning.core.learner_domain import LearnerDomain
 
-NOT_PREFIX = "(not"
+NOT_PREFIX = "(not "
 FORALL = "forall"
 
 
 def extract_predicate_data(
-        action_signature: SignatureType, predicate_str: str, domain_constants: Dict[str, PDDLConstant],
-        additional_parameter: Optional[str] = None, additional_parameter_type: Optional[PDDLType] = None) -> Predicate:
+    action_signature: SignatureType,
+    predicate_str: str,
+    domain_constants: Dict[str, PDDLConstant],
+    additional_parameter: Optional[str] = None,
+    additional_parameter_type: Optional[PDDLType] = None,
+) -> Predicate:
     """Extracts the lifted bounded predicate from the string.
 
     :param action_signature: the action that contains the predicate.
@@ -24,9 +28,11 @@ def extract_predicate_data(
     :return: the predicate object matching the string.
     """
     is_positive = not predicate_str.startswith(NOT_PREFIX)
-    predicate_data = predicate_str.replace(f"{NOT_PREFIX} (", "").strip(")").split(" ") if predicate_str.startswith(
-        NOT_PREFIX) \
+    predicate_data = (
+        predicate_str.replace(f"{NOT_PREFIX}(", "").strip(")").split(" ")
+        if predicate_str.startswith(NOT_PREFIX)
         else predicate_str.replace("(", "").replace(")", "").split(" ")
+    )
     predicate_data = [data for data in predicate_data if data != ""]  # Remove empty strings
     predicate_name = predicate_data[0]
     combined_signature = {**action_signature}
@@ -38,8 +44,7 @@ def extract_predicate_data(
     return Predicate(predicate_name, predicate_signature, is_positive=is_positive)
 
 
-def create_additional_parameter_name(
-        domain: Domain, grounded_action: ActionCall, pddl_type: PDDLType) -> str:
+def create_additional_parameter_name(domain: Domain, grounded_action: ActionCall, pddl_type: PDDLType) -> str:
     """Creates a unique name for the additional parameter.
 
     :param domain: the domain containing the action definition.
@@ -57,8 +62,8 @@ def create_additional_parameter_name(
 
 
 def find_unique_objects_by_type(
-        trajectory_objects: Dict[str, PDDLObject],
-        exclude_list: Optional[List[str]] = None) -> Dict[str, List[PDDLObject]]:
+    trajectory_objects: Dict[str, PDDLObject], exclude_list: Optional[List[str]] = None
+) -> Dict[str, List[PDDLObject]]:
     """Returns a dictionary containing a single object of each type.
 
     :param trajectory_objects: the objects that were observed in the trajectory.
@@ -76,9 +81,8 @@ def find_unique_objects_by_type(
 
 
 def iterate_over_objects_of_same_type(
-        trajectory_objects: Dict[str, PDDLObject],
-        action_additional_parameters: Dict[str, str],
-        exclude_list: Optional[List[str]] = None) -> Generator[Tuple[PDDLObject, str, str], None, None]:
+    trajectory_objects: Dict[str, PDDLObject], action_additional_parameters: Dict[str, str], exclude_list: Optional[List[str]] = None
+) -> Generator[Tuple[PDDLObject, str, str], None, None]:
     """Iterate over the objects of the same type.
 
     :param trajectory_objects: the objects that were observed in the trajectory.
