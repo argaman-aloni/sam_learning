@@ -3,7 +3,7 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Generator, Tuple
 
-from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, SignatureType
+from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, SignatureType, Domain
 
 from sam_learning.core.learner_domain import LearnerDomain
 
@@ -39,7 +39,7 @@ def extract_predicate_data(
 
 
 def create_additional_parameter_name(
-        domain: LearnerDomain, grounded_action: ActionCall, pddl_type: PDDLType) -> str:
+        domain: Domain, grounded_action: ActionCall, pddl_type: PDDLType) -> str:
     """Creates a unique name for the additional parameter.
 
     :param domain: the domain containing the action definition.

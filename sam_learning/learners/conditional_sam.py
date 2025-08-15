@@ -1,4 +1,5 @@
 """Module containing the algorithm to learn action models with conditional effects."""
+
 import logging
 from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
@@ -14,9 +15,11 @@ from pddl_plus_parser.models import (
     PDDLObject,
     PDDLType,
     Precondition,
+    Predicate,
+    Action,
 )
 
-from sam_learning.core import DependencySet, LearnerDomain, extract_discrete_effects, LearnerAction, extract_predicate_data
+from sam_learning.core import DependencySet, extract_discrete_effects, extract_predicate_data
 from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
@@ -93,7 +96,9 @@ class ConditionalSAM(SAMLearner):
         :param extra_lifted_object: an extra lifted object that indicates the parameter name of the grounded object.
         :return: the literals that match the input conditions.
         """
-        lifted_literals = self.matcher.get_possible_literal_matches(grounded_action, grounded_predicates, extra_grounded_object, extra_lifted_object)
+        lifted_literals = self.matcher.get_possible_literal_matches(
+            grounded_action, grounded_predicates, extra_grounded_object, extra_lifted_object
+        )
 
         if not should_be_in_state:
             for literal in lifted_literals:
@@ -158,7 +163,9 @@ class ConditionalSAM(SAMLearner):
         missing_next_state_literals = self._find_literals_not_in_state(grounded_action, self.triplet_snapshot.next_state_predicates)
         previous_state_literals = self._find_literals_existing_in_state(grounded_action, self.triplet_snapshot.previous_state_predicates)
         for literal in missing_next_state_literals:
-            self.conditional_antecedents[grounded_action.name].remove_dependencies(literal=literal, literals_to_remove=previous_state_literals)
+            self.conditional_antecedents[grounded_action.name].remove_dependencies(
+                literal=literal, literals_to_remove=previous_state_literals
+            )
 
         self.logger.debug(f"Done removing existing previous state dependencies.")
 
@@ -207,7 +214,7 @@ class ConditionalSAM(SAMLearner):
         self._update_observed_effects(grounded_action, previous_state, next_state)
         self._remove_not_antecedents(grounded_action, previous_state, next_state)
 
-    def _construct_restrictive_preconditions(self, action: LearnerAction, action_dependency_set: DependencySet, literal: str) -> None:
+    def _construct_restrictive_preconditions(self, action: Action, action_dependency_set: DependencySet, literal: str) -> None:
         """Constructs the additional preconditions that are required for the action to be safe.
 
         :param action: the action that contains unsafe literals in the effects.
@@ -216,13 +223,17 @@ class ConditionalSAM(SAMLearner):
         """
         self.logger.info(f"Constructing restrictive preconditions for the unsafe action {action.name}.")
         is_effect = literal in self.observed_effects[action.name]
-        conservative_preconditions = action_dependency_set.construct_restrictive_preconditions(action.preconditions_str_set, literal, is_effect)
+        conservative_preconditions = action_dependency_set.construct_restrictive_preconditions(
+            {precondition.untyped_representation for _, precondition in action.preconditions if isinstance(precondition, Predicate)},
+            literal,
+            is_effect,
+        )
         if conservative_preconditions is not None:
             action.preconditions.add_condition(conservative_preconditions)
 
     def _construct_antecedents(
         self,
-        action: LearnerAction,
+        action: Action,
         action_dependency_set: DependencySet,
         conditional_effect: ConditionalEffect,
         literal: str,
@@ -258,12 +269,14 @@ class ConditionalSAM(SAMLearner):
         self.logger.debug("The antecedents are conjunctions!")
         for antecedent in antecedents:
             conditional_effect.antecedents.add_condition(
-                extract_predicate_data(action.signature, antecedent, self.partial_domain.constants, additional_parameter, additional_parameter_type)
+                extract_predicate_data(
+                    action.signature, antecedent, self.partial_domain.constants, additional_parameter, additional_parameter_type
+                )
             )
 
     def _construct_result(
         self,
-        action: LearnerAction,
+        action: Action,
         conditional_effect: ConditionalEffect,
         literal: str,
         additional_parameter: Optional[str] = None,
@@ -278,12 +291,14 @@ class ConditionalSAM(SAMLearner):
         :param additional_parameter_type: the type of the additional parameter (if exists).
         """
         conditional_effect.discrete_effects.add(
-            extract_predicate_data(action.signature, literal, self.partial_domain.constants, additional_parameter, additional_parameter_type)
+            extract_predicate_data(
+                action.signature, literal, self.partial_domain.constants, additional_parameter, additional_parameter_type
+            )
         )
 
     def _construct_conditional_effect_data(
         self,
-        action: LearnerAction,
+        action: Action,
         action_dependency_set: DependencySet,
         literal: str,
         additional_parameter: Optional[str] = None,
@@ -297,13 +312,15 @@ class ConditionalSAM(SAMLearner):
         conditional_effect = ConditionalEffect()
         self.logger.info(f"Constructing conditional effect's data for the unsafe action {action.name}.")
         self._construct_result(action, conditional_effect, literal, additional_parameter, additional_parameter_type)
-        self._construct_antecedents(action, action_dependency_set, conditional_effect, literal, additional_parameter, additional_parameter_type)
+        self._construct_antecedents(
+            action, action_dependency_set, conditional_effect, literal, additional_parameter, additional_parameter_type
+        )
 
         return conditional_effect
 
     def _construct_restrictive_effect(
         self,
-        action: LearnerAction,
+        action: Action,
         dependency_set: DependencySet,
         literal: str,
         quantified_parameter: Optional[str] = None,
@@ -321,12 +338,14 @@ class ConditionalSAM(SAMLearner):
             combined_conditions.update(conditions)
 
         temp_dependency_set = DependencySet(
-            max_size_antecedents=dependency_set.max_antecedents, action_signature=action.signature, domain_constants=self.partial_domain.constants
+            max_size_antecedents=dependency_set.max_antecedents,
+            action_signature=action.signature,
+            domain_constants=self.partial_domain.constants,
         )
         temp_dependency_set.possible_antecedents[literal] = [combined_conditions]
         return self._construct_conditional_effect_data(action, temp_dependency_set, literal, quantified_parameter, quantified_type)
 
-    def _construct_simple_effect(self, action: LearnerAction, literal: str) -> None:
+    def _construct_simple_effect(self, action: Action, literal: str) -> None:
         """Constructs a simple effect (non-conditional effect) from the literal.
 
         :param action: the action to construct the effect for.
@@ -365,7 +384,7 @@ class ConditionalSAM(SAMLearner):
 
         return compressed_effects
 
-    def _verify_and_construct_safe_conditional_effects(self, action: LearnerAction) -> None:
+    def _verify_and_construct_safe_conditional_effects(self, action: Action) -> None:
         """Verifies that the action is safe and constructs its effects and preconditions.
 
         :param action: the action that is being verified.
@@ -385,7 +404,7 @@ class ConditionalSAM(SAMLearner):
         action.conditional_effects = compressed_effects
 
     def verify_single_possible_conditional_effect(
-        self, action: LearnerAction, action_dependency: DependencySet, literal: str
+        self, action: Action, action_dependency: DependencySet, literal: str
     ) -> Optional[ConditionalEffect]:
         """Verifies whether the literal is a possible conditional effect of the action.
 
@@ -410,7 +429,9 @@ class ConditionalSAM(SAMLearner):
             return
 
         if not self.conditional_antecedents[action.name].is_safe_conditional_effect(literal):
-            self.logger.debug(f"The literal {literal} is not a conditional effect of the action {action.name}, " f"constructing simple effect.")
+            self.logger.debug(
+                f"The literal {literal} is not a conditional effect of the action {action.name}, " f"constructing simple effect."
+            )
             self._construct_simple_effect(action, literal)
             return
 
@@ -455,7 +476,10 @@ class ConditionalSAM(SAMLearner):
         action_name = grounded_action.name
 
         self.triplet_snapshot.create_triplet_snapshot(
-            previous_state=previous_state, next_state=next_state, current_action=grounded_action, observation_objects=self.current_trajectory_objects
+            previous_state=previous_state,
+            next_state=next_state,
+            current_action=grounded_action,
+            observation_objects=self.current_trajectory_objects,
         )
         if action_name not in self.observed_actions:
             self._initialize_actions_dependencies(grounded_action)
@@ -469,18 +493,20 @@ class ConditionalSAM(SAMLearner):
         self.partial_domain.actions = {action_name: self.partial_domain.actions[action_name] for action_name in self.observed_actions}
 
         for action in self.partial_domain.actions.values():
-            self.conditional_antecedents[action.name].remove_preconditions_literals(action.preconditions_str_set)
+            self.conditional_antecedents[action.name].remove_preconditions_literals(
+                {precondition.untyped_representation for _, precondition in action.preconditions if isinstance(precondition, Predicate)}
+            )
             self._verify_and_construct_safe_conditional_effects(action)
             self.logger.debug(f"Finished handling action {action.name}.")
 
-    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
+    def learn_action_model(self, observations: List[Observation]) -> Tuple[Domain, Dict[str, str]]:
         """Learn the SAFE action model from the input trajectories.
 
         :param observations: the list of trajectories that are used to learn the safe action model.
         :return: a domain containing the actions that were learned.
         """
         self.logger.info("Starting to learn the action model!")
-        self.partial_domain.requirements.extend([DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ])
+        self.partial_domain.requirements.update([DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ])
         super().start_measure_learning_time()
         super().deduce_initial_inequality_preconditions()
         for observation in observations:
