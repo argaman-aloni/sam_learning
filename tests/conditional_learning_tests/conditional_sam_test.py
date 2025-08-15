@@ -1,7 +1,18 @@
 """Module test for Conditional SAM."""
+
 from typing import Set
 
-from pddl_plus_parser.models import Domain, Observation, Predicate, ConditionalEffect, PDDLType, State, ActionCall, Precondition, CompoundPrecondition
+from pddl_plus_parser.models import (
+    Domain,
+    Observation,
+    Predicate,
+    ConditionalEffect,
+    PDDLType,
+    State,
+    ActionCall,
+    Precondition,
+    CompoundPrecondition,
+)
 from pytest import fixture
 
 from sam_learning.core import DependencySet
@@ -47,11 +58,15 @@ def test_initialize_actions_dependencies_adds_the_dependencies_and_sets_the_pred
     spider_conditional_sam._initialize_actions_dependencies(spider_first_action)
     assert len(spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents) > 0
     negative_results = [
-        res for res in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents if res.startswith("(not")
+        res
+        for res in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents
+        if res.startswith("(not")
     ]
     assert len(negative_results) > 0
     positive_results = [
-        res for res in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents if not res.startswith("(not")
+        res
+        for res in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents
+        if not res.startswith("(not")
     ]
     assert len(positive_results) == len(negative_results)
 
@@ -176,7 +191,9 @@ def test_remove_existing_previous_state_dependencies_removes_literals_observed_i
     }
     not_effect = "(not (currently-dealing ))"
     for not_antecedent in not_antecedents:
-        assert {not_antecedent} not in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[not_effect]
+        assert {not_antecedent} not in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[
+            not_effect
+        ]
 
 
 def test_remove_existing_previous_state_dependencies_keeps_literals_not_observed_in_previous_state_in_literals_that_cannot_be_effects(
@@ -239,7 +256,9 @@ def test_apply_inductive_rules_updates_the_learned_effects_and_retains_anteceden
         "(not (currently-dealing ))",
     }
     for not_antecedent in not_antecedents:
-        assert {not_antecedent} in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[observed_effect]
+        assert {not_antecedent} in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[
+            observed_effect
+        ]
 
 
 def test_apply_inductive_rules_removes_literals_that_are_not_in_pre_state_from_being_antecedents(
@@ -264,7 +283,9 @@ def test_apply_inductive_rules_removes_literals_that_are_not_in_pre_state_from_b
         "(currently-dealing )",
     }
     for not_antecedent in not_antecedents:
-        assert {not_antecedent} not in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[observed_effect]
+        assert {not_antecedent} not in spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[
+            observed_effect
+        ]
 
 
 def test_apply_inductive_rules_updates_the_possible_antecedents_for_literal_observed_as_not_effect_of_the_action(
@@ -314,9 +335,13 @@ def test_apply_inductive_rules_does_not_change_the_number_of_dependencies_for_li
     sync_snapshot(spider_conditional_sam, spider_observation.components[0], spider_observation.grounded_objects)
     spider_conditional_sam._initialize_actions_dependencies(spider_first_action)
     tested_literal = "(not (currently-collecting-deck ))"
-    initial_number_antecedents = len(spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[tested_literal])
+    initial_number_antecedents = len(
+        spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[tested_literal]
+    )
     spider_conditional_sam._apply_inductive_rules(spider_first_action, spider_first_state, spider_second_state)
-    updated_number_antecedents = len(spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[tested_literal])
+    updated_number_antecedents = len(
+        spider_conditional_sam.conditional_antecedents[spider_first_action.name].possible_antecedents[tested_literal]
+    )
     assert initial_number_antecedents == updated_number_antecedents
 
 
@@ -366,7 +391,9 @@ def test_add_new_action_updates_action_positive_preconditions(
     assert len(positive_preconditions) == 0
 
 
-def test_add_new_action_updates_action_effects(spider_conditional_sam: ConditionalSAM, spider_observation: Observation, spider_domain: Domain):
+def test_add_new_action_updates_action_effects(
+    spider_conditional_sam: ConditionalSAM, spider_observation: Observation, spider_domain: Domain
+):
     sync_snapshot(spider_conditional_sam, spider_observation.components[0], spider_observation.grounded_objects)
     grounded_action = spider_observation.components[0].grounded_action_call
 
@@ -380,7 +407,9 @@ def test_add_new_action_updates_action_effects(spider_conditional_sam: Condition
     assert len(added_action.discrete_effects) <= len(initialized_discrete_effects)
 
 
-def test_update_action_updates_preconditions(spider_conditional_sam: ConditionalSAM, spider_observation: Observation, spider_domain: Domain):
+def test_update_action_updates_preconditions(
+    spider_conditional_sam: ConditionalSAM, spider_observation: Observation, spider_domain: Domain
+):
     sync_snapshot(spider_conditional_sam, spider_observation.components[0], spider_observation.grounded_objects)
     grounded_action = spider_observation.components[0].grounded_action_call
     spider_conditional_sam._initialize_actions_dependencies(grounded_action)
@@ -436,7 +465,9 @@ def test_extract_predicate_data_returns_correct_predicate_predicate_contains_par
     assert result_predicate.signature["?from"].name == "cardposition"
 
 
-def test_extract_predicate_data_returns_correct_predicate_predicate_contains_constants(spider_conditional_sam: ConditionalSAM, spider_domain: Domain):
+def test_extract_predicate_data_returns_correct_predicate_predicate_contains_constants(
+    spider_conditional_sam: ConditionalSAM, spider_domain: Domain
+):
     test_predicate = "(on ?c discard)"
     learner_action = spider_conditional_sam.partial_domain.actions["collect-card"]
     result_predicate = extract_predicate_data(
@@ -448,7 +479,9 @@ def test_extract_predicate_data_returns_correct_predicate_predicate_contains_con
     assert result_predicate.signature["discard"].name == "cardposition"
 
 
-def test_extract_predicate_data_returns_correct_predicate_with_additional_type(spider_conditional_sam: ConditionalSAM, spider_domain: Domain):
+def test_extract_predicate_data_returns_correct_predicate_with_additional_type(
+    spider_conditional_sam: ConditionalSAM, spider_domain: Domain
+):
     test_predicate = "(can-be-placed-on ?c ?c1)"
     learner_action = spider_conditional_sam.partial_domain.actions["collect-card"]
     result_predicate = extract_predicate_data(
@@ -551,7 +584,9 @@ def test_construct_restrictive_conditional_effects_constructs_the_correct_condit
     assert str(conditional_effect) == "(when (and (not (can-continue-group ?c ?to))) (and (make-unmovable ?to)))"
 
 
-def test_handle_single_trajectory_component_learns_correct_information(spider_conditional_sam: ConditionalSAM, spider_observation: Observation):
+def test_handle_single_trajectory_component_learns_correct_information(
+    spider_conditional_sam: ConditionalSAM, spider_observation: Observation
+):
     spider_conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     spider_conditional_sam.handle_single_trajectory_component(spider_observation.components[0])
 
@@ -596,7 +631,9 @@ def test_verify_and_construct_safe_conditional_effects_constructs_correct_safe_c
     spider_conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     spider_conditional_sam.handle_single_trajectory_component(first_component)
     test_action = spider_conditional_sam.partial_domain.actions[first_component.grounded_action_call.name]
-    spider_conditional_sam.conditional_antecedents[test_action.name].remove_preconditions_literals(test_action.preconditions_str_set)
+    spider_conditional_sam.conditional_antecedents[test_action.name].remove_preconditions_literals(
+        {precondition.untyped_representation for _, precondition in test_action.preconditions if isinstance(precondition, Predicate)}
+    )
     spider_conditional_sam._verify_and_construct_safe_conditional_effects(test_action)
 
     assert [effect.untyped_representation for effect in test_action.discrete_effects] == ["(currently-dealing )"]
@@ -641,7 +678,9 @@ def test_verify_and_construct_safe_conditional_effects_creates_simple_discrete_e
     spider_conditional_sam.current_trajectory_objects = spider_observation.grounded_objects
     spider_conditional_sam.handle_single_trajectory_component(fourth_component)
     test_action = spider_conditional_sam.partial_domain.actions[fourth_component.grounded_action_call.name]
-    spider_conditional_sam.conditional_antecedents[test_action.name].remove_preconditions_literals(test_action.preconditions_str_set)
+    spider_conditional_sam.conditional_antecedents[test_action.name].remove_preconditions_literals(
+        {precondition.untyped_representation for _, precondition in test_action.preconditions if isinstance(precondition, Predicate)}
+    )
     spider_conditional_sam._verify_and_construct_safe_conditional_effects(test_action)
     print(test_action.to_pddl())
     assert len(test_action.discrete_effects) == 7 + 2  # 7 simple effects + 2 conditional effects
@@ -726,7 +765,9 @@ def test_compress_conditional_effects_does_compress_effects_even_when_the_predic
     assert len(compressed_effects) == 1
 
 
-def test_compress_conditional_effects_compress_more_than_two_conditional_effects_when_they_are_compressable(spider_conditional_sam: ConditionalSAM):
+def test_compress_conditional_effects_compress_more_than_two_conditional_effects_when_they_are_compressable(
+    spider_conditional_sam: ConditionalSAM,
+):
     object_type = PDDLType("object")
     antecedents1 = [Predicate("ante1", {"?y": object_type}), Predicate("ante2", {"?x": object_type})]
     antecedents2 = [Predicate("ante2", {"?x": object_type}), Predicate("ante1", {"?y": object_type})]
