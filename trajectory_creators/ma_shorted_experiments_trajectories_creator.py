@@ -1,4 +1,5 @@
 """Creates the trajectories that will be used in the trajectory"""
+
 import logging
 import shutil
 import sys
