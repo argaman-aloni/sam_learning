@@ -1,4 +1,5 @@
 """Represents a data structure that manages the matching of lifted predicates to their possible executing actions."""
+
 from typing import List, Dict, Set, Tuple
 
 from pddl_plus_parser.models import Predicate
@@ -52,7 +53,7 @@ def group_params_from_clause(clause: List[Tuple[str, str]]) -> PGType:
     # each parameter has its own respective set of bound parameters
     clause_param_grouping = [set() for _ in range(num_of_params)]
 
-    for (action_name, fluent_str) in clause:
+    for action_name, fluent_str in clause:
         parameters = param_pattern.findall(fluent_str)
 
         for idx, param in enumerate(parameters):
@@ -86,8 +87,9 @@ class LiteralCNF:
                 if len(possible_joint_effect) == 0:
                     redundant_items_indexes.append(index)
 
-        for index in redundant_items_indexes:
-            self.possible_lifted_effects.pop(index)
+        self.possible_lifted_effects = [
+            lifted_effect for i, lifted_effect in enumerate(self.possible_lifted_effects) if i not in redundant_items_indexes
+        ]
 
     def add_possible_effect(self, possible_joint_effect: List[Tuple[str, str]]) -> None:
         """Add a possible joint effect to the list of possible effects.
@@ -95,7 +97,7 @@ class LiteralCNF:
         :param possible_joint_effect: a list of tuples of the form (action_name, predicate).
         """
         filtered_joint_effect = []
-        for (action_name, lifted_predicate) in possible_joint_effect:
+        for action_name, lifted_predicate in possible_joint_effect:
             if lifted_predicate in self.not_effects[action_name]:
                 continue
 
@@ -129,7 +131,7 @@ class LiteralCNF:
 
         for nunc in non_unit_clauses:
             if not any(uc in nunc for uc in unit_clauses):
-                for (action, predicate) in nunc:
+                for action, predicate in nunc:
                     if action == action_name and predicate not in action_preconditions:
                         return False
 
@@ -166,7 +168,9 @@ class LiteralCNF:
 
         return effects
 
-    def extract_macro_action_effects(self, action_names: List[str], action_preconditions: Set[str], param_grouping: PGType) -> List[Tuple[str, str]]:
+    def extract_macro_action_effects(
+        self, action_names: List[str], action_preconditions: Set[str], param_grouping: PGType
+    ) -> List[Tuple[str, str]]:
         """Extract the effects that a macro action is acting on.
 
         :param action_names: the names of the actions that participate in the macro.
@@ -177,7 +181,7 @@ class LiteralCNF:
         effects = []
         for possible_joint_effect in self.possible_lifted_effects:
             if is_clause_consistent(possible_joint_effect, action_names, param_grouping):
-                for (action, effect) in possible_joint_effect:
+                for action, effect in possible_joint_effect:
                     # basically, if there's at least one action that allows this effect, we'll take the effect
                     if effect not in action_preconditions:
                         effects.append((action, effect))
@@ -196,7 +200,7 @@ class LiteralCNF:
         preconditions = []
         for possible_joint_effect in self.possible_lifted_effects:
             if not is_clause_consistent(possible_joint_effect, action_names, param_grouping):
-                for (action_name, lifted_fluent) in possible_joint_effect:
+                for action_name, lifted_fluent in possible_joint_effect:
                     if action_name in action_names:
                         preconditions.append((action_name, lifted_fluent))
 

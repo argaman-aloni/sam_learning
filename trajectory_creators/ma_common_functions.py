@@ -1,4 +1,5 @@
 """Common functions for the multi-agent trajectory creators."""
+
 import random
 from pathlib import Path
 from typing import List, Tuple
@@ -46,6 +47,10 @@ def _find_empty_action_index(joint_action: JointActionCall) -> int:
     :return: the index of the empty action.
     """
     new_action_index = random.randint(0, len(joint_action.actions) - 1)
+    if all(action.name != NOP_ACTION for action in joint_action.actions):
+        # if all actions are filled, we need to find a new index
+        return -1
+
     while joint_action.actions[new_action_index].name != NOP_ACTION:
         new_action_index = random.randint(0, len(joint_action.actions) - 1)
 
@@ -53,7 +58,10 @@ def _find_empty_action_index(joint_action: JointActionCall) -> int:
 
 
 def insert_dummy_actions_to_plan(
-    plan_sequence: List[JointActionCall], agent_names: List[str], probabilities: List[float] = RANDOM_PROBABILITIES, dummy_in_goal: bool = False
+    plan_sequence: List[JointActionCall],
+    agent_names: List[str],
+    probabilities: List[float] = RANDOM_PROBABILITIES,
+    dummy_in_goal: bool = False,
 ) -> List[JointActionCall]:
     """Inserts the dummy action to the plan sequence.
 
@@ -64,10 +72,22 @@ def insert_dummy_actions_to_plan(
     :return: the joint action sequence with the dummy action inserted in multiple places.
     """
     new_plan_sequence = []
+    last_empty_cell_to_add_dummy = len(plan_sequence) - 1
+    if dummy_in_goal:
+        # search for the last plan index with an empty slot to add the dummy action
+        for index in range(len(plan_sequence) - 1, 0, -1):
+            free_agent = _find_empty_action_index(plan_sequence[index])
+            if free_agent != -1:
+                last_empty_cell_to_add_dummy = index
+                plan_sequence[index].actions[free_agent] = ActionCall(
+                    name=ADD_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[free_agent]]
+                )
+                break
+
     for index, joint_action in enumerate(plan_sequence):
-        if dummy_in_goal and index != len(plan_sequence) - 1:
-            agent_index = _find_empty_action_index(joint_action)
-            joint_action.actions[agent_index] = ActionCall(name=ADD_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[agent_index]])
+        if index >= last_empty_cell_to_add_dummy:
+            # if we are past the last empty cell, we do not add any dummy actions
+            new_plan_sequence.append(joint_action)
             continue
 
         add_dummy_action = bool(numpy.random.choice([0, 1], p=probabilities))
@@ -76,10 +96,17 @@ def insert_dummy_actions_to_plan(
             continue
 
         new_action_index = _find_empty_action_index(joint_action)
+        if new_action_index == -1:
+            continue
+
         if should_be_delete_action:
-            joint_action.actions[new_action_index] = ActionCall(name=DEL_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[new_action_index]])
+            joint_action.actions[new_action_index] = ActionCall(
+                name=DEL_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[new_action_index]]
+            )
         else:
-            joint_action.actions[new_action_index] = ActionCall(name=ADD_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[new_action_index]])
+            joint_action.actions[new_action_index] = ActionCall(
+                name=ADD_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[new_action_index]]
+            )
 
         new_plan_sequence.append(joint_action)
 

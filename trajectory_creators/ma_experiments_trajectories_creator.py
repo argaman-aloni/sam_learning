@@ -1,4 +1,5 @@
 """Creates the trajectories that will be used in the trajectory"""
+
 import logging
 import sys
 from pathlib import Path
@@ -89,7 +90,6 @@ class MAExperimentTrajectoriesCreator:
             trajectory_exporter.export_to_file(triplets, regular_trajectories_folder / f"{problem_folder_name}.trajectory")
             triplets = trajectory_exporter.parse_plan(problem=combined_problem, plan_path=combined_enhanced_plan_path)
             trajectory_exporter.export_to_file(triplets, enhanced_trajectories_folder / f"{problem_folder_name}.trajectory")
-            # self._copy_domain_files(problem_folder, output_folder)
 
 
 if __name__ == "__main__":
