@@ -145,7 +145,9 @@ class MASAMPlus(MultiAgentSAM):
         cnf_effects = set()
         relevant_preconditions_str = set()
         for action in lma_set:
-            relevant_preconditions_str.update(action.preconditions_str_set)
+            relevant_preconditions_str.update(
+                {precondition.untyped_representation for _, precondition in action.preconditions if isinstance(precondition, Predicate)}
+            )
 
         for fluent, fluent_cnf in self.literals_cnf.items():
             effects = fluent_cnf.extract_macro_action_effects(lma_names, relevant_preconditions_str, param_grouping)
