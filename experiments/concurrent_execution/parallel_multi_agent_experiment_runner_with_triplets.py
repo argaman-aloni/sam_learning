@@ -84,16 +84,17 @@ class MultiAgentTripletsBasedExperimentRunner(SingleIterationMultiAgentExperimen
             MAX_NUM_ITERATIONS if partial_domain.name not in ["rover", "grid_overcooked"] else ROVERS_EXPERIMENT_MAX_TRIPLETS
         )
         for index in range(1, iterations_to_run):  # we want to run the experiments with up to 100 triplets
+            domain_copy = partial_domain.shallow_copy()  # This is to avoid having to deal with deleted actions between iterations.
             if self._learning_algorithm == LearningAlgorithmType.sam_learning:
                 self._learn_model_offline(
                     [*transitions_based_training_set[0:index]],
-                    partial_domain,
+                    domain_copy,
                     test_set_dir_path,
                     fold_num,
                     single_agent_observations=[*allowed_observations[0:index]],
                 )
             else:
-                self._learn_model_offline([*allowed_observations[0:index]], partial_domain, test_set_dir_path, fold_num)
+                self._learn_model_offline([*allowed_observations[0:index]], domain_copy, test_set_dir_path, fold_num)
 
         self.semantic_performance_calc.export_semantic_performance(fold_num)
         self.learning_statistics_manager.export_action_learning_statistics(fold_number=fold_num)
