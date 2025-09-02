@@ -68,9 +68,7 @@ def insert_dummy_actions_to_plan(
     """
     new_plan_sequence = []
     last_empty_cell_to_add_dummy = len(plan_sequence) - 1
-    if dummy_in_goal:
-        # search for the last plan index with an empty slot to add the dummy action
-        for index in range(len(plan_sequence) - 1, 0, -1):
+        for index in range(len(plan_sequence) - 1, -1, -1):
             free_agent = _find_empty_action_index(plan_sequence[index])
             if free_agent != -1:
                 last_empty_cell_to_add_dummy = index
