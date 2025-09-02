@@ -52,6 +52,8 @@ def _find_empty_action_index(joint_action: JointActionCall) -> int:
         return -1
 
     return random.choice(empty_indices)
+
+
 def insert_dummy_actions_to_plan(
     plan_sequence: List[JointActionCall],
     agent_names: List[str],
@@ -68,6 +70,9 @@ def insert_dummy_actions_to_plan(
     """
     new_plan_sequence = []
     last_empty_cell_to_add_dummy = len(plan_sequence) - 1
+    if dummy_in_goal:
+        # if the dummy predicate is in the goal, we need to add the dummy action in the last joint action
+        # we need to find the last empty cell in the plan sequence
         for index in range(len(plan_sequence) - 1, -1, -1):
             free_agent = _find_empty_action_index(plan_sequence[index])
             if free_agent != -1:
