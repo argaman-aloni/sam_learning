@@ -46,17 +46,12 @@ def _find_empty_action_index(joint_action: JointActionCall) -> int:
     :param joint_action: the joint action to find the empty action index in.
     :return: the index of the empty action.
     """
-    new_action_index = random.randint(0, len(joint_action.actions) - 1)
-    if all(action.name != NOP_ACTION for action in joint_action.actions):
+    empty_indices = [i for i, action in enumerate(joint_action.actions) if action.name == NOP_ACTION]
+    if not empty_indices:
         # if all actions are filled, we need to find a new index
         return -1
 
-    while joint_action.actions[new_action_index].name != NOP_ACTION:
-        new_action_index = random.randint(0, len(joint_action.actions) - 1)
-
-    return new_action_index
-
-
+    return random.choice(empty_indices)
 def insert_dummy_actions_to_plan(
     plan_sequence: List[JointActionCall],
     agent_names: List[str],
