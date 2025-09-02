@@ -31,15 +31,6 @@ class SolverType(Enum):
     fast_forward = 4
 
 
-class SolutionOutputTypes(Enum):
-    ok = 1
-    no_solution = 2
-    timeout = 3
-    not_applicable = 4
-    goal_not_achieved = 5
-    solver_error = 6
-
-
 class NegativePreconditionPolicy(Enum):
     no_remove = (1,)  # keep all learned preconditions
     soft = (2,)
