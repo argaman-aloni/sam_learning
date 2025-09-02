@@ -97,14 +97,10 @@ def insert_dummy_actions_to_plan(
         if new_action_index == -1:
             continue
 
-        if should_be_delete_action:
-            joint_action.actions[new_action_index] = ActionCall(
-                name=DEL_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[new_action_index]]
-            )
-        else:
-            joint_action.actions[new_action_index] = ActionCall(
-                name=ADD_PREDICATE_ACTION_NAME, grounded_parameters=[agent_names[new_action_index]]
-            )
+        joint_action.actions[new_action_index] = ActionCall(
+            name=DEL_PREDICATE_ACTION_NAME if should_be_delete_action else ADD_PREDICATE_ACTION_NAME,
+            grounded_parameters=[agent_names[new_action_index]],
+        )
 
         new_plan_sequence.append(joint_action)
 
