@@ -1,4 +1,5 @@
 """Runs experiments for the numeric model learning algorithms."""
+
 import argparse
 import json
 import os
@@ -18,7 +19,6 @@ from experiments.concurrent_execution.parallel_basic_experiment_runner import (
     configure_iteration_logger,
 )
 from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
-from sam_learning.core import LearnerDomain
 from statistics import LearningStatisticsManager
 from statistics.utils import init_semantic_performance_calculator
 from trajectory_creators import PlanMinerTrajectoriesCreator
@@ -72,7 +72,10 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
 
         else:
             self.domain_validator = DomainValidator(
-                self.working_directory_path, learning_algorithm, self.working_directory_path / domain_file_name, problem_prefix=problem_prefix,
+                self.working_directory_path,
+                learning_algorithm,
+                self.working_directory_path / domain_file_name,
+                problem_prefix=problem_prefix,
             )
 
     def _init_plan_miner_performance_evaluation(self) -> None:
@@ -86,13 +89,12 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             executing_agents=self.executing_agents,
         )
 
-    def _handle_plan_miner_failure(self) -> Tuple[LearnerDomain, Dict[str, Any]]:
+    def _handle_plan_miner_failure(self) -> Tuple[Domain, Dict[str, Any]]:
         plan_miner_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
         plan_miner_domain.actions = {}
-        learned_domain = LearnerDomain(plan_miner_domain)
-        return learned_domain, {"learning_time": -1}
+        return plan_miner_domain, {"learning_time": -1}
 
-    def _create_learned_domain_for_evaluation(self, plan_miner_output_domain_path: Path) -> LearnerDomain:
+    def _create_learned_domain_for_evaluation(self, plan_miner_output_domain_path: Path) -> Domain:
         """Creates the learned domain for evaluation purposes (The learner domain object).
 
         :param plan_miner_output_domain_path: the path to the Plan-Miner output domain.
@@ -102,26 +104,28 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         try:
             plan_miner_domain = DomainParser(plan_miner_output_domain_path).parse_domain()
             temp_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
-            learned_domain = LearnerDomain(plan_miner_domain)
-            learned_domain.name = temp_domain.name
-            learned_domain.requirements = temp_domain.requirements
+            plan_miner_domain.name = temp_domain.name
+            plan_miner_domain.requirements = temp_domain.requirements
 
             for action_name, action_data in plan_miner_domain.actions.items():
-                learned_domain.actions[action_name].signature = action_data.signature
-                learned_domain.actions[action_name].preconditions = action_data.preconditions
-                learned_domain.actions[action_name].discrete_effects = action_data.discrete_effects
-                learned_domain.actions[action_name].numeric_effects = action_data.numeric_effects
+                plan_miner_domain.actions[action_name].signature = action_data.signature
+                plan_miner_domain.actions[action_name].preconditions = action_data.preconditions
+                plan_miner_domain.actions[action_name].discrete_effects = action_data.discrete_effects
+                plan_miner_domain.actions[action_name].numeric_effects = action_data.numeric_effects
 
         except Exception as e:
-            self.logger.warning(f"Failed to parse the learned domain for PlanMiner. Probably PlanMiner created a domain with syntax errors.: {e}")
-            plan_miner_domain = DomainParser(self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True).parse_domain()
+            self.logger.warning(
+                f"Failed to parse the learned domain for PlanMiner. Probably PlanMiner created a domain with syntax errors.: {e}"
+            )
+            plan_miner_domain = DomainParser(
+                self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True
+            ).parse_domain()
             plan_miner_domain.actions = {}
-            learned_domain = LearnerDomain(plan_miner_domain)
 
         with open(plan_miner_output_domain_path, "wt") as domain_file:
             # This should keep the domain name in the correct format and maintain the correct domain name in the PDDL file.
-            domain_file.write(learned_domain.to_pddl())
-            return learned_domain
+            domain_file.write(plan_miner_domain.to_pddl())
+            return plan_miner_domain
 
     def _run_plan_miner_process(self, plan_miner_trajectory_file_path: Path) -> Optional[Path]:
         """Runs the Plan-Miner process to learn the action model.
@@ -153,7 +157,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         self.logger.error("Plan-Miner failed to learn the action model.")
         return None
 
-    def _apply_plan_miner(self, test_set_dir_path: Path) -> Tuple[LearnerDomain, Dict[str, Any]]:
+    def _apply_plan_miner(self, test_set_dir_path: Path) -> Tuple[Domain, Dict[str, Any]]:
         """Applies the learning algorithm Plan-Miner to learn the action model.
 
         :param test_set_dir_path: the path to the directory containing the test problems.
@@ -190,7 +194,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
-    ) -> Tuple[LearnerDomain, Dict[str, str]]:
+    ) -> Tuple[Domain, Dict[str, str]]:
         """Learns the action model using the numeric action model learning algorithms.
 
         :param partial_domain: the partial domain without the actions' preconditions and effects.
@@ -212,13 +216,22 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
-        "--learning_algorithm", required=True, type=int, choices=[3, 5, 15, 19, 20, 21],
+        "--learning_algorithm",
+        required=True,
+        type=int,
+        choices=[3, 5, 15, 19, 20, 21],
     )
     parser.add_argument(
-        "--fluents_map_path", required=False, help="The path to the file mapping to the preconditions' " "fluents", default=None,
+        "--fluents_map_path",
+        required=False,
+        help="The path to the file mapping to the preconditions' " "fluents",
+        default=None,
     )
     parser.add_argument(
-        "--polynom_degree", required=False, help="The degree of the polynomial to set in the learning algorithm.", default=0,
+        "--polynom_degree",
+        required=False,
+        help="The degree of the polynomial to set in the learning algorithm.",
+        default=0,
     )
     parser.add_argument("--problems_prefix", required=False, help="The prefix of the problems' file names", type=str, default="pfile")
     parser.add_argument("--fold_number", required=True, help="The number of the fold to run", type=int)

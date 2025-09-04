@@ -5,8 +5,6 @@ from typing import Dict, List, Optional, Generator, Tuple
 
 from pddl_plus_parser.models import ActionCall, Predicate, PDDLConstant, PDDLObject, PDDLType, SignatureType, Domain
 
-from sam_learning.core.learner_domain import LearnerDomain
-
 NOT_PREFIX = "(not "
 FORALL = "forall"
 

@@ -20,7 +20,6 @@ from pddl_plus_parser.models import (
 from sam_learning.core import (
     PredicatesMatcher,
     extract_discrete_effects,
-    LearnerDomain,
     contains_duplicates,
     VocabularyCreator,
     EnvironmentSnapshot,

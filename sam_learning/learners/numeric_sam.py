@@ -2,16 +2,14 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, NumericalExpressionTree
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, NumericalExpressionTree, \
+    Action
 
 from sam_learning.core import (
-    LearnerDomain,
     NumericFluentStateStorage,
     NumericFunctionMatcher,
     NotSafeActionError,
-    LearnerAction,
 )
-from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
@@ -43,7 +41,7 @@ class NumericSAMLearner(SAMLearner):
         self._epsilon = epsilon
         self._qhull_options = qhull_options
 
-    def _remove_deprecated_numeric_preconditions(self, action: LearnerAction) -> None:
+    def _remove_deprecated_numeric_preconditions(self, action: Action) -> None:
         """Removes the deprecated numeric preconditions from the input action (used when the learning process is iterative).
 
         :param action: the action that the preconditions are removed from.
@@ -56,7 +54,7 @@ class NumericSAMLearner(SAMLearner):
 
         action.preconditions.root = non_numeric_preconditions
 
-    def _construct_safe_numeric_preconditions(self, action: LearnerAction) -> None:
+    def _construct_safe_numeric_preconditions(self, action: Action) -> None:
         """Constructs the safe preconditions for the input action.
 
         :param action: the action that the preconditions are constructed for.
@@ -73,18 +71,16 @@ class NumericSAMLearner(SAMLearner):
         else:
             learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(self.relevant_fluents[action_name])
 
-        if learned_numeric_preconditions.binary_operator == "and":
-            self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
-            for condition in learned_numeric_preconditions.operands:
-                action.preconditions.add_condition(condition)
+        if learned_numeric_preconditions.binary_operator != "and":
+            raise NotSafeActionError(action_name)
 
-            return
+        self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
+        for condition in learned_numeric_preconditions.operands:
+            action.preconditions.add_condition(condition)
 
-        self.logger.debug("The learned preconditions are not a conjunction. Adding them as a separate condition.")
-        action.preconditions.add_condition(learned_numeric_preconditions)
-        self.partial_domain.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
+        return
 
-    def _construct_safe_numeric_effects(self, action: LearnerAction) -> bool:
+    def _construct_safe_numeric_effects(self, action: Action) -> bool:
         """Constructs the safe numeric effects for the input action.
 
         :param action: the action that its effects are constructed for.
@@ -96,7 +92,8 @@ class NumericSAMLearner(SAMLearner):
             return True
 
         effects, numeric_preconditions, learned_perfectly = self.storage[action.name].construct_assignment_equations(
-            allow_unsafe=self._allow_unsafe, relevant_fluents=self.relevant_fluents[action.name] if self.relevant_fluents is not None else None
+            allow_unsafe=self._allow_unsafe,
+            relevant_fluents=self.relevant_fluents[action.name] if self.relevant_fluents is not None else None,
         )
         if effects is not None and len(effects) > 0:
             action.numeric_effects = effects
@@ -118,7 +115,9 @@ class NumericSAMLearner(SAMLearner):
         """
         super().add_new_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Creating the new storage for the action - {grounded_action.name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.previous_state_functions)
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(
+            grounded_action, self.triplet_snapshot.previous_state_functions
+        )
         next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.next_state_functions)
         possible_bounded_functions = self.vocabulary_creator.create_lifted_functions_vocabulary(
             domain=self.partial_domain, possible_parameters=self.partial_domain.actions[grounded_action.name].signature
@@ -146,13 +145,15 @@ class NumericSAMLearner(SAMLearner):
         action_name = grounded_action.name
         super().update_action(grounded_action, previous_state, next_state)
         self.logger.debug(f"Adding the numeric state variables to the numeric storage of action - {action_name}.")
-        previous_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.previous_state_functions)
+        previous_state_lifted_matches = self.function_matcher.match_state_functions(
+            grounded_action, self.triplet_snapshot.previous_state_functions
+        )
         next_state_lifted_matches = self.function_matcher.match_state_functions(grounded_action, self.triplet_snapshot.next_state_functions)
         self.storage[action_name].add_to_previous_state_storage(previous_state_lifted_matches)
         self.storage[action_name].add_to_next_state_storage(next_state_lifted_matches)
         self.logger.debug(f"Done updating the numeric state variable storage for the action - {grounded_action.name}")
 
-    def _create_safe_action(self, action_name: str) -> LearnerAction:
+    def _create_safe_action(self, action_name: str) -> Action:
         """Creates a safe action that can be executed in the environment.
 
         :param action_name: the name of the action to create.
@@ -164,7 +165,7 @@ class NumericSAMLearner(SAMLearner):
         self.logger.info(f"Done learning the action - {action_name}!")
         return action
 
-    def _create_safe_action_model(self) -> Tuple[Dict[str, LearnerAction], Dict[str, str]]:
+    def _create_safe_action_model(self) -> Tuple[Dict[str, Action], Dict[str, str]]:
         """Crates the safe action model learned by the algorithm.
 
         :return: the actions that are allowed to execute and the metadata about the learning.
@@ -191,7 +192,7 @@ class NumericSAMLearner(SAMLearner):
         self.partial_domain.actions = allowed_actions
         return allowed_actions, learning_metadata
 
-    def learn_action_model(self, observations: List[Observation]) -> Tuple[LearnerDomain, Dict[str, str]]:
+    def learn_action_model(self, observations: List[Observation]) -> Tuple[Domain, Dict[str, str]]:
         """Learn the SAFE action model from the input observations.
 
         :param observations: the list of trajectories that are used to learn the safe action model.

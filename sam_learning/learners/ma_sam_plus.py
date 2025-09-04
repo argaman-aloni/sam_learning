@@ -3,13 +3,13 @@
 from itertools import combinations, chain
 from typing import Dict, List, Tuple, Optional, Set
 
+import matplotlib.pyplot as plt
 import networkx as nx
-from pddl_plus_parser.models import Predicate, Domain, MultiAgentObservation, CompoundPrecondition
+from pddl_plus_parser.models import Predicate, Domain, MultiAgentObservation, CompoundPrecondition, Action
 
-from sam_learning.core import LearnerDomain, LearnerAction, extract_predicate_data, PGType, group_params_from_clause
+from sam_learning.core import extract_predicate_data, PGType, group_params_from_clause
 from sam_learning.learners.multi_agent_sam import MultiAgentSAM
 from utilities import NegativePreconditionPolicy, MacroActionParser, BindingType, MappingElement
-import matplotlib.pyplot as plt
 
 
 def visualize_grouping_graph(grouping_graph: nx.Graph) -> None:
@@ -88,7 +88,7 @@ class MASAMPlus(MultiAgentSAM):
         predicate = extract_predicate_data(action_signature, fluent, self.partial_domain.constants)
         return MacroActionParser.adapt_predicate_to_macro_mapping(mapping, predicate, action_name)
 
-    def extract_relevant_action_groups(self) -> List[Set[LearnerAction]]:
+    def extract_relevant_action_groups(self) -> List[Set[Action]]:
         """Extracts the action sets containing at least one unsafe action.
 
         These action groups (sets) are the ones that are relevant for the macro-action construction.
@@ -132,7 +132,7 @@ class MASAMPlus(MultiAgentSAM):
         return [flattened_groups]
 
     def extract_effects_for_macro_from_cnf(
-        self, lma_set: Set[LearnerAction], param_grouping: PGType, mapping: BindingType
+        self, lma_set: Set[Action], param_grouping: PGType, mapping: BindingType
     ) -> Set[Predicate]:
         """Extract the effects of the macro action containing the input single-agent actions.
 
@@ -157,7 +157,7 @@ class MASAMPlus(MultiAgentSAM):
         return cnf_effects
 
     def extract_preconditions_for_macro_from_cnf(
-        self, action_group: Set[LearnerAction], param_grouping: PGType, mapping: BindingType
+        self, action_group: Set[Action], param_grouping: PGType, mapping: BindingType
     ) -> CompoundPrecondition:
         """Extracts the preconditions for the newly constructed macro action.
 
@@ -204,7 +204,7 @@ class MASAMPlus(MultiAgentSAM):
                 macro_action_preconditions = self.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapper)
                 macro_action_effects = self.extract_effects_for_macro_from_cnf(action_group, parameter_grouping, mapper)
 
-                macro_action = LearnerAction(macro_action_name, macro_action_signature)
+                macro_action = Action(macro_action_name, macro_action_signature)
                 macro_action.preconditions = macro_action_preconditions
                 macro_action.discrete_effects = macro_action_effects
 

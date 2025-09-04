@@ -24,9 +24,9 @@ from sam_learning.core import (
     create_additional_parameter_name,
     find_unique_objects_by_type,
 )
-from sam_learning.core.learner_domain import CONDITIONAL_EFFECTS_REQ, DISJUNCTIVE_PRECONDITIONS_REQ, UNIVERSAL_PRECONDITIONS_REQ
-from sam_learning.learners.conditional_sam import ConditionalSAM
+from sam_learning.learners.conditional_sam import ConditionalSAM, CONDITIONAL_EFFECTS_REQ, DISJUNCTIVE_PRECONDITIONS_REQ
 
+UNIVERSAL_PRECONDITIONS_REQ = ":universal-preconditions"
 
 class UniversallyConditionalSAM(ConditionalSAM):
     """Class dedicated to learning action models with universal effects.

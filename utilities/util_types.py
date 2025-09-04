@@ -9,7 +9,6 @@ class LearningAlgorithmType(Enum):
     ma_sam = 7
     conditional_sam = 9
     universal_sam = 10
-    online_nsam = 13
     noam_learning = 14
     informative_explorer = 17
     goal_oriented_explorer = 18

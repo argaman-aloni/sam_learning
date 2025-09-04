@@ -1,8 +1,8 @@
 """Module test for the precision and recall calculation part."""
 import pytest
 from pddl_plus_parser.lisp_parsers import DomainParser
+from pddl_plus_parser.models import Predicate, Domain, Action
 from pytest import fixture
-from pddl_plus_parser.models import Predicate, Domain
 
 from statistics import PrecisionRecallCalculator
 from statistics.discrete_precision_recall_calculator import (
@@ -13,8 +13,6 @@ from statistics.discrete_precision_recall_calculator import (
     calculate_syntactic_recall,
 )
 from tests.consts import LOCATION_TYPE, OBJECT_TYPE, DEPOTS_NUMERIC_DOMAIN_PATH, TRUCK_TYPE
-from sam_learning.core import LearnerAction
-from utilities import LearningAlgorithmType
 
 TEST_SYMMETRIC_LEARNED_PRECONDITIONS = [
     Predicate(name="at", signature={"?truck": OBJECT_TYPE, "?loc": LOCATION_TYPE}),
@@ -126,7 +124,7 @@ def test_add_action_data_with_learned_action_stores_correct_values_in_object(
     expected_domain: Domain, precision_recall_calculator: PrecisionRecallCalculator
 ):
     expected_action = expected_domain.actions[TEST_ACTION_NAME]
-    learned_action = LearnerAction(name=TEST_ACTION_NAME, signature=expected_action.signature)
+    learned_action = Action(name=TEST_ACTION_NAME, signature=expected_action.signature)
     learned_action.preconditions.root.operands = set(TEST_SYMMETRIC_LEARNED_PRECONDITIONS)
     precision_recall_calculator.add_action_data(learned_action=learned_action, model_action=expected_action)
     learned_preconditions = {p.untyped_representation for p in TEST_SYMMETRIC_LEARNED_PRECONDITIONS}
@@ -144,7 +142,7 @@ def test_calculate_action_precision_when_action_has_no_preconditions_in_model_do
     expected_action.discrete_effects = set()
     expected_action.delete_effects = set()
 
-    learned_action = LearnerAction(name=TEST_ACTION_NAME, signature=expected_action.signature)
+    learned_action = Action(name=TEST_ACTION_NAME, signature=expected_action.signature)
     learned_action.preconditions.root.operands = set(TEST_SYMMETRIC_LEARNED_PRECONDITIONS)
     learned_action.discrete_effects = set()
 
@@ -162,7 +160,7 @@ def test_calculate_action_precision_when_action_has_negative_precondition_does_n
     expected_action.add_effects = set()
     expected_action.delete_effects = set()
 
-    learned_action = LearnerAction(name=TEST_ACTION_NAME, signature=expected_action.signature)
+    learned_action = Action(name=TEST_ACTION_NAME, signature=expected_action.signature)
     learned_action.positive_preconditions = set()
     learned_action.negative_preconditions = set(TEST_NEGATIVE_PRECONDITION)
     learned_action.add_effects = set()
@@ -180,7 +178,7 @@ def test_calculate_action_recall_when_action_has_no_preconditions_in_model_domai
     expected_action.preconditions.root.operands = set()
     expected_action.discrete_effects = set()
 
-    learned_action = LearnerAction(name=TEST_ACTION_NAME, signature=expected_action.signature)
+    learned_action = Action(name=TEST_ACTION_NAME, signature=expected_action.signature)
     learned_action.preconditions.root.operands = set(TEST_SYMMETRIC_LEARNED_PRECONDITIONS)
     learned_action.discrete_effects = set()
 
@@ -191,7 +189,7 @@ def test_calculate_action_recall_when_action_has_no_preconditions_in_model_domai
 
 def test_export_action_statistics_calculates_statistics_correctly(expected_domain: Domain, precision_recall_calculator: PrecisionRecallCalculator):
     expected_action = expected_domain.actions[TEST_ACTION_NAME]
-    learned_action = LearnerAction(name=TEST_ACTION_NAME, signature=expected_action.signature)
+    learned_action = Action(name=TEST_ACTION_NAME, signature=expected_action.signature)
     learned_action.preconditions.root.operands = {
         Predicate(name="at", signature={"?x": TRUCK_TYPE, "?y": LOCATION_TYPE}),
         Predicate(name="at", signature={"?x": TRUCK_TYPE, "?z": LOCATION_TYPE}),
