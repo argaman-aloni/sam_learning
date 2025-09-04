@@ -20,9 +20,12 @@ from pddl_plus_parser.models import (
 )
 
 from sam_learning.core import DependencySet, extract_discrete_effects, extract_predicate_data
-from sam_learning.core.learner_domain import DISJUNCTIVE_PRECONDITIONS_REQ, CONDITIONAL_EFFECTS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
+
+CONDITIONAL_EFFECTS_REQ = ":conditional-effects"
+DISJUNCTIVE_PRECONDITIONS_REQ = ":disjunctive-preconditions"
+
 
 
 class ConditionalSAM(SAMLearner):

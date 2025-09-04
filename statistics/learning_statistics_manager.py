@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 from pddl_plus_parser.lisp_parsers import DomainParser
 from pddl_plus_parser.models import Domain, Observation, MultiAgentObservation, MultiAgentComponent, Predicate
 
-from sam_learning.core import LearnerDomain, VocabularyCreator
+from sam_learning.core import VocabularyCreator
 from statistics.discrete_precision_recall_calculator import PrecisionRecallCalculator
 from utilities import LearningAlgorithmType, NegativePreconditionPolicy
 

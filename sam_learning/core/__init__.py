@@ -17,7 +17,6 @@ from sam_learning.core.propositional_operations.discrete_utilities import (
 from sam_learning.core.propositional_operations.literals_cnf import LiteralCNF, group_params_from_clause, is_clause_consistent, PGType
 from .environment_snapshot import EnvironmentSnapshot
 from .exceptions import NotSafeActionError
-from .learner_domain import LearnerAction, LearnerDomain
 from .learning_types import EquationSolutionType, ConditionType
 from .matching_utils import (
     extract_discrete_effects,

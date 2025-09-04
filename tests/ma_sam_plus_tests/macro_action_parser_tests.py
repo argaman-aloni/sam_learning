@@ -1,11 +1,10 @@
 """Module test for the multi-agent action model learning."""
-from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, MultiAgentComponent, GroundedPredicate
+from pddl_plus_parser.models import Domain, MultiAgentObservation, ActionCall, MultiAgentComponent
 from pytest import fixture
 
 from sam_learning.core import LiteralCNF
 from sam_learning.learners import MASAMPlus
 from utilities import MacroActionParser
-from tests.consts import sync_ma_snapshot
 
 WOODWORKING_AGENT_NAMES = ["glazer0", "grinder0", "highspeed-saw0", "immersion-varnisher0", "planer0", "saw0",
                            "spray-varnisher0"]
@@ -19,9 +18,7 @@ def woodworking_ma_sam_plus(woodworking_ma_combined_domain: Domain) -> MASAMPlus
 
 @fixture()
 def rovers_ma_sam(ma_rovers_domain) -> MASAMPlus:
-    return MASAMPlus(ma_rovers_domain,
-                     ["rover0", "rover1", "rover2", "rover3", "rover4", "rover5", "rover6", "rover7", "rover8",
-                      "rover9"])
+    return MASAMPlus(ma_rovers_domain)
 
 
 @fixture()

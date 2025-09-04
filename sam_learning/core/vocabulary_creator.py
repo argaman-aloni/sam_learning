@@ -6,8 +6,6 @@ from typing import List, Tuple, Dict, Set, Union, Optional
 
 from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, ActionCall, Action
 
-from sam_learning.core.learner_domain import LearnerDomain, LearnerAction
-
 
 def choose_objects_subset(array: List[str], subset_size: int) -> List[Tuple[str]]:
     """Choose r items our of a list size n.
@@ -26,7 +24,7 @@ class VocabularyCreator:
         self.logger = logging.getLogger(__name__)
 
     def _validate_type_matching(
-        self, grounded_signatures: Dict[str, PDDLType], lifted_variable_to_match: Union[Predicate, PDDLFunction, Action, LearnerAction]
+        self, grounded_signatures: Dict[str, PDDLType], lifted_variable_to_match: Union[Predicate, PDDLFunction, Action]
     ) -> bool:
         """Validates that the types of the grounded signature match the types of the predicate signature.
 
@@ -43,13 +41,15 @@ class VocabularyCreator:
             parameter_type = lifted_variable_to_match.signature[predicate_parameter]
             grounded_type = grounded_signatures[object_name]
             if not grounded_type.is_sub_type(parameter_type):
-                self.logger.debug(f"The combination of objects - {grounded_signatures}" f" does not fit {lifted_variable_to_match.name}'s signature")
+                self.logger.debug(
+                    f"The combination of objects - {grounded_signatures}" f" does not fit {lifted_variable_to_match.name}'s signature"
+                )
                 return False
 
         return True
 
     # TODO: vocabulary to allow duplicates in grounded_signature for future use
-    def create_vocabulary(self, domain: Union[LearnerDomain, Domain], observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
+    def create_vocabulary(self, domain: Domain, observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
         """Create a vocabulary of random combinations of the predicates parameters and objects.
 
         :param domain: the domain containing the predicates and the action signatures.
@@ -76,14 +76,16 @@ class VocabularyCreator:
                 grounded_predicate = GroundedPredicate(
                     name=predicate_name,
                     signature=matching_grounded_type_hierarchy_signature,
-                    object_mapping={parameter_name: object_name for object_name, parameter_name in zip(grounded_signature, predicate.signature)},
+                    object_mapping={
+                        parameter_name: object_name for object_name, parameter_name in zip(grounded_signature, predicate.signature)
+                    },
                 )
                 vocabulary[predicate.untyped_representation].add(grounded_predicate)
 
         return vocabulary
 
     def create_lifted_functions_vocabulary(
-        self, domain: Union[LearnerDomain, Domain], possible_parameters: Dict[str, PDDLType], must_be_parameter: Optional[str] = None
+        self, domain: Domain, possible_parameters: Dict[str, PDDLType], must_be_parameter: Optional[str] = None
     ) -> Dict[str, PDDLFunction]:
         """Create a function vocabulary from a domain containing action signatures and function definitions.
 
@@ -117,7 +119,7 @@ class VocabularyCreator:
         return vocabulary
 
     def create_lifted_vocabulary(
-        self, domain: Union[LearnerDomain, Domain], possible_parameters: Dict[str, PDDLType], must_be_parameter: Optional[str] = None
+        self, domain: Domain, possible_parameters: Dict[str, PDDLType], must_be_parameter: Optional[str] = None
     ) -> Set[Predicate]:
         """Create a vocabulary of random combinations of parameters that match the predicates.
 
@@ -152,8 +154,8 @@ class VocabularyCreator:
         self.logger.debug(f"Created vocabulary of size {len(vocabulary)}")
         return vocabulary
 
-    def create_grounded_actions_vocabulary(self, domain: Union[LearnerDomain, Domain], observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
-        """"Create a vocabulary of random combinations of the actions parameters and objects.
+    def create_grounded_actions_vocabulary(self, domain: Domain, observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
+        """ "Create a vocabulary of random combinations of the actions parameters and objects.
 
         :param domain: the domain containing the actions and the action signatures.
         :param observed_objects: the objects that were observed in the trajectory.

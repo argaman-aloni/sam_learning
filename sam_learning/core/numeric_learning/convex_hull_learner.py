@@ -73,7 +73,7 @@ class ConvexHullLearner:
         self.data = concat_data
 
     def _epsilon_approximate_hull(self, points: np.ndarray, incremental: bool = False) -> ConvexHull:
-        """Approximates the convex hull of the given points with a margin of epsilon and a set of options for the qhull algorithm..
+        """Approximates the convex hull of the given points with a margin of epsilon and a set of options for the qhull algorithm.
 
         :param points: The points comprising the convex hull.
         :param incremental: whether to use the incremental version of the qhull algorithm.

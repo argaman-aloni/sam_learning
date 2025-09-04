@@ -1,4 +1,5 @@
 """Runs experiments for the numeric model learning algorithms."""
+
 import argparse
 import json
 from pathlib import Path
@@ -8,7 +9,6 @@ from pddl_plus_parser.models import Observation, Domain
 
 from experiments.basic_experiment_runner import OfflineBasicExperimentRunner, configure_logger
 from experiments.experiments_consts import NUMERIC_SAM_ALGORITHM_VERSIONS
-from sam_learning.core import LearnerDomain
 from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
@@ -43,7 +43,7 @@ class OfflineNumericExperimentRunner(OfflineBasicExperimentRunner):
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
-    ) -> Tuple[LearnerDomain, Dict[str, str]]:
+    ) -> Tuple[Domain, Dict[str, str]]:
         """Learns the action model using the numeric action model learning algorithms.
 
         :param partial_domain: the partial domain without the actions' preconditions and effects.
@@ -78,10 +78,17 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--working_directory_path", required=True, help="The path to the directory where the domain is")
     parser.add_argument("--domain_file_name", required=True, help="the domain file name including the extension")
     parser.add_argument(
-        "--learning_algorithm", required=True, type=int, choices=[3, 15, 19], help="The type of learning algorithm.",
+        "--learning_algorithm",
+        required=True,
+        type=int,
+        choices=[3, 15, 19],
+        help="The type of learning algorithm.",
     )
     parser.add_argument(
-        "--polynom_degree", required=False, help="The degree of the polynomial to set in the learning algorithm.", default=0,
+        "--polynom_degree",
+        required=False,
+        help="The degree of the polynomial to set in the learning algorithm.",
+        default=0,
     )
     parser.add_argument("--fluents_map_path", help="The path to the fluent map file.", required=False, type=Path, default=None)
     parser.add_argument(
