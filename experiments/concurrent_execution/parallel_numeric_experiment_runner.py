@@ -26,7 +26,7 @@ from utilities import LearningAlgorithmType
 from validators import DomainValidator
 
 PLAN_MINER_DIR_PATH = os.environ["PLAN_MINER_DIR_PATH"]
-LEARNING_TIMEOUT = 600
+LEARNING_TIMEOUT = 60 * 30  # 30 minutes
 
 
 class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
@@ -115,7 +115,7 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
 
         except Exception as e:
             self.logger.warning(
-                f"Failed to parse the learned domain for PlanMiner. Probably PlanMiner created a domain with syntax errors.: {e}"
+                f"Failed to parse the learned domain for PlanMiner. Probably PlanMiner created a domain with syntax errors: {e}"
             )
             plan_miner_domain = DomainParser(
                 self.plan_miner_workdir / self.plan_miner_domain_file_name, partial_parsing=True

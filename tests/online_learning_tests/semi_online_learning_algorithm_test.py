@@ -2,14 +2,13 @@ import shutil
 import time
 from pathlib import Path
 
-from pandas import DataFrame
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, TrajectoryParser
 from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Observation
 from pytest import fixture
 
 from sam_learning.core import EpisodeInfoRecord
 from sam_learning.core.online_learning_agents import IPCAgent
-from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner, MAX_SUCCESSFUL_STEPS_PER_EPISODE
+from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver
 from tests.consts import (
     DEPOTS_NUMERIC_DOMAIN_PATH,

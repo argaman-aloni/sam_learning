@@ -227,9 +227,7 @@ class SAMLearner:
         """
         for action_name, action_signature in self._action_signatures.items():
             if action_name not in self.partial_domain.actions:
-                action = Action()
-                action.name = action_name
-                action.signature = action_signature
+                action = Action(name=action_name, signature=action_signature)
                 self.partial_domain.actions[action_name] = action
 
     def handle_single_trajectory_component(self, component: ObservedComponent) -> None:
