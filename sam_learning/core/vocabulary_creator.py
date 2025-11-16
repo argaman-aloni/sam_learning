@@ -155,7 +155,7 @@ class VocabularyCreator:
         return vocabulary
 
     def create_grounded_actions_vocabulary(self, domain: Domain, observed_objects: Dict[str, PDDLObject]) -> Set[ActionCall]:
-        """ "Create a vocabulary of random combinations of the actions parameters and objects.
+        """Create a vocabulary of random combinations of the actions parameters and objects.
 
         :param domain: the domain containing the actions and the action signatures.
         :param observed_objects: the objects that were observed in the trajectory.
