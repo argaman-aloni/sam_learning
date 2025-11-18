@@ -4,6 +4,7 @@ from typing import List, Tuple, Optional
 
 from pddl_plus_parser.models import Domain, Predicate, GroundedPredicate, ActionCall, PDDLObject
 
+from sam_learning.core.vocabulary_creator import VocabularyCreator
 from sam_learning.core.matching_utils import contains_duplicates, create_signature_permutations
 
 
@@ -16,6 +17,7 @@ class PredicatesMatcher:
     def __init__(self, domain: Domain):
         self.logger = logging.getLogger(__name__)
         self.matcher_domain = domain
+        self.vocabulary_creator = VocabularyCreator()
 
     @staticmethod
     def _extract_combinations_data(possible_combinations: Tuple[Tuple[str]]) -> Tuple[List[str], List[str]]:
@@ -156,6 +158,9 @@ class PredicatesMatcher:
         """
         self.logger.debug(f"Finding the possible matches for the grounded action - {str(grounded_action_call)}")
         possible_matches = []
+        lifted_signature = self.matcher_domain.actions[grounded_action_call.name].signature
+        grounded_predicates_vocabulary = self.vocabulary_creator.create_grounded_predicate_vocabulary(
+            domain=self.matcher_domain, observed_objects={grounded_obj: PDDLObject(grounded_obj, type=lifted_signature.keys()[]) for grounded_obj in grounded_action_call.parameters})
         for state_predicate in state_literals:
             if extra_grounded_object is None or extra_grounded_object not in state_predicate.grounded_objects:
                 possible_matches.extend(self.match_predicate_to_action_literals(state_predicate, grounded_action_call))

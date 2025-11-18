@@ -36,7 +36,7 @@ class EnvironmentSnapshot:
         """
         self.logger.debug("Creating a snapshot of the state predicates.")
         positive_state_predicates, negative_state_predicates = set(), set()
-        vocabulary = self.vocabulary_creator.create_vocabulary(domain=self.partial_domain, observed_objects=relevant_objects)
+        vocabulary = self.vocabulary_creator.create_grounded_predicate_vocabulary(domain=self.partial_domain, observed_objects=relevant_objects)
 
         for lifted_predicate_name, vocabulary_predicates in vocabulary.items():
             if lifted_predicate_name not in state.state_predicates:

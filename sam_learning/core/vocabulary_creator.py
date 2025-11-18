@@ -49,7 +49,7 @@ class VocabularyCreator:
         return True
 
     # TODO: vocabulary to allow duplicates in grounded_signature for future use
-    def create_vocabulary(self, domain: Domain, observed_objects: Dict[str, PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
+    def create_grounded_predicate_vocabulary(self, domain: Domain, observed_objects: List[PDDLObject]) -> Dict[str, Set[GroundedPredicate]]:
         """Create a vocabulary of random combinations of the predicates parameters and objects.
 
         :param domain: the domain containing the predicates and the action signatures.
@@ -57,8 +57,8 @@ class VocabularyCreator:
         :return: list containing all the predicates with the different combinations of parameters.
         """
         vocabulary = defaultdict(set)
-        possible_objects_str = list(observed_objects.keys()) + list(domain.constants.keys())
-        objects_and_consts = list(observed_objects.values()) + list(domain.constants.values())
+        possible_objects_str = [obj.name for obj in observed_objects] + list(domain.constants.keys())
+        objects_and_consts = observed_objects + list(domain.constants.values())
         for predicate in domain.predicates.values():
             predicate_name = predicate.name
             signature_permutations = choose_objects_subset(possible_objects_str, len(predicate.signature))
