@@ -175,7 +175,7 @@ class FaultGenerator:
         else:
             self._alter_action_according_to_random_defect(faulty_action)
 
-        faulty_domain = Domain(altered_domain)
+        faulty_domain = altered_domain
         for original_action, faulty_domain_action in zip(altered_domain.actions.values(), faulty_domain.actions.values()):
             faulty_domain_action.positive_preconditions = original_action.positive_preconditions
             faulty_domain_action.inequality_preconditions = original_action.inequality_preconditions
