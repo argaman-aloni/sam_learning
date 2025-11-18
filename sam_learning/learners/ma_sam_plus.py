@@ -204,7 +204,7 @@ class MASAMPlus(MultiAgentSAM):
                 macro_action_preconditions = self.extract_preconditions_for_macro_from_cnf(action_group, parameter_grouping, mapper)
                 macro_action_effects = self.extract_effects_for_macro_from_cnf(action_group, parameter_grouping, mapper)
 
-                macro_action = Action(macro_action_name, macro_action_signature)
+                macro_action = Action(name=macro_action_name, signature=macro_action_signature)
                 macro_action.preconditions = macro_action_preconditions
                 macro_action.discrete_effects = macro_action_effects
 
