@@ -10,6 +10,7 @@ from sam_learning.core import (
     NumericFunctionMatcher,
     NotSafeActionError,
 )
+from sam_learning.learners.conditional_sam import DISJUNCTIVE_PRECONDITIONS_REQ
 from sam_learning.learners.sam_learning import SAMLearner
 from utilities import NegativePreconditionPolicy
 
@@ -71,14 +72,16 @@ class NumericSAMLearner(SAMLearner):
         else:
             learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(self.relevant_fluents[action_name])
 
-        if learned_numeric_preconditions.binary_operator != "and":
-            raise NotSafeActionError(action_name)
+        if learned_numeric_preconditions.binary_operator == "and":
+            self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
+            for condition in learned_numeric_preconditions.operands:
+                action.preconditions.add_condition(condition)
 
-        self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
-        for condition in learned_numeric_preconditions.operands:
-            action.preconditions.add_condition(condition)
+            return
 
-        return
+        self.logger.debug("The learned preconditions are not a conjunction. Adding them as a separate condition.")
+        action.preconditions.add_condition(learned_numeric_preconditions)
+        self.partial_domain.requirements.append(DISJUNCTIVE_PRECONDITIONS_REQ)
 
     def _construct_safe_numeric_effects(self, action: Action) -> bool:
         """Constructs the safe numeric effects for the input action.
