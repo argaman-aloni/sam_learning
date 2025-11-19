@@ -10,6 +10,7 @@ from pddl_plus_parser.models import (
     ActionCall,
     State,
     Domain,
+    Action,
     ObservedComponent,
     SignatureType,
     PDDLType,
@@ -19,7 +20,6 @@ from scipy.cluster.hierarchy import DisjointSet
 
 from sam_learning.core import (
     extract_discrete_effects,
-    LearnerAction,
     extract_not_effects,
     NotSafeActionError,
     EquationSolutionType,
@@ -203,7 +203,7 @@ class ExtendedSamLearner(SAMLearner):
         proxy_effects: Set[Predicate],
         modified_parameter_mapping_dict: Dict[str, str],
         proxy_number: Optional[int] = None,
-    ) -> LearnerAction:
+    ) -> Action:
         """
         constructs a proxy action based on information learned.
 
@@ -235,7 +235,7 @@ class ExtendedSamLearner(SAMLearner):
         }
 
         new_signature = {parameter: signature[parameter] for parameter in reversed_proxy_signature_modified_param_dict.keys()}
-        proxy_action = LearnerAction(proxy_action_name, signature=new_signature)
+        proxy_action = Action(proxy_action_name, signature=new_signature)
         proxy_action.discrete_effects = discrete_effects
         proxy_action.preconditions.root.operands = preconds
         self.logger.debug(f"Finished construction of proxy action: {proxy_action_name}")

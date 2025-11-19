@@ -2,9 +2,8 @@ import re
 from typing import List, Set, Dict, Tuple
 from uuid import uuid4
 
-from pddl_plus_parser.models import Predicate, SignatureType, PDDLType
+from pddl_plus_parser.models import Predicate, SignatureType, PDDLType, Action
 
-from sam_learning.core.learner_domain import LearnerAction
 
 BindingType = Dict[Tuple[str, str], str]
 MappingElement = Tuple[List[str], BindingType]
@@ -44,7 +43,7 @@ class MacroActionParser:
         return f"{name_candidate}---{uuid4()}"
 
     @staticmethod
-    def generate_macro_action_signature(actions: Set[LearnerAction], mapping: BindingType) -> SignatureType:
+    def generate_macro_action_signature(actions: Set[Action], mapping: BindingType) -> SignatureType:
         """
         generates a signature for a macro action, taking care of the types of the parameters, and their names
 
@@ -88,7 +87,7 @@ class MacroActionParser:
         return predicate_copy
 
     @staticmethod
-    def generate_macro_mappings(groupings: List[set], lma_set: Set[LearnerAction]) -> BindingType:
+    def generate_macro_mappings(groupings: List[set], lma_set: Set[Action]) -> BindingType:
         """
         returns a mapping between macro action names and macro action names
         the orders of the keys conveys important information:

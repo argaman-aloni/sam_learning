@@ -1,23 +1,21 @@
 """Module that repairs faulty domains by fixing the action that contains the defect."""
+
 import json
 import logging
 import re
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, NoReturn
+from typing import List, Tuple, Optional, Dict
 
 from pddl_plus_parser.exporters import ENHSPParser
 from pddl_plus_parser.exporters.numeric_trajectory_exporter import parse_action_call
 from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser
 from pddl_plus_parser.models import State, Observation, Operator, ActionCall, Domain
 
-from fault_detection.defect_types import RepairAlgorithmType
-from sam_learning.core import LearnerDomain
-from sam_learning.learners import NumericSAMLearner, ObliqueTreeModelLearner, SVCModelLearner
+from sam_learning.learners import NumericSAMLearner
 from validators import VALID_PLAN, GOAL_NOT_REACHED, INAPPLICABLE_PLAN
 from validators.validator_script_data import run_validate_script
 
-FAULTY_ACTION_LOCATOR_REGEX = re.compile(r"Plan failed because of unsatisfied precondition in:\n\((\w+) [\w+ ]*\)",
-                                         flags=re.MULTILINE)
+FAULTY_ACTION_LOCATOR_REGEX = re.compile(r"Plan failed because of unsatisfied precondition in:\n\((\w+) [\w+ ]*\)", flags=re.MULTILINE)
 
 
 class FaultRepair:
@@ -42,8 +40,7 @@ class FaultRepair:
         self.diagnosis_statistics = []
         self.logger = logging.getLogger(__name__)
 
-    def _validate_applied_action(self, faulty_action_name: str, valid_next_state: State,
-                                 faulty_next_state: State) -> bool:
+    def _validate_applied_action(self, faulty_action_name: str, valid_next_state: State, faulty_next_state: State) -> bool:
         """Validates whether the applied action resulted in the same state as when applying it on the agent.
 
         :param faulty_action_name: the name of the action that contains a defect.
@@ -56,13 +53,14 @@ class FaultRepair:
                 self.logger.debug(f"The predicate {predicate_name} is missing in the faulty observation!")
                 return False
 
-            if set(predicate.untyped_representation for predicate in grounded_predicates) != \
-                    set(predicate.untyped_representation for predicate in faulty_next_state.state_predicates[
-                        predicate_name]):
+            if set(predicate.untyped_representation for predicate in grounded_predicates) != set(
+                predicate.untyped_representation for predicate in faulty_next_state.state_predicates[predicate_name]
+            ):
                 self.logger.debug(
                     f"The action {faulty_action_name} resulted in different state in the executing agent!"
                     f"\nValid next state: {valid_next_state.serialize()}"
-                    f"\nPossibly faulty next state: {faulty_next_state.serialize()}")
+                    f"\nPossibly faulty next state: {faulty_next_state.serialize()}"
+                )
                 return False
 
         for fluent_name, fluent in valid_next_state.state_fluents.items():
@@ -71,13 +69,13 @@ class FaultRepair:
                     f"The action {faulty_action_name} resulted in a numeric value that's difference "
                     f"is larger than the threshold!"
                     f"\nExpected - {fluent.state_representation} +- x < 1 and received - "
-                    f"{faulty_next_state.state_fluents[fluent_name].state_representation}")
+                    f"{faulty_next_state.state_fluents[fluent_name].state_representation}"
+                )
                 return False
 
         return True
 
-    def _generate_grounded_operators(self, action_name: str,
-                                     faulty_domain: Domain, parameters: List[str]) -> Tuple[Operator, Operator]:
+    def _generate_grounded_operators(self, action_name: str, faulty_domain: Domain, parameters: List[str]) -> Tuple[Operator, Operator]:
         """Generates the valid and faulty grounded operators from the action descriptor.
 
         :param action_name: the name of the action that contains a defect.
@@ -85,10 +83,10 @@ class FaultRepair:
         :param parameters: the parameters with which the action was executed.
         :return: the faulty and valid grounded operators.
         """
-        valid_operator = Operator(action=self.model_domain.actions[action_name],
-                                  domain=self.model_domain, grounded_action_call=parameters)
-        possibly_faulty_operator = Operator(action=faulty_domain.actions[action_name],
-                                            domain=faulty_domain, grounded_action_call=parameters)
+        valid_operator = Operator(action=self.model_domain.actions[action_name], domain=self.model_domain, grounded_action_call=parameters)
+        possibly_faulty_operator = Operator(
+            action=faulty_domain.actions[action_name], domain=faulty_domain, grounded_action_call=parameters
+        )
         return possibly_faulty_operator, valid_operator
 
     def _is_plan_applicable(self, problem_file_path: Path, solution_file_path: Path) -> Tuple[bool, Optional[str]]:
@@ -99,9 +97,9 @@ class FaultRepair:
 
         :return: whether the plan is valid and the name of the faulty action if it is not.
         """
-        validation_file_path = \
-            run_validate_script(domain_file_path=self.model_domain_file_path,
-                                problem_file_path=problem_file_path, solution_file_path=solution_file_path)
+        validation_file_path = run_validate_script(
+            domain_file_path=self.model_domain_file_path, problem_file_path=problem_file_path, solution_file_path=solution_file_path
+        )
 
         with open(validation_file_path, "r") as validation_file:
             validation_file_content = validation_file.read()
@@ -114,8 +112,8 @@ class FaultRepair:
                 return False, faulty_action_name
 
     def _observe_single_plan(
-            self, faulty_domain: Domain, problem_file_path: Path,
-            solution_file_path: Path) -> Tuple[Optional[Observation], Optional[Observation], Optional[str]]:
+        self, faulty_domain: Domain, problem_file_path: Path, solution_file_path: Path
+    ) -> Tuple[Optional[Observation], Optional[Observation], Optional[str]]:
         """Observes a single plan and determines whether there are faults in it and where they might be.
 
         :param plan_sequence: The plan sequence to observe.
@@ -133,8 +131,7 @@ class FaultRepair:
         valid_observation = Observation()
         faulty_observation = Observation()
         faulty_action_name = None
-        valid_previous_state = State(predicates=problem.initial_state_predicates,
-                                     fluents=problem.initial_state_fluents, is_init=True)
+        valid_previous_state = State(predicates=problem.initial_state_predicates, fluents=problem.initial_state_fluents, is_init=True)
         faulty_previous_state = valid_previous_state
 
         for grounded_action in plan_sequence:
@@ -150,8 +147,7 @@ class FaultRepair:
             is_state_identical = self._validate_applied_action(action_name, valid_next_state, faulty_next_state)
             if not is_state_identical:
                 faulty_action_name = faulty_action_name or action_name
-                faulty_observation.add_component(faulty_previous_state, ActionCall(action_name, parameters),
-                                                 faulty_next_state)
+                faulty_observation.add_component(faulty_previous_state, ActionCall(action_name, parameters), faulty_next_state)
 
             valid_previous_state = valid_next_state
             faulty_previous_state = faulty_next_state
@@ -160,8 +156,8 @@ class FaultRepair:
 
     @staticmethod
     def _filter_redundant_observations(
-            faulty_action_name: str, faulty_action_observations: List[Observation],
-            valid_action_observations: List[Observation]) -> NoReturn:
+        faulty_action_name: str, faulty_action_observations: List[Observation], valid_action_observations: List[Observation]
+    ) -> None:
         """Filters out the observations that do not belong to the faulty action.
 
         :param faulty_action_name: the action that contains a defect.
@@ -169,16 +165,18 @@ class FaultRepair:
         :param valid_action_observations: the observations obtained from executing the actions on the agent.
         """
         for valid_observation, faulty_observation in zip(valid_action_observations, faulty_action_observations):
-            relevant_valid_components = [component for component in valid_observation.components
-                                         if component.grounded_action_call.name == faulty_action_name]
-            relevant_faulty_components = [component for component in faulty_observation.components if
-                                          component.grounded_action_call.name == faulty_action_name]
+            relevant_valid_components = [
+                component for component in valid_observation.components if component.grounded_action_call.name == faulty_action_name
+            ]
+            relevant_faulty_components = [
+                component for component in faulty_observation.components if component.grounded_action_call.name == faulty_action_name
+            ]
             valid_observation.components = relevant_valid_components
             faulty_observation.components = relevant_faulty_components
 
     def execute_plans_on_agent(
-            self, plans_dir_path: Path, faulty_domain_path: Path, solving_report: Dict[str, str],
-            is_repaired_model: bool = False) -> Tuple[List[Observation], List[Observation], Dict[str, str]]:
+        self, plans_dir_path: Path, faulty_domain_path: Path, solving_report: Dict[str, str], is_repaired_model: bool = False
+    ) -> Tuple[List[Observation], List[Observation], Dict[str, str]]:
         """Executes the plans on the agent and returns the learned information about the possible faults and the
         execution status.
 
@@ -199,7 +197,8 @@ class FaultRepair:
 
             problem_file_path = plans_dir_path / f"{solution_file_path.stem}.pddl"
             valid_observation, faulty_observation, faulty_action = self._observe_single_plan(
-                faulty_domain, problem_file_path, solution_file_path)
+                faulty_domain, problem_file_path, solution_file_path
+            )
             if faulty_action is None:
                 self.logger.debug(f"The plan {solution_file_path.stem} was validated and is applicable!")
                 observed_plans[solution_file_path.stem] = "ok"
@@ -211,8 +210,7 @@ class FaultRepair:
 
             if faulty_action is not None:
                 faulty_action_name = faulty_action
-                self.logger.debug(f"Detected a faulty action in plan {solution_file_path.stem}! "
-                                  f"The action {faulty_action} is faulty!")
+                self.logger.debug(f"Detected a faulty action in plan {solution_file_path.stem}! " f"The action {faulty_action} is faulty!")
                 observed_plans[solution_file_path.stem] = "state_difference"
 
             if valid_observation is not None:
@@ -228,41 +226,20 @@ class FaultRepair:
         return valid_action_observations, faulty_action_observations, observed_plans
 
     def repair_model(
-            self, faulty_domain: LearnerDomain, valid_observations: List[Observation],
-            faulty_observations: List[Observation] = None, faulty_action_name: str = None,
-            repair_algorithm_type: RepairAlgorithmType = RepairAlgorithmType.numeric_sam) -> Tuple[LearnerDomain, Dict[str, str]]:
+        self,
+        faulty_domain: Domain,
+        valid_observations: List[Observation],
+        faulty_action_name: str = None,
+    ) -> Tuple[Domain, Dict[str, str]]:
         """Repairs an action model that contains a defect by learning valid observations.
 
         :param faulty_domain: the domain that contains a defected action.
         :param valid_observations: the valid observations obtained from executing the actions on the agent.
-        :param faulty_observations: the observations containing the defect in them.
         :param faulty_action_name: the name of the action that contains a defect.
-        :param repair_algorithm_type: the algorithm that will be used to repair the model.
         :return: the action model with the defect repaired.
         """
         partial_domain = DomainParser(domain_path=self.model_domain_file_path).parse_domain()
-        repaired_action = None
-        if repair_algorithm_type == RepairAlgorithmType.numeric_sam:
-            learner = NumericSAMLearner(partial_domain=partial_domain, relevant_fluents=self.fluents_map)
-            learned_model, report = learner.learn_action_model(valid_observations)
-            repaired_action = learned_model.actions[faulty_action_name]
-
-        elif repair_algorithm_type == RepairAlgorithmType.raw_numeric_sam:
-            learner = NumericSAMLearner(partial_domain=partial_domain)
-            learned_model, report = learner.learn_action_model(valid_observations)
-            repaired_action = learned_model.actions[faulty_action_name]
-
-        elif repair_algorithm_type == RepairAlgorithmType.oblique_tree:
-            learner = ObliqueTreeModelLearner(partial_domain=partial_domain, polynomial_degree=0,
-                                              faulty_action_name=faulty_action_name)
-            learned_model, report = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
-            repaired_action = learned_model.actions[faulty_action_name]
-
-        elif repair_algorithm_type == RepairAlgorithmType.extended_svc:
-            learner = SVCModelLearner(partial_domain=partial_domain, polynomial_degree=0,
-                                      faulty_action_name=faulty_action_name)
-            learned_model, report = learner.learn_unsafe_action_model(valid_observations, faulty_observations)
-            repaired_action = learned_model.actions[faulty_action_name]
-
-        faulty_domain.actions[faulty_action_name] = repaired_action
+        learner = NumericSAMLearner(partial_domain=partial_domain, relevant_fluents=self.fluents_map)
+        learned_model, report = learner.learn_action_model(valid_observations)
+        faulty_domain.actions[faulty_action_name] = learned_model.actions[faulty_action_name]
         return faulty_domain, report

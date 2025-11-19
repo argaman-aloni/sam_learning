@@ -3,8 +3,6 @@ from typing import Dict, Set, List
 
 from pddl_plus_parser.models import Action, Predicate
 
-from sam_learning.core import LearnerAction
-
 
 def calculate_number_true_positives(learned_predicates: Set[str], expected_predicates: Set[str]) -> int:
     """Calculates the number of predicates that appear both in the model domain and in the learned domain.
@@ -89,7 +87,7 @@ class PrecisionRecallCalculator:
         self._compared_tuples = [(self.preconditions, self.ground_truth_preconditions), (self.discrete_effects, self.ground_discrete_effects)]
         self._learned_actions = []
 
-    def add_action_data(self, learned_action: LearnerAction, model_action: Action) -> None:
+    def add_action_data(self, learned_action: Action, model_action: Action) -> None:
         """Adds the discrete action's data to the class data to calculate the precision and recall values.
 
         :param learned_action: the action that was learned using the action model learning algorithm.

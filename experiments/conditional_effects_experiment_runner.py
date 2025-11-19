@@ -1,4 +1,5 @@
 """Runs experiments for the numeric model learning algorithms."""
+
 import argparse
 import json
 from pathlib import Path
@@ -7,7 +8,6 @@ from typing import List, Optional, Dict, Tuple
 from pddl_plus_parser.models import Observation, Domain
 
 from experiments.basic_experiment_runner import OfflineBasicExperimentRunner, configure_logger
-from sam_learning.core import LearnerDomain
 from sam_learning.learners import UniversallyConditionalSAM
 from utilities import LearningAlgorithmType, SolverType
 from validators import DomainValidator
@@ -49,7 +49,7 @@ class OfflineConditionalEffectsExperimentRunner(OfflineBasicExperimentRunner):
 
     def _apply_learning_algorithm(
         self, partial_domain: Domain, allowed_observations: List[Observation], test_set_dir_path: Path
-    ) -> Tuple[LearnerDomain, Dict[str, str]]:
+    ) -> Tuple[Domain, Dict[str, str]]:
         """Learns the action model using the numeric action model learning algorithms.
 
         :param partial_domain: the partial domain without the actions' preconditions and effects.
