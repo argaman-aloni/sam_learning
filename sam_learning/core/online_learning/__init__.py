@@ -1,7 +1,6 @@
 from .priority_queue import PriorityQueue
 from .bfs_feature_selection import BFSFeatureSelector
 from .episode_info_recorder import EpisodeInfoRecord
-from .novelty_learner import NoveltyLearner
 from .incremental_convex_hull_learner import IncrementalConvexHullLearner
 from .informative_states_learner import InformationStatesLearner
 from .online_discrete_models_learner import OnlineDiscreteModelLearner

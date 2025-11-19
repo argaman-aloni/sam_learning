@@ -482,7 +482,6 @@ class ConditionalSAM(SAMLearner):
             previous_state=previous_state,
             next_state=next_state,
             current_action=grounded_action,
-            observation_objects=self.current_trajectory_objects,
         )
         if action_name not in self.observed_actions:
             self._initialize_actions_dependencies(grounded_action)

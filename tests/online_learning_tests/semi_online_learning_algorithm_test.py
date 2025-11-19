@@ -6,7 +6,7 @@ from pddl_plus_parser.lisp_parsers import DomainParser, ProblemParser, Trajector
 from pddl_plus_parser.models import Domain, Problem, State, ActionCall, Observation
 from pytest import fixture
 
-from sam_learning.core import EpisodeInfoRecord
+from sam_learning.core import EpisodeInfoRecord, contains_duplicates
 from sam_learning.core.online_learning_agents import IPCAgent
 from sam_learning.learners.semi_online_learning_algorithm import SemiOnlineNumericAMLearner
 from solvers import ENHSPSolver
@@ -121,7 +121,7 @@ def test_sort_ground_actions_based_on_success_rate_does_not_create_duplicated_ac
         "num_unload_success": 2,
     }
     sorted_actions = depot_semi_online_learner.sort_ground_actions_based_on_success_rate(grounded_actions)
-    assert len(sorted_actions) == len(grounded_actions)
+    assert len(sorted_actions) == len([action for action in grounded_actions if not contains_duplicates(action.parameters)])
     assert len([str(a) for a in sorted_actions]) == len(
         set(str(a) for a in sorted_actions)
     ), "There should be no duplicated actions in the sorted actions list"

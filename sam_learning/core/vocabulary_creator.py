@@ -4,10 +4,20 @@ from collections import defaultdict
 from itertools import permutations
 from typing import List, Tuple, Dict, Set, Union, Optional
 
-from pddl_plus_parser.models import Predicate, PDDLObject, GroundedPredicate, PDDLType, Domain, PDDLFunction, ActionCall, Action
+from pddl_plus_parser.models import (
+    Predicate,
+    PDDLObject,
+    GroundedPredicate,
+    PDDLType,
+    Domain,
+    PDDLFunction,
+    ActionCall,
+    Action,
+    SignatureType,
+)
 
 
-def choose_objects_subset(array: List[str], subset_size: int) -> List[Tuple[str]]:
+def choose_objects_subset(array: List[PDDLObject], subset_size: int) -> List[Tuple[PDDLObject]]:
     """Choose r items our of a list size n.
 
     :param array: the input list.
@@ -57,21 +67,19 @@ class VocabularyCreator:
         :return: list containing all the predicates with the different combinations of parameters.
         """
         vocabulary = defaultdict(set)
-        possible_objects_str = [obj.name for obj in observed_objects] + list(domain.constants.keys())
         objects_and_consts = observed_objects + list(domain.constants.values())
         for predicate in domain.predicates.values():
             predicate_name = predicate.name
-            signature_permutations = choose_objects_subset(possible_objects_str, len(predicate.signature))
+            signature_permutations = choose_objects_subset(objects_and_consts, len(predicate.signature))
             for signature_permutation in signature_permutations:
-                grounded_signature = {
-                    object_name: objects_and_consts[possible_objects_str.index(object_name)].type for object_name in signature_permutation
+                grounded_signature: SignatureType = {
+                    permutation_object.name: permutation_object.type for permutation_object in signature_permutation
                 }
                 if not self._validate_type_matching(grounded_signature, predicate):
                     continue
 
                 matching_grounded_type_hierarchy_signature = {
-                    parameter_name: objects_and_consts[possible_objects_str.index(object_name)].type
-                    for object_name, parameter_name in zip(grounded_signature, predicate.signature)
+                    parameter_name: object_type for object_type, parameter_name in zip(grounded_signature.values(), predicate.signature)
                 }
                 grounded_predicate = GroundedPredicate(
                     name=predicate_name,
@@ -96,20 +104,17 @@ class VocabularyCreator:
         """
         self.logger.debug(f"Creating a function vocabulary from {possible_parameters}")
         vocabulary = {}
-        possible_parameters_names = list(possible_parameters.keys()) + list(domain.constants.keys())
-        parameter_types = list(possible_parameters.values()) + [const.type for const in domain.constants.values()]
+        parameter_objects = [PDDLObject(name=param_name, type=param_type) for param_name, param_type in possible_parameters.items()] + list(
+            domain.constants.values()
+        )
         for predicate in domain.functions.values():
             function_name = predicate.name
-            signature_permutations = choose_objects_subset(possible_parameters_names, len(predicate.signature))
+            signature_permutations = choose_objects_subset(parameter_objects, len(predicate.signature))
             for signature_permutation in signature_permutations:
-                bounded_lifted_signature = {
-                    param_name: parameter_types[possible_parameters_names.index(param_name)] for param_name in signature_permutation
-                }
-
-                if not self._validate_type_matching(bounded_lifted_signature, predicate):
-                    continue
-
-                if must_be_parameter and must_be_parameter not in bounded_lifted_signature:
+                bounded_lifted_signature = {param.name: param.type for param in signature_permutation}
+                if not self._validate_type_matching(bounded_lifted_signature, predicate) or (
+                    must_be_parameter and must_be_parameter not in bounded_lifted_signature
+                ):
                     continue
 
                 lifted_function = PDDLFunction(name=function_name, signature=bounded_lifted_signature)

@@ -31,6 +31,6 @@ from .numeric_learning import (
     construct_linear_equation_string,
     construct_non_circular_assignment,
 )
-from .online_learning import EpisodeInfoRecord, NoveltyLearner, BFSFeatureSelector, PriorityQueue
+from .online_learning import EpisodeInfoRecord, BFSFeatureSelector, PriorityQueue
 from .predicates_matcher import PredicatesMatcher
 from .vocabulary_creator import VocabularyCreator

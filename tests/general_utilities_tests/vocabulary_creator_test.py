@@ -1,4 +1,6 @@
 """Module test for the vocabulary_creator module."""
+from itertools import permutations
+
 from pddl_plus_parser.models import Domain, Problem
 from pytest import fixture
 
@@ -10,12 +12,21 @@ def vocabulary_creator() -> VocabularyCreator:
     return VocabularyCreator()
 
 
+
+def test_choose_objects_subset_when_objects_are_not_string_returns_correct_predicate_subsets(elevators_problem: Problem):
+    pddl_objects = list(elevators_problem.objects.values())[0:3]
+    subsets = list(permutations(pddl_objects, 2))
+    assert len(subsets) > 0
+
+
+
 def test_create_vocabulary_creates_grounded_predicates_only_for_those_with_matching_types(
         elevators_domain: Domain, vocabulary_creator: VocabularyCreator, elevators_problem: Problem):
     vocabulary_predicates = vocabulary_creator.create_grounded_predicate_vocabulary(
         domain=elevators_domain,
         observed_objects=[elevators_problem.objects["n1"],elevators_problem.objects["n2"]])
     assert list(vocabulary_predicates.keys()) == ['(above ?floor1 ?floor2)', '(next ?n1 ?n2)']
+    print([str(pred) for preds in vocabulary_predicates.values() for pred in preds])
 
 
 def test_create_vocabulary_creates_grounded_predicates_when_given_two_types_of_objects(

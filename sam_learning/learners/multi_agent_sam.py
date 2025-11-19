@@ -225,7 +225,6 @@ class MultiAgentSAM(SAMLearner):
                 previous_state=previous_state,
                 next_state=next_state,
                 current_action=executed_action,
-                observation_objects=self.current_trajectory_objects,
             )
             if executed_action.name not in self.observed_actions:
                 super()._add_new_action_preconditions(executed_action)
@@ -266,7 +265,6 @@ class MultiAgentSAM(SAMLearner):
                 previous_state=previous_state,
                 next_state=next_state,
                 current_action=executing_action,
-                observation_objects=self.current_trajectory_objects,
             )
             self.update_single_agent_executed_action(executing_action)
             return

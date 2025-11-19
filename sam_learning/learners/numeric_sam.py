@@ -2,8 +2,7 @@
 
 from typing import List, Dict, Tuple, Optional
 
-from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, NumericalExpressionTree, \
-    Action
+from pddl_plus_parser.models import Observation, ActionCall, State, Domain, Precondition, NumericalExpressionTree, Action
 
 from sam_learning.core import (
     NumericFluentStateStorage,
@@ -61,24 +60,25 @@ class NumericSAMLearner(SAMLearner):
         """
         action_name = action.name
         self._remove_deprecated_numeric_preconditions(action)
-        if self.relevant_fluents is None:
-            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
-
-        elif len(self.relevant_fluents[action_name]) == 0:
+        if self.relevant_fluents is not None and len(self.relevant_fluents[action_name]) == 0:
             self.logger.debug(f"The action {action_name} has no numeric preconditions.")
             return
 
-        else:
+        if self.relevant_fluents is not None:
             learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities(self.relevant_fluents[action_name])
+            if learned_numeric_preconditions is None:
+                self.logger.debug(f"The action {action_name} has no numeric preconditions.")
+                return
+
+        else:
+            learned_numeric_preconditions = self.storage[action_name].construct_safe_linear_inequalities()
 
         if learned_numeric_preconditions.binary_operator != "and":
-            raise NotSafeActionError(action_name)
+            raise ValueError(f"The learned numeric preconditions for the action {action.name} are not a conjunction.")
 
         self.logger.debug("The learned preconditions are a conjunction. Adding the internal numeric conditions.")
         for condition in learned_numeric_preconditions.operands:
             action.preconditions.add_condition(condition)
-
-        return
 
     def _construct_safe_numeric_effects(self, action: Action) -> bool:
         """Constructs the safe numeric effects for the input action.
