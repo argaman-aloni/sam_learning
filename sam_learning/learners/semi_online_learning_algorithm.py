@@ -265,7 +265,6 @@ class SemiOnlineNumericAMLearner:
             previous_state=current_state,
             next_state=next_state,
             current_action=selected_ground_action,
-            observation_objects=problem_objects,
         )
         self.episode_recorder.record_single_step(
             action=selected_ground_action, action_applicable=is_transition_successful, previous_state=current_state, next_state=next_state
@@ -437,7 +436,6 @@ class SemiOnlineNumericAMLearner:
                 previous_state=observed_transition.previous_state,
                 next_state=observed_transition.next_state,
                 current_action=observed_transition.grounded_action_call,
-                observation_objects=trace.grounded_objects,
             )
             self._add_transition_data(
                 action_to_update=observed_transition.grounded_action_call,

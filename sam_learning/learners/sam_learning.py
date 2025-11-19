@@ -252,7 +252,6 @@ class SAMLearner:
             previous_state=previous_state,
             next_state=next_state,
             current_action=grounded_action,
-            observation_objects=self.current_trajectory_objects,
         )
         if grounded_action.name not in self.observed_actions:
             self.add_new_action(grounded_action, previous_state, next_state)

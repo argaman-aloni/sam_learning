@@ -1,4 +1,5 @@
 """Converts regular trajectories to the type of trajectories that PlanMiner algorithm accepts."""
+
 import logging
 import sys
 from pathlib import Path
@@ -96,14 +97,19 @@ class PlanMinerTrajectoriesCreator:
                 action = action_triplet.grounded_action_call
                 prev_state = action_triplet.previous_state
                 next_state = action_triplet.next_state
-                previous_state_predicates = triplet_snapshot._create_state_discrete_snapshot(prev_state, observation.grounded_objects)
-                next_state_predicates = triplet_snapshot._create_state_discrete_snapshot(next_state, observation.grounded_objects)
+                previous_state_predicates = triplet_snapshot.create_discrete_state_snapshot(prev_state, observation.grounded_objects)
+                next_state_predicates = triplet_snapshot.create_discrete_state_snapshot(next_state, observation.grounded_objects)
                 op = Operator(
-                    action=domain.actions[action.name], domain=domain, grounded_action_call=action.parameters, problem_objects=problem.objects
+                    action=domain.actions[action.name],
+                    domain=domain,
+                    grounded_action_call=action.parameters,
+                    problem_objects=problem.objects,
                 )
                 plan_sequence.append(f"[{index}, {index + 1}]: {op.typed_action_call.upper()}")
                 if index == 0:
-                    state_str = self.create_complete_state(state_predicates=previous_state_predicates, state_functions=prev_state.state_fluents)
+                    state_str = self.create_complete_state(
+                        state_predicates=previous_state_predicates, state_functions=prev_state.state_fluents
+                    )
                     state_sequence.append(f"[{index}]: {state_str}")
 
                 state_str = self.create_complete_state(state_predicates=next_state_predicates, state_functions=next_state.state_fluents)

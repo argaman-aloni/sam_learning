@@ -1,4 +1,5 @@
 """Module test for the numeric performance calculation."""
+
 import os
 from pathlib import Path
 
@@ -9,9 +10,8 @@ from pytest import fixture
 
 from statistics import NumericPerformanceCalculator
 from statistics.performance_calculation_utils import _ground_executed_action
-from tests.consts import SAILING_EXPECTED_DOMAIN_PATH, SAILING_PROBLEM_PATH, SAILING_TRAJECTORY_PATH, \
-    SAILING_LEARNED_DOMAIN_PATH
-from utilities import LearningAlgorithmType
+from tests.consts import SAILING_EXPECTED_DOMAIN_PATH, SAILING_PROBLEM_PATH, SAILING_TRAJECTORY_PATH, SAILING_LEARNED_DOMAIN_PATH
+from utilities import LearningAlgorithmType, NegativePreconditionPolicy
 
 TEST_WORKING_DIRECTORY = Path(os.getcwd())
 
@@ -39,27 +39,36 @@ def sailing_expected_observation(sailing_expected_domain: Domain, sailing_proble
 
 
 @fixture()
-def numeric_performance_calculator(sailing_expected_domain: Domain,
-                                   sailing_expected_observation: Observation) -> NumericPerformanceCalculator:
-    return NumericPerformanceCalculator(model_domain=sailing_expected_domain,
-                                        observations=[sailing_expected_observation],
-                                        working_directory_path=TEST_WORKING_DIRECTORY,
-                                        learning_algorithm=LearningAlgorithmType.numeric_sam)
+def numeric_performance_calculator(
+    sailing_expected_domain: Domain, sailing_expected_observation: Observation
+) -> NumericPerformanceCalculator:
+    return NumericPerformanceCalculator(
+        model_domain=sailing_expected_domain,
+        model_domain_path=SAILING_EXPECTED_DOMAIN_PATH,
+        observations=[sailing_expected_observation],
+        working_directory_path=TEST_WORKING_DIRECTORY,
+        learning_algorithm=LearningAlgorithmType.numeric_sam,
+    )
 
 
 def test_ground_tested_operator_is_able_to_ground_properly_with_negative_preconditions(
-        numeric_performance_calculator: NumericPerformanceCalculator, sailing_learned_domain: Domain):
+    numeric_performance_calculator: NumericPerformanceCalculator, sailing_learned_domain: Domain, sailing_problem: Problem
+):
     test_action_call = ActionCall(name="save_person", grounded_parameters=["b3", "p2"])
     try:
-        _ground_executed_action(action_call=test_action_call, learned_domain=sailing_learned_domain)
+        _ground_executed_action(
+            action_call=test_action_call, learned_domain=sailing_learned_domain, problem_objects=sailing_problem.objects
+        )
     except Exception as e:
         pytest.fail(f"Failed to ground the tested action properly. Exception: {e}")
 
 
 def test_calculate_performance_is_able_to_ground_properly_with_negative_preconditions(
-        numeric_performance_calculator: NumericPerformanceCalculator, sailing_learned_domain: Domain):
+    numeric_performance_calculator: NumericPerformanceCalculator, sailing_learned_domain: Domain, sailing_problem: Problem
+):
     try:
-        numeric_performance_calculator.calculate_performance(learned_domain_path=SAILING_LEARNED_DOMAIN_PATH,
-                                                             num_used_observations=1)
+        numeric_performance_calculator.calculate_performance(
+            learned_domain_path=SAILING_LEARNED_DOMAIN_PATH, num_used_observations=1, policy=NegativePreconditionPolicy.hard
+        )
     except Exception as e:
         pytest.fail(f"Failed to ground the tested action properly. Exception: {e}")

@@ -400,7 +400,7 @@ class UniversallyConditionalSAM(ConditionalSAM):
         specific_types = (
             self.universals_map[action_name] if action_name in self.universals_map and len(self.universals_map[action_name]) > 0 else []
         )
-        self.triplet_snapshot.create_triplet_snapshot(
+        self.triplet_snapshot.create_triplet_snapshot_for_universal_variables(
             previous_state=previous_state,
             next_state=next_state,
             current_action=grounded_action,

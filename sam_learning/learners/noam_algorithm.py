@@ -94,12 +94,16 @@ class NumericOnlineActionModelLearner(SemiOnlineNumericAMLearner):
                                 object names to their respective PDDLObject instances.
         :return: A boolean indicating whether the specific state-action pair is informative and whether the action is applicable.
         """
-        previous_state_grounded_predicates = self.triplet_snapshot.create_propositional_state_snapshot(
-            current_state, action_to_test, {**problem_objects, **self.partial_domain.constants}
+        action_lifted_signature_types = list(self.partial_domain.actions[action_to_test.name].signature.values())
+        parameterized_objects = [
+            PDDLObject(name=param_name, type=param_type)
+            for param_name, param_type in zip(action_to_test.parameters, action_lifted_signature_types)
+        ]
+        previous_state_grounded_predicates = self.triplet_snapshot.create_discrete_state_snapshot(
+            current_state,
+            parameterized_objects,
         )
-        previous_state_grounded_functions = self.triplet_snapshot.create_numeric_state_snapshot(
-            current_state, action_to_test, {**problem_objects, **self.partial_domain.constants}
-        )
+        previous_state_grounded_functions = self.triplet_snapshot.create_numeric_state_snapshot(current_state, parameterized_objects)
         previous_state_pb_predicates = set(
             self._discrete_predicate_matcher.get_possible_literal_matches(action_to_test, list(previous_state_grounded_predicates))
         )

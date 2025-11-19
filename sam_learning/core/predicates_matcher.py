@@ -1,10 +1,12 @@
 """Matches predicates to their corresponding actions based on the common types."""
+
 import logging
 from typing import List, Tuple, Optional
 
-from pddl_plus_parser.models import Domain, Predicate, GroundedPredicate, ActionCall, PDDLObject
+from pddl_plus_parser.models import Domain, Predicate, GroundedPredicate, ActionCall
 
 from sam_learning.core.matching_utils import contains_duplicates, create_signature_permutations
+from sam_learning.core.vocabulary_creator import VocabularyCreator
 
 
 class PredicatesMatcher:
@@ -45,23 +47,24 @@ class PredicatesMatcher:
         """
         self.logger.debug("Filtering out impossible matches from the matches list.")
         filtered_matches = []
-        for match, grounded_matching_objects in zip(possible_matches, possible_grounded_params):
-            is_possible_match = True
-            if grounded_predicate.grounded_objects != grounded_matching_objects:
-                continue
-
-            for signature_item_type, grounded_predicate_signature_item_type in zip(match.signature.values(), grounded_predicate.signature.values()):
-                if not grounded_predicate_signature_item_type.is_sub_type(signature_item_type):
-                    is_possible_match = False
-                    break
-
-            if is_possible_match:
+        for match, grounded_obs in zip(possible_matches, possible_grounded_params):
+            grounded_version = GroundedPredicate(
+                name=match.name,
+                signature=grounded_predicate.signature,
+                object_mapping={param: obj for param, obj in zip(grounded_predicate.signature.keys(), grounded_obs)},
+                is_positive=match.is_positive,
+            )
+            if grounded_version == grounded_predicate:
                 filtered_matches.append(match)
 
         return filtered_matches
 
     def match_predicate_to_action_literals(
-        self, grounded_predicate: GroundedPredicate, action_call: ActionCall, extra_grounded_object: str = None, extra_lifted_object: str = None
+        self,
+        grounded_predicate: GroundedPredicate,
+        action_call: ActionCall,
+        extra_grounded_object: str = None,
+        extra_lifted_object: str = None,
     ) -> List[Predicate]:
         """Matches the action objects to the predicate objects.
 
@@ -73,7 +76,8 @@ class PredicatesMatcher:
         :param extra_lifted_object: the additional lifted object matching the grounded observed one.
         """
         self.logger.debug(
-            f"Trying to match the grounded predicate - {grounded_predicate.untyped_representation} " f"to the action call {str(action_call)}"
+            f"Trying to match the grounded predicate - {grounded_predicate.untyped_representation} "
+            f"to the action call {str(action_call)}"
         )
         if len(grounded_predicate.signature) == 0:
             self.logger.debug("The predicate has no parameters, by default matches the action!")
@@ -85,7 +89,9 @@ class PredicatesMatcher:
 
         constants_in_predicate = [obj for obj in grounded_predicate_call if obj in constants]
         action_grounded_objects = (
-            action_call.parameters + constants_in_predicate if extra_grounded_object is None else action_call.parameters + [extra_grounded_object]
+            action_call.parameters + constants_in_predicate
+            if extra_grounded_object is None
+            else action_call.parameters + [extra_grounded_object]
         )
         lifted_action_params = (
             list(lifted_action_data.signature.keys()) + constants_in_predicate
@@ -96,7 +102,9 @@ class PredicatesMatcher:
         if contains_duplicates(action_call.parameters):
             self.logger.debug(f"Action {str(action_call)} was executed with duplicated objects!")
 
-        possible_parameter_permutations = create_signature_permutations(action_grounded_objects, lifted_action_params, len(grounded_predicate_call))
+        possible_parameter_permutations = create_signature_permutations(
+            action_grounded_objects, lifted_action_params, len(grounded_predicate_call)
+        )
         possible_matches = []
         grounded_base_params = []
         for possible_permutation in possible_parameter_permutations:
@@ -114,7 +122,9 @@ class PredicatesMatcher:
                 possible_matches.append(
                     Predicate(
                         name=grounded_predicate.name,
-                        signature={lifted_parameter_name: combined_types[lifted_parameter_name] for lifted_parameter_name in lifted_parameters},
+                        signature={
+                            lifted_parameter_name: combined_types[lifted_parameter_name] for lifted_parameter_name in lifted_parameters
+                        },
                         is_positive=grounded_predicate.is_positive,
                     )
                 )
@@ -145,14 +155,14 @@ class PredicatesMatcher:
         extra_grounded_object: str = None,
         extra_lifted_object: str = None,
     ) -> List[Predicate]:
-        """Get a list of possible preconditions for the action according to the previous state.
+        """Get a list of possible parameter-bound for the action.
 
         :param grounded_action_call: the grounded action that was executed according to the trajectory.
         :param state_literals: the list of literals that we try to match according to the action.
         :param extra_grounded_object: an additional object that is not part of the action call.
             Used in cases where we observe universal effects / preconditions.
         :param extra_lifted_object: the additional lifted object matching the grounded observed one.
-        :return: a list of possible preconditions for the action that is being executed.
+        :return: a list of possible parameter-bound for the action that is being executed.
         """
         self.logger.debug(f"Finding the possible matches for the grounded action - {str(grounded_action_call)}")
         possible_matches = []

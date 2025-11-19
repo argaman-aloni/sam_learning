@@ -97,6 +97,7 @@ def test_match_predicate_to_action_with_no_match_returns_empty_list(logistics_pr
 
 def test_match_predicate_to_action_with_no_duplicated_parameters_returns_correct_match(logistics_predicate_matcher):
     test_action_call = ActionCall(name="drive-truck", grounded_parameters=["tru1", "pos1", "pos2", "city1"])
+    # The predicate (at tru1 pos1) should match the action drive-truck(tru1 pos1 pos2 city1)
     actual_predicates = logistics_predicate_matcher.match_predicate_to_action_literals(
         grounded_predicate=TRUCK_AT_LOCATION_GROUNDED_PREDICATE, action_call=test_action_call
     )
@@ -153,9 +154,7 @@ def test_match_predicate_to_action_with_two_possible_options_for_match_one_with_
     ]
 
     assert len(actual_predicates) == 2
-    assert set([p.untyped_representation for p in actual_predicates]) == set(
-        [p.untyped_representation for p in expected_predicates]
-    )
+    assert set([p.untyped_representation for p in actual_predicates]) == set([p.untyped_representation for p in expected_predicates])
 
 
 def test_match_predicate_to_action_with_no_duplicated_parameters_where_predicate_contains_only_consts_returns_correct_match(
@@ -172,9 +171,7 @@ def test_match_predicate_to_action_with_no_duplicated_parameters_where_predicate
     ]
 
     assert len(actual_predicates) == 2
-    assert [p.untyped_representation for p in expected_predicates] == [
-        p.untyped_representation for p in actual_predicates
-    ]
+    assert [p.untyped_representation for p in expected_predicates] == [p.untyped_representation for p in actual_predicates]
 
 
 def test_match_predicate_to_action_literals_with_complex_action_returns_only_correct_matches(
@@ -230,9 +227,7 @@ def test_match_predicate_to_action_with_duplicated_objects_finds_all_possible_ma
     ]
 
     assert len(actual_predicates) == 2
-    assert [p.untyped_representation for p in expected_predicates] == [
-        p.untyped_representation for p in actual_predicates
-    ]
+    assert [p.untyped_representation for p in expected_predicates] == [p.untyped_representation for p in actual_predicates]
 
 
 def test_get_possible_literal_matches_with_single_predicate_without_duplicates_returns_correct_matches(
@@ -261,9 +256,7 @@ def test_get_possible_literal_matches_with_single_predicate_with_duplicates_retu
     ]
 
     assert len(possible_matches) == 2
-    assert [p.untyped_representation for p in expected_predicates] == [
-        p.untyped_representation for p in possible_matches
-    ]
+    assert [p.untyped_representation for p in expected_predicates] == [p.untyped_representation for p in possible_matches]
 
 
 def test_get_possible_literal_matches_with_two_predicate_returns_correct_matches(logistics_predicate_matcher):
@@ -277,9 +270,7 @@ def test_get_possible_literal_matches_with_two_predicate_returns_correct_matches
     ]
 
     assert len(possible_matches) == 2
-    assert [p.untyped_representation for p in expected_predicates] == [
-        p.untyped_representation for p in possible_matches
-    ]
+    assert [p.untyped_representation for p in expected_predicates] == [p.untyped_representation for p in possible_matches]
 
 
 def test_get_possible_literal_matches_from_actual_trajectory_state(
@@ -292,9 +283,7 @@ def test_get_possible_literal_matches_from_actual_trajectory_state(
     for predicate_set in observation_component.previous_state.state_predicates.values():
         previous_state_predicates.extend(predicate_set)
 
-    possible_matches = elevators_predicate_matcher.get_possible_literal_matches(
-        test_action_call, previous_state_predicates
-    )
+    possible_matches = elevators_predicate_matcher.get_possible_literal_matches(test_action_call, previous_state_predicates)
     for matched_lifted_predicate in possible_matches:
         for parameter in matched_lifted_predicate.signature:
             assert parameter in ["?lift", "?f1", "?f2"]
@@ -312,9 +301,7 @@ def test_get_possible_literal_from_actual_state_captures_all_needed_predicates_i
     possible_matches = depot_predicate_matcher.get_possible_literal_matches(test_action_call, previous_state_predicates)
 
     actual_preconditions = {"(at ?x ?p)", "(available ?x)", "(at ?y ?p)", "(on ?y ?z)", "(clear ?y)"}
-    possible_lifted_matches = [
-        matched_lifted_predicate.untyped_representation for matched_lifted_predicate in possible_matches
-    ]
+    possible_lifted_matches = [matched_lifted_predicate.untyped_representation for matched_lifted_predicate in possible_matches]
     print(possible_lifted_matches)
     assert actual_preconditions.issubset(possible_lifted_matches)
 
@@ -370,12 +357,8 @@ def test_get_possible_literal_matches_with_extra_literal_extends_the_possible_se
     test_action_call = ActionCall(name="move-painting", grounded_parameters=["pos-5-0", "pos-4-0", "g0", "n1", "n0"])
     test_predicate = nurikabe_domain.predicates["part-of"]
     test_state_predicates = [
-        GroundedPredicate(
-            name=test_predicate.name, signature=test_predicate.signature, object_mapping={"?x": "pos-5-0", "?y": "g0"}
-        ),
-        GroundedPredicate(
-            name=test_predicate.name, signature=test_predicate.signature, object_mapping={"?x": "pos-5-2", "?y": "g0"}
-        ),
+        GroundedPredicate(name=test_predicate.name, signature=test_predicate.signature, object_mapping={"?x": "pos-5-0", "?y": "g0"}),
+        GroundedPredicate(name=test_predicate.name, signature=test_predicate.signature, object_mapping={"?x": "pos-5-2", "?y": "g0"}),
     ]
     possible_matches = nurikabe_predicate_matcher.get_possible_literal_matches(
         test_action_call, test_state_predicates, extra_grounded_object="pos-5-2", extra_lifted_object="?cadj"

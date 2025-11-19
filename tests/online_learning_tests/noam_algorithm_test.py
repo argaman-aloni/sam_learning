@@ -158,7 +158,6 @@ def test_add_transition_data_when_failure_caused_by_discrete_condition_not_holdi
         previous_state=component.previous_state,
         next_state=component.next_state,
         current_action=component.grounded_action_call,
-        observation_objects=trace.grounded_objects,
     )
     depot_noam_informative_explorer._add_transition_data(action_to_update=first_action, is_transition_successful=True)
     assert len(depot_noam_informative_explorer._discrete_models_learners[first_action.name].must_be_preconditions) == 0
@@ -168,7 +167,6 @@ def test_add_transition_data_when_failure_caused_by_discrete_condition_not_holdi
         previous_state=component.previous_state,
         next_state=component.next_state,
         current_action=failed_action,
-        observation_objects=trace.grounded_objects,
     )
     depot_noam_informative_explorer._add_transition_data(action_to_update=failed_action, is_transition_successful=False)
     assert len(depot_noam_informative_explorer._discrete_models_learners[first_action.name].must_be_preconditions) == 1
@@ -189,7 +187,6 @@ def test_add_transition_data_when_transition_is_not_successful_adds_data_to_all_
         previous_state=component.previous_state,
         next_state=component.next_state,
         current_action=component.grounded_action_call,
-        observation_objects=trace.grounded_objects,
     )
     depot_noam_informative_explorer._add_transition_data(action_to_update=failed_first_action, is_transition_successful=False)
     assert len(depot_noam_informative_explorer._discrete_models_learners[failed_first_action.name].cannot_be_preconditions) == 0
@@ -211,7 +208,6 @@ def test_add_transition_data_when_transition_is_successful_adds_data_to_all_mode
         previous_state=component.previous_state,
         next_state=component.next_state,
         current_action=component.grounded_action_call,
-        observation_objects=trace.grounded_objects,
     )
     depot_noam_informative_explorer._add_transition_data(action_to_update=first_action, is_transition_successful=True)
     assert len(depot_noam_informative_explorer._discrete_models_learners[first_action.name].cannot_be_preconditions) > 0
@@ -290,13 +286,11 @@ def test_select_action_and_execute_when_exploration_policy_is_goal_oriented_sele
         previous_state=component.previous_state,
         next_state=component.next_state,
         current_action=component.grounded_action_call,
-        observation_objects=trace.grounded_objects,
     )
     depot_noam_informative_explorer.triplet_snapshot.create_triplet_snapshot(
         previous_state=component.previous_state,
         next_state=component.next_state,
         current_action=component.grounded_action_call,
-        observation_objects=trace.grounded_objects,
     )
     depot_noam_goal_oriented._add_transition_data(action_to_update=first_action, is_transition_successful=True)
     depot_noam_informative_explorer._add_transition_data(action_to_update=first_action, is_transition_successful=True)
