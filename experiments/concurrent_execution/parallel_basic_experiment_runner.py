@@ -211,7 +211,7 @@ class ParallelExperimentRunner:
             # assuming that the folders were created so that each folder contains only the correct number of trajectories, i.e., iteration_number
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
-            complete_observation = TrajectoryParser(partial_domain, problem).parse_trajectory(
+            complete_observation = TrajectoryParser(partial_domain).parse_trajectory(
                 trajectory_file_path, executing_agents=self.executing_agents
             )
             allowed_observations.append(complete_observation)
