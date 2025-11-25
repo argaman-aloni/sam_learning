@@ -13,6 +13,7 @@ from pddl_plus_parser.models import Observation, Domain, MultiAgentObservation
 
 from experiments.experiments_consts import MAX_SIZE_MB, DEFAULT_NUMERIC_TOLERANCE, NUMERIC_ALGORITHMS
 from statistics.learning_statistics_manager import LearningStatisticsManager
+from statistics.trajectories_statistics import compute_trajectory_statistics, export_trajectory_statistics
 from statistics.utils import init_semantic_performance_calculator
 from utilities import LearningAlgorithmType, SolverType, NegativePreconditionPolicy
 from validators import DomainValidator
@@ -197,25 +198,34 @@ class ParallelExperimentRunner:
         return DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
 
     def collect_observations(
-        self, train_set_dir_path: Path, partial_domain: Domain
+        self, train_set_dir_path: Path, partial_domain: Domain, fold: int
     ) -> Union[List[Observation], List[MultiAgentObservation]]:
         """Collects all the observations from the trajectories in the train set directory.
 
         :param train_set_dir_path: the path to the directory containing the trajectories.
         :param partial_domain: the partial domain without the actions' preconditions and effects.
+        :param fold: the index of the current fold.
         :return: the allowed observations.
         """
         allowed_observations = []
+        used_problems = []
         sorted_trajectory_paths = sorted(train_set_dir_path.glob("*.trajectory"))  # for consistency
         for index, trajectory_file_path in enumerate(sorted_trajectory_paths):
             # assuming that the folders were created so that each folder contains only the correct number of trajectories, i.e., iteration_number
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
+            used_problems.append(problem)
             complete_observation = TrajectoryParser(partial_domain).parse_trajectory(
                 trajectory_file_path, executing_agents=self.executing_agents
             )
             allowed_observations.append(complete_observation)
 
+        self.logger.info("Exporting trajectories statistics.")
+        trajectories_stats = compute_trajectory_statistics(allowed_observations, used_problems, domain=partial_domain)
+        export_trajectory_statistics(
+            trajectories_stats,
+            self.working_directory_path / "results_directory" / f"trajectories_statistics_{fold}_{len(allowed_observations)}.csv",
+        )
         return allowed_observations
 
     def learn_model_offline(
@@ -236,7 +246,7 @@ class ParallelExperimentRunner:
         self.logger.info(f"Starting the learning phase for the fold - {fold_num}!")
         partial_domain_path = train_set_dir_path / self.domain_file_name
         partial_domain = DomainParser(domain_path=partial_domain_path, partial_parsing=True).parse_domain()
-        allowed_observations = self.collect_observations(train_set_dir_path, partial_domain)
+        allowed_observations = self.collect_observations(train_set_dir_path, partial_domain, fold_num)
         self.logger.info(f"Learning the action model using {len(allowed_observations)} trajectories!")
         learned_model, learning_report = self._apply_learning_algorithm(partial_domain, allowed_observations, test_set_dir_path)
         self.learning_statistics_manager.add_to_action_stats(
