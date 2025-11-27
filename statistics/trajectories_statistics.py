@@ -6,6 +6,22 @@ from typing import List, Dict
 
 from pddl_plus_parser.models import Observation, Problem, Domain
 
+TRAJECTORY_STATS_COLUMNS = [
+    "min_trajectory_length",
+    "max_trajectory_length",
+    "average_trajectory_length",
+    "average_number_of_problem_objects",
+    "min_number_of_problem_objects",
+    "max_number_of_problem_objects",
+    "average_number_of_functions_in_problem",
+    "min_number_of_functions_in_problem",
+    "max_number_of_functions_in_problem",
+    "average_number_of_predicates_in_problem",
+    "min_number_of_predicates_in_problem",
+    "max_number_of_predicates_in_problem",
+    "action_distribution",
+]
+
 
 def compute_trajectory_statistics(trajectories: List[Observation], problems: List[Problem], domain: Domain) -> Dict[str, float]:
     """Compute statistics for the given trajectories."""
