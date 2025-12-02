@@ -209,8 +209,8 @@ class ParallelExperimentRunner:
         """
         allowed_observations = []
         used_problems = []
-        sorted_trajectory_paths = sorted(train_set_dir_path.glob("*.trajectory"))[48]  # for consistency
-        for index, trajectory_file_path in enumerate([sorted_trajectory_paths]):
+        sorted_trajectory_paths = sorted(train_set_dir_path.glob("*.trajectory"))  # for consistency
+        for index, trajectory_file_path in enumerate(sorted_trajectory_paths):
             # assuming that the folders were created so that each folder contains only the correct number of trajectories, i.e., iteration_number
             problem_path = train_set_dir_path / f"{trajectory_file_path.stem}.pddl"
             problem = ProblemParser(problem_path, partial_domain).parse_problem()
@@ -268,7 +268,7 @@ class ParallelExperimentRunner:
         :param iteration_number: the current iteration number.
         """
         self.logger.info(f"Running fold {fold_num} iteration {iteration_number}")
-        # self._init_semantic_performance_calculator(fold_num)
+        self._init_semantic_performance_calculator(fold_num)
         self.learn_model_offline(fold_num, train_set_dir_path, test_set_dir_path)
         self.domain_validator.write_statistics(fold_num, iteration_number)
         self.semantic_performance_calc.export_semantic_performance(fold_num, iteration_number)
