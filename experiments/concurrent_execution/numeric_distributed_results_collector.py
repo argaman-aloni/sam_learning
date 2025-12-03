@@ -1,13 +1,15 @@
 import argparse
+import csv
 import logging
 from pathlib import Path
 from typing import List
 
 from pddl_plus_parser.lisp_parsers import DomainParser
 
-from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector
+from experiments.concurrent_execution.distributed_results_collector import DistributedResultsCollector, FOLD_FIELD
 from experiments.plotting.plot_nsam_results import plot_results
 from experiments.plotting.plot_nsam_solo_results import plot_solo_results
+from statistics.trajectories_statistics import TRAJECTORY_STATS_COLUMNS
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -34,6 +36,24 @@ class NumericResultsCollector(DistributedResultsCollector):
     ):
         super().__init__(working_directory_path, domain_file_name, learning_algorithms, num_folds, iterations)
 
+    def collect_trajectories_statistics(self) -> None:
+        """Collects the trajectories statistics from the results directory."""
+        results_directory = self.working_directory_path / "results_directory"
+        max_iteration = max(self.iterations) if self.iterations else 0
+        combined_statistics_data = []
+        for fold_index in range(self.num_folds):
+            trajectory_stats_path = results_directory / f"trajectories_statistics_{fold_index}_{max_iteration}.csv"
+            with open(trajectory_stats_path, "r") as trajectory_stats_file:
+                self.logger.info(f"Trajectory statistics for fold {fold_index} at iteration {max_iteration}")
+                reader = csv.DictReader(trajectory_stats_file)
+                combined_statistics_data.extend([{FOLD_FIELD: fold_index, **row} for row in reader])
+
+        combined_statistics_path = results_directory / f"combined_trajectories_statistics.csv"
+        with open(combined_statistics_path, "wt") as combined_statistics_file:
+            writer = csv.DictWriter(combined_statistics_file, fieldnames=[FOLD_FIELD, *TRAJECTORY_STATS_COLUMNS])
+            writer.writeheader()
+            writer.writerows(combined_statistics_data)
+
     def collect_numeric_statistics(self) -> None:
         """Collects the statistics from the results directory."""
         self._collect_solving_statistics(collecting_triplets=False)
@@ -43,6 +63,7 @@ class NumericResultsCollector(DistributedResultsCollector):
         domain = DomainParser(self.working_directory_path / self.domain_file_name).parse_domain()
         self._collect_syntactic_performance_statistics(domain)
         self._collect_numeric_semantic_performance_statistics(collecting_triplets=False)
+        self.collect_trajectories_statistics()
 
     def collect_numeric_statistics_with_triplets_statistics(self) -> None:
         self._collect_solving_statistics(collecting_triplets=True)

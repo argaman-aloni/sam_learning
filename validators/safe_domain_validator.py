@@ -27,6 +27,7 @@ SOLVING_STATISTICS = [
     "policy",
     "learning_time",
     "solving_time",
+    "solving_time_per_problem",
     "solver",
     "ok",
     "no_solution",
@@ -284,7 +285,7 @@ class DomainValidator:
 
         self.logger.info("Solving the test set problems using the learned domain!")
         problem_solving_times = []
-        for problem_path in test_set_directory_path.glob(f"{self.problem_prefix}*.pddl"):
+        for problem_path in sorted(test_set_directory_path.glob(f"{self.problem_prefix}*.pddl")):
             problem_solving_report = {}
             problem_solved = False
             problem_file_name = problem_path.stem
@@ -338,6 +339,7 @@ class DomainValidator:
                 "num_trajectories": num_trajectories,
                 "policy": preconditions_removal_policy.name,
                 "num_trajectory_triplets": num_triplets,
+                "solving_time_per_problem": problem_solving_times,
                 "learning_time": learning_time,
                 "solver": [solver.name for solver in solvers_portfolio],
                 **solving_stats,
