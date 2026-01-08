@@ -1,4 +1,5 @@
 from sam_learning.learners import NumericSAMLearner, IncrementalNumericSAMLearner
+from sam_learning.learners.baseline_learners.naive_numeric_sam import NaivePolynomialSAMLearning
 from utilities import LearningAlgorithmType
 
 DEFAULT_SPLIT = 5
@@ -19,4 +20,5 @@ MAX_SIZE_MB = 5
 NUMERIC_SAM_ALGORITHM_VERSIONS = {
     LearningAlgorithmType.numeric_sam: NumericSAMLearner,
     LearningAlgorithmType.incremental_nsam: IncrementalNumericSAMLearner,
+    LearningAlgorithmType.naive_nsam: NaivePolynomialSAMLearning,
 }

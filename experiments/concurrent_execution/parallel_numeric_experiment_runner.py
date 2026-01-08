@@ -6,6 +6,7 @@ import os
 import shutil
 import signal
 import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -127,6 +128,15 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
             domain_file.write(plan_miner_domain.to_pddl())
             return plan_miner_domain
 
+    def _log_plan_miner_output(self, process: subprocess.Popen) -> None:
+        """Logs the output of the Plan-Miner process.
+
+        :param process: the Plan-Miner process.
+        """
+        assert process.stdout is not None
+        for line in process.stdout:
+            self.logger.info(f"Plan-Miner: {line.strip()}")
+
     def _run_plan_miner_process(self, plan_miner_trajectory_file_path: Path) -> Optional[Path]:
         """Runs the Plan-Miner process to learn the action model.
 
@@ -136,7 +146,17 @@ class SingleIterationNSAMExperimentRunner(ParallelExperimentRunner):
         plan_miner_domain_name = f"{self.domain_file_name.split('.')[0]}_{uuid.uuid4()}"
         os.chdir(PLAN_MINER_DIR_PATH)
         # cmd = ./PlanMiner {path to pts file} {domain name without extension}
-        process = subprocess.Popen(f"./bin/PlanMiner {plan_miner_trajectory_file_path} {plan_miner_domain_name}", shell=True)
+        process = subprocess.Popen(
+            f"./bin/PlanMiner {plan_miner_trajectory_file_path} {plan_miner_domain_name}",
+            shell=True,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        logging_lambda = lambda: self._log_plan_miner_output(process)
+        logging_thread = threading.Thread(target=logging_lambda, daemon=True)
+        logging_thread.start()
+
         try:
             process.wait(timeout=LEARNING_TIMEOUT)
 

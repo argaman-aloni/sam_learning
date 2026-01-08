@@ -1,4 +1,5 @@
 """Creates the trajectories that will be used in the trajectory"""
+
 import logging
 import sys
 from pathlib import Path
@@ -54,7 +55,8 @@ class ExperimentTrajectoriesCreator:
                 triplets = trajectory_exporter.parse_plan(problem, solution_file_path)
                 trajectory_exporter.export_to_file(triplets, trajectory_file_path)
 
-            except (ValueError, IndexError):
+            except (ValueError, IndexError) as e:
+                self.logger.warning(f"Could not create trajectory for problem - {problem_file_path.stem}. Error: {e}")
                 continue
 
 

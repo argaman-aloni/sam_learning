@@ -97,8 +97,12 @@ class PlanMinerTrajectoriesCreator:
                 action = action_triplet.grounded_action_call
                 prev_state = action_triplet.previous_state
                 next_state = action_triplet.next_state
-                previous_state_predicates = triplet_snapshot.create_discrete_state_snapshot(prev_state, observation.grounded_objects)
-                next_state_predicates = triplet_snapshot.create_discrete_state_snapshot(next_state, observation.grounded_objects)
+                previous_state_predicates = triplet_snapshot.create_discrete_state_snapshot(
+                    prev_state, list(observation.grounded_objects.values())
+                )
+                next_state_predicates = triplet_snapshot.create_discrete_state_snapshot(
+                    next_state, list(observation.grounded_objects.values())
+                )
                 op = Operator(
                     action=domain.actions[action.name],
                     domain=domain,

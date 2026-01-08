@@ -104,6 +104,13 @@ class MetricFFSolver(AbstractSolver):
         self.logger.debug(f"Starting to work on solving problem - {problem_file_path.stem}")
         solution_path = problems_directory_path / f"{problem_file_path.stem}.solution"
         run_command = f"./ff -o {domain_file_path} -f {problem_file_path} -s 0 -t {tolerance} > {solution_path}"
+        num_retries = 0
+        solution_output = self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_timeout)
+        while solution_output == SolutionOutputTypes.solver_error and num_retries < 3:
+            self.logger.debug(f"Retrying to solve problem - {problem_file_path.stem}. Retry number {num_retries + 1}")
+            solution_output = self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_timeout)
+            num_retries += 1
+
         return self._run_metric_ff_process(run_command, solution_path, problem_file_path, solving_timeout)
 
     def execute_solver(
