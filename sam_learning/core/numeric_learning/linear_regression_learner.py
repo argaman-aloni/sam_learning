@@ -1,12 +1,30 @@
 """This module contains the LinearRegressionLearner class."""
 import logging
+import os
 from typing import Optional, List, Dict, Tuple, Set
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
 from pddl_plus_parser.models import Precondition, NumericalExpressionTree, PDDLFunction
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, HuberRegressor
+
+
+def _build_effect_regressor():
+    """Return the regressor used to learn numeric effects.
+
+    Selected via the ``SVRAM_EFFECT_REGRESSOR`` env var so the SVRAM agent
+    variants can swap the effect regression without threading a parameter
+    through every learner layer (mirrors the codebase's env-var config style,
+    e.g. ``EPSILON`` / ``OBS_NOISE_PROB``). Defaults to plain LinearRegression,
+    preserving the previous behaviour for all other callers.
+    """
+    kind = os.environ.get("SVRAM_EFFECT_REGRESSOR", "linear").lower()
+    if kind == "huber":
+        # epsilon=1.35 is sklearn's default (~95% efficiency under Gaussian
+        # noise); robust to the observation corruption in the noisy envs.
+        return HuberRegressor(epsilon=1.35, max_iter=1000)
+    return LinearRegression()
 
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import EquationSolutionType, ConditionType
@@ -93,7 +111,7 @@ class LinearRegressionLearner:
         :param allow_unsafe_learning: whether to allow unsafe learning.
         :return: the vector representing the coefficients for the function variables and the learning score (R^2).
         """
-        regressor = LinearRegression()
+        regressor = _build_effect_regressor()
         regressor.fit(values_matrix, function_post_values)
         learning_score = regressor.score(values_matrix, function_post_values)
         if learning_score < LEGAL_LEARNING_SCORE:

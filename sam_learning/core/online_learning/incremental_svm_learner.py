@@ -1,6 +1,7 @@
 """This module contains the ConvexHullLearner class."""
 
 import logging
+import os
 from typing import Dict, List, Tuple, Optional
 
 import matplotlib.pyplot as plt
@@ -144,7 +145,12 @@ class IncrementalSVMLearner:
             X_filtered = X_reminder[final_mask]
             y_filtered = y_reminder[final_mask]
 
-            classifier = LinearSVC(random_state=0, tol=EPSILON, dual=False, max_iter=5000, C=1e10)
+            # C controls the SVM margin: a very large C (default) is effectively
+            # a hard margin; a small C (e.g. 1.0) is a soft margin. Selected via
+            # the SVRAM_SVM_C env var so the SVRAM variants can pick hard/soft
+            # without threading a param through every learner layer.
+            svm_c = float(os.environ.get("SVRAM_SVM_C", "1e10"))
+            classifier = LinearSVC(random_state=0, tol=EPSILON, dual=False, max_iter=5000, C=svm_c)
             classifier.fit(X_filtered, y_filtered.tolist())
             A = classifier.coef_[0].copy()
             b = -classifier.intercept_[0].copy()
