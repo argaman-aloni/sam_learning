@@ -61,6 +61,19 @@ class OnlineDiscreteModelLearner:
         """Applies unit propagation to the must be preconditions CNFs."""
         self.logger.debug("Applying unit propagation to the must be preconditions CNFs.")
         unit_clauses = [cnf for cnf in self.must_be_preconditions if len(cnf) == 1]
+        # Hoisted out of the loop below: it depends only on unit_clauses, which the
+        # loop never modifies. Rebuilding it once per iteration made this
+        # O(|must_be| x |unit atoms|) predicate hashes instead of O(|must_be| + |unit
+        # atoms|), and Predicate.__hash__ formats a string on every call. On depot,
+        # where one lifted action has 972 groundings, this was 98.6% of runtime and
+        # left a single episode unfinished after 13+ hours.
+        #
+        # NOTE: the intersection test below is deliberately NOT rewritten as
+        # . Predicate.__eq__ matches across type
+        # inheritance while __hash__ hashes the exact type name, so eq/hash are
+        # inconsistent and the two forms give different answers -- swapping them
+        # fails semi_online_learning_algorithm_test.py.
+        unit_atoms = {element for clause in unit_clauses for element in clause}
         new_must_be_preconditions = unit_clauses.copy()
         for cnf in self.must_be_preconditions:
             if len(cnf) == 1:
@@ -68,7 +81,7 @@ class OnlineDiscreteModelLearner:
                 continue
 
             # If an atom from the unit clause is already in the CNF, the clause becomes true.
-            if len(cnf.intersection({element for clause in unit_clauses for element in clause})) > 0:
+            if len(cnf.intersection(unit_atoms)) > 0:
                 self.logger.debug("The CNF is already satisfied by the unit clause. No need to apply unit propagation.")
                 continue
 
