@@ -69,7 +69,7 @@ class OnlineDiscreteModelLearner:
         # left a single episode unfinished after 13+ hours.
         #
         # NOTE: the intersection test below is deliberately NOT rewritten as
-        # . Predicate.__eq__ matches across type
+        # `not cnf.isdisjoint(unit_atoms)`. Predicate.__eq__ matches across type
         # inheritance while __hash__ hashes the exact type name, so eq/hash are
         # inconsistent and the two forms give different answers -- swapping them
         # fails semi_online_learning_algorithm_test.py.
