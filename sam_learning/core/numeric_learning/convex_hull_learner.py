@@ -12,6 +12,7 @@ from scipy.spatial import ConvexHull, QhullError
 
 from sam_learning.core.exceptions import NotSafeActionError
 from sam_learning.core.learning_types import ConditionType, EquationSolutionType
+from sam_learning.core.numeric_learning.numeric_utils import DECIMAL_DIGITS
 from sam_learning.core.numeric_learning.numeric_utils import (
     prettify_coefficients,
     construct_numeric_conditions,
@@ -118,9 +119,19 @@ class ConvexHullLearner:
         equations = np.unique(hull.equations, axis=0)
 
         A = equations[:, : points.shape[1]]
-        b = -equations[:, points.shape[1]]
         coefficients = [prettify_coefficients(row) for row in A]
-        border_point = prettify_coefficients(b)
+
+        # Recompute each facet's border from the *rounded* coefficients against
+        # the hull's own points. The hull vertices lie ON the facets (A.x == b
+        # there); rounding A and b independently tips the plane past a vertex and
+        # drops it, so a learned model can fail to solve the very problems it was
+        # learned from. b_i = max_x (rounded_A_i . x) keeps every hull point
+        # satisfied, and rounding the border outward preserves that.
+        # Ported from SPL-BGU/nomad, docs/convex_hull_rounding_bug.md.
+        rounded_coefficients = np.array(coefficients, dtype=float)
+        borders = (rounded_coefficients @ hull.points.T).max(axis=1)
+        scale = 10 ** DECIMAL_DIGITS
+        border_point = (np.ceil(borders * scale) / scale).tolist()
         return coefficients, border_point
 
     def _create_convex_hull_linear_inequalities(
